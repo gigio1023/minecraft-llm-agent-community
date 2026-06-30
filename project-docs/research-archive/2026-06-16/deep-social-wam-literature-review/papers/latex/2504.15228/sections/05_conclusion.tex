@@ -1,0 +1,84 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We provide SICA, a self-improving coding agent.
+Our results demonstrate that self-improvement, implemented via an agent system
+editing its own codebase, is indeed possible, particularly in longer-horizon
+`agentic' tasks where the base \acr{LLM}s stand to gain more from the structure
+and guidance of a scaffolding system---for instance showing improvements from
+17\% to 53\% on a random subset of SWE-Bench Verified, while also achieving a
+slight decrease in the average time spent per problem on average.
+The framework we present offers both a practical approach to automated
+agent system design and a foundation for future work in jointly training
+foundation models with their agent systems.
+\subsection{Limitations}
+\label{sec:limitations}
+
+Our initial attempt at a self-improving coding agent is not without
+limitations. One key difficulty was getting the LLM-based agent to autonomously
+come up with truely novel, innovative, feasible and interesting modification
+ideas at each meta-improvement step, which is a theme which has been commented
+on in the open-ended learning literature
+\citep{nathaniMLGymNewFramework2025,yamadaAIScientistv2WorkshopLevel2025,hughesOpenEndednessEssentialArtificial2024}.
+The cost of settling on a bad idea which suffered from poor `taste' was a
+lengthy agent editing step followed by an even more expensive run through the
+benchmarks. While the failed iteration persists in the archive, in principle
+acting as an example of what not to do, we found that the initial feature ideas
+would often heavily influence later feature ideas as variations on the same
+theme. This path dependency may lead to higher variance agent runs; with poor
+quality initial feature suggestions (e.g. fixating on caching open files)
+often lowering the quality of subsequent feature suggestions.
+
+We also note that in optimizing for agent running time and cost, our relatively
+short 5-minute timeouts (and to a lesser degree per-problem cost limits) cause
+the initial benchmark scores to perhaps be lower than expected for the
+underlying language model (e.g. Sonnet 3.5 v2), especially for longer-horizon
+benchmark tasks like SWE-Bench. Indeed, much of the initial improvement we report
+arises from features speeding up file editing and agent cost, which are not
+traditionally reflected to the same degree in SWE-Bench numbers.
+
+\subsection{Future Work}
+\label{sec:future}
+
+Our approach reflects a non weight-based learning mechanism, where we update the
+system's behaviour through a combination of optimising the prompts on which the
+model is conditioned, as well as the way the \acr{LLM} calls are orchestrated by
+editing the underlying code. This is in some sense very sample-efficient, where
+a detailed inspection of the archive of outcomes informs substantial
+modifications at each step. However, we recognize the potential of jointly
+updating the foundation model's weights with the agent system. The work of
+AlphaEvolve \citep{novikovAlphaEvolveCodingAgent2025} demonstrates a proof of
+this principle, and it may be fruitful to more explicitly fine-tune the foundation
+model to work with new newly created tools and scaffold at each iteration.
+
+While we did not get to the point of benchmark saturation in our relatively
+short runs, we expect that future systems may run out of things to learn from a
+static benchmark set. One way this problem may be solved is through the
+automated design and curation of benchmarks, as initially demonstrated in the
+work of \cite{faldorOMNIEPICOpenendednessModels2024} where RL environments are
+designed in code. By including two synthetic benchmarks in our work which were
+curated entirely by the agent through manual prompting (the file editing and
+symbol navigation benchmark) we demonstrate that \acr{SICA} is flexible enough
+to support creating new benchmarks and evaluations for itself.
+
+\section{Safety Considerations}%
+\label{subsec:safety}
+
+It is vitally important to carefully consider the safety implications posed by systems designed to be self-improving.
+While our self-improving coding agent shows improvement in certain agentic tasks, there seem to be limits to what
+can be achieved with such purely scaffolding based systems (as seen in Figure~\ref{fig:aime_gpqa}), which do not modify the model weights.
+If the system updated the model weights as well as the scaffolding, we would expect that the risks of recursively self-improving systems would be higher. We highlight two key mechanisms for mitigating any risks.
+
+First, a key safety mitigation in such systems is observability: that humans can and do oversee all aspects of potentially self-improving systems.
+We have thus architected \acr{SICA} with sophisticated yet user-friendly observability mechanisms, which provide rich insight into the chain-of-thought, actions and sub-agent invocations at each step. These include an interactive web interface for easy oversight of all events occurring in the agent system, as well as the asynchronous LLM-based overseer, which may be prompted to treat various behaviors as grounds for canceling an agent, and which may also use a different LLM to the running agent.
+See Appendix~\ref{subsec:overseer_prompt} for an example overseer judgement and
+the control afforded to it at each asynchronous invocation.
+Given the lack of model weight updates, which make it difficult but not impossible for the model to encode e.g.\ stenographic messages \citep{motwani2023perfect,motwani2024secret} in the chain-of-thought, we believe this provides strong safety mitigation.
+That said, for recursively self-improving systems where the model weights are also updated, observability mechanisms, on their own, are clearly inadequate, and further research on safety mechanisms is clearly necessary.
+
+The second opportunity for safety mitigation is inherent to the iterative, evaluation-based update procedure. While our initial benchmark set focuses on measuring capabilities we wish to improve, it is entirely possible to include safety-related evaluations in this benchmark set, to validate each agent before it progresses to the next iteration as the meta-agent.
+
+We do not believe there to be any significant, direct adverse societal
+consequences to this work. Our objectives either focus on improving the
+mechanics of code editing or the effectiveness of multi-step reasoning through
+longer-horizon coding tasks.

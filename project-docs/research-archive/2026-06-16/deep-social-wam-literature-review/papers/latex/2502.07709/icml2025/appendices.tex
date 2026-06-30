@@ -1,0 +1,799 @@
+\section*{Appendices}
+This supplementary material provides additional results, discussion, and implementation details.
+
+\begin{itemize}
+    \item Section~\ref{app:environment} details our Little-Zoo environment. 
+    \begin{itemize}
+        \item Section~\ref{app:environment_mechanics} explains the environment mechanics and how the different actions affect the environment. It also gives more details about optimal trajectories.
+        \item Section~\ref{app:goal_space_generation} details the goal space generation.
+        \item Section~\ref{app:example_of_impossible_goals} explains the different types of impossible goals. This section also gives examples for each type of impossible goal.
+        \item Section~\ref{app:goal_repartition} contains the goal space's distribution per goal type.
+    \end{itemize}
+    \item Section~\ref{app:lp_literature_review} extends the table from Section~\ref{sec:lp_baselines}, comparing the previous LP estimation methods. 
+    \item Section~\ref{app:implementation_details} contains the implementation details of MAGELLAN and the baselines.
+    \begin{itemize}
+        \item Section~\ref{app:implementation_details_sac_glam} explains the LLM-based RL agent used in our experiments, the associated hyperparameters and the prompt used.
+        \item Section~\ref{app:implementation_details_magellan} details MAGELLAN architecture, hyperparameters and the prompt used.
+        \item Section~\ref{app:implementation_details_baselines} contains the additional details for implementing the baselines.
+        \item Section~\ref{app:compute_budget} is about the compute budget.
+    \end{itemize}
+    \item Section~\ref{app:additional_results} extends the results given in the Section~\ref{sec:experiments} on the experiments of the paper.
+    \begin{itemize}
+        \item Section~\ref{app:additional_results_magellan_architecture} is an ablation on MAGELLAN's architecture.
+        \item Section~\ref{app:additional_results_q1} develops the results given in Section~\ref{sec:q1} with plots for goal spaces of different size.
+        \item Section~\ref{app:additional_results_q2} contains several additional results for Section~\ref{sec:q2}.
+        \begin{itemize}
+            \item Section~\ref{app:additional_results_q2_per_goal_success_rate} gives the evolution of the success rate per method and per goal type.
+            \item Section~\ref{app:additional_results_q2_goal_sampling_strategies} is an analysis of the goal sampling strategy of each method. 
+        \end{itemize}
+        \item Section~\ref{app:additional_results_q3} develops several aspects of MAGELLAN's generalization abilities from Section~\ref{sec:q3}.
+        \begin{itemize}
+            \item Section~\ref{app:per_goal_success_probability_ontest_set} specifically examines the ability to generalize success probability estimations to test goals across different goal types.
+            \item Section~\ref{app:embedding_evolution} describes the embedding evolution during training.
+            \item Section~\ref{app:embedding_impossible} conducts a detailed analysis of the embeddings of impossible goals.
+        \end{itemize}
+        \item Section~\ref{app:additional_results_q4} expends on the results found in Section~\ref{sec:q4}.
+        \begin{itemize}
+            \item Section~\ref{app:10_adap_cases_throughout_training} contains all the curves from the experiment about the adaptation to an evolving goal space. 
+            \item Section~\ref{app:global_sample_efficiency_assessment} provides a quantitative analysis of this experiment.
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+
+\newpage
+\section{Little-Zoo environment}\label{app:environment}
+
+\subsection{Environment mechanics}
+\label{app:environment_mechanics}
+
+There are $5$ categories of elements the agent can interact with: the objects (i.e. "bookshelf"), the water, the plants (i.e. tomato) which can bee \texttt{seed} and \texttt{grown}, the herbivores (i.e cow) which can be \texttt{baby} or \texttt{grown}, and the carnivores (i.e. lion) which can be \texttt{baby} or \texttt{grown}. 
+
+To interact with any element of the environment, multiple actions are accessible. First, the agent can use \texttt{"Go to \{element\}"} to move to any element. You can only move to an element (not a random point in the plane) and after a "\texttt{Go to}" action you are placed on the element. When performing the \texttt{"Grasp"} action, the element the agent is standing on is added to its inventory (up to 2 items). Some elements can interact with each other. To make two elements interact, the agent must release one element in its inventory by using the \texttt{"Release \{element\}"} action while standing on the other element. Interactions between three elements are also possible: the agent has to hold two elements in its inventory and perform \texttt{"Release all"} while standing on the third element. The "Release" action is only accessible if an interaction can be made between the element to release and the one the agent is standing on. Therefore, the agent must carefully manage its inventory to avoid filling it with useless elements without being able to release them. At each turn you get a full description of the environment with \texttt{"You see \{element\_1\}, \{element\_2\}, \{element\_3\}, \{element\_4\}"}.
+
+To grow a plant, an herbivore or a carnivore, the agent needs to follow a certain sequence of actions:
+\begin{itemize}
+    \item To \texttt{"Grow a plant"}, the agent has to \texttt{"Release water"} while \texttt{"Standing"} on the plant seed.
+    \item To \texttt{"Grow an herbivore"}, the agent has to \texttt{"Release a grown plant"} while standing on a baby herbivore.
+    \item  To \texttt{"Grow a carnivore"}, the agent has to \texttt{"Release a grown herbivore"} while standing on a baby carnivore.
+\end{itemize}
+
+Table~\ref{tab:optimal_trajectories_categories} summarizes the optimal action strategy for each category. In order to maintain a coherent level of difficulty between the different categories, we fix the maximal number of actions allowed to the agent to solve a goal as $150\%$ of the minimal number of actions required to solve the goal. The required exploration to discover strategies has, therefore, the same level of difficulty for all goals. 
+\begin{table}[!ht]
+\caption{The optimal trajectories per categories.}
+\label{tab:optimal_trajectories_categories}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\multirow{2}{*}{Categories}           & \multirow{2}{*}{Optimal action strategy}              & Minimal number & Maximal number \\
+                     &                                          & of actions     & of actions     \\ \hline
+Grasp X              & Go to X, Grasp                           & 2              & 3              \\ \hline
+\multirow{2}{*}{Grow plant} & Go to water, Grasp, Go to plant, & \multirow{2}{*}{4}              & \multirow{2}{*}{6}              \\
+                     & Release water &              &             \\ \hline
+\multirow{2}{*}{Grow herbivore} & Go to water, Grasp, Go to plant, & \multirow{2}{*}{7}              & \multirow{2}{*}{11}              \\
+                     & Release water, Grasp, Go to herbivore, release plant &              &             \\ \hline
+\multirow{3}{*}{Grow carnivore} & Go to water, Grasp, Go to plant, & \multirow{3}{*}{10}              & \multirow{3}{*}{15}              \\
+                     & Release water, Grasp, Go to herbivore, release plant, &              &             \\
+                     & Grasp, Go to carnivore, release &              &             \\ \hline
+
+\end{tabular}
+\end{table}
+
+\subsection{Goal space generation}
+\label{app:goal_space_generation}
+
+To define our goal space, we start from the sets of objects $\mathcal{O}$, plants $\mathcal{P}$, herbivores $\mathcal{H}$, carnivores $\mathcal{C}$ and the element water (each set being of size $6$). One goal $g$ in the goal space is defined using $5$ elements $(E_0, E_1, E_2, E_3, E_4) \in \{ \mathcal{O}, \mathcal{P}, \mathcal{H}, \mathcal{C}, \text{water} \}$ and by using the objective function $\mathcal{F}_{g}$ from the set $\{\texttt{Grasp\{X\}}, \texttt{Grow\{X\}}\}$ on $E_0$. Thus, we get the goal $g=(\mathcal{F}_{g}(E_0), E_1, E_2, E_3, E_4)$. As each set contains $6$ elements, we get a total of $19,531,250$ goals. The vast majority of these goals are impossible for various reasons (see Appendix~\ref{app:example_of_impossible_goals}).
+
+In our experiments, we subsample two goal spaces: a train and held-out test space. To generate them, we sample the total number of impossible goals $n_{impo}$ we want to have, then sample among the possible goals: $\frac{n_{impo}}{5}$ goals where $E_0 \in \mathcal{O}$, $\frac{n_{impo}}{5^2}$ goals where $E_0 \in \mathcal{P}$, $\frac{n_{impo}}{5^3}$ goals where $E_0 \in \mathcal{H}$, and $\frac{n_{impo}}{5^4}$ goals where $E_0 \in \mathcal{C}$. Appendix~\ref{app:goal_repartition} gives more details on the goal repartition.
+
+\subsection{Example of impossible goals}
+\label{app:example_of_impossible_goals}
+
+In our environment, a goal is defined as a combination of elements present in the environment and an instruction, such as "grasp the rabbit". Some combinations are incompatible such as:\\ \texttt{Grasp rabbit \\ You see: bookshelf, baby lion, desk, baby cow}, \\
+where there is no rabbit. The generation of our environment leads to having $80\%$ of impossible goals in the goal space, which is similar to any complex environment \cite{zhang_omni_2024, matthews2024kinetixinvestigatingtraininggeneral}. However, conversely to \cite{zhang_omni_2024}, identifying impossible goals and avoiding to select them is not trivial, as there are multiple reasons why a goal is impossible.
+
+The easiest reason for impossibility is the absence of the element the agent has to act on:
+\begin{itemize}
+    \item Absence of the element to grasp \\
+\texttt{Goal: Grasp bed \\
+You see: bookshelf, baby lion, desk, baby cow}.
+\item Absence of the element to grow \\
+\texttt{Goal: Grow deer \\
+You see: baby giraffe, bookshelf, water, tomato seed}.
+\end{itemize}
+
+Another reason is that the element cannot follow the dynamic required in the objective: 
+\begin{itemize}
+    \item Growing an element that is neither an animal nor a plant \\
+    \texttt{Goal: Grow desk \\
+You see: bed, baby bobcat, baby elephant, door}.
+\end{itemize}
+
+A more difficult reason that requires a better understanding of the underlying mechanisms of the environment is the lack of at least one element necessary to reach the objective grow:
+\begin{itemize}
+    \item The lack of water: \\
+    \texttt{Goal: Grow cucumber \\
+You see: cucumber seed, carrot seed, baby coyote, baby wolf}, \\
+\texttt{Goal: Grow coyote \\
+You see: cucumber seed, berry seed, baby coyote, baby cow}.
+    \item The lack of a plant preventing the agent to grow an herbivore resulting in the impossibility to grow a carnivore: \\
+    \texttt{Goal: Grow coyote \\
+You see: water, baby elephant, baby coyote, baby cow}.
+\end{itemize}
+
+Consequently, to efficiently build a curriculum, being able to understand why a goals is impossible and quickly generalize to infer the other impossible goals is crucial.
+
+\subsection{Goal repartition}
+\label{app:goal_repartition}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.475\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/true_distribution.png}  
+    \caption{Goal distribution per categories on the full goal space.}
+    \label{fig:true_distribution}
+\end{subfigure}
+\begin{subfigure}{.475\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/goal_repartition.png}  
+    \caption{Goal distribution per categories in our experiments.}
+    \label{fig:goal_distribution}
+\end{subfigure}
+    \label{fig:goal_repartition}
+     \caption{We first generate the full goal space whom the distribution is given Figure~\ref{fig:true_distribution} then for computational reasons we sample a smaller goal space with the following distribution Figure~\ref{fig:goal_distribution}.}
+\end{figure}
+
+At the end of the goal space generation, we have $19 531 250$ goals distributed as presented in Figure~\ref{fig:true_distribution}. However, using all the goals was computationally impossible considering all the comparisons we made. Moreover, the repartition with $92\%$ of impossible goals and $7.53\%$ of "Grasp" goals made the epsilon-greedy exploration of our goal selector too slow to discover LP niches in an acceptable compute budget. Subsequently, we sample a training goal space and a testing goal space following the distribution given in Figure~\ref{fig:goal_distribution}. Both goal spaces are composed at $80\%$ of impossible goals, the remaining goal categories becoming less and less represented as the difficulty increases. This repartition synthetically simulates how natural language goals mostly lead to sequences of words without any meaning. This structure makes the strategy of uniformly sampling goals inefficient and underlines the necessity of a curriculum to be able to reach the hardest goals in the allocated training budget ($500$k episodes in our experiments).
+
+%\section{Extended Related Work}
+%\label{app:extended_related_work}
+
+% \subsection{Autonomous LLM agents}
+% In the past years, several works proposed methods to harness the strong ability of LLMs to combine contextual and commonsense knowledge for solving complex natural language goals in interactive environments. In a first line of work, multiple approaches studied how to directly use the LLM to predict actions in a myopic manner \cite{ahn_as_2022} or based on environmental feedback \cite{huang_language_2022, yao2022react, hao2023rap, shinn2023reflexion}. However, none of these works modify the LLM's inner knowledge based on the interactions with the environment. In the wake of GLAM \citep{carta_grounding_2023}, various papers such as POAD \citep{wen_reinforcing_2024}, ETPO \citep{wen_entropy-regularized_2024}, Archer \citep{zhou_archer_2024} or SAC-GLAM \cite{gaven2024sacglam} have developed different schemes to ground the LLM in interactive environments using online RL. In this paper, we consider LLM agents grounded in interactive environments using online RL. In particular, we use SAC-GLAM \cite{gaven2024sacglam} for its sample efficiency and ease of implementation in environments with few actions.
+
+% % Other works, such as Retroformer \cite{yao2023retroformer} or \citet{zhai_fine-tuning_2024} proposed mixed both RL and prompting. 
+
+% \subsection{Autotelic agents}
+% Autotelic agents represent, generate, select and solve their own goals \cite{colas_autotelic_2022}. 
+
+% \subsection{Computing LP over goals}
+% The LP on some goal is defined as the expected \textit{future} progress when practicing this goal \cite{oudeyer_intrinsic_2007}. In practice, we do not have access to future progress. While \cite{kumar_practice_2024} introduced a first model predicting future LP using Bayesian models, most prior works approximate future progress using past progress \cite{oudeyer_intrinsic_2007}. Nonetheless, computing past LP still requires tracking competence over the whole goal space. For continuous goal spaces, various methods proposed to automatically partition the goal space into groups of goals sharing the same LP \cite{oudeyer_intrinsic_2007,baranes_r-iac_2009,baranes_active_2013,moulin-frier_exploration_2013,moulin-frier_self-organization_2014,portelas_teacher_2019}. Additionally, \cite{forestier_modular_2016,kovac_grimgep_2023} showed learning to project goals into embedding spaces leads to better partitioning, especially on images. Such a goal-grouping approach allowed prior work to keep only a handful of competence estimations and update them online whenever a goal from a group is experienced. When considering discrete goal spaces, \cite{kanitscheider_multi-task_2021,zhang_omni_2024} directly estimated the policy's competence over each goal separately by regularly performing evaluations of the current policy's competence on all goals. On the other hand, most other methods also relied on goal groupings \cite{stout_competence_2010,lopes_strategic_2012,matiisen_teacher-student_2017,fournier_accuracy-based_2018,colas_curious_2019,blaes_control_2019,akakzia_grounding_2021}. However, they all used expert-designed groupings.
+
+% Another dimension is the use of Absolute Learning Progress (ALP), which detects both progress and forgetting in competence \citet{baranes_active_2013,portelas_teacher_2019,colas_curious_2019,akakzia_grounding_2021,kanitscheider_multi-task_2021,zhang_omni_2024}. In this work, we also use the ALP.  
+
+% Finally, in addition to progress on the goal practiced, \textbf{competence transfer} between goals is usually assumed (i.e. experiencing some goal may change the policy's competence on other goals). Accurately estimating competence transfer between goals is essential if one wants to track competence efficiently. While regularly reevaluating the policy's competence on all goals \cite{kanitscheider_multi-task_2021,zhang_omni_2024} allows tracking of competence changes on goals not experienced, this approach becomes intractable on very large discrete or continuous goal spaces. On the other hand, using goal groupings simply assumes competence transfer between all goals in the same group. However, automatically partitioning the goal has only been done for continuous goal spaces so far \cite{oudeyer_intrinsic_2007,baranes_r-iac_2009,baranes_active_2013}. Dealing with very large discrete goal spaces remains an open question. In this paper, we focus on high-dimensional structured spaces such as natural language, where competence transfer may occur between semantically similar goals.
+
+% \subsection{Automatic curriculum learning}
+% The field of automatic curriculum learning studies how to design methods that automatically adjust the curriculum of goals to propose to an online RL learner. As covered in \cite{portelas_automatic_2020}, the word goal encompasses a large set of environment parametrization, including goals for goal-conditioned policies \citep{colas_curious_2019, florensa_automatic_2018, kanitscheider_multi-task_2021}, environments generation \citep{romac_teachmyagent_2021,parker-holder_evolving_2023,samvelyan_maestro_2022} or even opponents generation \citep{silver_mastering_2017}. To select goals that should be prioritized, methods usually leverage the policy's return \citep{openai_solving_2019, florensa_automatic_2018}, regret \citep{jiang_prioritized_2020,parker-holder_evolving_2023}, prediction error \citep{pathak_curiosity-driven_2017}, Temporal-Difference error \citep{jiang_prioritized_2020} or LP \citep{stout_competence_2010,matiisen_teacher-student_2017,fournier_accuracy-based_2018,portelas_teacher_2019,colas_curious_2019, kanitscheider_multi-task_2021,kovac_grimgep_2023,zhang_omni_2024}. LP-based methods were shown to be very robust while not requiring any knowledge about the environment \citep{romac_teachmyagent_2021}. In this paper, we study how to efficiently compute LP over high-dimensional, structured and evolving goal spaces. Upon our LP estimation over goals, we simply apply the multi-armed bandit goal selection scheme introduced by \cite{lopes_strategic_2012} and further used in \cite{matiisen_teacher-student_2017,fournier_accuracy-based_2018,colas_curious_2019,portelas_teacher_2019,akakzia_grounding_2021}.
+
+\section{Comparison of LP methods} \label{app:lp_literature_review}
+We compare prior work computing LP for automatic curriculum learning under the dimensions from Section~\ref{app:additional_results_q1}. We show the comparison in Table~\ref{tab:table_lp_literature} evaluating methods:
+\begin{itemize}
+    \item \textbf{Efficiency}: Computational cost of additional evaluation episodes not used to train the policy.
+    \item \textbf{Competence transfer tracking}: How well does the method track all the possible competence transfer.
+    \item \textbf{No expert knowledge required}: if they require any external expert knowledge such as pre-defined goal groupings.
+\end{itemize}
+We consider a method’s efficiency as “high” if it does not require any additional evaluation (i.e. it only uses the performance observed on goals sampled), and as “low” otherwise. We evaluate the competence transfer tracking using the following criteria:
+\begin{itemize}[noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item absence of +: the estimated competence is updated only on sampled goals.
+    \item +: the estimated competence is updated on a predefined goal subset the sampled goal belongs to.
+    \item ++: the estimated competence is updated on a dynamically learned goal subset the sampled goal belongs to.
+    \item +++: the estimated competence is updated on all goals.
+\end{itemize}
+
+\begin{table}[h!] 
+\centering 
+\small
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Methods} & \textbf{Efficiency} & \textbf{Competence transfer tracking} & \textbf{No expert knowledge required} \\ 
+\hline 
+\cite{oudeyer_intrinsic_2007} & high & ++ & $\checkmark$ \\ 
+\cite{baranes_r-iac_2009} & high & ++ & $\checkmark$ \\ 
+\cite{baranes_active_2013} & high & ++ & $\checkmark$ \\ 
+\cite{moulin-frier_exploration_2013} & high & ++ & $\checkmark$ \\ 
+\cite{moulin-frier_self-organization_2014} & high & ++ & $\checkmark$ \\ 
+\cite{portelas_teacher_2019} & high & ++ & $\checkmark$ \\ 
+\cite{forestier_modular_2016} & high & ++ & $\checkmark$ \\ 
+\cite{kovac_grimgep_2023} & high & ++ & $\checkmark$ \\ 
+\hline 
+\cite{stout_competence_2010} & high & + & $\times$ \\ 
+\cite{lopes_strategic_2012} & high & + & $\times$ \\ 
+\cite{matiisen_teacher-student_2017} & high & + & $\times$ \\ 
+\cite{fournier_accuracy-based_2018} & high & + & $\times$ \\ 
+\cite{colas_curious_2019} & high & + & $\times$ \\ 
+\cite{blaes_control_2019} & high & + & $\times$ \\ 
+\cite{akakzia_grounding_2021} & high & + & $\times$ \\ 
+\cite{kumar_practice_2024} & high & + & $\times$ \\ 
+\hline 
+\cite{kanitscheider_multi-task_2021} & low & +++ & $\checkmark$ \\ 
+\cite{zhang_omni_2024} & low & +++ & $\checkmark$ \\ 
+\hline 
+\end{tabular}
+\caption{Comparison of prior work w.r.t. their LP estimation approach. We use the following dimensions: computational efficiency, dynamical competence transfer assumptions and no required expert knowledge.} 
+\label{tab:table_lp_literature}
+\end{table}
+
+\newpage
+\section{Implementation details} \label{app:implementation_details}
+To facilitate reproduction and future work, we provide our code at \url{https://github.com/flowersteam/MAGELLAN}.
+
+\subsection{LLM-based RL agent}\label{app:implementation_details_sac_glam}
+We use the SAC-GLAM method from \cite{gaven2024sacglam} with the hyperparameters listed in Table~\ref{tab:sac_param}. Following SAC-GLAM, the Q-value head is a two-layer MLP with 1024 ReLU-activated units, applied to the last hidden state of the decoder. The policy and the critic share the same LoRA adapters. Additionally, we apply a warm-up phase of 10 updates, during which only the Q-function is trained.
+
+\begin{table}[!ht]
+    \caption{SAC hyperparameters}
+    \centering 
+    \begin{tabular}{ll}
+    \toprule
+    \textbf{Variable} & \textbf{Value} \\
+    \midrule
+    Update frequency & $64$ \\
+    Number of updates & $1$ \\
+    Batch size & $256$ \\
+    Discount factor & $0.99$ \\
+    Optimizer & Adam \\
+    Critic learning rate & $1 \times 10^{-4}$ \\
+    Actor learning rate & $1 \times 10^{-4}$ \\
+    Entropy coefficient & auto \\
+    Entropy coefficient initialization & $0.05$ \\
+    Target entropy & $-0.125$ \\
+    Entropy coefficient learning rate & $1 \times 10^{-3}$ \\
+    n-step & $3$ \\
+    Replay buffer capacity & $500000$ \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:sac_param}
+\end{table}
+
+The prompt used as the LLM agent's observation is shown in Prompt~\ref{prompt:policy_prompt}.
+
+\begin{promptbox_policy}{\textbf{RL Agent observation}} \label{prompt:policy_prompt}
+Goal: Grow lion
+
+You see: water, carrot seed, baby lion, baby cow
+
+You are standing on: nothing
+
+Inventory (0/2): empty
+
+Action: 
+\end{promptbox_policy}
+
+
+\subsection{MAGELLAN}
+\label{app:implementation_details_magellan}
+
+Our competence estimator uses a single-layer MLP with 128 units and Tanh activations, applied to the last hidden state of the LLM. It is updated every 32 policy updates, with batch sampling that prioritizes recent data. The sampling distribution is determined by $\frac{i}{\sum_{j=1}^{M} j}$, where $i$ represents the position of a data point in the buffer $\mathcal{D}$ (with 1 being the oldest and $M$ the buffer size). This strategy ensures that the competence predictor remains responsive while preserving batch diversity, incorporating data from different versions of the learning agent to help mitigate noise introduced by the fluctuations in the RL agent’s learning process.
+
+To compute the LP, we store the weights of our competence estimator in the buffer $\mathcal{B}$. This is done by saving the LoRA adapters and the MLP weights whenever the competence estimator is updated. The window for LP computation is defined by $|\mathcal{B}| \times \textit{update frequency}$. The LP is calculated by comparing the competence estimation obtained with the oldest and most recent weights in the buffer.
+
+The MAGELLAN hyperparameters are provided in Table~\ref{tab:magellan_param}.
+
+\begin{table}[!ht]
+    \caption{MAGELLAN hyperparameters}
+    \centering 
+    \begin{tabular}{ll}
+    \toprule
+    \textbf{Variable} & \textbf{Value} \\
+    \midrule
+    $\epsilon$ start & $1$ \\
+    $\epsilon$ end & $0.2$ \\
+    $\epsilon$ decay period & $320$ \\
+    $\mathcal{B}$ size & $100$ \\
+    $\mathcal{D}$ size & $5000$ \\
+    Batch size & $256$ \\
+    Optimizer & Adam \\
+    Learning rate & $1 \times 10^{-4}$ \\
+    Update frequency & 32 \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:magellan_param}
+\end{table}
+
+The prompt given to the competence estimator is the same as the prompt given to the RL agent Prompt~\ref{prompt:magellan_prompt}.
+
+\begin{promptbox_magellan}{\textbf{MAGELLAN prompt}} \label{prompt:magellan_prompt}
+Goal: Grow lion
+
+You see: water, carrot seed, baby lion, baby cow
+
+You are standing on: nothing
+
+Inventory (0/2): empty
+
+Action: 
+\end{promptbox_magellan}
+
+
+
+\subsection{Baselines}
+\label{app:implementation_details_baselines}
+% We follow the Model Babbling method from \cite{Forestier2016ModularAC} to estimate the LP of each goal.
+% We keep a per-goal history of the last $N$ success rates. Every time this goal $g$ is sampled, a new ALP measure $\hat{ALP}(g)$ is obtained by computing the average of the absolute difference between the new goal' binary reward and every reward from the history. This goal's ALP (and utility in the Multi-Armed Bandit) is updated with a moving average between the current utility and the new ALP measure:
+% \[
+% ALP(g) = \alpha ALP(g) + (1-\alpha) \hat{ALP}(g)
+% \]
+
+% In our experiments, we use $N=100$ and $\alpha=0.3$.
+
+We compared our method against four baselines: Online-ALP, Eval-ALP, EK-Online-ALP, and EK-Eval-ALP. Below, we outline the implementation details for the different families of methods:
+
+\begin{itemize}
+
+\item \textbf{Non-EK methods}  
+For methods that do not rely on expert knowledge, competence and LP estimations are computed individually for each goal.  
+
+\item \textbf{EK methods}  
+For methods incorporating expert knowledge, goals are grouped into five buckets, with competence and LP computed at the bucket level.  
+
+\item \textbf{Online methods}  
+In online methods, a buffer of size \( M \) stores goal-outcome pairs. The agent's current competence is estimated from the most recent half of the buffer, while past competence is derived from the oldest half. Non-EK methods maintain a separate buffer for each goal, whereas EK methods use a buffer for each bucket.  
+
+\item \textbf{Eval methods}  
+In evaluation-based methods, the agent's competence is assessed every \( N \) episodes. For non-EK methods, the agent is evaluated \( k \) times on each individual goal, while for EK methods, evaluations are performed \( k \) times per bucket.
+
+\end{itemize}
+
+The hyperparameters for Online methods are presented in Table~\ref{tab:online_param}, while those for Eval methods are shown in Table~\ref{tab:eval_param}.
+
+\begin{table}[!ht]
+    \caption{Online methods hyperparameters}
+    \centering 
+    \begin{tabular}{ll}
+    \toprule
+    \textbf{Variable} & \textbf{Value} \\
+    \midrule
+    $\epsilon$ start & $1$ \\
+    $\epsilon$ end & $0.2$ \\
+    $\epsilon$ decay period & $320$ \\
+    Buffer size & $100$ \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:online_param}
+\end{table}
+
+
+\begin{table}[!ht]
+    \caption{Eval methods hyperparameters}
+    \centering 
+    \begin{tabular}{ll}
+    \toprule
+    \textbf{Variable} & \textbf{Value} \\
+    \midrule
+    $\epsilon$ start & $1$ \\
+    $\epsilon$ end & $0.2$ \\
+    $\epsilon$ decay period & $320$ \\
+    Eval frequency & $1000$ \\
+    Number of eval & $2048$ \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:eval_param}
+\end{table}
+
+
+\subsection{Compute budget}
+\label{app:compute_budget}
+To optimize GPU VRAM usage during training, we employ 4-bit quantization techniques as described in \citep{Dettmers2023QLoRAEF}. We use a vectorized version of Little-Zoo with 32 instances of the environment running (synchronously) in parallel. In order to accelerate training of our LLM agent  (both its policy with online RL and MAGELLAN), we leverage Lamorel\footnote{https://github.com/flowersteam/lamorel} to deploy 2 instances of the LLM in parallel. Thus, we distribute both the forward passes to compute actions' probability or LP and training in a Data Parallelism setting. When using Flan-T5 250M, each LLM instance is distributed (Vertical Model Parallelism) over one Nvidia H100 80GB GPUs requiring thus a total of 2 Nvidia H100 80GB GPUs to run an experiment (1 GPU $\times$ 2 LLM instances). For one seed of one ALP method trained in Section~\ref{sec:q2}, performing 500k training episodes requires 80 GPU hours on the Nvidia H100 80GB.
+
+
+\newpage
+\section{Additional results} \label{app:additional_results}
+
+\subsection{Ablations on the MAGELLAN architecture} \label{app:additional_results_magellan_architecture}
+
+In order to implement MAGELLAN, we try various architectures presented in Figure~\ref{fig:possible_architectures_MAGELLAN}. In all of them, to reduce the computational cost, we froze the LLM and used LoRA adapters \cite{Hu2021LoRALA} for training the policy (along with its Q-value) and the SR estimator. The architectures tested are:
+\begin{itemize}
+    \item \textbf{A: Different adapters for the policy and MAGELLAN} (Figure~\ref{fig:MAGELLAN_architecture_A}). This is the architecture adopted in the paper. The environment representation for the policy and the goal space representation for the competence estimator are learned separately on different adapters.
+    \item \textbf{B: Shared adapters for the policy and MAGELLAN}(Figure~\ref{fig:MAGELLAN_architecture_B}). We test whether a shared useful representation between the policy and competence estimator can emerge through training.
+    \item \textbf{C: Shared adapters but only trained with the policy loss}(Figure~\ref{fig:MAGELLAN_architecture_C}). We use a single set of LoRA adapters to train both the policy and the competence estimation module, but apply the latter's gradient only to the MLP outputting the competence. This ablation tests if the policy loss on its own creates semantical relationships between goals. We argue that training of the policy should push towards a clustering of the goal space.
+    \item \textbf{D: Adapter only for the policy, frozen LLM representation for MAGELLAN}(Figure~\ref{fig:MAGELLAN_architecture_D}). In this ablation, we test if MAGELLAN can learn to predict competence using the LLM's original latent space. Learning to estimate competence over a fixed representation is closer to prior works such as ALP-GMM \cite{portelas_teacher_2019}.   
+     
+\end{itemize}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Figures/Appendices/magellan_architecture_A.png}  
+    \caption{}
+    \label{fig:MAGELLAN_architecture_A}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Figures/Appendices/magellan_architecture_B.png}  
+    \caption{}
+    \label{fig:MAGELLAN_architecture_B}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Figures/Appendices/magellan_architecture_C.png}  
+    \caption{}
+    \label{fig:MAGELLAN_architecture_C}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{Figures/Appendices/magellan_architecture_D.png}  
+    \caption{}
+    \label{fig:MAGELLAN_architecture_D}
+\end{subfigure}
+\caption{Different architectural choices in MAGELLAN: (a) we learn separate LoRA adapters between the policy and MAGELLAN (used in the paper); (b) we share adapters and update them using both the policy and MAGELLAN gradient; (c) we share adapters but they are only updated by the policy gradient; (d) MAGELLAN directly uses the latent representation produced by the pretrained LLM.}
+\label{fig:possible_architectures_MAGELLAN}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\linewidth]{Figures/Appendices/possible_architectures_MAGELLAN_train.png}
+    \caption{Training curves of the four different possible architecture for MAGELLAN. We use $8$ seeds to plot the mean and the standard deviation (shadow area around the solid line).}
+    \label{fig:possible_architectures_MAGELLAN_train}
+\end{figure}
+
+We compare the learning dynamics of the four architectures in Figure~\ref{fig:possible_architectures_MAGELLAN_train}. We observe no difference in their ability at learning "grasp" goals. However, the agents with Architecture A continue to progress on other goal types whereas the ones using Architectures B, C, and D stagnate between 50k and 100k episodes before progressing again. At the end of training (500k episodes), agents using architecture A have learned all goal types. The ones based on Architectures B and C learned up to "grow herbivore" goal types. The agents that utilize Architecture D succeed plateaued on "grow plant". 
+
+To gain a finer comprehension of the learning dynamics implied by the different architectures, we look in Figure~\ref{fig:embs_archi_after} at the embeddings at the end of training for each architecture. 
+
+Architecture A (Figure~\ref{fig:architecture_A_embed_after}) and architecture B (Figure~\ref{fig:architecture_B_embed_after}) shared very similar representations with in both cases goals clustered between "grasp", "grow" and impossible goals. Inside the cluster "grow" the different element types (i.e. plants, herbivores, carnivores) are also clustered. Nonetheless, as seen in Figure~\ref{fig:possible_architectures_MAGELLAN_train}, Architecture B does not master "grow carnivore" goals and classified them as impossible. This indicates that obtaining a shared latent space for the policy and MAGELLAN is possible but slows down skill acquisition.
+
+Architecture C (Figure~\ref{fig:architecture_C_embed_after}) where MAGELLAN uses the representation solely changed by the policy still manages to accurately estimate competence. However, predicting competence is much more difficult using this architecture as the goal space is not modified ease competence estimation. Yet, using only the policy gradient still improves the initial latent space of the LLM as shown by Architecture D (Figure~\ref{fig:architecture_D_embed_after}).
+
+\begin{figure}
+\centering
+\begin{subfigure}{.475\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Q3/embs_after_training_seed0.png}  
+    \caption{Architecture A.}
+    \label{fig:architecture_A_embed_after}
+\end{subfigure}
+\begin{subfigure}{.475\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/embs_archiB_500k.png}  
+    \caption{Architecture B.}
+    \label{fig:architecture_B_embed_after}
+\end{subfigure}
+\begin{subfigure}{.475\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/embs_archiC_500k.png}  
+    \caption{Architecture C.}
+    \label{fig:architecture_C_embed_after}
+\end{subfigure}
+\begin{subfigure}{.475\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/embs_archiD_500k.png}  
+    \caption{Architecture D.}
+    \label{fig:architecture_D_embed_after}
+\end{subfigure}
+\caption{The LLM embedding space of MAGELLAN displayed using t-SNE with goals used in Q2 (Train) and Q3 (Test), along with MAGELLAN's estimated success probability and linear interpolation between goals. We show the embedding space for a single seed for the four architectures described in Appendix~\ref{app:additional_results_magellan_architecture} at the end of the 500k training episodes.}
+\label{fig:embs_archi_after}
+\end{figure}
+
+
+\newpage
+\subsection{Q1. Competence estimation properties} \label{app:additional_results_q1}
+
+\subsubsection{Per-goal competence estimation}
+\label{app:per_goal_error}
+In this section, we report the evolution of the per-goal competence estimation of experiments from Section~\ref{sec:q1}. We show it separately for the three goal space size: 25k (Figure~\ref{fig:detail_sr_25k_Q1}), 50k (Figure~\ref{fig:detail_sr_50k_Q1}) and 100k (Figure~\ref{fig:detail_sr_100k_Q1}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{Figures/Appendices/detail_sr_30k_Q1.png}
+    \caption{Evolution of competence estimation for each ALP method on each goal category for 25k goals. We show the average competence and its standard deviation across 8 seeds that use EK-Eval-ALP to sample goals.}
+    \label{fig:detail_sr_25k_Q1}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{Figures/Appendices/detail_sr_60k_Q1.png}
+    \caption{Evolution of competence estimation for each ALP method on each goal category for 50k goals. We show the average competence and its standard deviation across 8 seeds that use EK-Eval-ALP to sample goals.}
+    \label{fig:detail_sr_50k_Q1}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{Figures/Appendices/detail_sr_120k_Q1.png}
+    \caption{Evolution of competence estimation for each ALP method on each goal category for 100k goals. We show the average competence and its standard deviation across 8 seeds that use EK-Eval-ALP to sample goals.}
+    \label{fig:detail_sr_100k_Q1}
+\end{figure}
+
+\subsubsection{Competence estimation on the BabyAI-text goal-space}
+
+We replicated the experiment from Section~\ref{sec:q1}, simulating a learning agent and estimating its competence online using MAGELLAN and Online-ALP. In this setting, the goal space is drawn from the BabyAI-Text environment, consisting of five goal categories of increasing difficulty: Go to \textit{"object"}, Pick up \textit{"object"}, Open \textit{"door"}, Put \textit{"object A"} next to \textit{"object B"}, and Pick up \textit{"object A"} then go to \textit{"object B"}. As shown in Figure~\ref{fig:competence-babyai}, MAGELLAN outperforms Online-ALP, successfully tracking the agent’s competence progression across the different task categories.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\linewidth]{Figures//Appendices/competence_babyai.png}
+    \caption{Competence estimation on BabyAI-Text. MAGELLAN accurately tracks competence across five goal types of increasing difficulty and consistently outperforms Online-ALP.}
+    \label{fig:competence-babyai}
+\end{figure}
+
+\subsubsection{Impact of the LLM used in MAGELLAN}
+
+In this section, we compare different LLMs (Flan-T5-small, Flan-T5-base, and Qwen2.5-0.5B \citep{qwen2025qwen25technicalreport}) to evaluate their impact on the competence estimation performance of MAGELLAN. The experiments simulate agent learning using two goal spaces: OpenR1-Math-220k and BabyAI-Text (Figures~\ref{fig:diff_llms_math} and~\ref{fig:diff_llms_babyai}). Results show that all tested LLMs achieve similar performance, suggesting that MAGELLAN's competence estimation remains robust across a range of lightweight language models.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{Figures//Appendices/diff_llms_math.png}
+    \caption{Effect of LLM choice on MAGELLAN's competence estimation for OpenR1-Math-220k. All models yield similar performance.}
+    \label{fig:diff_llms_math}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=1\linewidth]{diff_llms_babyai.png}
+    \caption{Effect of LLM choice on MAGELLAN's competence estimation for BabyAI-Text. Performance remains consistent across models.}
+    \label{fig:diff_llms_babyai}
+\end{figure}
+
+
+\newpage
+\subsection{Q2. Training an LLM-based RL agent with MAGELLAN } 
+\label{app:additional_results_q2}
+
+\subsubsection{Per-goal Success Rate}
+\label{app:additional_results_q2_per_goal_success_rate}
+We detail in Figure~\ref{fig:SR_per_category} the evolution of the success rate per method and per goal type. All methods perform similarly on the type "Grasp". However, MAGELLAN outperforms all the baselines that do not rely on expert knowledge (Uniform and Online-ALP) on all other types. Learning dynamics fostered by MAGELLAN are close to the ones generated with EK-Online-ALP which relies on expert knowledge. Such results hint towards a clustering of the goal space by MAGELLAN to efficiently and reliably estimate the SR of the LLM agent. This hypothesis is strengthened by the plot of the embedding space in Appendix~\ref{app:additional_results_q3}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Figures/Appendices/SR_per_category.png}
+    \caption{ Evolution of average SR for each ALP method for each goal category. To get the success rate within a category, we evaluate the policy on 64 goals of this category. We use 8 seeds to plot the mean and the standard deviation.}
+    \label{fig:SR_per_category}
+\end{figure}
+
+
+\newpage
+\subsubsection{Goal sampling strategies}
+\label{app:additional_results_q2_goal_sampling_strategies}
+
+We analyze the sampling strategies of the different methods. In Figure~\ref{fig:sampling_strat}, it appears that MAGELLAN has a sampling strategy close to the one of EK-Online-ALP. The main difference is that EK-Online-ALP does not select impossible goals thanks to the use of expert knowledge. MAGELLAN's sampling strategy quickly begins to sample goals of type "Grow herbivore" after sampling goals of type "Grow plant", which contrasts with the strategy of Online-ALP. Indeed, Online-ALP mostly selects goals already encountered, getting stuck on one goal type before moving to another. The  similarity between MAGELLAN and EK-Online-ALP indicates that MAGELLAN is able to cluster the goal space dynamically, using this information to generalize its competence estimation to sample interesting goals not yet discovered. More results on the dynamic clustering of the goal space by MAGELLAN are given in Appendix~\ref{app:embedding_evolution}. 
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/sampling_magellan.png}  
+    \caption{MAGELLAN's sampling strategy.}
+    \label{fig:MAGELLAN_sampling_strat}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/sampling_ek_online_lp.png}  
+    \caption{EK-Online-ALP's sampling strategy.}
+    \label{fig:ek_online_lp_sampling_strat}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/sampling_online_lp.png}  
+    \caption{Online-ALP's sampling strategy.}
+    \label{fig:_online_lp_sampling_strat}
+\end{subfigure}
+\caption{Goal sampling strategies of MAGELLAN, EK-Online-ALP, Online-ALP. We do not take into account the $20\%$ uniformly sampled goals from the $\varepsilon$-greedy exploration.}
+\label{fig:sampling_strat}
+\end{figure}
+
+
+\newpage
+\subsection{Q3. MAGELLAN’s generalization abilities} \label{app:additional_results_q3}
+\subsubsection{Per-goal Success Probability estimation on test set}
+\label{app:per_goal_success_probability_ontest_set}
+
+In this section, we provide a detailed analysis of the results presented in Section~\ref{sec:q3}, specifically examining the ability to generalize success probability estimations to test goals across different goal types (see Figure~\ref{fig:sampling_strategies}). As expected, Online-ALP exhibits the largest errors, as it can only assign a success probability of 0 to unseen goals. In contrast, both MAGELLAN and EK-Online-ALP achieve highly accurate estimations for "Grasp", "Grow plant", and "Grow herbivore". However, both methods tend to overestimate the generalization abilities of the policy on "Grow carnivore" goals.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/sr_test_estimation_magellan.png}  
+    \caption{MAGELLAN.}
+    \label{fig:MAGELLAN}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/sr_test_estimation_ek_online.png}  
+    \caption{EK-Online-ALP.}
+    \label{fig:ek_online_lp}
+\end{subfigure}
+\begin{subfigure}{.49\textwidth}
+    \centering
+    \includegraphics[width=.95\linewidth]{Figures/Appendices/sr_test_estimation_online.png}  
+    \caption{Online-ALP.}
+    \label{fig:_online_lp}
+\end{subfigure}
+\caption{Per-goal estimation of the success probability for each method. The average result (over $8$ seed) is the solid line and the shaded zone represents the standard deviation.}
+\label{fig:sampling_strategies}
+\end{figure}
+
+ \newpage
+\subsubsection{Evolution of the embeddings}
+\label{app:embedding_evolution}
+
+In Section~\ref{sec:q3}, we present the embedding at the beginning and the end of the training for the seed $0$.\footnote{The dynamic is the same for the other seeds.} In this section, we explore how the goal space is dynamically modified throughout training with Figure~\ref{fig:chronogram_embedding_seed_0}. It is a chronogram of the embedding space used by MAGELLAN projected using t-SNE \cite{JMLR:v9:vandermaaten08a} with the estimated success probability over the whole space calculated using linear interpolation with a Gaussian filter. Each embedding (except the first one that is the initial state) is plotted after the agent masters a goal category.
+\begin{itemize}
+    \item At the beginning, Figure~\ref{fig:begining_training}, no structure is discernible in the goal space and the estimated success probability is uniform around $0.5$.
+    \item After mastering the goals of type "Grasp", Figure~\ref{fig:grasp_mastered} shows several clustered appeared. All "Grasp" goals are in the same cluster with a high estimated success probability zone. The goals of type "Grow plant" are also clustered together and close to the zone of high estimated success probability. That is a hint that MAGELLAN has already picked them as the next candidate type for the curriculum. It also correctly places the "Grow plant" goals from the test set in the same cluster as the ones from the train set. However, it still mixes them with impossible goals, underlying that it does not fully master this type of goal.  The "Grow herbivore" and "Grow carnivore" are mixed with other impossible goals.
+    \item After achieving mastery of "Grow plant", in Figure~\ref{fig:grow_plant_mastered}, we see both "Grasp" and "Grow plant" are correctly clustered in the zone of high success probability, with the goals from the test set correctly placed into the two clusters. The goals from the type "Grow herbivore" and "Grow carnivore" are clustered together and almost separated from the impossible goals. Their cluster is close to the zone of high estimated probability.
+    \item Once "Grow herbivore" has been solved, we see in Figure~\ref{fig:grow_herbivore_mastered} that the three achieved goal types are clustered in three groups, all in the zone of high estimated success probability. The "Grow carnivore" are far from this zone but still clustered together, apart from the impossible ones. It also appears that the model places "Grow carnivore" goals from the test close to the "Grow herbivore". 
+    \item Finally, when the type "Grow carnivore" is mastered, in Figure~\ref{fig:grow_carnivore_mastered}, all the goals from the possible goal types (from both train and test) are placed in the zone of high success probability. The goals of type "Grow X" form three clusters tightly packed. The "Grasp" type is separated from the other types.
+\end{itemize}
+ What is clear from the chronogram is that MAGELLAN's learning modifies the embedding space in a way that facilitates prediction of the probability of success.  
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.34\linewidth]{Figures/Q3/embs_before_training.png}
+        \caption{Beginning of training, no goal mastered.}
+        \label{fig:begining_training}
+    \end{subfigure}
+    % \hfill 
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.34\linewidth]{Figures/Appendices/embs_22847.png}
+        \caption{"Grasp" type of goals mastered.}
+        \label{fig:grasp_mastered}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.34\linewidth]{Figures/Appendices/embs_57590.png}
+        \caption{"Grow plant" type of goals mastered.}
+        \label{fig:grow_plant_mastered}
+    \end{subfigure}  
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.34\linewidth]{Figures/Appendices/embs_104272.png}
+        \caption{"Grow herbivore" type of goals mastered.}
+        \label{fig:grow_herbivore_mastered}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.34\linewidth]{Figures/Appendices/embs_451909.png}
+        \caption{"Grow carnivore" type of goals mastered.}
+        \label{fig:grow_carnivore_mastered}
+    \end{subfigure}  
+    \caption{Chronogram of the embedding space of the seed $0$, at the beginning and after mastering each type of goal.}
+    \label{fig:chronogram_embedding_seed_0}
+\end{figure}
+
+% \subsubsection{Generalization abilities}
+% \label{app:generalization_abilities}
+% Embeddings of invented words
+\subsubsection{Embedding of impossible goals}
+\label{app:embedding_impossible}
+
+As detailed in Section~\ref{app:example_of_impossible_goals}, a goal is considered impossible either due to the absence of a required element or when attempting to grow furniture. Accurately identifying impossible goals and generalizing this knowledge is crucial for strong performance in the Little-Zoo environment. In this section, we analyze how MAGELLAN handles impossible goals.
+
+Figure~\ref{fig:zoom_impossibles_categories} illustrates the clustering of different categories of impossible goals. The impossible "Grasp" goals form a compact cluster, while the "Grow" goals—categorized as "Grow plant", "Grow herbivore", "Grow carnivore", and "Grow furniture"—exhibit four less-defined clusters. Additionally, a large, mixed cluster contains various impossible "Grow" goals. However, when examining the same embeddings through the lens of missing elements, as shown in Figure~\ref{fig:zoom_impossibles_items}, a distinct structure emerges: MAGELLAN also organizes goals based on the absent element in the scene.
+
+For instance, the previously observed clusters of impossible "Grow" goals largely align with the "missing water" category, as water is a prerequisite for all "Grow" goals. Moreover, the central mixed cluster from Figure~\ref{fig:zoom_impossibles_categories} is further clustered into sub-clusters based on the missing element. In particular, the red cluster at the bottom of Figure~\ref{fig:zoom_impossibles_items} represents the absence of a plant, encompassing both "Grow herbivore" and "Grow carnivore" goals. This suggests that MAGELLAN effectively captures underlying environmental dependencies to determine goal feasibility. This ability to infer structural properties of the environment likely contributes to the strong generalization performance observed in Section~\ref{sec:q3} and Section~\ref{sec:q4}.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.51\linewidth]{Figures/Appendices/zoom_impossibles_categories.png}
+        \caption{}
+        \label{fig:zoom_impossibles_categories}
+    \end{subfigure}
+    \begin{subfigure}[t]{\linewidth}
+        \centering
+        \includegraphics[width=0.5\linewidth]{Figures/Appendices/zoom_impossibles_items.png}
+        \caption{}
+        \label{}
+    \end{subfigure}
+    \caption{Plot of the t-SNE-projected embeddings of impossible goals, where each goal is color-coded based (a) on the type of impossible goal (b) on the specific missing element required to make it possible.}
+    \label{fig:zoom_impossibles_items}
+\end{figure}
+
+% \subsubsection{Embeddings of invented words}
+
+
+\subsection{Q4. Leveraging the generalization abilities when facing new goals} \label{app:additional_results_q4}
+
+\subsubsection{10 adaptation cases throughout training}
+\label{app:10_adap_cases_throughout_training}
+
+In Section~\ref{sec:q4}, we present adaptation tests where the goal space evolves by replacing goals with new unseen goals from similar categories. We conduct the test by training an agent using MAGELLAN for $500$k steps. Then, every $50000 *n$ episodes (with $n \in \{1; 2; 3; 4; 5; 6; 7; 8; 9; 10\}$), we stop training and replace MAGELLAN by one of the four ALP methods of goal sampling (MAGELLAN, EK-Online-ALP, Online-ALP, and Uniform). Finally, we resume the training for $50$k steps and measure the SR. For EK-Online-ALP, we make it track the agent's competence based on goals sampled by MAGELLAN during the first phase, allowing it to start with an estimation on the new unseen goals. Our test measures the ability of a method to estimate and quickly update competence on unseen goals. Figure~\ref{fig:adaptation_tests} details all the results obtained at the ten points we use in the experiments. 
+
+We can divide the different experiments in $2$ typical scenarios:
+
+\begin{itemize}
+    \item\textbf{Scenario zero LP (Figure~\ref{fig:app_sub_a}):} the agent has mastered the "Grasp" and "Grow plant" goals and has $0$ ALP across all goals. In this scenario, all ALP estimations are equivalent. EK-Online-LP manages to discover new ALP niches faster as all impossible goals are in the same group.
+    \item\textbf{Scenario with LP}:
+    \begin{itemize}
+        \item \textbf{High LP (figures~\ref{fig:app_sub_b},~\ref{fig:app_sub_c},~\ref{fig:app_sub_d}):} the agent is getting a high ALP as it is learning some "Grow carnivore" goals. Here, MAGELLAN outperforms baselines by generalizing its ALP estimation and continuing training on these goals.
+        \item \textbf{Medium LP at the end of training (figures~\ref{fig:app_sub_e} to ~\ref{fig:app_sub_j}):} the agent has almost learned all the goals, and it only remains few goals in the "Grow carnivore" category on which its performance is not stable. When changing the goal space, Online-ALP and Uniform take a lot of steps to find the remaining goals with LP in the new goal space, destabilizing the agent. As a result, the agent's SR decreases just after the transition and does not recover after $50$k training epispdes. MAGELLAN and EK-Online-ALP maintain their high SR.
+    \end{itemize}
+    We notice that the learning curve of the agents using MAGELLAN and EK-Online-ALP are almost identical, but our method does not rely on expert knowledge and naturally clustered the goal space as seen in Figure~\ref{fig:embedding_MAGELLAN_after}.
+\end{itemize}
+
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_50k.png}
+        \caption{}
+        \label{fig:app_sub_a}
+    \end{subfigure}
+    % \hfill 
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_100k.png}
+        \caption{}
+        \label{fig:app_sub_b}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_150k.png}
+        \caption{}
+        \label{fig:app_sub_c}
+    \end{subfigure}  
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_200k.png}
+        \caption{}
+        \label{fig:app_sub_d}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_250k.png}
+        \caption{}
+        \label{fig:app_sub_e}
+    \end{subfigure}  
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_300k.png}
+        \caption{}
+        \label{fig:app_sub_f}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_350k.png}
+        \caption{}
+        \label{fig:app_sub_g}
+    \end{subfigure}  
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_400k.png}
+        \caption{}
+        \label{fig:app_sub_h}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_450k.png}
+        \caption{}
+        \label{fig:app_sub_i}
+    \end{subfigure}  
+    \begin{subfigure}[t]{0.24\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{Figures/Q4/adaptation_500k.png}
+        \caption{}
+        \label{fig:app_sub_j}
+    \end{subfigure}
+    % \hfill
+    \caption{\textbf{Adaptation tests}: Using a single's seed training of 500k episodes, we stop and replace all goals by new unseen goals every 50k episodes. We then resume training by sampling goals using each of our four methods' ALP estimation (MAGELLAN, EK-Online-ALP, Online-ALP, Uniform) and perform 50k training episodes. We report the evolution of observed competence (SR) when evaluating the policies on 64 goals per category from the new training set every 5000 episodes. We report the average competence over evaluated goals along with standard deviation.}
+    \label{fig:adaptation_tests}
+\end{figure}
+
+\subsubsection{Global Sample Efficiency assessment}
+\label{app:global_sample_efficiency_assessment}
+
+%As described in Section~\ref{sec:q4}, we evaluate the adaptability of each ALP method to evolving goal spaces. Every $50$k episodes throughout the $500$k training duration, we pause training, replace the training goals with those from a held-out test set, and initialize four independent training runs (each with 8 seeds) under the new goal distribution—one per ALP method for $50$k steps. We hypothesize that MAGELLAN will rapidly adapt by leveraging semantic relationships between previously encountered and newly introduced goals. In contrast, both Uniform and Online-ALP initialize with a competence estimate of zero for the new goals. For EK-Online-ALP, we ensure that up to the goal space shift, it tracks policy competence in parallel with MAGELLAN. Consequently, upon replacement, it retains per-group competence estimates and the expert-defined group assignment for each new goal. 
+To obtain a quantitative analysis of the results from Section~\ref{sec:q4}, we plot in Figure~\ref{fig:app_adaptation_tests_sample_efficiency} the average sample efficiency (after $\kappa$ episodes) of each method, averaged over the $10$ tests, with $\kappa \in \{10 000; 20000; 30000; 40000; 50000 \}$. The sample efficiency after $\kappa$ episodes is calculated as $\frac{1}{10}\sum_{n=1}^{10}\int_{0}^{\kappa} SR(50000*n  +t)-SR(50000*n) \,dt$.
+
+We observe that the Uniform method is the only approach exhibiting a negative average sample efficiency, which is expected since it predominantly samples impossible goals, thereby destabilizing the agent. In contrast, the other methods demonstrate increasing sample efficiency as $\kappa$ progresses, reflecting improved success probability estimation and, consequently, more effective goal sampling. However, Online-ALP exhibits only a marginal improvement, as it must continually re-estimate success probabilities across the entire goal space.
+
+Both MAGELLAN and EK-Online-ALP, which leverage generalization to estimate success probabilities for novel goals, achieve higher sample efficiency. Notably, EK-Online-ALP benefits significantly from expert knowledge in clustering the goal space and identifying impossible goals. However, its strong performance is contingent on the assumption that new goals belong to the same categories as those in the training set, which may limit its generalization capacity.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{Figures/Appendices/adaptation_test.png}
+    \caption{Average sample efficiency (after $\kappa$, the length of the test) of each method average over the $10$ tests.}
+    \label{fig:app_adaptation_tests_sample_efficiency}
+\end{figure}
+

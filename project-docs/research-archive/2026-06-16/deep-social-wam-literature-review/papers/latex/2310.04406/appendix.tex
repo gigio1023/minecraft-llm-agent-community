@@ -1,0 +1,743 @@
+\section{LATS Pseudocode}
+\label{sec:pseudocode}
+Alg.~\ref{alg:mcts} shows the pseudocode of our algorithm LATS. Nodes are stored explicitly in the memory. Unless otherwise specified, in all experiments, we set the number of sampled nodes to $n=5$ and the exploration weight to $w=1$. We use a self-consistency weight of $\lambda=0.5$ for HotPotQA and Game of 24, and $\lambda=0.8$ for Programming and WebShop.
+\begin{algorithm*}[ht]
+\centering
+\caption{$\operatorname{LATS}(s, p_\theta, {p_V}, p_{\text{ref}}, d, k, n, w, a, b)$ \label{alg:mcts}}
+\begin{minipage}{0.9\linewidth} 
+\small
+\begin{algorithmic}
+    \Require Initial state $s$, action generator $p_\theta$, value function {$p_V$}, reflection generator $p_{\text{ref}}$, number of generated actions $n$, depth limit $L$, number of roll-outs $K$, context $c$, exploration weight $w$, and value function weight $\lambda$
+    \State Initialize action space $A$, observation space $O$
+    \State Initialize the state-action value function ${p_V} : S \times A \mapsto \mathbb R$ and visit counter ${N} : S \mapsto \mathbb N$ to one
+    \For {$k \gets 0, \dots, K - 1$}
+        \For {$t \gets 0, \dots, L - 1$}
+            \If {$s_t$ not\ terminal} \Comment{Expansion \& Simulation}
+                \For {$i \gets 1, \dots, n$}
+                \State Sample $a_t^{(i)} \sim p_\theta(s_t)$
+                \State Get $o_t^{(i)}$ from environment, $s_{t+1}^{(i)} \gets (c_{t}^{(i)}, o_t^{(i)}, a_t^{(i)})$, $c_{t+1}^{(i)} \gets (o_t^{(i)}, a_t^{(i)})$
+                \State Evaluate ${V}_t^{(i)} \sim \lambda * {p_V}(s_t^{(i)}) + (1-\lambda) * \text{SC}(s_t^{(i)})$ 
+                \Comment Evaluation
+                \State ${V}(s_t) \gets {V}_t^{(i)}$
+                \State Add $s_t^{(i)}$ to children
+                \EndFor
+            \EndIf
+            \If {$s_t$ is terminal}
+                \Comment{Reflection}
+                \State Get $r$ from environment
+                \If {$r$ not success}
+                    \State $\text{reflection} \gets p_{\text{ref}}(c_t)$
+                    \State $c \gets \text{reflection}$
+                \EndIf
+            \EndIf
+            \State $a_{t} \gets \arg\max_{a \in e(s_t)} \left[ {V(s_t)} + w \sqrt{\frac{\ln {N}(s_{t})}{{N}(s_{t+1})}} \right]$ \Comment{Selection}
+            \State Get corresponding $o_t$ from memory, $s_{t+1} \gets (c_t,o_t,a_t), c_{t+1}\gets (o_t,a_t)$
+            \State ${N}(s_{t+1}) \gets {N}(s_{t+1}) + 1$
+            \State \algorithmicif\ {$a_t$ is an output action}\ \algorithmicthen\ \textbf{break}
+        \EndFor
+        \State $T \gets$ the actual number of steps
+        \For {$t \gets T - 1, \dots, 0$} \Comment{Backpropagation}
+            \State {$V(s_t)\leftarrow \frac{V(s_t)(N(s_t) - 1) + r}{N(s_t)}$}
+        \EndFor
+    \EndFor
+\end{algorithmic}
+\end{minipage}
+\end{algorithm*}
+
+\section{More Discussion on Limitations}
+
+\label{sec:discussion}
+
+As stated in Sec.~\ref{sec:conclusion}, LATS has two main limitations: 
+
+\textbf{Computational cost.} Although LATS can improve reasoning and decision-making, this arrives at a higher computational cost relative to simpler prompting methods like ReAct or Reflexion. However, the following facts serve as mitigations to this issue:
+
+\begin{itemize}
+    \item Asymptotically, our method has the same sample complexity as ToT~\cite{yao2023tree} and RAP~\cite{hao2023reasoning}, but achieves better performance, expands fewer nodes, and uses fewer tokens on average upon success. This suggests that our method is not only stronger in problem-solving but also has higher efficiency. A full analysis of the cost can be found in Tab.~\ref{tab:cost} in Appendix~\ref{sec:abl}.
+    \item The number of nodes $n$ expanded at every step provides a natural trade-off between performance and efficiency. In fact, setting $n=1$ makes the method as efficient as ReAct~\cite{yao2023react} with multiple trials or CoT-SC~\cite{wang2022self}.
+\end{itemize}
+
+In general, we recommend using LATS for difficult tasks like programming or for situations where performance is prioritized over efficiency in practice. We hope that continued advancements in LMs will reduce costs and increase the applicability of LATS.
+
+{Additionally, there exists a minor cost from querying the environment, which we find to be trivial for the environments we study. Most LM-based environments involve API-based tools, which are inexpensive and fast to use. It is also worth noting that this is cheaper than the inference cost associated with using LMs as world models, as in previous search approaches \cite{hao2023reasoning, liu2023reason}.}
+
+\textbf{Assumption of environment reversion in decision-making.} Since our method is based on Monte Carlo Tree Search and is model-free, one limitation of LATS on decision-making tasks is that it requires the agent to be able to revert to earlier states in the environments. However, this reversion property is feasible in many real-world environments and applications (despite being not universally applicable in all possible environments), including programming (HumanEval~\cite{chen2021evaluating}), web search (WebShop~\cite{yao2022webshop}), text-based manipulation tasks (Alfworld~\cite{shridhar2020alfworld}), and LMs with tool use (ToolBench~\cite{qin2023toolllm}). Therefore, we believe that leveraging the reversion property is not a shortcoming but rather \textit{a feature that has not been explicitly given notice by the LM decision-making community} -- it opens up new opportunities in the emerging LM agent community.
+
+%However, since a variety of  LM task possesses such property, we feel that prior work overlooked and did not use this capability. Recognizing this fact and leveraging this property is the main motivation of our work.
+%}
+Additionally, the benchmarks we use in this paper are relatively simple and focused on decision-making compared to the complexity of real-world interactive environments. Moreover, some environments might not easily support rollbacks to previous states. However, the design of LATS is flexible and can be adjusted to various resource constraints. Using planning-based prompting methods like LATS in environments like Minecraft \citep{fan2022minedojo} and more reasoning benchmarks would be interesting avenues for future work. 
+
+{
+\section{Additional Ablations}\label{sec:abl}
+
+\begin{figure}[t]
+    \centering
+    \begin{minipage}{.48\textwidth}
+        \centering
+        \begin{table}[H]
+            \begin{tabular}{c|c}
+                \toprule
+                Prompt Method & HotpotQA (EM) $\uparrow$  \\
+                \midrule
+                LATS ($w=0.5$) & 0.55 \\
+                LATS ($w=2.0$) & 0.63 \\
+                LATS ($d=4$) & 0.58 \\
+                LATS (CoT) & 0.62 \\
+                LATS (No LM Heuristic) & 0.37 \\
+                LATS ($w=1.0$, $d=7$) & \textbf{0.63} \\ 
+                \bottomrule
+            \end{tabular}
+    \caption{Ablation results on LATS and baseline variants in HotPotQA measured by Exact Match (EM). We test different depth $d$, exploration factor $w$, and versions of LATS using CoT and without the LM value function. We sample $n=5$ and $k=50$ trajectories.}
+        \end{table}
+
+        \label{tab:hotpotqa}
+    \end{minipage}%
+    \hspace{4pt}
+    \begin{minipage}{.48\textwidth}
+        \centering
+         \includegraphics[width=0.95\linewidth]{figures/k.png}
+        \vspace{-0.1in}
+        \caption{Performance over successive iterations on HumanEval with GPT-3.5.}
+        \label{fig:k}
+    \end{minipage}
+\end{figure}
+
+
+In this section, we ablate various designs of LATS. Experiments are conducted on HotPotQA with a maximum of $k=50$ trajectories and sampling size of $n=5$ and HumanEval with a maximum of $k=8$ trajectories and sampling size of $n=5$. The result for HotPotQA is shown in Tab.~\ref{table:abl} and HumanEval in Fig.~\ref{fig:k}.
+
+\textbf{Exploration weight.} We find that there is lower performance on HotPotQA when the exploration weight $w$ in the selection formula is decreased to $0.5$, suggesting that this reduces the effectiveness of the search. Increasing $w$ to $2.0$ does not lead to a performance improvement, but we tend to observe faster convergence. The optimal setting depends on the particular environment and complexity of the state space.
+
+\textbf{Depth.} In our main experiments we use a maximum depth of $d=7$ on HotPotQA for all methods, following previous work \citep{yao2023react}. We ablate the effect on LATS after reducing it to $d=4$. This results in only a slight drop in performance. We find that most questions can be answered within four steps, and using a greater number of steps tends to force the agent into local minima and rarely improves success.
+
+\textbf{LM value function.} The LM value function scores states based on expected future reward. Without this heuristic, the only signal to guide search would be from environment rewards for completed trajectories, which are scarce and often binary. When we remove the evaluation operation, we observe a dramatic $0.26$ drop in performance.
+
+\textbf{Performance over time.} To see the effects of increasing the number of trajectories sampled, we change $k$ to different values. We conduct this experiment on HumanEval, which has a more noticeable difference due to sampling less trajectories. The results are shown in Fig. \ref{fig:k}, in which LATS scales better with more iterations than Reflexion.
+
+
+
+\section{Environment Details}
+\label{sec:envdetail}
+\subsection{HotPotQA}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=1.0\linewidth]{figures/qualitative.pdf}
+    \caption{{Example trajectories on} HotPotQA for ReAct (\textbf{left}) and LATS (\textbf{right}). LATS can sample more actions and avoid failure from previous mistakes by evaluating states with an LM to guide the search toward promising areas of the tree.}
+    \label{fig:qualitative}
+    \vspace{-0.1in}
+\end{figure*}
+
+HotPotQA \citep{yang2018hotpotqa} is a question-answering dataset that requires reasoning over multiple supporting documents to answer questions. It contains 113k Wikipedia-based question-answer pairs crafted by crowdworkers to be diverse, multi-hop, and explainable. Questions cover a range of types like entities, locations, dates, and comparison of shared properties between two entities. Crowdworkers also provide supporting facts from the documents that justify the answer. We use the HotPotQA benchmark setting with all the Wikipedia paragraphs to test retrieval. We use a randomly selected subset of 100 questions for our experiments and a maximum depth limit of 6. {Fig.~\ref{fig:qualitative} illustrates how ReAct and LATS work on an example task of HotPotQA, and gives a qualitative example on how LATS outperforms ReAct on the task. } For value function hyperparameters, we use $\lambda = 0.5$ for the LM score and self-consistency score.
+
+\textbf{Action Space.} We adopt the Wikipedia web API proposed in \citet{yao2023react}, with three types of actions to support interactive information retrieval: 
+
+(1) \textbf{\texttt{search}}[\texttt{entity}], which returns the first 5 sentences from the corresponding \texttt{entity} wiki page if it exists, or else suggests top-5 similar entities from the Wikipedia search engine, 
+
+(2) \textbf{\texttt{lookup}}[\texttt{string}], which returns the next sentence in the page containing \texttt{string}, 
+
+(3) \textbf{\texttt{finish}}[\texttt{answer}], which finishes the current task with \texttt{answer}.
+
+These API calls and free-form thoughts form the action space for this environment.
+
+\subsection{Programming}
+
+The HumanEval dataset \citep{chen2021evaluating} is a collection of 164 handwritten programming problems introduced to evaluate the functional correctness of models for synthesizing programs from natural language descriptions. Each problem includes a function signature, docstring description, reference implementation, and multiple unit tests, with an average of 7.7 tests per problem. The programming tasks assess comprehension of natural language, reasoning, algorithms, and basic mathematics, at a difficulty level comparable to simple software interview questions. Pass rates are evaluated with the pass@k metric, where k samples are generated per problem and a problem is considered solved if any sample passes all tests. We use all 164 problems for our experiments and a maximum depth limit of 8. For the three questions without sample test cases, we write our own. For value function hyperparameters, we use $\lambda = 0.8$ for the LM score and self-consistency score. For GPT-3.5 we use six internal tests, while for GPT-4 we use four internal tests.
+
+The Mostly Basic Programming Problems (MBPP) \cite{austin2021program} benchmark contains 974 short Python functions designed to evaluate program synthesis techniques. The dataset was constructed by crowdsourcing from workers with basic Python knowledge. Each data point consists of a natural language description of a programming task, a reference solution implementation, and three test cases for functional correctness. The natural language prompts are typically short, one-sentence descriptions. Solutions cover common programming constructs including mathematical operations, list processing, string manipulation, and usage of the Python standard library. On average, solutions are 6.8 lines of code. The dataset is also supplemented with an additional set of 426 problems that were manually verified for unambiguous specifications, standard function signatures, and accurate test cases. We use a randomly selected subset of 397 problems for our experiments. For value function hyperparameters, we use $\lambda = 0.8$ for the LM score and self-consistency score.
+
+\subsection{WebShop}
+
+WebShop \citep{yao2022webshop} is an interactive web-based environment designed to evaluate agents on grounded language understanding and decision-making. It simulates an e-commerce shopping task by providing agents with over 1 million real-world products scraped from Amazon, spanning 5 categories and 113 subcategories. These products contain rich linguistic information, with an average text length of 262 words and a vocabulary size of 224k. In addition, there are over 800k unique product options available for customization. The environment renders webpages in two modes: HTML mode provides pixel-level observations with interactive elements, while simple mode converts the raw HTML into a structured text observation more amenable for training agents. The action space consists of query searches and button clicks, which transition between 4-page types: search, results, item, and item detail. Instructions are crowdsourced natural language specifying product attributes and options, with a total of 12k collected. Automatic rewards are computed by comparing the product purchased by the agent against the attributes and options specified in the instruction, using both lexical matching and semantic similarity metrics. 
+\\
+
+\begin{table}[ht]
+    \centering
+\begin{tabular}{lll}
+\toprule
+     Type &  Argument &  State $\rightarrow$ Next State \\
+\midrule
+    \texttt{search} & [\textit{Query}] & Search $\rightarrow$ Results\\ 
+    \texttt{choose} & Back to search & $*$ $\rightarrow$ Search\\
+    \texttt{choose} & Prev/Next page & Results $\rightarrow$ Results\\
+    \texttt{choose} & [\textit{Product title}] & Results $\rightarrow$ Item\\
+    \texttt{choose} & [\textit{Option}] & Item $\rightarrow$ Item\\
+    \texttt{choose} & Desc/Overview & Item $\rightarrow$ Item-Detail\\
+    \texttt{choose} & Previous & Item-Detail $\rightarrow$ Item\\
+    \texttt{choose} & Buy & Item $\rightarrow$ Episode End\\
+\bottomrule
+\end{tabular}
+\vspace{5pt}
+\caption{Action space of WebShop.}
+\label{table:action_space_}
+\end{table}
+
+There are two evaluation metrics used in WebShop: (1) \textbf{Task Score} defined as $(100 \times \text{avg. reward})$, which captures the average reward obtained across episodes; and (2) \textbf{Success Rate (SR)} defined as the portion of instructions where $r=1$. The reward is calculated based on the number of attributes satisfied by the selected item. We use 50 environments for our experiments and a maximum depth limit of 15. For value function hyperparameters, we use $\lambda = 0.8$ for the LM score and self-consistency score.
+
+\subsection{Game of 24}
+
+Game of 24 is a mathematical reasoning challenge where the goal is to use basic arithmetic operations to construct 24 out of 4 numbers. We follow the setup from \citet{yao2023tree}, where we measure success if the agent produces a correct equation that equals 24 and uses each input number only once. We report success rate over 50 games. We use $k = 30$ iterations and a maximum depth limit of 5. For value function hyperparameters, we use $\lambda = 0.5$ for the LM score and self-consistency score. Tab.~\ref{table:game24-abl} shows the performance comparison between $\lambda=0.5$ and $\lambda=1$, which validates our design of self-consistency term.
+
+\begin{table}[t]
+  \centering
+  \begin{tabular}{l|c}
+  \toprule
+    Prompt Method & Game of 24 (Success Rate) $\uparrow$ \\
+    \midrule
+    LATS (CoT, $\lambda=1$) & 0.40  \\
+    LATS (CoT) & \textbf{0.44}  \\
+    \bottomrule
+    \end{tabular}
+    \caption{Ablations on $\lambda$ in Game of 24 with GPT-3.5. $\lambda = 0.5$ used in the main paper outperforms $\lambda=1$, equivalent to removing self-consistency, which indicates that the self-consistency score improves the performance of LATS.
+    }
+    \label{table:game24-abl}
+    \vspace{-0.1in}
+\end{table}
+
+\section{HotPotQA Prompts}
+\label{sec:hotpotqa_prompt}
+\subsection{Base Acting Prompt}
+
+Solve a question answering task with interleaving Thought, Action, Observation steps. Thought can reason about the current situation, and Action can be three types: 
+
+(1) Search[entity], which searches the exact entity on Wikipedia and returns the first paragraph if it exists. If not, it will return some similar entities to search.
+
+(2) Lookup[keyword], which returns the next sentence containing keyword in the current passage.
+
+(3) Finish[answer], which returns the answer and finishes the task.
+
+After each observation, provide the next Thought and next Action. 
+
+Here are some examples:
+
+Question: Which magazine was started first Arthur's Magazine or First for Women?
+
+Thought 1: I need to search Arthur's Magazine and First for Women, and find which was started first.
+
+Action 1: Search[Arthur's Magazine]
+
+Observation 1: Arthur's Magazine was an American literary periodical published in Philadelphia in the 19th century. Edited by Timothy Shay Arthur, it featured work by Edgar A. Poe, J.H. Ingraham, Sarah Josepha Hale, Thomas G. Spear, and others.[1][2] In May 1846 it was merged into Godey's Lady's Book.[3]
+
+Thought 2: Arthur's Magazine was started in 1844. I need to search First for Women next.
+
+Action 2: Search[First for Women]
+
+Observation 2: First for Women is a woman's magazine published by Bauer Media Group in the USA.[1] The magazine was started in 1989. It is based in Englewood Cliffs, New Jersey.[2] In 2011 the circulation of the magazine was 1,310,696 copies.[3]
+
+Thought 3: First for Women was started in 1989. 1844 (Arthur's Magazine) $<$ 1989 (First for Women), so Arthur's Magazine was started first. 
+
+Action 3: Finish[Arthur's Magazine]
+
+(examples)
+
+You have attempted to answer the following question before and failed. The following reflection(s) give a plan to avoid failing to answer the question in the same way you did previously. Use them to improve your strategy of correctly answering the given question.
+
+(trajectories)
+
+(input)
+
+\subsection{Base Reasoning Prompt}
+
+Solve a question answering task by having a Thought, then Finish with your answer. Thought can reason about the current situation. Finish[answer] returns the answer and finishes the task. You will be given context that you should use to help you answer the question. Start your response with either Action or an indexed Thought
+
+Here are some examples:
+
+Question: What is the elevation range for the area that the eastern sector of the Colorado orogeny extends into? 
+
+Let's think step by step.
+
+Thought 1: The eastern sector of Colorado orogeny extends into the High Plains. 
+
+Thought 2: High Plains rise in elevation from around 1,800 to 7,000 ft
+
+Thought 3: The answer is 1,800 to 7,000 ft.
+
+Action: Finish[1,800 to 7,000 ft]
+
+(examples)
+
+Previous trial:
+(trajectories)
+
+(input)
+
+\subsection{Value Function Prompt}
+
+Analyze the trajectories of a solution to a question answering task. The trajectories are labeled by environmental Observations about the situation, Thoughts that can reason about the current situation, and Actions that can be three types: 
+
+(1) Search[entity], which searches the exact entity on Wikipedia and returns the first paragraph if it exists. If not, it will return some similar entities to search.
+
+(2) Lookup[keyword], which returns the next sentence containing keyword in the current passage.
+
+(3) Finish[answer], which returns the answer and finishes the task.
+
+Given a question and a trajectory, evaluate its correctness and provide your reasoning and analysis in detail. Focus on the latest thought, action, and observation. Incomplete trajectories can be correct if the thoughts and actions so far are correct, even if the answer is not found yet. Do not generate additional thoughts or actions. Then at the last line conclude ``Thus the correctness score is {s}'', where s is an integer from 1 to 10.
+
+Question: Which magazine was started first Arthur's Magazine or First for Women?
+
+Thought 1: I need to search Arthur's Magazine and First for Women, and find which was started first.
+
+Action 1: Search[Arthur's Magazine]
+
+Observation 1: Arthur's Magazine was an American literary periodical published in Philadelphia in the 19th century. Edited by Timothy Shay Arthur, it featured work by Edgar A. Poe, J.H. Ingraham, Sarah Josepha Hale, Thomas G. Spear, and others.[1][2] In May 1846 it was merged into Godey's Lady's Book.[3]
+
+This trajectory is correct as it is reasonable to search for the first magazine provided in the question. It is also better to have simple searches corresponding to a single entity, making this the best action.
+
+Thus the correctness score is 10
+
+(other examples)
+
+(failed trajectories)
+
+(context)
+
+\subsection{Reflection Prompt}
+
+
+Analyze the trajectories of a solution to a question-answering task. The trajectories are labeled by environmental Observations about the situation, Thoughts that can reason about the current situation, and Actions that can be three types: 
+
+(1) Search[entity], which searches the exact entity on Wikipedia and returns the first paragraph if it exists. If not, it will return some similar entities to search.
+
+(2) Lookup[keyword], which returns the next sentence containing keyword in the current passage.
+
+(3) Finish[answer], which returns the answer and finishes the task.
+
+Given a question and a trajectory, evaluate its correctness and provide your reasoning and analysis in detail. Focus on the latest thought, action, and observation. Incomplete trajectories can be correct if the thoughts and actions so far are correct, even if the answer is not found yet. Do not generate additional thoughts or actions. Then at the last line conclude ``Thus the correctness score is {s}'', where s is an integer from 1 to 10.
+
+Question: Which magazine was started first Arthur's Magazine or First for Women?
+
+Thought 1: I need to search Arthur's Magazine and First for Women, and find which was started first.
+
+Action 1: Search[Arthur's Magazine]
+
+Observation 1: Arthur's Magazine was an American literary periodical published in Philadelphia in the 19th century. Edited by Timothy Shay Arthur, it featured work by Edgar A. Poe, J.H. Ingraham, Sarah Josepha Hale, Thomas G. Spear, and others.[1][2] In May 1846 it was merged into Godey's Lady's Book.[3]
+
+This trajectory is correct as it is reasonable to search for the first magazine provided in the question. It is also better to have simple searches corresponding to a single entity, making this the best action.
+
+Thus the correctness score is 10
+
+(other examples)
+
+(failed trajectories)
+
+(context)
+
+\section{Programming Prompts}
+\label{sec:programming_prompt}
+\subsection{HumanEval function implementation example}
+Sample function signature:\\
+\begin{lstlisting}
+def minSubArraySum(nums):
+    Given an array of integers nums, 
+    find the minimum sum of any
+    non-empty sub-array of nums.
+    Example
+    minSubArraySum([-1, -2, -3]) == -6
+\end{lstlisting}
+
+Sample function body implementation:\\
+\begin{lstlisting}
+    min_sum = float('inf')
+    for i in range(len(nums)):
+        current_sum = 0
+        for j in range(i, len(nums)):
+            current_sum += nums[j]
+            if current_sum < min_sum:
+                min_sum = current_sum
+    return min_sum
+\end{lstlisting}
+
+\subsection{Base Acting/Reasoning Prompt}
+
+You are an AI Python assistant. You will be given your previous implementation of a function, a series of unit tests results, and your self-reflection on your previous implementation. Write your full implementation (restate the function signature).
+
+Example 1:
+
+[previous impl]:
+
+\begin{lstlisting}
+def add(a: int, b: int) -> int:
+    ``Given integers a and b, 
+    return the total value of a and b.''
+    return a - b
+\end{lstlisting}
+
+[unit test results from previous impl]:
+
+Tested passed:
+
+Tests failed:
+
+assert add(1, 2) == 3 \# output: -1
+
+assert add(1, 2) == 4 \# output: -1
+
+[reflection on previous impl]:
+
+The implementation failed the test cases where the input integers are 1 and 2. The issue arises because the code does not add the two integers together, but instead subtracts the second integer from the first. To fix this issue, we should change the operator from `-' to `+' in the return statement. This will ensure that the function returns the correct output for the given input.
+
+[improved impl]:
+
+\begin{lstlisting}
+def add(a: int, b: int) -> int:
+    ``
+    Given integers a and b, 
+    return the total value of a and b.
+    ''
+    return a + b
+\end{lstlisting}
+
+\subsection{Reflection Prompt}
+
+You are a Python programming assistant. You will be given a function implementation and a series of unit test results. Your goal is to write a few sentences to explain why your implementation is wrong, as indicated by the tests. You will need this as guidance when you try again later. Only provide the few sentence description in your answer, not the implementation. You will be given a few examples by the user.
+
+Example 1:
+
+[previous impl]:
+
+\begin{lstlisting}
+    def add(a: int, b: int) -> int:
+        ``
+        Given integers a and b, 
+        return the total value of a and b.
+        ''
+    return a - b
+\end{lstlisting}
+
+[unit test results from previous impl]:
+
+Tested passed:
+
+Tests failed:
+
+assert add(1, 2) == 3 \# output: -1
+
+assert add(1, 2) == 4 \# output: -1
+
+[reflection on previous impl]:
+
+The implementation failed the test cases where the input integers are 1 and 2. The issue arises because the code does not add the two integers together, but instead subtracts the second integer from the first. To fix this issue, we should change the operator from `-' to `+' in the return statement. This will ensure that the function returns the correct output for the given input.
+
+\subsection{Test Case Generation Prompt}
+
+You are an AI coding assistant that can write unique, diverse, and intuitive unit tests for functions given the signature and docstring.
+
+(input)
+
+\section{WebShop Prompts}
+\label{sec:webshop_prompt}
+\subsection{Acting Prompt}
+
+Webshop 
+
+Instruction:  
+
+i would like a 3 ounce bottle of bright citrus deodorant for sensitive skin, and price lower than 50.00 dollars 
+
+[Search]  
+\\
+
+Action: search[3 ounce bright citrus deodorant sensitive skin]
+
+Observation: 
+
+[Back to Search] 
+
+Page 1 (Total results: 50) 
+
+[Next
+] 
+[B078GWRC1J] 
+
+Bright Citrus Deodorant by Earth Mama | Natural and Safe for Sensitive Skin, Pregnancy and Breastfeeding, Contains Organic Calendula 3-Ounce 
+
+\$10.99 
+
+[B078GTKVXY] 
+
+Ginger Fresh Deodorant by Earth Mama | Natural and Safe for Sensitive Skin, Pregnancy and Breastfeeding, Contains Organic Calendula 3-Ounce 
+
+\$10.99 
+
+[B08KBVJ4XN] 
+
+Barrel and Oak - Aluminum-Free Deodorant, Deodorant for Men, Essential Oil-Based Scent, 24-Hour Odor Protection, Cedar \& Patchouli Blend, Gentle on Sensitive Skin (Mountain Sage, 2.7 oz, 2-Pack) 
+
+\$15.95  
+\\
+
+Action: think[B078GWRC1J and B078GTKVXY are bright citrus deodorant less then 50 dollars. I can check B078GWRC1J first.]
+
+Observation: OK.
+\\
+
+Action: click[B078GWRC1J]
+
+Observation: 
+
+[Back to Search] 
+
+[Prev] 
+
+scent [assorted scents][bright citrus][calming lavender][ginger fresh][simply non-scents]
+size [travel set (4-pack)][3 ounce (pack of 1)][3-ounce (2-pack)]
+Bright Citrus Deodorant by Earth Mama | Natural and Safe for Sensitive Skin, Pregnancy and Breastfeeding, Contains Organic Calendula 3-Ounce 
+
+Price: \$10.99 
+
+Rating: N.A. 
+
+[Description] 
+
+[Features] 
+
+[Reviews] 
+
+[Buy Now]  
+\\
+
+Action: think[For 3 ounce bottle of bright citrus deodorant for sensitive skin, the item has options `bright citrus' and `3 ounce (pack of 1)' and seems good to buy.]
+
+Observation: OK.
+\\
+
+Action: click[bright citrus]
+
+Observation: You have clicked bright citrus. 
+\\
+
+Action: click[3 ounce (pack of 1)]
+
+Observation: You have clicked 3 ounce (pack of 1). 
+\\
+
+Action: click[Buy Now]
+
+\subsection{Value Function Prompt}
+
+Given an item to purchase and a trajectory that aims to buy an item that exactly matches the specification, which corresponds to the ideal score of 1.0, analyze the following trajectory, then at the last line conclude, ``Thus the correctness score is {s}'', where s is an integer from 1 to 10.
+
+Here are some examples
+\\
+
+Webshop
+
+Instruction:
+
+i am looking for dairy free and apple variety pack of chips, and price lower than 30.00 dollars
+
+[Search]
+\\
+
+Action: search[dairy free and apple variety pack of chips]
+
+Observation:
+
+[Back to Search]
+
+Page 1 (Total results: 50)
+
+[Next]
+
+[B07HRFJWP8]
+
+Enjoy Life Foods Soft Baked Ovals, Breakfast Bars, Nut Free Bars, Soy Free, Dairy Free, Non GMO, Gluten Free, Vegan, Variety Pack, 4 Boxes (20 Bars Total)
+
+\$100.0
+
+[B01KMHY5PG]
+
+Enjoy Life Soft Baked Chewy Bars, Variety Pack, Nut Free Bars, Soy Free, Dairy Free, Gluten Free, 6 Boxes (30 Total Bars)
+
+\$21.49
+
+[B008D2X8C4]
+
+Enjoy Life Lentil Chips Variety Pack, Dairy Free Chips, Soy Free, Nut Free, Non GMO, Vegan, Gluten Free, 24 Bags (0.8 oz)
+
+\$100.0
+\\
+
+Action: think[The first two items are not what I want. The third item is the dairy free and apple variety pack of chips I want.]
+
+Observation: OK.
+\\
+
+Action: click[B008D2X8C4]
+
+Observation:
+
+[Back to Search]
+
+[Prev]
+
+flavor name [dill and sour cream][garlic \& parmesan][light sea salt][margherita pizza][thai chili lime][variety pack]
+size [0.8 ounce (pack of 24)][4 ounce (pack of 12)]
+
+Price: \$100.0
+
+Rating: N.A.
+
+[Description]
+
+[Features]
+
+[Reviews]
+
+[Buy Now]
+\\
+
+Action: think[The item has options `variety pack' and `0.8 ounce (pack of 24)' and seems good to buy.]
+
+Observation: OK.
+\\
+
+Action: click[variety pack]
+
+Observation: You have clicked variety pack.
+\\
+
+Action: click[0.8 ounce (pack of 24)]
+
+Observation: You have clicked 0.8 ounce (pack of 24).
+\\
+
+Action: click[Buy Now]
+\\
+
+Reflection: In this attempt, I was unsuccessful. I accidentally bought a product that was \$100, which is more than my budget of \$30. Either way, the initial search results were not good. Next time, I will do search[``variety pack of chip'';] and then check if the results meet the dairy free and the \$30 budget constraints. I will continue to refine my searches so that I can find more products.
+
+Thus the correctness score is 5
+\\
+
+(input)
+
+\subsection{Reflection Prompt}
+
+You are an advanced reasoning agent that can improve based on self-reflection. You will be given a previous reasoning trial in which you were given access to a shopping website and a specific type of item to buy. You were given access to relevant context and an item to purchase. You were unsuccessful in buying the correct item either because you did not find an item meeting all of the required specifications or because you did not select the correct item. The ideal score is 1.0, and anything less is incorrect. In a few sentences, Diagnose a possible reason for failure and devise a new, concise, high-level plan that aims to mitigate the same failure. Use complete sentences.  
+Here are some examples:
+
+Previous Trial
+Instruction:
+i am looking for dairy free and apple variety pack of chips, and price lower than 30.00 dollars
+[Search]
+
+Action: search[dairy free and apple variety pack of chips]
+Observation:
+[Back to Search]
+Page 1 (Total results: 50)
+[Next $>$]
+[B07HRFJWP8]
+Enjoy Life Foods Soft Baked Ovals, Breakfast Bars, Nut Free Bars, Soy Free, Dairy Free, Non GMO, Gluten Free, Vegan, Variety Pack, 4 Boxes (20 Bars Total)
+\$100.0
+[B01KMHY5PG]
+Enjoy Life Soft Baked Chewy Bars, Variety Pack, Nut Free Bars, Soy Free, Dairy Free, Gluten Free, 6 Boxes (30 Total Bars)
+\$21.49
+[B008D2X8C4]
+Enjoy Life Lentil Chips Variety Pack, Dairy Free Chips, Soy Free, Nut Free, Non GMO, Vegan, Gluten Free, 24 Bags (0.8 oz)
+\$100.0
+
+Action: think[The first two items are not what I want. The third item is the dairy free and apple variety pack of chips I want.]
+Observation: OK.
+
+Action: click[B008D2X8C4]
+Observation:
+[Back to Search]
+[$<$ Prev]
+flavor name [dill and sour cream][garlic \& parmesan][light sea salt][margherita pizza][thai chili lime][variety pack]
+size [0.8 ounce (pack of 24)][4 ounce (pack of 12)]
+Price: \$100.0
+Rating: N.A.
+[Description]
+[Features]
+[Reviews]
+[Buy Now]
+
+Action: think[The item has options `variety pack' and `0.8 ounce (pack of 24)' and seems good to buy.]
+Observation: OK.
+
+Action: click[variety pack]
+Observation: You have clicked variety pack.
+
+Action: click[0.8 ounce (pack of 24)]
+Observation: You have clicked 0.8 ounce (pack of 24).
+
+Action: click[Buy Now]
+
+STATUS: FAIL
+
+Reflection: In this attempt, I was unsuccessful. I accidentally bought a product that was \$100, which is more than my budget of \$30. Either way, the initial search results were not good. Next time, I will do search[``variety pack of chips''] and then check if the results meet the dairy free and the \$30 budget constraints. I will continue to refine my searches so that I can find more products.
+
+Previous Trial
+Instruction:
+i need gluten free vegetarian smoked peppered bacon - 4 ounce (pack of 2), and price lower than 40.00 dollars
+[Search]
+
+Action: search[gluten free vegetarian smoked peppered bacon 4 ounce pack of 2]
+Observation:
+[Back to Search]
+Page 1 (Total results: 50)
+[Next $>$]
+[B06Y96MXJV]
+Smoked Bacon Sea Salt 3-Pack: Smoked Bacon Chipotle, Smoked Bacon and Onion, Smoked Peppered Bacon - All-Natural Sea Salts Slowly Smoked Over Alderwood - No Gluten, No MSG, Non-GMO (12 total oz.)
+\$29.99
+[B06Y96N1KG]
+Spicy Hot Pepper Sea Salt 3-Pack: Ghost Pepper, Jalapeno, Habanero - All Natural, Delicious Blends of Peppers \& Sea Salt - Gluten-Free, Kosher, No MSG, Non-GMO (12 total oz.)
+\$29.99
+[B07GJTKYJQ]
+Louisville Vegan Jerky - 5 Flavor Variety Pack, Non-GMO Soy Protein, Gluten-Free (Black Pepper, Buffalo Dill, Pepperoni, Maple Bacon, and Carolina BBQ, 3 Ounces)
+\$42.99
+
+Action: think[The first two items are not what I want. The third item is not what I want, but it is the closest one.]
+Observation: OK.
+
+Action: click[B07GJTKYJQ]
+Observation:
+[Back to Search]
+[$<$ Prev]
+Louisville Vegan Jerky - 5 Flavor Variety Pack, Non-GMO Soy Protein, Gluten-Free (Black Pepper, Buffalo Dill, Pepperoni, Maple Bacon, and Carolina BBQ, 3 Ounces)
+Price: \$42.99
+Rating: N.A.
+[Description]
+[Features]
+[Reviews]
+[Buy Now]
+
+Action: think[The price is too high and it is not what I want.]
+Observation: OK.
+
+Action: click[$<$ Prev]
+Observation:
+[Back to Search]
+Page 1 (Total results: 50)
+[Next $>$]
+[B06Y96MXJV]
+Smoked Bacon Sea Salt 3-Pack: Smoked Bacon Chipotle, Smoked Bacon and Onion, Smoked Peppered Bacon - All-Natural Sea Salts Slowly Smoked Over Alderwood - No Gluten, No MSG, Non-GMO (12 total oz.)
+29.99
+[B06Y96N1KG]
+Spicy Hot Pepper Sea Salt 3-Pack: Ghost Pepper, Jalapeno, Habanero - All Natural, Delicious Blends of Peppers \& Sea Salt - Gluten-Free, Kosher, No MSG, Non-GMO (12 total oz.)
+29.99
+[B07GJTKYJQ]
+Louisville Vegan Jerky - 5 Flavor Variety Pack, Non-GMO Soy Protein, Gluten-Free (Black Pepper, Buffalo Dill, Pepperoni, Maple Bacon, and Carolina BBQ, 3 Ounces)
+42.99
+
+Action: think[The first two items are not what I want.]
+Observation: OK.
+
+Action: click[Next $>$]
+Observation: Invalid action!
+
+Action: think[I need to refine my search.]
+Observation: OK.
+
+Action: click[$<$ Back to Search]
+Observation: Invalid action!
+
+Action: click[Back to Search]
+
+STATUS: FAIL
+
+Reflection: In this attempt, I was unsuccessful. The initial search results were not the products that I was looking for. Next time, I will do search[``vegetarian bacon''] for a broader search. I will check that the new results will fulfill the gluten free and 4 ounce pack of 2 constraints. I will continue to refine my searches so that I can find more products.
+
+Previous trial:
+{trajectory}
+Reflection:'''

@@ -1,0 +1,281 @@
+\documentclass{article}
+\PassOptionsToPackage{numbers, compress}{natbib}
+ \usepackage[eandd,preprint]{neurips_2026}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+% \hypersetup{
+%   colorlinks=true,
+%   linkcolor=blue,
+%   citecolor=blue,
+%   urlcolor=blue,
+% }
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[scale=0.95,semibold]{sourcecodepro}
+\usepackage{natbib}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,decorations.pathmorphing,backgrounds}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{wrapfig}
+\usepackage{needspace}
+
+\makeatletter
+\renewcommand{\paragraph}{%
+  \@startsection{paragraph}{4}{\z@}%
+                {0.4ex \@plus 0.2ex \@minus 0.1ex}%
+                {-1em}%
+                {\normalsize\bf}%
+}
+\makeatother
+
+% Boxed environments for Section 2
+\newtcolorbox{principlesbox}{
+  colback=blue!2,
+  colframe=blue!40!black,
+  boxrule=0.4pt,
+  arc=1.5pt,
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+}
+\newtcolorbox{slopbox}[1][]{
+  colback=red!3,
+  colframe=red!40!black,
+  title={#1},
+  fonttitle=\bfseries\small,
+  boxrule=0.4pt,
+  arc=1.5pt,
+  left=2pt, right=2pt, top=2pt, bottom=2pt,
+}
+\newtcolorbox{cleanbox}[1][]{
+  colback=green!3,
+  colframe=green!40!black,
+  title={#1},
+  fonttitle=\bfseries\small,
+  boxrule=0.4pt,
+  arc=1.5pt,
+  left=2pt, right=2pt, top=2pt, bottom=2pt,
+}
+\definecolor{runexborder}{RGB}{0,32,96}
+\newtcolorbox{runningexample}[1][Running Example]{
+  enhanced, breakable,
+  colback=white,
+  colframe=runexborder,
+  boxrule=1pt,
+  sharp corners,
+  fonttitle=\bfseries,
+  coltitle=runexborder,
+  colbacktitle=white,
+  title=#1,
+  attach boxed title to top left={xshift=10pt, yshift=-\tcboxedtitleheight/2},
+  boxed title style={
+    colback=white, colframe=white,
+    boxrule=0pt, sharp corners,
+    left=4pt, right=4pt, top=0pt, bottom=0pt,
+  },
+  top=10pt,
+  left=10pt, right=4pt, bottom=4pt,
+}
+
+% so \autoref produces "Running Example 1.2" instead of "runex 1.2"
+\providecommand{\runexautorefname}{Running Example}
+
+% GitHub-style diff colors
+\definecolor{diffadd}{HTML}{dafbe1}
+\definecolor{diffrem}{HTML}{ffcecb}
+\definecolor{diffaddmark}{HTML}{1a7f37}
+\definecolor{diffremmark}{HTML}{cf222e}
+\definecolor{diffctx}{HTML}{f6f8fa}
+\definecolor{diffborder}{HTML}{d0d7de}
+
+\usepackage{colortbl}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{tabularx}
+
+% Diff box environment
+\newtcolorbox{diffbox}[1][]{
+  colback=white,
+  colframe=diffborder,
+  title={#1},
+  fonttitle=\bfseries\small,
+  boxrule=0.5pt,
+  arc=2pt,
+  left=0pt, right=0pt, top=0pt, bottom=0pt,
+  boxsep=0pt,
+}
+
+\definecolor{figyellow}{HTML}{FFD966}
+\definecolor{figred}{HTML}{E06666}
+\definecolor{codebg}{gray}{0.97}
+\definecolor{codeframe}{gray}{0.75}
+\definecolor{codegreen}{rgb}{0.0,0.4,0.0}
+\definecolor{codepurple}{rgb}{0.5,0.0,0.33}
+\definecolor{codenumber}{gray}{0.55}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  keywordstyle=\color{codepurple}\bfseries,
+  stringstyle=\color{codegreen},
+  commentstyle=\color{gray}\itshape,
+  numbers=left,
+  numberstyle=\ttfamily\scriptsize\color{codenumber},
+  numbersep=6pt,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=l,
+  framerule=1.5pt,
+  rulecolor=\color{codeframe},
+  framesep=4pt,
+  xleftmargin=1.2em,
+  xrightmargin=0.2em,
+  aboveskip=1pt,
+  belowskip=1pt,
+  showstringspaces=false,
+  captionpos=b,
+  tabsize=4,
+}
+
+\lstdefinestyle{specblock}{
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  xleftmargin=1em,
+  language={},
+  keywordstyle={},
+  stringstyle={},
+  commentstyle={},
+}
+
+\title{SlopCodeBench: Benchmarking How Coding Agents Degrade Over Long-Horizon Iterative Tasks}
+
+\author{
+  Gabriel Orlanski\textsuperscript{1}\thanks{Corresponding author. Correspondence to \texttt{gorlanski@wisc.edu}.} \And
+  Devjeet Roy\textsuperscript{2} \And
+  Alexander Yun\textsuperscript{1} \And
+  Changho Shin\textsuperscript{1} \And
+  Alex Gu\textsuperscript{3} \And
+  Albert Ge\textsuperscript{1} \And
+  Dyah Adila\textsuperscript{1} \And
+  Nicholas Roberts\textsuperscript{1} \And
+  Frederic Sala\textsuperscript{1} \And
+  Aws Albarghouthi\textsuperscript{1} \AND
+  \normalfont\textsuperscript{1}University of Wisconsin--Madison \quad
+  \textsuperscript{2}Washington State University \quad
+  \textsuperscript{3}MIT
+}
+
+\newcommand{\addcites}{(\textbf{ADDCITATIONS})}
+
+% Anonymity-aware URLs. When the document is built in anonymous mode (default
+% under [eandd] without [preprint]/[final]), all canonical scbench.ai and
+% gabeorlanski/scb-problems links are rewritten to anonymous mirrors.
+\makeatletter
+\if@anonymous
+  \newcommand{\scbsiteurl}{https://anonymous.4open.science/r/anon-slop-code-CA9D/}
+  \newcommand{\scbrepourl}{https://anonymous.4open.science/r/anon-slop-code-CA9D/}
+  \newcommand{\scbproblemurl}[1]{anonymous.4open.science/r/anon-slop-code-CA9D/}
+  \newcommand{\scbsitelink}{\href{\scbsiteurl}{here}}
+  \newcommand{\scbrepolink}{\href{\scbrepourl}{here}}
+\else
+  \newcommand{\scbsiteurl}{https://www.scbench.ai}
+  \newcommand{\scbrepourl}{https://github.com/gabeorlanski/scb-problems}
+  \newcommand{\scbproblemurl}[1]{https://www.scbench.ai/problems/#1}
+  \newcommand{\scbsitelink}{\url{\scbsiteurl}}
+  \newcommand{\scbrepolink}{\url{\scbrepourl}}
+\fi
+\makeatother
+
+\newcommand{\scb}{SlopCodeBench}
+\newcommand{\problem}{P}
+\newcommand{\ckptlist}{\textbf{C}}
+\newcommand{\ckpt}[1]{C_{#1}}
+\newcommand{\ckptinit}{\ckpt{1}}
+\newcommand{\solution}[1]{y_{#1}}
+\newcommand{\solutioninit}{\solution{0}}
+\newcommand{\testsuite}[1]{v_{#1}}
+\newcommand{\spec}[1]{x_{#1}}
+\newcommand{\agent}{\pi_{\theta}}
+\newcommand{\codesearch}{\texttt{code\_search}}
+\newcommand{\mass}[1]{\mathcal{M}_{#1}}
+\newcommand{\vdef}{\text{vd}}
+\newcommand{\justsolve}{\texttt{just-solve}}
+\newcommand{\antislop}{\texttt{anti-slop}}
+\newcommand{\planfirst}{\texttt{plan-first}}
+\input{sections/generated/overall_stats}
+\input{sections/generated/transition_stats}
+\input{sections/generated/erosion_stats}
+\input{sections/generated/verbosity_findings_stats}
+\input{sections/generated/iterative_stats}
+\input{sections/generated/agent_behavior_stats}
+\input{sections/generated/agent_behavior_fig_stats}
+\input{sections/generated/new_stats}
+\input{sections/generated/agent_vs_human_stats}
+\input{sections/generated/prompt_strategy_stats}
+\input{sections/generated/prompt_strategy_lift_macros}
+\definecolor{diffstart}{named}{codebg}
+\definecolor{diffincl}{named}{codegreen}
+\definecolor{diffrem}{named}{red}
+\lstdefinelanguage{diff}{
+  basicstyle=\ttfamily\small,
+  morecomment=[f][\color{diffstart}]{@@},
+  morecomment=[f][\color{diffincl}]{+\ },
+  morecomment=[f][\color{diffrem}]{-\ },
+}
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Software development is iterative, yet agentic coding benchmarks hide design issues through their single-shot setup.
+%
+Recent iterative benchmarks attempt to remedy this but heavily constrain an agent's design decision space, making it impossible to faithfully measure how their decisions shape future extensions.
+%
+We introduce SlopCodeBench, a benchmark of 36 problems and 196 checkpoints where agents repeatedly extend their own solutions. Unlike prior iterative benchmarks, our evolving specifications demand architectural decisions but leave internal structure to the agent.
+%
+We measure two forms of degradation: structural erosion (concentrated complexity) and verbosity (redundant code).
+%
+Evaluating 15 coding agents across open and closed models, we find that no agent fully solves any problem end-to-end, and the best agent passes 14.8\% of checkpoints.
+%
+Quality degrades across checkpoints, with structural erosion rising in 77\% of trajectories and verbosity in 75.5\%.
+%
+Compared to 473 open-source Python repositories, agent code is 2.3x more verbose and 2.0x more eroded, and the human repositories degrade less often and by smaller margins across their git histories.
+%
+Explicit quality guidance reduces initial verbosity and erosion by up to a third, without affecting degradation rates.
+%
+SlopCodeBench provides the first measurement of code degradation under iterative extension, revealing that agents pass checkpoints while producing code that erodes and bloats with each turn.
+\end{abstract}
+
+\input{sections/introduction}
+\input{sections/benchmark}
+\input{sections/experiments}
+\input{sections/related_work}
+% \input{sections/limitations}
+\input{sections/conclusion}
+
+\begin{ack}
+We thank Abtin Molavi, Amanda Xu, June Cho, Xavier Garcia, and Samuel Guo for feedback during the development of this project. We also thank the Terminal Bench team for their inspiration and feedback.
+
+This work is supported by Snorkel AI through the Open Benchmarks Grants program. This work was additionally supported in part by DARPA and the NSF.
+\end{ack}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\appendix
+% \input{checklist.tex}
+
+\input{sections/appendix/A_benchmark.tex}
+\input{sections/appendix/B_quality.tex}
+\input{sections/appendix/C_setup.tex}
+\input{sections/appendix/E_results.tex}
+\input{sections/appendix/F_related_work.tex}
+
+\end{document}

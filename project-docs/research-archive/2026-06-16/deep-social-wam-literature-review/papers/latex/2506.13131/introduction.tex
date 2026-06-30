@@ -1,0 +1,56 @@
+\section{Introduction}
+
+\label{sec:introduction}
+
+Discovering new high-value knowledge, such as making a novel scientific discovery or developing a commercially valuable algorithm, generally requires a prolonged process of ideation, exploration, backtracking on unpromising hypotheses, experimentation, and validation. There has been much recent interest in using large language models (LLMs) to automate significant parts of this process.
+Hopes of success here are driven by the breathtaking power of recent LLMs \cite{gemini25,o3}, which can enhance their capabilities using test-time compute, and the rise of \emph{agents} that combine language generation and action \cite{yao2023react,shinn2023reflexion}. These advances have improved performance across a range of established benchmarks and accelerated discovery-oriented tasks like hypothesis generation~\cite{gottweis2025towards} and experiment design \cite{huang2024crisprgpt,boiko2023autonomous}. However, getting LLM pipelines all the way to making entirely new scientific or practical discoveries remains challenging. 
+
+In this white paper, we present an LLM code superoptimization agent, called \method, that takes on this challenge using a combination of evolutionary computation and LLM-based code generation. \method focuses on the broad spectrum of scientific and engineering discovery problems in which the candidates of discovery can be automatically evaluated. 
+It represents the candidates (for example, new mathematical objects or practical heuristics) as algorithms and uses a set of LLMs to generate, critique, and evolve a pool of such algorithms. The LLM-directed evolution process is grounded using code execution and automatic evaluation. 
+This evaluation mechanism allows \method to avoid any incorrect suggestions from the base LLM~\citep{huang2025survey}.
+
+The evolutionary process in \method leverages modern LLMs' ability to respond to feedback, enabling the discovery of candidates that are substantially different from the initial candidate pool in syntax and function.
+It is applicable both to problems where discovering new algorithms is the intrinsic goal, as well as to the broad range of problems where the solution of interest is not an algorithm itself but an algorithm can \emph{describe} how that solution is to be constructed or found.
+In the latter case, discovering the algorithm is only an instrumental goal, but it turns out to be a surprisingly effective strategy compared to searching for the solution directly~\cite{paredes2023mathematical}.
+
+The idea of combining evolutionary methods with coding LLMs has been previously explored in various specialized settings.
+In particular, \method is a substantial enhancement of \emph{FunSearch}~\cite{paredes2023mathematical} (see~\Cref{tab:funsearch-vs-alphaevolve}), which used LLM-guided evolution to discover heuristics in order to construct novel mathematical objects or to drive the operation of online algorithms.
+Also, related approaches have been used in tasks such as discovering policies for simulated robots~\cite{lehman2023evolution}, symbolic regression \citep{shojaee2025llmsr,grayeli2024symbolic}, and the synthesis of heuristic functions for combinatorial optimization~\cite{liu2024evolution}.
+In contrast to these systems, \method leverages state-of-the-art (SOTA) LLMs to evolve large pieces of code that implement complex algorithms spanning multiple functions and components. As a result, it is able to go significantly beyond its predecessors in scale and generality.
+
+\begin{table}[H]
+\small
+\rowcolors{2}{white}{gray!20}
+\begin{center}
+\begin{tabular}{ll} \toprule
+    \emph{FunSearch}~\cite{paredes2023mathematical} & \method \\
+    \midrule
+    evolves single function & evolves entire code file\\
+    evolves up to 10-20 lines of code & evolves up to hundreds of lines of code\\
+    evolves code in Python & evolves any language\\
+    needs fast evaluation ($\leq 20$min on 1 CPU)\;\; & can evaluate for hours, in parallel, on accelerators\\
+    millions of LLM samples used & thousands of LLM samples suffice\\
+    small LLMs used; no benefit from larger & benefits from SOTA LLMs\\ 
+    minimal context (only previous solutions) & rich context and feedback in prompts\\
+    optimizes single metric & can simultaneously optimize multiple metrics\\
+    \bottomrule
+\end{tabular}
+\caption{Capabilities and typical behaviours of \method and our previous agent.}
+\label{tab:funsearch-vs-alphaevolve}
+\end{center}
+\end{table}
+
+While the use of an automated evaluation metric offers \method a key advantage, it is also a limitation---in particular, it puts tasks that require manual experimentation out of our scope. 
+Because problems in mathematics, computer science, and system optimization typically permit automated evaluation metrics, our efforts on \method focus on these domains.
+Specifically, we use \method to make progress on several well-known open problems in algorithm design and constructive mathematics, as well as the optimization of critical layers in the large-scale computation stacks at Google.
+
+Within algorithm design, we consider the fundamental problem of discovering fast algorithms for multiplying matrices, a problem to which a more specialized AI approach had been applied previously~\citep{fawzi2022discovering}.
+Despite being general-purpose, \method goes beyond~\cite{fawzi2022discovering}, improving the SOTA for 14 matrix multiplication algorithms; notably, for $4 \times 4$ matrices, \method improves \authoryearcitet{strassen1969gaussian}'s algorithm by discovering an algorithm using 48 multiplications to multiply $4 \times 4$ complex-valued matrices.%
+\footnote{These discovered algorithms as well as our other new mathematical results can be found at \url{\ResultsColabURL}.}
+
+In mathematics, we consider a broad range of open problems on which one can make progress by discovering constructions (objects) with better properties than all previously known constructions, according to given mathematical definitions.
+We apply \method to a large number (over 50) of such problems and match the best known constructions on $\sim$75\% of them (in many cases these constructions are likely to already be optimal). On $\sim$20\% of the problems, \method surpasses the SOTA and discovers new, provably  better constructions.
+This includes an improvement on the Minimum Overlap Problem set by \citet{erdHos1955some} and an improved construction on the Kissing Numbers problem in $11$ dimensions~\citep{kissing_survey,kissing_11}.
+
+Finally, we use \method in four engineering problems spanning different layers of Google's compute stack: discovering scheduling heuristics for Google's cluster management system, optimizing matrix-multiplication kernels used to train LLMs, optimizing arithmetic circuits used within TPUs, and optimizing the runtime of attention in Transformers.
+Because these components are run repeatedly over a long period of time, any improvements are highly valuable.

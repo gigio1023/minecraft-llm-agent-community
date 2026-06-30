@@ -1,0 +1,51 @@
+\section{Data}
+\label{section:data}
+
+Our training dataset consists of 4,700 hours at 25Hz of proprietary driving data collected in London, UK between 2019 and 2023. This corresponds to approximately 420M unique images. During training we balance over a customizable set of features to control the distribution of data (\Cref{fig:data_sampling}). We achieve this by sampling individual data points with weighting inversely proportional to the (binned and precomputed) empirical distribution of a given feature. For a given example we take the joint probability across all features to balance and stochastically decide whether to include or discard that example. We can control the strength of balancing by raising the sampling weight to an exponent, where an exponent of 0 would result in the empirical distribution (no balancing) and an exponent of 1 would result in a uniformly balanced distribution. We used an exponent of 0.5 for all features as a compromise between final balancing achieved and the severity of discarding samples for training efficiency.
+
+For the tokenizer we balanced over (latitude, longitude, weather category) to account for geography and visually distinct weather conditions ensuring our tokenizer can adequately represent a diverse range of scenes.
+
+For the world model and the video diffusion model we balanced over (latitude, longitude, weather category, steering behavior category, speed behavior category), additionally considering speed and steering behaviors to ensure the dynamics of different behaviors are captured and sufficiently modeled by the world model and the temporal decoder.
+
+Our validation dataset contains 400 hours of driving data from runs not included in the training set. The runs selected for validation are those that pass through predetermined geofences as well as a selection of randomly selected runs. We further split our validation set into strict geofences in order to analyze only those samples strictly within the validation geofence (i.e., roads never seen during training) and another geofence around our main data collection routes (i.e., roads seen during training) as a way to monitor overfitting and generalization.
+
+\begin{figure}[t]
+    \centering 
+\begin{subfigure}{0.32\textwidth}
+  \includegraphics[width=\linewidth]{Figures/Data_Balancing/data_balancing_latitude.pdf}
+  % \caption{}
+  \label{fig:data_sampling_1}
+\end{subfigure}\hfil 
+\begin{subfigure}{0.32\textwidth}
+  \includegraphics[width=\linewidth]{Figures/Data_Balancing/data_balancing_longitude.pdf}
+  % \caption{}
+  \label{fig:data_sampling_2}
+\end{subfigure}\hfil
+\begin{subfigure}{0.32\textwidth}
+  \includegraphics[width=\linewidth]{Figures/Data_Balancing/data_balancing_weather.pdf}
+  % \caption{}
+  \label{fig:data_sampling_3}
+\end{subfigure}
+
+% \medskip
+\begin{subfigure}{0.33\textwidth}
+  \includegraphics[width=\linewidth]{Figures/Data_Balancing/data_heatmap_empirical.pdf}
+  % \caption{}
+  \label{fig:data_sampling_4}
+\end{subfigure}\hfil 
+\begin{subfigure}{0.33\textwidth}
+  \includegraphics[width=\linewidth]{Figures/Data_Balancing/data_heatmap_balanced.pdf}
+  % \caption{}
+  \label{fig:data_sampling_5}
+\end{subfigure}\hfil 
+\begin{subfigure}{0.33\textwidth}
+  \includegraphics[width=\linewidth]{Figures/Data_Balancing/data_heatmap_validation.pdf}
+  % \caption{}
+  \label{fig:data_sampling_6}
+\end{subfigure}
+\caption{Data sampling. The top row shows the empirical distribution and the sampled distribution for three features we selected to balance over during training: latitude, longitude and weather condition. Dashed lines indicate data outside of the range we balanced over. The bottom row shows the geographical heatmap of sampled latitude and longitude coordinates for the whole training set, the sampled training set and the geofenced validation set.}
+\label{fig:data_sampling}
+\end{figure}
+
+
+

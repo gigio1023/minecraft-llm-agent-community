@@ -1,0 +1,204 @@
+\section{Methods}
+\label{sec:methods}
+
+The main running loop of \acr{SICA} resembles the
+\acr{ADAS} loop \citet{huAutomatedDesignAgentic2024} and is illustrated in
+Figure~\ref{fig:agent_loop}.
+In particular, both \acr{SICA}, and \acr{ADAS} keep an archive of previous agents and their benchmark results.
+In the first step, \acr{SICA} takes the best performing agent from the archive up until this point as the meta-agent, which is instructed to
+look through the archive, identify an improvement, and implement it. The
+high-level scheme is illustrated in Algorithm~\ref{algo:adas}.
+Note that this is different from \acr{ADAS}, in that \acr{ADAS} has a fixed meta-agent, so does not select the meta-agent from the archive (the archive in \acr{ADAS} is an archive of target-agents, not meta-agents).
+Second, both \acr{ADAS} and \acr{SICA} evaluate the new agent on a set of evaluation benchmarks and store the results.
+
+We define the `best' performing agent by a utility
+function, which incorporates common desiderata for a good agent; the normalised
+benchmark performance score $p_{\text{score}} \in [0, 1]$, the wall-clock time
+in seconds $p_{\text{time}}$, as well as the dollar cost $p_{\text{cost}}$. The
+base utility is calculated as
+\begin{equation}
+\label{eq:base_utility}
+U = w_{\text{score}} p_{\text{score}} + w_{\text{cost}} (1 - \min(1, p_{\text{cost}} / \$ 10)) + w_{\text{time}} (1 - \min(1, p_{\text{time}} / 300 \text{ s}))
+\end{equation}
+where we set the coefficients to $w_{\text{score}} = 0.5$,
+$w_{\text{cost}} = 0.25$ and $w_{\text{time}} = 0.25$.
+We cap the worst cost at
+\$10 per problem, and impose a timeout of 300 s after which we cancel the agent.
+To give partial credit for work done before the timeout, we calculate the final
+utility as follows, with a timeout penalty of $\tau = 0.5$:
+\begin{equation}
+U_{\text{final}} =
+\begin{cases}
+    U (1 - \tau), & \text{if timed out} \\
+    U, & \text{otherwise}
+\end{cases}
+\end{equation}
+
+Note that since we are not performing any weight updates, this numerical score
+is only used to pick the next meta agent, as well as the base agent for the next
+iteration.
+
+We begin by describing the initial coding agent.
+We then go on to describe the benchmark runner framework, and how this framework
+naturally allows us to create a self-referential task (that of improving the
+coding agent).
+
+\begin{wrapfigure}{R}{0.35\textwidth}
+\begin{tikzpicture}[
+    box/.style={
+        draw,
+        rectangle,
+        minimum width=5cm,    % Reduced from 12cm
+        align=left,
+        rounded corners=2pt,
+        fill=white
+    },
+    section/.style={
+        draw,
+        rectangle,
+        minimum width=4cm,    % Reduced from 11cm
+        align=left,
+        rounded corners=2pt,
+        fill=b4!20
+    },
+    component/.style={
+        rectangle,
+        align=left,
+        text width=4cm       % Reduced from 10cm
+    }
+]
+
+% System Prompt Section
+\node[section] (system) at (0,0) {System Prompt};
+\node[component, below=0.55cm of system.north] (system_comp) {
+    \textbullet~Agent definition and goals\\
+    \textbullet~Tool documentation\\
+    \textbullet~Sub-agent documentation\\
+    \textbullet~System instructions
+};
+
+% Core Prompt Section
+\node[section, below=2cm of system] (core) {Core Prompt};
+\node[component, below=0.55cm of core.north] (core_comp) {
+    \textbullet~Problem statement or instruction\\
+    \textbullet~Open files\\
+    \textbullet~Directory tree
+};
+
+% Assistant Messages Section
+\node[section, below=1.7cm of core] (assistant) {Assistant Messages};
+\node[component, below=0.55cm of assistant.north] (assistant_comp) {
+    \textbullet~CoT reasoning\\
+    \textbullet~Tool calls and results\\
+    \textbullet~Sub-agent calls and results\\
+    \textbullet~Overseer notifications
+};
+
+
+% Background container - now includes the component nodes
+\begin{scope}[on background layer]
+    \node[box,fit={(system) (system_comp) (core) (core_comp) (assistant) (assistant_comp)},inner sep=0.5cm] (container) {};
+\end{scope}
+
+% Labels for major sections
+\node[rotate=90,anchor=south] at (container.west) {LLM Context Window};
+
+\end{tikzpicture}
+\label{fig:context_window}
+\caption{LLM context window structure.}
+\end{wrapfigure}
+
+
+\subsection{Initial agent}%
+\label{subsec:tools}
+
+We were interested in useful, practically relevant coding agents capable of self-improvement.
+To that end, we started with a sophisticated coding agent, with a number of tools, sub-agents and oversight mechanisms.
+Of course, the tools, sub-agents and oversight mechanisms were all amenable to self-improvement; but here we simply describe the starting point.
+
+We designed a set of tools to open (i.e.~add to the context) and close files, overwrite files, execute a shell command and a simple calculator tool. We also include basic tools to submit a final answer to a benchmark problem, return a result from a sub-agent call to its caller, as well as exiting early from a sub-agent call. Finally, we provide an `archive analysis' tool, which facilitates extracting high-level summary statistics about each agent iteration in the archive.
+We describe the tool calling mechanism in more detail in Appendix~\ref{sec:function_calling}.
+
+Next, we included several \emph{sub-agents}. These are merely agents invoked by
+an existing agent, much like a tool call, by accepting input arguments and
+returning a string value.
+Introducing this abstraction serves two purposes.
+The first is to ensure the benchmark tasks can run entirely autonomously, without human direction and guidance.
+We provide the problem statement to the main entrypoint agent, (the full prompt for which is given in Appendix~\ref{subsec:prompts})
+which then decomposes the task, delegating and asking questions to sub-agents.
+% The  sub-agents allow the main agent to provide the guidance that would otherwise be provided by a human.
+The second is to manage the context length for extended agent runs. The meta-improvement task is challenging, and the main agent may take on the order of one hour to finish one meta-improvement iteration. The sub-agent calls allow the context used for a sub-task to be naturally discarded when the agent returns, with the value returned by the sub-agent providing a summary of that sub-task in the main agent's context.
+% During a run, an initial sub-agent may explore the codebase, another
+% might implement some functionality, and another may test this functionality---at
+% the end of each step the sub-agents' contexts are discarded, and with it the
+% open file content, chain-of-thought reasoning, tool calls and so forth used to
+% perform the sub-task, hence saving context.
+Initially, we included three agents: a coding agent, a problem-solver agent and a reasoning agent.
+The full prompts for these agents are given in Appendix~\ref{subsec:sub_agent_prompts}.
+
+% \subsection{Oversight Mechanism}%
+% \label{subsec:oversight}
+
+Finally, one important component we provide in the initial agent that enables
+extended, autonomous operation while remaining on-task, avoiding loops or other
+behaviours that frustrate progress is the asynchronous overseer. This is an
+\acr{LLM}, running periodically in a concurrent thread, which is prompted to
+judge whether there are any pathological behaviours or deviations from the
+original task, and which may intervene by notifying the currently running agent
+(or any of its parents) by means of a message in-lined into the assistant
+context, or in serious cases to cancel the execution of an agent if it has
+deviated too far or appears stuck. The overseer is called every 30s by default,
+or on key events.
+
+This overseer is provided with a comprehensive textual representation of the
+state of the system (a truncated example of which is provided in
+Appendix~\ref{subsec:traces}) with verbose content truncated to limit context.
+This consists of the `callgraph' of agent and sub-agent execution, in addition
+to the event stream of \acr{LLM} messages, tool calls and responses, and
+sub-agent calls and responses associated with each agent call.  This broad
+representation of the system's behaviour, allows the overseer to to pick out
+patterns, as well as detect repeated work completed by previous agent calls. The
+full Overseer prompt is given in Appendix~\ref{subsec:overseer_prompt}.
+
+The structure of the agent's contexts, which contains e.g.\ open file contents, rather than just the prompt is critical.  In the initial coding agent, the context is structured as Figure~\ref{fig:context_window}.
+The system prompt with the agent definition (from Appendix~\ref{subsec:prompts}) is presented first, listing the
+definitions of the tools that the agent has available and
+the sub-agents it has available to call too. The system prompt concludes with system
+information, such as instructions for how to break out of the agent loop and
+return to the calling process.
+
+Next comes the `core prompt', which is set as the first user message in the
+chat template format\footnote{We use the user message role in the chat template
+for the core prompt not by design, but owing to the fact that we are using chat
+endpoints from model provider APIs. If fine-tuning the \acr{LLM} specifically
+for agentic applications, one might choose a more appropriately named section
+delimiter such as \texttt{<core>}.}, and contains the caller-specified problem
+statement to work on (the caller might be the user invoking the agent, or an
+agent calling a sub-agent). This is also where we insert a view of the files the
+agent has open, as well as a representation of the current working directory.
+
+Finally, the remainder of the \acr{LLM} agent's context is the running assistant
+message. This contains periods of chain-of-thought reasoning about the problem,
+punctuated by tool calls and their responses, sub-agent calls and their
+responses, as well as any notifications or comments from the asynchronous
+overseer system.
+
+The \acr{LLM} context is laid out in this way to allow new content to be
+appended, hence preserving the \acr{KV} cache to the benefit of latency between
+tool calls and cost. For the base agent, we adopt a simple scheme where file
+edits are appended as diffs, and these are periodically re-consolidated into the
+stale file view after a certain number accumulate. More sophisticated \acr{KV}
+cache preservation schemes may be written by the agent to drive down cost.
+
+\begin{algorithm}[t]
+  \KwIn{Evaluation benchmarks $B = \{b_{j} : j = 1, \ldots, m\} $, iteration count $n \in \mathbb{N}$}
+  \KwOut{Improved agent system $A_{n}$}
+  Initialise agent $A_{0}$\;
+  \For {$i = 0, 1, \ldots, n-1$} {
+    Evaluate $A_{i}$ on benchmarks $B$ and store in $p_{i}$\;
+    Run $A_{\hat{i}}$ to generate $A_{i+1}$, using the archive of $A_{\le i}$
+    and $p_{\le i}$, where $\hat{i} = \argmax_{j \in \{0, \ldots, i\}}p_{j}$\;
+  }
+  \Return $A_{n}$\;
+  \caption{\label{algo:adas}Self-Referential Agent Improvement.}
+\end{algorithm}

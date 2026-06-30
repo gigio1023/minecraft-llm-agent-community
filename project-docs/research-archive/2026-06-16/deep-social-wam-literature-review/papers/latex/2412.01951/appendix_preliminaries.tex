@@ -1,0 +1,116 @@
+
+
+\subsection{Guarantees for Approximate Maximizers}
+\label{sec:approx}
+
+Recall that the theoretical guarantees for sharpening algorithms in \cref{sec:theoretical_analysis} provide convergence to the set $\Ystar(x)\ldef{}\argmax_{y\in\cY}\piref(y\mid{}x)$ of
+(potentially non-unique) maximizers for the \mlsharp self-reward
+function $\log\piref(y\mid{}x)$. These guarantees require that the
+base model $\piref$ places sufficient provability mass on $\Ystar(x)$,
+which may not always be realistic. To address this, throughout this appendix we state and prove more general versions of our theoretical results that allow for approximate maximizers, and consequently enjoy weaker coverage assumptions
+
+For a parameter $\gamma\in[0,1)$ we define
+\begin{align}
+  \Ygamma(x)\ldef{}\crl*{y\mid{}
+  \piref(y\mid{}x)\geq{}(1-\gamma)\cdot\max_{y\in\cY}\piref(y\mid
+  x)}
+\end{align}%
+as the set of $(1-\gamma)$-approximate maximizers for $\log\piref(y\mid{}x)$.
+We quantify the
+quality of a
+sharpened model
+as follows.
+\begin{definition}[Sharpened model]
+  \label{def:sharpening_general}
+    We say that a model $\pihat$ is $(\eps,\delta,\gamma)$-sharpened relative
+    to $\piref$ if
+    \begin{align}
+      \bbP_{x\sim\cdist}\brk*{\pihat\prn*{\Ygamma(x)\mid{}x}\geq{}1-\delta} \geq{} 1-\eps.
+    \end{align}
+  \end{definition}
+That is, an 
+$(\eps,\delta,\gamma)$-sharpened policy places at least
+$1-\delta$ mass on $(1-\gamma)$-approximate arg-max responses on all but an $\eps$-fraction
+of prompts under $\mu$.
+
+Lastly, we will make use of the following generalized coverage coefficient
+\begin{align}
+  \Cstarg = \En_{x\sim\cdist}\brk*{\frac{1}{\piref(\Ygamma(x)\mid{}x)}},
+\end{align}
+which has $\Cstarg\leq{}\Cstar$.
+
+\subsection{Technical Tools}
+
+
+For a pair of probability measures $\bbP$ and $\bbQ$ with
+a common dominating measure $\omega$, Hellinger distance is defined
+via
+\begin{align}
+\Dhels{\bbP}{\bbQ}=\int\prn*{\sqrt{\frac{\mathrm{d}\bbP}{\mathrm{d}\omega}}-\sqrt{\frac{\mathrm{d}\bbQ}{\mathrm{d}\omega}}}^2\mathrm{d}\omega.
+\end{align}
+
+\begin{lemma}[MLE for conditional density estimation (e.g., \iftoggle{workshop}{\cite{wong1995probability,Sara00,zhang2006from}}{\citet{wong1995probability,Sara00,zhang2006from}})]
+  \label{lem:mle}
+  Consider a conditional density $\pistar : \cX \rightarrow
+  \Delta(\cY)$. Let $\cD = \{(x_i,y_i)\}_{i=1}^n$ be a dataset in which $(x_i,y_i)$ are drawn i.i.d. as $x_i \sim \cdist \in \Delta(\cX)$ and $y_i \sim \pistar(\cdot\mid{}x)$. Suppose we have a finite function class $\Pi\subset(\cX\to\Delta(\cY))$ such that $\pistar \in \Pi$. Define the maximum likelihood estimator
+  \begin{align}
+    \pihat \ldef \argmax_{\pi \in \Pi} \sum_{(x,y) \in \cD} \log \pi(y\mid{}x).
+  \end{align}
+  Then with probability at least $1-\deltaf$, 
+  \begin{align}
+    \En_{x \sim \cdist}\brk*{\Dhels{\pihat(\cdot\mid{}x)}{\pistar(\cdot\mid{}x)}} \le \frac{2\log(|\Pi|\deltaf^{-1})}{n}.
+  \end{align}    
+\end{lemma}
+
+\begin{lemma}[Elliptic potential lemma]\label{lemma:elliptic}
+Let $\lambda,K>0$, and let $A_1,\dots,A_T \in \RR^{d\times d}$ be positive semi-definite matrices with $\Tr(A_t) \leq K$ for all $t \in [T]$. Fix $\Gamma_0 = \lambda I_d$ and $\Gamma_t = \lambda I_d + \sum_{i=1}^t A_i$ for $t \in [T]$. Then
+\[\sum_{t=1}^T \Tr(\Gamma_{t-1}^{-1} A_t) \leq \frac{dK\log \frac{(T+1)K}{\lambda}}{\lambda\log(1+K/\lambda)}.\]
+\end{lemma}
+
+\begin{proof}[\pfref{lemma:elliptic}]
+Fix $t \in [T]$. Since $\Tr(A_t) \leq 1$, there is some $p_t \in \Delta(\RR^d)$ such that $A_t = \EE_{a \sim p_t}\brk{ aa^\top}$ and $\Pr[\norm{a}_2\leq 1] = 1$. Now observe that
+\begin{align}
+\log \det(\Gamma_t)
+&= \log \det(\Gamma_{t-1} + A_t) \\ 
+&= \log \det(\Gamma_{t-1}) + \log \det(I_d + \Gamma_{t-1}^{-1/2} A_t \Gamma_{t-1}^{-1/2}) \\ 
+&= \log \det(\Gamma_{t-1}) + \log \det\left(\EE_{a \sim p_t}\left[I_d + \Gamma_{t-1}^{-1/2} aa^\top \Gamma_{t-1}^{-1/2}\right]\right) \\ 
+&\geq \log \det(\Gamma_{t-1}) + \EE_{a \sim p_t} \log \det(I_d + \Gamma_{t-1}^{-1/2}aa^\top \Gamma_{t-1}^{-1/2}) \\ 
+&= \log\det(\Gamma_{t-1}) + \EE_{a\sim p_t}\log(1 + a^\top \Gamma_{t-1}^{-1} a).
+\end{align}
+Now $a^\top \Gamma_{t-1}^{-1} a \leq 1/\lambda$ with probability $1$, where $\lambda = \lambda_{\min}(\Gamma_0)$. We know that $\lambda x\log(1+1/\lambda) \leq \log(1+x)$ for all $x \in [0,1/\lambda]$. Thus,
+\[\log\det(\Gamma_t) \geq \log\det(\Gamma_{t-1}) + \lambda \log(1+1/\lambda) \EE_{a\sim p_t} a^\top \Gamma_{t-1}^{-1} a.\]
+Summing over $t\in [T]$, we get
+\[\log \det(\Gamma_T) \geq \log \det(\Gamma_0) + \lambda\log(1+1/\lambda) \sum_{t=1}^T \Tr(\Gamma_{t-1}^{-1} A_t).\]
+Finally note that $\lambda_{\max}(\Gamma_T) \leq T+1$ so $\log \det(\Gamma_T) \leq d\log T$, whereas $\log\det(\Gamma_0) \geq d\log \lambda$. Thus,
+\[\sum_{t=1}^T \Tr(\Gamma_{t-1}^{-1} A_t) \leq \frac{d\log \frac{T+1}{\lambda}}{\lambda\log(1+1/\lambda)}\]
+as claimed.
+\end{proof}
+
+\begin{lemma}[Freedman's inequality, e.g. \cite{agarwal2014taming}]\label{lemma:freedman}
+Let $(Z_t)_{t=1}^T$ be a martingale difference sequence adapted to filtration $(\MF_t)_{t=0}^{T-1}$. Suppose that $|Z_t| \leq R$ holds almost surely for all $t$. For any $\delta \in (0,1)$ and $\eta \in (0, 1/R)$, it holds with probability at least $1-\delta$ that
+\[\sum_{t=1}^T Z_t \leq \eta \sum_{t=1}^T \EE[Z_t^2|\MF_{t-1}] + \frac{\log(1/\delta)}{\eta}.\]
+\end{lemma}
+
+\begin{corollary}\label{cor:filtration-tail}
+Let $(Z_t)_{t=1}^T$ be a sequence of random variables adapted to filtration $(\MF_t)_{t=0}^{T-1}$. Suppose that $Z_t \in [0,R]$ holds almost surely for all $t$. For any $\delta \in (0,1)$, it holds with probability at least $1-\delta$ that 
+\[\sum_{t=1}^T \EE[Z_t|\MF_{t-1}] \leq 2\sum_{t=1}^T Z_t + 4R\log(1/\delta).\]
+\end{corollary}
+
+\begin{proof}[\pfref{cor:filtration-tail}]
+Observe that for any $t \in [T]$,
+\begin{align}
+\EE[(Z_t - \EE[Z_t\mid \MF_{t-1}])^2\mid \MF_{t-1}]
+&\leq \EE[Z_t^2\mid \MF_{t-1}] \\ 
+&\leq R \cdot \EE[Z_t\mid \MF_{t-1}].
+\end{align}
+Applying \cref{lemma:freedman} to the sequence $(\EE[Z_t\mid \MF_{t-1}] - Z_t)_{t=1}^T$, which is a martingale difference sequence with elements supported almost surely on $[-R,R]$, we get for any $\eta \in (0,1/R)$ that with probability at least $1-\delta$,
+\begin{align}
+\sum_{t=1}^T (\EE[Z_t\mid \MF_{t-1}] - Z_t)
+&\leq \eta \sum_{t=1}^T \EE[(Z_t - \EE[Z_t\mid \MF_{t-1}])^2\mid \MF_{t-1}] + \frac{\log(1/\delta)}{\eta} \\ 
+&\leq \eta R \sum_{t=1}^T \EE[Z_t\mid \MF_{t-1}] + \frac{\log(1/\delta)}{\eta}.
+\end{align}
+Set $\eta = 1/(2R)$. Simplifying gives
+\[\sum_{t=1}^T \EE[Z_t\mid \MF_{t-1}] \leq 2\sum_{t=1}^T Z_t + 4R\log(1/\delta).\]
+as claimed.
+\end{proof}
+

@@ -1,0 +1,104 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Task: Jump over rolling logs on a bridge
+
+    Description:
+    - The environment consists of a wide static bridge that is 50 meters long and 5 meters wide, elevated 10 meters above a water surface.
+    - The robot starts at the beginning of the bridge, facing the positive x-axis.
+    - Logs (cylinders) with a radius of 0.5 meters are spawned 2 meters above the bridge and 10 meters ahead of the robot, rolling towards the robot with an initial velocity of 5 m/s along the negative x-axis.
+    - The robot must move forward on the bridge while jumping over the rolling logs to reach the end of the bridge.
+
+    Success:
+    The task is successfully completed when the robot reaches the end of the bridge.
+
+    Rewards:
+    - The robot receives a survival reward for each time step it remains on the bridge, encouraging steady progress.
+    - The robot is rewarded based on how much it reduces the distance to the end of the bridge, incentivizing swift movement towards the goal.
+    - The robot is penalized for colliding with the logs.
+
+    Termination:
+    The task terminates immediately if the robot falls off the bridge, collides with a log, or reaches the end of the bridge.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.water_size = [1000.0, 1000.0, 10.0]
+        self.water_position = [0.0, 0.0, 0.0]
+        self.water_id = self.create_box(mass=0.0, half_extents=[self.water_size[0] / 2, self.water_size[1] / 2, self.water_size[2] / 2], position=self.water_position, color=[0.0, 0.0, 1.0, 0.5])
+        self.bridge_length = 50.0
+        self.bridge_width = 5.0
+        self.bridge_height = 0.5
+        self.bridge_position = [self.water_position[0] + self.bridge_length / 2, self.water_position[1], self.water_position[2] + self.water_size[2] / 2 + self.bridge_height / 2]
+        self.bridge_id = self.create_box(mass=0.0, half_extents=[self.bridge_length / 2, self.bridge_width / 2, self.bridge_height / 2], position=self.bridge_position, color=[0.8, 0.8, 0.8, 1.0])
+        self.log_radius = 0.5
+        self.log_height = 2.0
+        self.log_spawn_distance = 10.0
+        self.log_spawn_height = 2.0
+        self.log_velocity = -5.0
+        self.log_ids = []
+        self.robot_position_init = [self.bridge_position[0] - self.bridge_length / 2 + 1.0, self.bridge_position[1], self.bridge_position[2] + self.bridge_height / 2 + self.robot.links['base'].position_init[2]]
+        self.robot_orientation_init = self._p.getQuaternionFromEuler([0.0, 0.0, 0.0])
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_cylinder(self, mass, radius, height, position, orientation, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, height=height)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position, baseOrientation=orientation)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot_orientation_init)
+        for log_id in self.log_ids:
+            self._p.removeBody(log_id)
+        self.log_ids = []
+        return observation
+
+    def step(self, action):
+        self.distance_to_bridge_end = self.bridge_length - (self.robot.links['base'].position[0] - (self.bridge_position[0] - self.bridge_length / 2))
+        observation, reward, terminated, truncated, info = super().step(action)
+        if np.random.rand() < 0.05:
+            log_position = [self.robot.links['base'].position[0] + self.log_spawn_distance, self.bridge_position[1], self.bridge_position[2] + self.bridge_height / 2 + self.log_spawn_height]
+            log_orientation = self._p.getQuaternionFromEuler([np.pi / 2, 0.0, 0.0])
+            log_id = self.create_cylinder(mass=10.0, radius=self.log_radius, height=self.log_height, position=log_position, orientation=log_orientation, color=[0.8, 0.4, 0.2, 1.0])
+            self._p.resetBaseVelocity(log_id, linearVelocity=[self.log_velocity, 0.0, 0.0])
+            self.log_ids.append(log_id)
+        for log_id in self.log_ids:
+            log_position = self.get_object_position(log_id)
+            if log_position[0] < self.bridge_position[0] - self.bridge_length / 2:
+                self._p.removeBody(log_id)
+                self.log_ids.remove(log_id)
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_bridge_end = self.bridge_length - (self.robot.links['base'].position[0] - (self.bridge_position[0] - self.bridge_length / 2))
+        survival = 1.0 if self.robot.links['base'].position[2] > self.bridge_position[2] else -1.0
+        reach_bridge_end = (self.distance_to_bridge_end - new_distance_to_bridge_end) / self.dt
+        collision_with_log = -1.0 if any((len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=log_id)) > 0 for log_id in self.log_ids)) else 0.0
+        return {'survival': survival, 'reach_bridge_end': reach_bridge_end, 'collision_with_log': collision_with_log}
+
+    def get_terminated(self, action):
+        is_off_bridge = self.robot.links['base'].position[2] < self.bridge_position[2]
+        is_at_bridge_end = self.robot.links['base'].position[0] > self.bridge_position[0] + self.bridge_length / 2
+        collision_with_log = any((len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=log_id)) > 0 for log_id in self.log_ids))
+        return is_off_bridge or is_at_bridge_end or collision_with_log
+
+    def get_success(self):
+        is_at_bridge_end = self.robot.links['base'].position[0] > self.bridge_position[0] + self.bridge_length / 2
+        return is_at_bridge_end
+\end{lstlisting}

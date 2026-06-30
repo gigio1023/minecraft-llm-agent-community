@@ -1,0 +1,156 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Search and Rescue in a Multi-Room Environment
+
+    Description: 
+    - The environment consists of a large, two-story building with multiple rooms connected by doors, hallways, and staircases. The layout is fixed but contains challenging features:
+      - 8 rooms total (4 on each floor), connected by 2 hallways (one per floor)
+      - Each room is 5 m x 5 m. Hallways are 20 m long and 2 m wide. Staircase is 5 m long.
+      - Rooms contain various static and movable obstacles like furniture.
+      - Doors are 1 m wide and initially closed. Robot must push them open.
+    - A target object (a 0.5 m x 0.5 m x 1 m box) representing a person is located in one of the rooms on the second floor. Its location is fixed for now.
+    - The robot starts at the entrance of the building on the first floor.
+    - The robot must systematically explore the building, locate the target object, attach a virtual tether to it, and guide it back to the entrance while avoiding obstacles.
+
+    Success Conditions:
+    The task is considered complete when the robot brings the target object to rest within 2 m of the entrance location. 
+
+    Time Limit:
+    The robot has a time limit of 10 minutes to complete the task.
+
+    Rewards:
+    - Provide a small reward for exploring new areas of the environment.
+    - Provide a moderate reward for locating the target object.
+    - Provide a large reward for successfully bringing the target object to the goal location.
+    - Provide a small penalty for collisions with obstacles to encourage careful navigation.
+
+    Termination:
+    The episode terminates if the robot flips over or if the time limit is exceeded.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.room_size = 5.0
+        self.hallway_length = 20.0
+        self.hallway_width = 2.0
+        self.staircase_length = 5.0
+        self.num_rooms_per_floor = 4
+        self.num_floors = 2
+        self.wall_thickness = 0.5
+        self.wall_height = 2.0
+        self.door_width = 1.0
+        self.target_object_size = [0.5, 0.5, 1.0]
+        self.entrance_position = [-self.hallway_length / 2, 0.0, 0.0]
+        self.time_limit = 600.0
+        self.wall_color = [0.5, 0.5, 0.5, 1.0]
+        self.floor_color = [1.0, 1.0, 1.0, 1.0]
+        self.target_object_color = [1.0, 0.0, 0.0, 1.0]
+        self.maze = self.generate_maze()
+        self.floor_ids = []
+        for i in range(self.num_floors):
+            floor_id = self.create_box(mass=0.0, half_extents=[self.hallway_length / 2, self.hallway_width / 2, 0.1], position=[0.0, 0.0, i * self.wall_height - 0.1], color=self.floor_color)
+            self.floor_ids.append(floor_id)
+        self.wall_ids = []
+        for wall in self.maze:
+            wall_id = self.create_box(mass=0.0, half_extents=[wall[1][0] / 2, wall[1][1] / 2, self.wall_height / 2], position=[wall[0][0], wall[0][1], wall[0][2] + self.wall_height / 2], color=self.wall_color)
+            self.wall_ids.append(wall_id)
+        self.target_object_id = self.create_box(mass=1.0, half_extents=[self.target_object_size[0] / 2, self.target_object_size[1] / 2, self.target_object_size[2] / 2], position=[self.room_size / 2, self.room_size / 2, self.wall_height + self.target_object_size[2] / 2], color=self.target_object_color)
+        self.robot_position_init = [self.entrance_position[0] + self.robot.links['base'].position_init[0] + 1.0, self.entrance_position[1] + self.robot.links['base'].position_init[1], self.entrance_position[2] + self.robot.links['base'].position_init[2] + 0.5]
+
+    def generate_maze(self):
+        maze = []
+        maze.append(([0.0, -self.hallway_width / 2, 0.0], [self.hallway_length, self.wall_thickness, self.wall_height]))
+        maze.append(([0.0, self.hallway_width / 2, 0.0], [self.hallway_length, self.wall_thickness, self.wall_height]))
+        maze.append(([-self.hallway_length / 2, 0.0, 0.0], [self.wall_thickness, self.hallway_width, self.wall_height]))
+        maze.append(([self.hallway_length / 2, 0.0, 0.0], [self.wall_thickness, self.hallway_width, self.wall_height]))
+        for i in range(self.num_rooms_per_floor):
+            room_position = [-self.hallway_length / 2 + (i + 0.5) * self.room_size, self.hallway_width / 2 + self.room_size / 2, 0.0]
+            maze.append((room_position, [self.room_size, self.wall_thickness, self.wall_height]))
+            maze.append(([room_position[0], room_position[1] - self.room_size, 0.0], [self.room_size, self.wall_thickness, self.wall_height]))
+            maze.append(([room_position[0] - self.room_size / 2, room_position[1] - self.room_size / 2, 0.0], [self.wall_thickness, self.room_size, self.wall_height]))
+            maze.append(([room_position[0] + self.room_size / 2, room_position[1] - self.room_size / 2, 0.0], [self.wall_thickness, self.room_size - self.door_width, self.wall_height]))
+        maze.append(([0.0, -self.hallway_width / 2, self.wall_height], [self.hallway_length, self.wall_thickness, self.wall_height]))
+        maze.append(([0.0, self.hallway_width / 2, self.wall_height], [self.hallway_length, self.wall_thickness, self.wall_height]))
+        maze.append(([-self.hallway_length / 2, 0.0, self.wall_height], [self.wall_thickness, self.hallway_width, self.wall_height]))
+        maze.append(([self.hallway_length / 2, 0.0, self.wall_height], [self.wall_thickness, self.hallway_width, self.wall_height]))
+        for i in range(self.num_rooms_per_floor):
+            room_position = [-self.hallway_length / 2 + (i + 0.5) * self.room_size, -self.hallway_width / 2 - self.room_size / 2, self.wall_height]
+            maze.append((room_position, [self.room_size, self.wall_thickness, self.wall_height]))
+            maze.append(([room_position[0], room_position[1] + self.room_size, self.wall_height], [self.room_size, self.wall_thickness, self.wall_height]))
+            maze.append(([room_position[0] - self.room_size / 2, room_position[1] + self.room_size / 2, self.wall_height], [self.wall_thickness, self.room_size - self.door_width, self.wall_height]))
+            maze.append(([room_position[0] + self.room_size / 2, room_position[1] + self.room_size / 2, self.wall_height], [self.wall_thickness, self.room_size, self.wall_height]))
+        maze.append(([-self.hallway_length / 2 + self.room_size, 0.0, 0.0], [self.staircase_length, self.hallway_width, self.wall_height]))
+        maze.append(([-self.hallway_length / 2 + self.room_size, 0.0, self.wall_height], [self.staircase_length, self.hallway_width, self.wall_height]))
+        return maze
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot.links['base'].orientation_init)
+        self.time = 0.0
+        self.explored_areas = set()
+        self.found_target_object = False
+        self.attached_target_object = False
+        return observation
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.time += self.dt
+        if self.time >= self.time_limit:
+            truncated = True
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        robot_position = self.robot.links['base'].position
+        exploration_reward = 0.0
+        current_area = (int(robot_position[0] // self.room_size), int(robot_position[1] // self.room_size), int(robot_position[2] // self.wall_height))
+        if current_area not in self.explored_areas:
+            exploration_reward = 1.0
+            self.explored_areas.add(current_area)
+        target_object_reward = 0.0
+        if not self.found_target_object and self.is_robot_close_to_target_object():
+            target_object_reward = 10.0
+            self.found_target_object = True
+        goal_reward = 0.0
+        if self.attached_target_object and self.is_target_object_close_to_entrance():
+            goal_reward = 100.0
+        collision_penalty = 0.0
+        if self.is_colliding_with_obstacles():
+            collision_penalty = -1.0
+        return {'exploration_reward': exploration_reward, 'target_object_reward': target_object_reward, 'goal_reward': goal_reward, 'collision_penalty': collision_penalty}
+
+    def get_terminated(self, action):
+        return self.is_robot_flipped() or (self.attached_target_object and self.is_target_object_close_to_entrance())
+
+    def get_success(self):
+        return self.attached_target_object and self.is_target_object_close_to_entrance()
+
+    def is_robot_close_to_target_object(self):
+        robot_position = self.robot.links['base'].position
+        target_object_position = self._p.getBasePositionAndOrientation(self.target_object_id)[0]
+        distance = np.linalg.norm(np.array(robot_position) - np.array(target_object_position))
+        return distance < 1.0
+
+    def is_target_object_close_to_entrance(self):
+        target_object_position = self._p.getBasePositionAndOrientation(self.target_object_id)[0]
+        distance = np.linalg.norm(np.array(target_object_position) - np.array(self.entrance_position))
+        return distance < 2.0
+
+    def is_colliding_with_obstacles(self):
+        for obstacle_id in self.wall_ids:
+            if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0:
+                return True
+        return False
+
+    def is_robot_flipped(self):
+        robot_orientation = self._p.getEulerFromQuaternion(self.robot.links['base'].orientation)
+        return abs(robot_orientation[0]) > np.pi / 4 or abs(robot_orientation[1]) > np.pi / 4
+\end{lstlisting}

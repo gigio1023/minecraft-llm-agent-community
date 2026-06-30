@@ -1,0 +1,114 @@
+\section{Discussions}
+\begin{wrapfigure}{r}{0.45\linewidth}
+    \vspace{-1em}
+    \centering
+    \includegraphics[width=\linewidth]{figs/ablation.pdf}
+    \vspace{-2em}
+    \caption{Ablation study on the simulation stage and self-refinement stage.}
+    % \input{figs/ablation}
+    \label{fig:ablation}
+    \vspace{-1em}
+\end{wrapfigure}
+
+
+\subsection{Planning Framework}
+\label{subsec:planning}
+\paragraph{Ablation.}
+We perform ablation studies on the simulation and self-refinement stages of \OurMethod on the VWA shopping human subset, which is the largest subset verified by humans.
+We pay special attention to the simulation stage, which is the core of model-based planning.
+One might argue that the primary improvement stems from reranking candidate actions, irrespective of whether this ranking relies on simulation.
+To test this idea, we conduct an experiment where we remove the simulation stage completely and instead ask the reward model (\texttt{score}) to directly evaluate each candidate action (Reranking).
+Additionally, we remove the self-refinement step after the action proposal in our \OurMethod framework to assess its impact (\textit{w/o} Self-Refinement).
+
+As shown in Figure~\ref{fig:ablation}, this modified reranking approach does lead to some improvement over the reactive baseline, but the gain is small and still falls well behind \OurMethod. 
+These results confirm that the LLM-based world model simulation plays a crucial role in the planning process.
+Furthermore, we observe a decrease in performance when removing the self-refinement stage. 
+Upon closer examination, we find that this decline is primarily due to the self-refinement module's ability to effectively filter out less relevant candidate actions when the next optimal action is clear. 
+In contrast, directly simulating all actions may introduce additional noise that can negatively impact performance.
+
+
+\paragraph{Planning Horizon.}
+As introduced in Section~\ref{subset:core-design}, \OurMethod supports configurable planning horizon $H$ (\ie, the simulation depth).
+To gain deeper insights into its effectiveness and current limitations, we investigate how the planning horizon affects the final performance. 
+Using GPT-4o as the world model, we evaluate \OurMethod with planning horizons of 1, 2, and 3 on the same subset of Online-Mind2Web~\citep{m2wonline}.
+
+\begin{figure}[t]
+    \vspace{-0.5em}
+    \centering
+    \begin{minipage}{0.45\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/planning_horizon.pdf}
+        \vspace{-2.2em}
+        \caption{Performance of \OurMethod with GPT-4o and different planning horizons $H$ on Online-Mind2Web.}
+        \label{fig:planning_horizon}
+        \vspace{-1em}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/scaling_trend.pdf}
+        \vspace{-2.2em}
+        \caption{Performance of \OurMethod with Dreamer-7B w.r.t. different sizes of training data on two online benchmarks.}
+        \label{fig:scaling}
+        \vspace{-1em}
+    \end{minipage}
+\end{figure}
+
+
+As depicted in Figure~\ref{fig:planning_horizon}, the performance consistently outperforms the reactive baseline across all horizon settings. Nonetheless, when the planning horizon extends to 2 and 3 steps, the effectiveness begins to diminish.
+Upon closer examination, this is primarily due to action proposal hallucinations within the simulation. Specifically, the action proposal within simulation is biased toward generating seemingly relevant actions for task completion, even when these actions are not available based on the predicted outcome.
+As a result, as the planning horizon increases, the trajectories simulated from different actions become less distinguishable, as they all appear somewhat correct.
+Given the complexity of the web environment, simulating multiple steps ahead is challenging due to error accumulation, which aligns with previous observations~\citep{mendes2025language, chae2024web}.
+However, achieving better performance with longer horizons is not a major goal of this work; instead, we aim to show the feasibility and potential of using LLMs for model-based planning.
+We leave this as a venue for future improvement.
+
+\subsection{Training World Models}
+
+
+
+\paragraph{Scaling Trend.}
+We investigate the scaling trend by gradually increasing the size of our synthetic training data, as shown in Figure~\ref{fig:scaling}.
+For Mind2Web-Live, performance steadily improves with larger training datasets, though the rate of improvement tapers off at higher data scales, suggesting potential diminishing returns.
+In contrast, Online-Mind2Web shows more consistent gains overall, following a slight performance drop with small-scale training data.
+These observations suggest that further scaling may continue to yield performance improvements. We omit scaling results on the sandbox environments in VWA and focus our analysis on the other two online benchmarks, which more accurately reflect real-world environments and web agent tasks.
+
+\paragraph{In-Domain Continual Training.}
+For specific environments, we can synthesize domain-specific data for world model training, enabling more specialized and contextually grounded simulations.
+In VWA~\citep{koh2024visualwebarena}, we employ our data synthesis pipeline introduced in Section~\ref{subsec:train-world-model} to synthesize 25K in-domain interactions for each of the three environments: Classifieds, Reddit, and Shopping.
+To prevent test data leakage, we filter out search actions containing queries that appear in test examples.
+The final in-domain checkpoints are continually trained from the Dreamer-7B model, resulting in three separate world models, each specialized for its respective environment.
+
+\input{tables/in-domain}
+
+As shown in Table~\ref{tab:in-domain}, continual training improves performance over the Dreamer-7B model and achieves results comparable to or even better than GPT-4o in certain environments.
+The Classifieds and Shopping domains benefit the most from in-domain adaptation, demonstrating that domain-specific fine-tuning successfully refines model predictions to better reflect the specific environment dynamics.
+However, performance on Reddit remains unchanged, likely due to its dense viewport and limited functional interactions.
+Unlike Classifieds and Shopping, which have simpler visual organization, Reddit pages contain long, text-heavy content, making it difficult for a world model to infer meaningful state changes beyond surface-level text visibility.
+In addition, the limited perception abilities~\citep{gou2024uground, zhang2025chartEval} of 7B models in dense web viewports may further constrain them to simulate fine-grained changes in text-heavy environments.
+These results underscore the effectiveness of domain-specific adaptation while highlighting areas for further improvement in specific web domains.
+Future work can explore enhanced representation techniques to better handle dense web layouts, further expanding the applicability of world models across diverse real-world web environments.
+
+
+
+\paragraph{Case Studies.}
+
+\begin{figure*}[tbh]
+    % \vspace{-0.8em}
+    \centering
+    \includegraphics[width=\linewidth]{figs/case_study.pdf}
+    \vspace{-1em}
+    \captionof{figure}{An example comparing GPT-4o and Dreamer-7B as world models. General-purpose models such as GPT-4o often provide detailed but sometimes noisy predictions, while our Dreamer-7B focuses on concise, action-relevant outcomes.}
+    \label{fig:case-study}
+    % \vspace{-0.5em}
+\end{figure*}
+
+We present a case study to explore the differences between GPT-4o and Dreamer-7B as world models.
+GPT-4o usually provides more detailed state change descriptions and considers multiple possible outcomes, though some of these details are unimportant or irrelevant. 
+For example, as shown in Figure~\ref{fig:case-study}, GPT-4o successfully predicts the key state changes after clicking on ``Dosage,'' outlining the relevant information that may appear on the new webpage. 
+However, its prediction also includes unimportant details such as URL and UI changes, which may introduce noise for the policy model. 
+On the contrary, Dreamer-7B offers more concise and action-oriented predictions, directly predicting the most important information on the new webpage.
+
+To further clarify the role of simulation in planning, we also present case studies with GPT-4o as a world model, covering both positive and negative examples in Appendix~\ref{appendix:case-study}.
+They illustrate how simulation aids the agent in exploring the environment, as well as how inaccuracies in simulation can lead to incorrect predictions.
+
+

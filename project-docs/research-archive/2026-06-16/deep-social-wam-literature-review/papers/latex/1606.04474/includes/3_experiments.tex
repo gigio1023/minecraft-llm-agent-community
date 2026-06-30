@@ -1,0 +1,287 @@
+\section{Experiments}\label{sec:exp}
+
+In all experiments the trained optimizers use two-layer LSTMs with 20 hidden
+units in each layer. Each optimizer is trained by minimizing
+Equation~\ref{eq:meta-optimization} using truncated BPTT as described in
+Section~\ref{sec:learning-to-learn}. The minimization is performed using ADAM
+with a learning rate chosen by random search.
+
+We use early stopping when training the optimizer in order to avoid overfitting
+the optimizer.  After each epoch (some fixed number of learning steps) we
+freeze the optimizer parameters and evaluate its performance.  We pick the best
+optimizer (according to the final validation loss) and report its average
+performance on a number of freshly sampled test problems.
+
+We compare our trained optimizers with standard optimizers used in Deep
+Learning: SGD, RMSprop, ADAM, and Nesterov's accelerated gradient (NAG).
+For each of these optimizer and each problem we tuned the learning rate, and
+report results with the rate that gives the best final error for each problem.
+When an optimizer has more parameters than just a learning rate (e.g. decay
+coefficients for ADAM) we use the default values from the \texttt{optim}
+package in Torch7.  Initial values of all optimizee parameters were sampled
+from an IID Gaussian distribution.
+
+
+
+\subsection{Quadratic functions}
+
+In this experiment we consider training an optimizer on a simple class of
+synthetic 10-dimensional quadratic functions.  In particular we consider minimizing
+functions of the form
+\begin{align*}
+    f(\theta) = \|W\theta - y\|_2^2
+\end{align*}
+for different 10x10 matrices $W$ and 10-dimensional vectors $y$ whose elements are drawn
+from an IID Gaussian distribution.
+Optimizers were trained by optimizing random functions from this family and
+tested on newly sampled functions from the same distribution.  Each function was
+optimized for 100 steps and the trained optimizers were unrolled for 20 steps.
+We have not used any preprocessing, nor postprocessing.
+
+Learning curves for different optimizers, averaged over many functions, are
+shown in the left plot of Figure~\ref{fig:mnist-1}.  Each curve corresponds to
+the average performance of one optimization algorithm on many test functions;
+the solid curve shows the learned optimizer performance and dashed curves show
+the performance of the standard baseline optimizers.  It is clear the learned
+optimizers substantially outperform the baselines in this setting.
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{plots/mnist-1.pdf}
+\caption{Comparisons between learned and hand-crafted optimizers performance.
+Learned optimizers are shown with solid lines and hand-crafted optimizers are
+shown with dashed lines.  Units for the $y$ axis in the MNIST plots are logits.
+\textbf{Left:} Performance of different optimizers on randomly sampled
+10-dimensional quadratic functions. \textbf{Center:} the LSTM optimizer
+outperforms standard methods training the base network on MNIST.
+\textbf{Right:} Learning curves for steps 100-200 by an optimizer trained to
+optimize for 100 steps (continuation of center plot).}
+\label{fig:mnist-1}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{plots/mnist-2.pdf}
+\caption{Comparisons between learned and hand-crafted optimizers performance.
+Units for the $y$ axis are logits. \textbf{Left:} Generalization to the
+different number of hidden units (40 instead of 20).  \textbf{Center:}
+Generalization to the different number of hidden layers (2 instead of 1).  This
+optimization problem is very hard, because the hidden layers are very narrow.
+\textbf{Right:} Training curves for an MLP with 20 hidden units using ReLU
+activations.  The LSTM optimizer was trained on an MLP with sigmoid
+activations.}
+\label{fig:mnist-2}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{plots/mnist-sigmoid.pdf}
+\caption{Systematic study of final MNIST performance as the optimizee
+architecture is varied, using sigmoid non-linearities. The vertical dashed line
+in the left-most plot denotes the architecture at which the LSTM is trained and
+the horizontal line shows the final performance of the trained optimizer in
+this setting.}
+\label{fig:mnist-sigmoid}
+\end{figure}
+
+\subsection{Training a small neural network on MNIST}
+
+In this experiment we test whether trainable optimizers can learn to optimize a
+small neural network on MNIST, and also explore how the trained optimizers
+generalize to functions beyond those they were trained on.  To this end, we
+train the optimizer to optimize a base network and explore a series of
+modifications to the network architecture and training procedure at test time.
+
+%\begin{wrapfigure}[25]{r}{0.6\textwidth}
+%\centering
+%\includegraphics[width=\linewidth]{plots/mnist-all.pdf}
+%\caption{Systematic study of the final MNIST performance as the optimizee
+%architecture is varied, using both sigmoid and ReLU non-linearities. Note that
+%we train two optimizers, both on MNIST problems using architectures of 1 layer
+%and 20 hidden units, but with and without ReLU.}
+%\label{fig:mnist-all}
+%\end{wrapfigure}
+
+In this setting the objective function $f(\theta)$ is the cross entropy of a
+small MLP with parameters $\theta$. The values of $f$ as well as the gradients
+$\partial f(\theta) / \partial\theta$ are estimated using random minibatches of
+128 examples. The base network is an MLP with one hidden layer of 20 units
+using a sigmoid activation function. The only source of variability between
+different runs is the initial value $\theta_0$ and randomness in minibatch
+selection. Each optimization was run for 100 steps and the trained optimizers
+were unrolled for 20 steps. We used input preprocessing described in
+Appendix~\ref{sec:pre} and rescaled the outputs of the LSTM by the factor
+$0.1$.
+
+Learning curves for the base network using different optimizers are displayed
+in the center plot of Figure~\ref{fig:mnist-1}. In this experiment NAG, ADAM,
+and RMSprop exhibit roughly equivalent performance the LSTM optimizer
+outperforms them by a significant margin. The right plot in
+Figure~\ref{fig:mnist-1} compares the performance of the LSTM optimizer if it
+is allowed to run for 200 steps, despite having been trained to optimize for
+100 steps.  In this comparison we re-used the LSTM optimizer from the previous
+experiment, and here we see that the LSTM optimizer continues to outperform the
+baseline optimizers on this task.
+
+\paragraph{Generalization to different architectures} Figure~\ref{fig:mnist-2}
+shows three examples of applying the LSTM optimizer to train networks with
+different architectures than the base network on which it was trained.  The
+modifications are (from left to right) (1) an MLP with 40 hidden units instead
+of 20, (2) a network with two hidden layers instead of one, and (3) a network
+using ReLU activations instead of sigmoid.  In the first two cases the LSTM
+optimizer generalizes well, and continues to outperform the hand-designed
+baselines despite operating outside of its training regime.  However, changing
+the activation function to ReLU makes the dynamics of the learning procedure
+sufficiently different that the learned optimizer is no longer able to
+generalize. Finally, in Figure~\ref{fig:mnist-sigmoid} we show the results of
+systematically varying the tested architecture; for the LSTM results we again
+used the optimizer trained using 1 layer of 20 units and sigmoid
+non-linearities. Note that in this setting where the test-set problems are
+similar enough to those in the training set we see even better generalization
+than the baseline optimizers.
+
+\subsection{Training a convolutional network on CIFAR-10}
+
+Next we test the performance of the trained neural optimizers on optimizing
+classification performance for the CIFAR-10 dataset \citep{krizhevsky:2009}. In
+these experiments we used a model with both convolutional and feed-forward
+layers. In particular, the model used for these experiments includes three
+convolutional layers with max pooling followed by a fully-connected layer with
+32 hidden units; all non-linearities were ReLU activations with batch
+normalization.
+
+The coordinatewise network decomposition introduced in
+Section~\ref{sec:coordinatewise}---and used in the previous
+experiment---utilizes a single LSTM architecture with shared weights, but
+separate hidden states, for each optimizee parameter. We found that this
+decomposition was not sufficient for the model architecture introduced in this
+section due to the differences between the fully connected and convolutional
+layers. Instead we modify the optimizer by introducing two LSTMs: one proposes
+parameter updates for the fully connected layers and the other updates the
+convolutional layer parameters. Like the previous LSTM optimizer we still
+utilize a coordinatewise decomposition with shared weights and individual
+hidden states, however LSTM weights are now shared only between parameters of
+the same type (i.e.\ fully-connected vs.\ convolutional).
+
+The performance of this trained optimizer compared against the baseline
+techniques is shown in Figure~\ref{fig:cifar}. The left-most plot displays the
+results of using the optimizer to fit a classifier on a held-out test set. The
+additional two plots on the right display the performance of the trained
+optimizer on modified datasets which only contain a subset of the labels, i.e.
+the CIFAR-2 dataset only contains data corresponding to 2 of the 10 labels.
+Additionally we include an optimizer \emph{LSTM-sub} which was only trained on
+the held-out labels.
+
+In all these examples we can see that the LSTM optimizer learns much more
+quickly than the baseline optimizers, with significant boosts in performance
+for the CIFAR-5 and especially CIFAR-2 datsets. We also see that the optimizers
+trained only on a disjoint subset of the data is hardly effected by this
+difference and transfers well to the additional dataset.
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{plots/cifar.pdf}
+\caption{Optimization performance on the CIFAR-10 dataset and subsets. Shown on
+the left is the LSTM optimizer versus various baselines trained on CIFAR-10 and
+tested on a held-out test set. The two plots on the right are the performance
+of these optimizers on subsets of the CIFAR labels. The additional optimizer
+\emph{LSTM-sub} has been trained only on the heldout labels and is hence
+transferring to a completely novel dataset.}
+\label{fig:cifar}
+\end{figure}
+
+\subsection{Neural Art}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.85\linewidth]{plots/neural-art.pdf}
+\vspace{-0.1cm}
+\caption{
+Optimization curves for Neural Art. Content images come from the test set,
+which was not used during the LSTM optimizer training. Note: the y-axis is in
+log scale and we zoom in on the interesting portion of this plot.
+\textbf{Left:} Applying the training style at the training resolution.
+\textbf{Right:} Applying the test style at double the training resolution.}
+\label{fig:neural-art}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.46\linewidth]{plots/neural-art-img1-big-boat.png}
+\qquad
+\includegraphics[width=0.46\linewidth]{plots/neural-art-img2-big-scream.png}
+\caption{
+Examples of images styled using the LSTM optimizer.  Each triple consists of
+the content image (left), style (right) and image generated by the LSTM
+optimizer (center).  \textbf{Left:} The result of applying the training style
+at the training resolution to a test image.  \textbf{Right:} The result of
+applying a new style to a test image at double the resolution on which the
+optimizer was trained.}
+\label{fig:neural-art-examples}
+\end{figure}
+
+
+The recent work on artistic style transfer using convolutional networks, or
+Neural Art \citep{gatys:2015}, gives a natural testbed for our method, since
+each content and style image pair gives rise to a different optimization
+problem.  Each Neural Art problem starts from a \emph{content image}, $c$, and
+a \emph{style image}, $s$, and is given by
+\begin{align*}
+f(\theta) = \alpha \mathcal{L}_\mathrm{content}(c, \theta)
++ \beta \mathcal{L}_\mathrm{style}(s, \theta) + \gamma \calL_{\mathrm{reg}}(\theta)
+\,
+\end{align*}
+The minimizer of $f$ is the \emph{styled image}.
+The first two terms try to match the content and style of the styled image to that of their first argument, and the third term is a regularizer that encourages smoothness in the styled image.
+Details can be found in \citep{gatys:2015}.
+
+% Neural
+% Art is formulated as the following optimization problem.
+% Starting from a \emph{content image}, $c$, and a \emph{style image}, $s$, a \emph{styled
+% image}, $\theta$, is produced by optimizing the following function
+% \begin{align*}
+% f(\theta) = \alpha \mathcal{L}_\mathrm{content}(c, \theta)
+% + \beta \mathcal{L}_\mathrm{style}(s, \theta) + \gamma ||\theta||_{\mathrm{tv},p}
+% \,,
+% \end{align*}
+% where the content loss $\mathcal{L}_\mathrm{content}(c, \theta)$ measures the distance between the contents of images $c$ and $\theta$,
+% $\mathcal{L}_\mathrm{style}(s, \theta)$ measures the distance between the styles of $s$ and $\theta$ and $||\theta||_{\mathrm{tv},p}$ is
+% some regularization term.
+% The values $\mathcal{L}_\mathrm{content}(c, \theta)$ and $\mathcal{L}_\mathrm{style}(s, \theta)$ are in fact defined using activations in some fixed convolutional neural network when
+% applied to appropriate images.
+% The initial value of the styled images is set to the content image $\theta_0 = c$.
+% The neural network used is the VGG-19 network
+% of \citep{simonyan:2014}, which seems to give the most visually appealing
+% results.
+
+We train optimizers using only 1 style and 1800 content images taken from
+ImageNet \citep{deng:2009}.  We randomly select 100 content images for testing
+and 20 content images for validation of trained optimizers.  We train the
+optimizer on 64x64 content images from ImageNet and one fixed style image.  We
+then test how well it generalizes to a different style image and higher
+resolution (128x128).  Each image was optimized for 128 steps and trained
+optimizers were unrolled for 32 steps.  Figure~\ref{fig:neural-art-examples}
+shows the result of styling two different images using the LSTM optimizer.  The
+LSTM optimizer uses inputs preprocessing described in Appendix~\ref{sec:pre}
+and no postprocessing. See Appendix~\ref{sec:neural-art-images} for additional images.
+
+Figure~\ref{fig:neural-art} compares the performance of the LSTM optimizer to
+standard optimization algorithms.  The LSTM optimizer outperforms all standard
+optimizers if the resolution and style image are the same as the ones on which
+it was trained.  Moreover, it continues to perform very well when both the
+resolution and style are changed at test time.
+
+Finally, in Appendix~\ref{sec:proposed-updates} we qualitatively examine the
+behavior of the step directions generated by the learned optimizer.
+
+%We also experimented with changing only one of the resolution or style with similar results.
+
+%testing this trained procedure on (top left) problems from the training set,
+%(top right) problems with different styles, (bottom left) problems with
+%different target sizes, and (bottom right) problems with both style and size
+%differences.
+%In all cases we see that the learned optimizer outperforms or at least matches
+%the performance of all other methods.
+%and is able to generalize beyond the strict style and size
+%settings it was trained with. Figure~\ref{fig:neural-art-examples} shows neural art styles using the trained optimizer for the larger target instances.
+

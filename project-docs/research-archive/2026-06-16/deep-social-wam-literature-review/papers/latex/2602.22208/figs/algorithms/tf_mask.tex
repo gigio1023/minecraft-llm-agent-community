@@ -1,0 +1,52 @@
+    
+    
+    
+    
+    
+    
+    
+\begin{algorithm}[t]
+\DontPrintSemicolon
+\caption{Pseudocode of \texttt{TeacherForcingMask} in a NumPy-like style.}
+\label{alg:teacher_forcing_mask}
+\definecolor{codeblue}{rgb}{0.25,0.5,0.5}
+\lstset{
+  basicstyle=\fontsize{7.2pt}{7.2pt}\ttfamily\selectfont,
+  commentstyle=\fontsize{7.2pt}{7.2pt}\color{codeblue}\ttfamily\selectfont,
+  keywordstyle=\fontsize{7.2pt}{7.2pt}\ttfamily\selectfont,
+}
+\begin{lstlisting}[language=python]
+# L_s: student context length (sliding window size)
+# L_t: teacher context length (number of frames)
+# tokens_per_frame: number of tokens per frame
+
+ctx_len = L_t * tokens_per_frame
+
+# create index grids for queries and keys
+q_idx = np.arange(2 * ctx_len)[:, None]
+kv_idx = np.arange(2 * ctx_len)[None, :]
+
+# compute frame indices
+q_frame = (q_idx // tokens_per_frame) %
+kv_frame = (kv_idx // tokens_per_frame) %
+
+# determine if query/key is from noisy or clean frames
+q_is_noisy = q_idx >= ctx_len
+kv_is_noisy = kv_idx >= ctx_len
+
+# teacher forcing mask logic
+teacher_forcing = (
+    # noisy queries attend to same-frame noisy keys
+    (q_is_noisy & kv_is_noisy & (q_frame == kv_frame))
+    # noisy queries attend to earlier clean keys
+    | (q_is_noisy & ~kv_is_noisy & (q_frame > kv_frame))
+    # clean queries attend causally to clean keys
+    | (~q_is_noisy & ~kv_is_noisy & (q_frame >= kv_frame))
+)
+
+# sliding window constraint
+sliding_window = kv_frame > (q_frame - L_s)
+
+mask = teacher_forcing & sliding_window
+\end{lstlisting}
+\end{algorithm}

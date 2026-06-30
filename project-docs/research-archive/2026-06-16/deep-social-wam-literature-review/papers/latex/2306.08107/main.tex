@@ -1,0 +1,495 @@
+\documentclass[10pt]{article} % For LaTeX2e
+\usepackage[preprint]{tmlr}
+% If accepted, instead use the following line for the camera-ready submission:
+%\usepackage[accepted]{tmlr}
+% To de-anonymize and remove mentions to TMLR (for example for posting to preprint servers), instead use the following:
+%\usepackage[preprint]{tmlr}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+
+% Added packages
+\usepackage{microtype} % microtypography
+\usepackage{booktabs}  % tables
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{xspace}
+\usepackage{paralist}
+\usepackage{graphicx}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+\title{AutoML in the Age of Large Language Models:\\ Current Challenges, Future Opportunities and Risks}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the tmlr package is used without the [accepted] or [preprint] options.
+% Non-anonymous submissions will be rejected without review.
+
+\author{\name Alexander Tornede \email a.tornede@ai.uni-hannover.de \\
+      %\addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \vspace{-2em}
+      \AND
+      \name Difan Deng \email d.deng@ai.uni-hannover.de \\
+      \vspace{-2em}
+      %\addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Theresa Eimer \email t.eimer@ai.uni-hannover.de \\
+      \addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Joseph Giovanelli \email j.giovanelli@unibo.it \\
+      \addr Alma Mater Studiorum -- University of Bologna
+      \AND
+      \name Aditya Mohan \email a.mohan@ai.uni-hannover.de \\
+      \vspace{-2em}
+      %\addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Tim Ruhkopf \email t.ruhkopf@ai.uni-hannover.de \\
+      \vspace{-2em}
+      %\addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Sarah Segel \email s.segel@ai.uni-hannover.de \\
+      \addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Daphne Theodorakopoulos \email d.theodorakopoulos@ai.uni-hannover.de \\
+      \addr Institute of Artificial Intelligence, Leibniz University Hannover, German Research Center for Artificial Intelligence (DFKI)
+      \AND
+      \name Tanja Tornede \email t.tornede@ai.uni-hannover.de \\
+      %\vspace{-2em}
+      \addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Henning Wachsmuth \email h.wachsmuth@ai.uni-hannover.de \\
+      \vspace{-2em}
+      %\addr Institute of Artificial Intelligence, Leibniz University Hannover
+      \AND
+      \name Marius Lindauer \email m.lindauer@ai.uni-hannover.de \\
+      \addr Institute of Artificial Intelligence, L3S Research Center, Leibniz University Hannover
+      }
+
+% The \author macro works with any number of authors. Use \AND 
+% to separate the names and addresses of multiple authors.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\def\month{02}  % Insert correct month for camera-ready version
+\def\year{2024} % Insert correct year for camera-ready version
+\def\openreview{\url{https://openreview.net/forum?id=cAthubStyG}} % Insert correct link to OpenReview for camera-ready version
+
+\begin{document}
+
+\include{macros}
+
+\maketitle
+
+\begin{abstract}
+The fields of both Natural Language Processing (\NLP) and Automated Machine Learning (\AutoML) have achieved remarkable results over the past years. In \NLP, especially Large Language Models (\LLMs) have experienced a rapid series of breakthroughs very recently. We envision that the two fields can radically push the boundaries of each other through tight integration. To showcase this vision, we explore the potential of a symbiotic relationship between \AutoML and \LLMs, shedding light on how they can benefit each other. In particular, we investigate both the opportunities to enhance \AutoML approaches with \LLMs from different perspectives and the challenges of leveraging \AutoML to further improve \LLMs. To this end, we survey existing work, and we critically assess risks. We strongly believe that the integration of the two fields has the potential to disrupt both fields, \NLP and \AutoML. By highlighting conceivable synergies, but also risks, we aim to foster further exploration at the intersection of \AutoML and \LLMs.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introcution}
+Large Language Models (\LLMs) \citep{zhao-arxiv23a} are currently on everybody's lips due to the recent series of rapid breakthroughs achieved, such as self-attention \citep{vaswani-neurips17a}, BERT \citep{devlin-acl19a}, several versions of GPT \citep{radford-openai18a,radford-openai19a,brown-neurips20a,openai-openai22a,openai-openai23a}, LaMDA \citep{thoppilan-arxiv22a}, LLaMA \citep{touvren-arxiv23a}, or OpenAssistant \citep{koepf-arxiv23a}. The term \LLM refers to a language model where the actual model is instantiated by a deep neural network that typically features millions to billions of weights.\footnote{We note that there is no clear threshold after which a language model is called large.} Such \LLMs are pre-trained on extremely large corpora of textual datasets. Due to their excellent capabilities on various Natural Language Processing (\NLP) tasks, they have the potential to lead to the democratization of \NLP, if their pre-trained versions are accessible to the broad public and the power of \LLMs does not lay in the hand of a few companies with sufficient financial resources. Additionally,  we highlight the emerging possibilities of multimodal \LLMs~\citep{yin-arxiv2023a, wu-arxiv2023a}. By incorporating various data modalities, such as audio or images, these models enable a more flexible communication with users by capturing information presented in non-textual formats as well as facilitating the output of information in non-text formats.
+
+Similarly, Automated Machine Learning (\AutoML) \citep{hutter-book19a} democratizes Machine Learning (\ML) by supporting data scientists in finding well-performing \ML pipelines for specific tasks through (partial) automation. \AutoML has achieved remarkable success over the last decade with heavily-used open-source frameworks such as Auto-WEKA \citep{thornton-kdd13a,kotthoff-jmlr17a,kotthoff-automlbook19a}, AutoSklearn \citep{feurer-nips15a,feurer-automlbook19b,feurer-jmlr22a}, AutoGluon \citep{erickson-arxiv20a}, Auto-PyTorch \citep{zimmer-tpami21a}, and closed commercialized frameworks. 
+
+With this paper, we want to highlight our vision in which \AutoML and \LLMs are integrated with each other to radically push the boundaries of both \AutoML and \NLP. On the one hand, we expect that applying \AutoML to \LLMs improves various stages of the \LLM lifecycle by increasing their capabilities and making them more efficient. On the other hand, the disruptive \NLP and knowledge-modeling capabilities of \LLMs can unleash the full potential of \AutoML both via an integration as a human-machine-interaction component, and as a technical meta-learning component within \AutoML frameworks themselves. Correspondingly, this survey is targeted both 
+\begin{inparaenum}[1)]
+    \item at \NLP researchers leveraging \AutoML methods to further improve \LLMs and
+    \item at \AutoML researchers who seek to leverage the strengths of \LLMs to improve \AutoML paradigms and tools in various regards outlined below.
+\end{inparaenum} Consequently, we only sparsely mention general topics or problems concerning \LLMs, but focus on problems and aspects that arise from the intersection of the two fields. For a more general survey on \LLMs, we refer the reader to \cite{zhao-arxiv23a}. To make this paper as tailored as possible, we explicitly chose not to focus on pre-trained models in general, but focus on language models as they allow extracting knowledge from the large set of unstructured data in the form of text on the web which certainly contains valuable AutoML knowledge.\footnote{We note that there also exists work in the broader intersection of \AutoML and pre-trained models \citep{hollmann-iclr23a,muller-icml23a} which is outside the scope of this paper as we only focus on (pre-trained) \LLMs and not pre-trained models in general.}
+
+To showcase our vision, we explore the potential of a symbiotic relationship between \AutoML and \LLMs, including a survey of existing work on the matter. We start by investigating the challenges of applying \AutoML to \LLMs, in particular Neural Architecture Search (\NAS) \citep{elsken-jmlr19a,wistuba-arxiv19a,white-arxiv23a} and Hyperparameter Optimization (\HPO) \citep{feurer-automlbook19a,bischl-dmkd23a}, as well as potential solutions for optimizing pre-training, fine-tuning, and inference (Sec. \ref{sec:automl-for-llms}). Subsequently, we swap perspectives and elaborate on opportunities offered by \LLMs to improve \AutoML approaches in terms of human-machine-interaction, the configuration of \AutoML systems, and the replacement of parts of \AutoML systems by an \LLM (Sec. \ref{sec:llms-for-automl}). In order to give a balanced outlook, we also critically assess potential risks which might arise due to an integration of \AutoML and \LLMs (Sec. \ref{sec:dangers-and-challenges}). 
+
+The main insights we want to bring across with this work are the following: 
+\begin{enumerate}[(i)]
+    \item Current \AutoML approaches are not ready for a holistic optimization of the whole lifecycle of \LLMs due to several challenges, such as the computational demand of pre-training and the multi-stage training process of \LLMs featuring varying metrics and learning paradigms. 
+    \item An integration of \LLMs with \AutoML tools has the potential to substantially improve the human-machine-interaction component of corresponding tools, alleviate the tedious task of correctly configuring an \AutoML tool and to improve several internal components of \AutoML tools through knowledge gained on meta-learning from unstructured data.
+    \item Integrating the two research areas with each other naturally also bears risks such as inadequate evaluation of \LLM powered \AutoML systems, catastrophically wrong behavior of \AutoML systems due to hallucinations of an \LLM powered component, (too) high trust in results of an \AutoML tool explained through natural language and ever-increasing resource demands.
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{AutoML for \LLMs}
+\label{sec:automl-for-llms}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+One could argue that \AutoML for \LLMs is yet another application of \AutoML. However, compared to previous applications of \AutoML to different learning paradigms, \LLMs come with a complete set of new challenges, rendering the standard approaches of existing \AutoML tools partially useless. In fact, \citet{godbole-github23} argues that standard \HPO tools cannot be applied off-the-shelf for optimizing very deep and thus resource-intensive neural networks such as \LLMs. Furthermore, as pointed out by \cite{hutter-blog22a} in his vision for Deep Learning 2.0, we need to bring many ideas together and face new challenges if we want to automatically obtain models of the same or a better quality level as the ones currently manually designed for deep learning including \LLMs.
+
+In a nutshell, we see five main challenges which need to be addressed: 
+\begin{enumerate}[(i)] 
+    \item Pre-training the base model of \LLMs is extremely expensive such that very few full training runs -- maybe even only a single one -- of the \LLM base model are possible.
+    \item The \AutoML task is complex and ideally has to be performed across many steps of the \LLM lifecycle, including pre-training, several steps for fine-tuning, and inference. However, these steps currently cannot be addressed in a single joint, holistic optimization and instead have to be performed independently most of the time;
+    \item Finding good neural architectures to solve a specific problem is a tedious task and modern automated methods such as \NAS can only do so to a certain extent, but have not yet been able to produce new ground-breaking architectures.
+    \item All of the stages of the \LLM lifecycle call for the optimization of a different metric. Especially in pre-training this metric can be seen to act as a proxy for the final performance across a variety of different tasks, which the \LLM could be used for. This can lead to potentially misleading, noisy, and biased performance indicators for the \AutoML process.
+    \item \AutoML commonly considers only a single learning paradigm (e.g. supervised learning) at a time. However, training \LLMs is challenging as the different stages of the lifecycle require different learning paradigms.
+\end{enumerate}
+
+After providing more background on \LLMs in the next subsection, we delve into details for all these challenges and discuss existing \AutoML ideas that are either applied already to \LLMs or could be a promising future direction.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=.75\textwidth]{figures/automl_for_llms.pdf}
+    \caption{\AutoML can be used in all stages of the \LLM lifecycle and needs to be adjusted to the different objectives, hyperparameters, and design decisions of each stage. The graphic depicts exemplary objectives, subjects of optimization, and associated hyperparameters. Due to computational constraints, the stages are considered separately, one after the other.}
+    \label{fig:automl_for_llms}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Background on \LLMs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The lifecycle of an \LLM typically involves three key stages: pre-training, fine-tuning, and inference \citep{zhao-arxiv23a}. Each stage of this lifecycle comes with its own set of objectives, hyperparameters, and design decisions affecting the final performance on downstream tasks, as depicted in \autoref{fig:automl_for_llms}.
+
+During \textbf{pre-training}, the base model is trained on a large corpus of unlabeled text to learn language patterns and capture general knowledge about the language. The overall goal of pre-training is to produce useful representations of sequences with a pre-text task in a quasi-unsupervised fashion which corresponds to the first stage of the Self-Supervised Learning (SSL) paradigm \citep{balestriero-arxiv23a}. 
+It is typically the most expensive part of training an \LLM and only a few groups and companies world-wide can afford to pre-train a base model.
+
+\textbf{Fine-tuning} follows, where the pre-trained model is further trained on domain- or task-specific data to specialize its knowledge and adapt to specific tasks,  domains, or use cases. In general, fine-tuning covers various groups of approaches such as task-specific supervised fine-tuning \citep{zhao-arxiv23a}, instruction tuning \citep{wei-iclr22a}, and alignment fine-tuning \citep{zhao-arxiv23a}. 
+The success in this specialization is quantified with a corresponding metric or loss function. 
+Provided the pre-training found useful representations, the objective here is to utilize or adapt these representations with specific downstream tasks in mind.
+This can be very effective even with limited data for the downstream task and thus is computationally much less demanding than training a base model.
+The probable reason is that for a given downstream task, there often exists a low-dimensional reparametrization of the strong joint embedding which was learned during pre-training featuring a large number of parameters. This allows to unleash the full power of transfer learning \citep{aghajanyan-acl21}.
+
+Instruction tuning can be seen as generalized task-specific supervised fine-tuning that teaches LLMs to follow instructions in the form of prompts. It fine-tunes a single model using instructions via prompts that span various tasks, thereby enabling the prompting of LLMs. A very specific and, from an \AutoML perspective, complicated task that is often solved by a form of instruction tuning, called Reinforcement Learning from Human Feedback (RLHF)~\citep{fernandes-arxiv23a}, is alignment.%
+\footnote{We note that there are recent approaches aimed at replacing reinforcement learning with supervised approaches such as classification losses~\citep{rafailov-arxiv23a}. Moreover, in general instruction tuning covers a large range of techniques such as self-instruct \citep{wang-acl23a}.}
+Alignment (fine-tuning) describes the idea of approximately aligning the behavior and output of \LLMs with human value-related task objectives such as helpfulness, honesty, harmlessness, etc.
+The two ingredients required to make Reinforcement Learning (RL) work on a pre-trained Language Model (\LM) are:
+\begin{inparaenum}[(i)]
+    \item A Reward Model (RM) to convert a sequence of texts to a scalar reward which numerically represents the human preference.
+    \item A policy that takes user queries or prompts as input to produce language tokens as outputs.
+\end{inparaenum}
+
+We note that, in principle, one can also use a pre-trained model off-the-shelf. However, in practice, some instruction tuning and alignment fine-tuning is performed if the model is released to end-users. Moreover, some form of additional task-specific fine-tuning is often performed to increase the performance of the \LLM for its designated usage and to make it properly usable.
+
+Finally, during \textbf{inference}, the fine-tuned \LLM generates text for language-related tasks, such as question answering, based on the learned knowledge and contextual understanding.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Challenge I: Cost of Pre-Training Base Models}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Applying standard black-box \AutoML approaches, such as grid search, random search, Bayesian Optimization or evolutionary algorithms, to pre-train \LLMs is simply not feasible since a single pre-training of an \LLM requires hundreds of GPUs for days. \cite{brown-neurips20a} estimate that a single training of GPT-3 required months on a thousand V100 GPUs. To put it in numbers, consider tuning $10$ hyperparameters and that a black-box AutoML optimizer requires at least $10$ times the number of hyperparameters as samples \footnote{We note that some optimizers recommend $10$ times the number of hyperparameters as samples alone for the initial design before the actual optimization starts.}, we would need $100$ months (i.e., more than 8 years) on a thousand V100 GPUs. Even when considering smaller and potentially open-source \LLMs, many still require training on a considerable amount of compute units (be it GPUs or TPUs) for several days, yielding training resource requirements of hundreds of exaFLOPS \citep{geiping-icml23a} just for a single training run. Since emerging abilities of \LLMs only happen from a certain size onward, size is important and thus, large training costs are often unavoidable. In view of recent state-of-the-art approaches to \AutoML, there could be two ways to address this, as discussed in the following.
+
+\subsubsection{Prior-Guided Multi-Fidelity Optimization with Scaling Laws}
+
+In cases where many full training evaluations with different hyperparameters or neural architectures are not feasible, a common \AutoML approach is multi-fidelity optimization. The general idea is to approximate the real target function by a less expensive fidelity (e.g., by training for fewer epochs or by training on less data) making this a natural candidate strategy for \HPO for \LLMs.
+
+However, even multi-fidelity approaches require at least tenths of full training runs to perform well. At the same time, human experts are somewhat successful in tuning \LLMs manually without excessive re-trainings. Guided by this observation on earlier \AutoML problems, the community developed approaches leveraging intuitive prior knowledge of experts. While \cite{souza-ecmlpkdd21a} and \cite{hvarfner-iclr22a} proposed ways to integrate prior knowledge on the location of promising hyperparameter configurations into Bayesian Optimization, \cite{mallik-neurips23a} extended this idea to multi-fidelity optimization and achieved strong performance within ten full training runs.
+
+Moreover, multi-fidelity approaches have to be configured correctly, in particular regarding the choice of the fidelity type, to achieve strong performance. This choice should be based on the observation that the ordering among potential configurations on low-fidelity approximations should be correlated with the maximum fidelity. It is currently unclear, if such an assumption can be made for \LLMs considering recent work, e.g., by \citet{kirsch-arxiv22a}.
+Even more related, in the pursuit of understanding the interplay between the size of a language model and its performance, recent works have delved into the scaling laws of language models \citep{radford-openai19a, brown-neurips20a, kaplan-arxiv2020a}. 
+They showed that improvements along scale dimensions generally lead to an increase in performance, both for parameter scaling dimensions such as the network width and depth, computational scaling dimensions such as the number of training steps, and the amount of data used for training.
+When not limited by the other two factors, performance exhibits a power-law correlation with each of the three scale factors, bounded by diminishing returns. Correspondingly, under reasonable assumptions, multi-fidelity approaches seem to be indeed very suitable, if correctly configured.
+
+Motivated by the same idea of leveraging cheap approximations, \citet{yang-neurips21a} mitigate the large cost of \LLM hyperparameter optimization by leveraging specific network parametrizations that allow for stable training across model sizes. 
+This way, a smaller version of the actual model can be tuned, and the best-found hyperparameter configuration can be transferred to the larger model. 
+However, the approach is limited to hyperparameters that have a stable optimum across different network scales under the network parameterization. 
+Naturally, this excludes hyperparameters that define the training scale, which other hyperparameters are transferred across.
+As shown in the paper, hyperparameters with a strong regularization effect, such as dropout probability and weight decay, were empirically found not to transfer well.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Gradient-Based \AutoML}
+
+Instead of having an outer loop training an \ML model with different configurations over and over again, it would be desirable to learn the hyperparameters on the fly while training the \ML model. This would be specifically interesting for \LLMs when we can afford only one training run. Although gradient-based optimization is possible both for \HPO~\citep{maclaurin-icml15a,luketina-icml16a,franceschi-icml17a,mackay-iclr19a,lorraine-aistats20a} and neural architecture search w.r.t. individual cells of the network~\citep{liu-iclr19a,elsken-jmlr19a}, these approaches struggle so far with robustness and scaling to large networks such as \LLMs.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Meta-Learning When and How to Adjust Training}
+
+If we think about how human experts train \LLMs, they use check-pointing s.t. they can intervene if the training threatens to fail, e.g., changing the learning rate accordingly. Overall, this manual strategy resembles dynamic configuration approaches~\citep{adriaensen-jair22a} that meta-learn how to adjust the hyperparameter configurations while the training of the model is ongoing. 
+Going even one step further would lead to learning the learning process itself~\citep{andrychowicz-neurips16a,chen-neurips22a}.
+Since this approach requires an offline meta-learning for obtaining the corresponding meta-policy (e.g., learned with RL), it is an open problem how to scale it up to \LLMs where the collection of meta-learning and evaluations of the meta-policy is not trivially feasible.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Challenge II: A Multitude of Different Stages}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+As we illustrate in Figure~\ref{fig:automl_for_llms}, the \LLM lifecycle comprises different stages and each of them has different objectives, subjects and hyperparameters. That makes a holistic \AutoML approach very hard and, perhaps, even impossible. Although it is in principle possible to tune complex pipelines of predictive models~\citep{wachsmuth-cicl13a,feurer-nips15a,wever-automl18a,olson-automl19a}, it would be too expensive to tune all stages of the \LLM training jointly. Moreover, they even do not follow the same metrics for the objectives. Therefore, we usually tune them independently and discuss them step by step in the following.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Pre-Training}
+
+Hyperparameter Optimization for pre-training is not only expensive, as previously discussed, but also spans a variety of very different types of hyperparameters.  
+Selecting data sources for pre-training is a subtle but crucial choice to this end. 
+It affects the domain-specific and general knowledge encoded into the \LLM, while also impacting its conversational and reasoning abilities \citep{zhao-arxiv23a}.
+Additionally, data pre-processing decisions impact the data quality and, in turn, affect the downstream performance. 
+As with all text-based models, tokenization \citep{schuster-ieee2012, sennrich-acl2016a, kudo-acl2018a} plays a key role in the training data representation.
+Subsequently, the intricacies of the backbone architecture of the \LLM must be decided. 
+Transformer-based models \citep{vaswani-neurips17a} are the avant-garde in language models.
+Designing such a transformer model comprises several crucial architectural choices such as a range of different encoder-decoder architectures \citep{vaswani-neurips17a, lewis-acl20a}, decoder architectures \citep{brown-neurips20a, zhang-arxiv2022a} and encoder architectures \citep{devlin-acl19a,liu-arxiv19a}.
+Similarly, a key configuration option is the choice of self-supervised training strategies \citep{lewis-acl20a}. Besides, choices regarding normalization \citep{ba-arxiv2016a, xiong-icml20a}, activation functions \citep{hendrycks-arxiv2016a, shazeer-arxiv2020a}, or positional encoding \citep{su-arxiv2022}, as well as training settings such as the optimizer \citep{kingma-iclr15a, loshchilov-iclr18a, shazeer-icml18a}, learning rate schedule~\citep{loshchilov-iclr17a}, and batch size have to be made. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Fine-Tuning}
+As fine-tuning approaches can be categorized into groups following different learning paradigms, corresponding challenges also differ according to the learning paradigm as we outline below.
+
+\paragraph{Supervised Task-Specific Fine-Tuning} 
+Task-specific fine-tuning can be regarded a standard supervised-learning stage based on input-output pairs (with or without instructions). That is, \LLMs can still be fine-tuned to specific tasks without instruction tuning, and since the realization of the two is different, the application of AutoML differs in practice. AutoML for supervised fine-tuning in principle could follow the same approaches as extensively studied in the AutoML community since it provides a clear supervised training signal and is feasible computation-wise. Interesting questions arise with respect to neural architecture search to which we will come back later. One of the core challenges associated with supervised (task-specific) fine-tuning is that it can undo some of the alignment achieved via alignment fine-tuning \citep{qi-arxiv23a} such that the two stages are ideally considered jointly when performing \HPO.
+
+\paragraph{Instruction Tuning}
+With instruction tuning being a specific type of generalized supervised task-specific fine-tuning \citep{wei-iclr22a} that prepares LLMs for prompting, similar challenges as for supervised task-specific fine-tuning arise when performing \AutoML for this stage.
+In particular, this is the case since instruction tuning is also a form of supervised fine-tuning generalized to multiple tasks and thus, \AutoML approaches for supervised learning can be used. While optimizing instruction tuning using AutoML boils down to the techniques already available for supervised learning problems, a few additional challenges arise.
+
+First, curating the necessary task-specific data in sufficient quality and quantity is cumbersome and potentially labor-intensive.
+To alleviate the burdensome quantity issue, trained LLMs can be prompted using templates as a data extraction module ~\citep{zhang-arxiv23c}.
+The quality of the extracted dataset, however, adheres to prompt engineering and LLM inference hyperparameters located in the pre-processing pipeline. 
+They can be subjected to \AutoML methods.
+
+Second, oftentimes tasks share an inherent structure or knowledge as in coding tasks for code summarization or code completion. 
+Exploiting the similarities using multi-task learning can facilitate improved (generalization) performance, robustness, data efficiency and data imbalance across tasks ~\citep{liu-arxiv23a}.
+With the ability to generate ample datasets and related tasks at arguably significant cost, task selection may become an issue.  
+\citet{kung-emnlp23a} resort to active learning in order to solve it, but \AutoML could also be invoked to assist in this selection.
+
+
+A third challenge arises from the multi-task nature of the tuning process as the cost function optimized by an \AutoML approach has to be able to capture the performance across multiple tasks. 
+While this problem is prevalent in the related field of algorithm configuration~\citep{schede-jair22a}, it is less so in \AutoML. 
+Nevertheless, corresponding approaches exist \citep{perrone-neurips18a,law-neurips19a,li-kdd22a}. 
+In general, \AutoML can help with finding the right hyperparameter values for instruction tuning that are described by \citet{wei-iclr22a} such as the number of gradient steps, the batch size, the optimizer or the learning rate.
+
+\paragraph{Alignment Fine-Tuning}
+Alignment fine-tuning is usually performed via reinforcement learning, more precisely RLHF~\citep{fernandes-arxiv23a}. Although RLHF can be seen as a form of instruction tuning, we dedicate a separate paragraph to alignment tuning and RLHF here, as they are complicated problems from an \AutoML perspective due to their dependability on reinforcement learning \citep{eimer-icml23a}.\footnote{We note that there are recent approaches aimed at replacing reinforcement learning with supervised approaches, such as classification losses~\citep{rafailov-arxiv23a}.} 
+Unfortunately, RL is not well studied from an \AutoML perspective. 
+There are still many open questions, such as properties of hyperparameter landscapes in RL~\citep{mohan-automlconf23a}, sound evaluation protocols~\citep{eimer-icml23a}, stability of training due to the non-stationary learning task and non-deterministic data collection on the fly, especially in online and on-policy learning. 
+The nonstationarity in the training data introduces noise to the performance observations for \AutoML systems and increases the risk of overfitting the tuning process to a few random seeds~\citep{eimer-icml23a}.
+
+Automated Reinforcement Learning (AutoRL)~\citep{parkerholder-jair22a} aims to address these issues through techniques such as hyperparameter optimization for RL~\citep{li-kdd19a,parkerholder-neurips20a,wan-automl22a}, learned optimizers~\citep{lan-arxiv23a}, neural architecture search~\citep{wan-automl22a} and dynamic configurations~\citep{adriaensen-jair22a}.
+Most of these considerations of AutoRL translate to the RL components of \LLMs; thus, corresponding methods might be a suitable choice.
+However, at the current point in time, appropriate tuning of RL for \LLM is even more understudied than AutoRL for traditional RL benchmarks such as control or games.
+
+A crucial design decision is the RL algorithm itself. PPO~\citep{schulman-arxiv17a} and A2C~\citep{mnih-icml16a} are currently common choices for RLHF.
+However, in principle, the scalar nature of the reward in the RL optimization stage of \LLM alignment allows seamless integration of many existing RL algorithms. 
+Thus, selecting RL algorithms based on the task at hand could leverage further potential here~\citep{laroche-iclr18a}.
+
+Most RLHF-specific design decisions related to the reward model (RM) are not used in standard RL and thus are not studied in the existing AutoRL literature.
+A crucial design decision for the RM is determining its size relative to the pre-trained \LLM.
+There is no established standard for this, with current solutions being driven heuristically.
+For example, OpenAI uses an RM with 6 billion parameters for an \LLM with 175 billion parameters, while Deepmind uses the same size for both the RM and the \LLM~\citep{lambert-hf22a}.
+This design decision could depend on the downstream task for which the fine-tuning is being performed and the multiple objectives the preference score aims to capture.
+Optimizing for optimal size ratio for RM with respect to the \LLM is a configuration problem that could be sped up via learning-curve-based multi-fidelity methods~\citep{klein-iclr17a,jawed-ecml21a,ruhkopf-tmlr23a}.
+Recent results on the positive impact of incorporating multiple reward models to produce a more expressive reward signal~\citep{wu-arxiv23a} open up new avenues for methods that can utilize ensembling methodologies for task-specific fine-tuning architectures.
+Moreover, methods to iteratively update the RM and policy together~\citep{lambert-hf22a,bai-arxiv22a} could open the doors to complex dynamics for which AutoRL hyperparameter landscapes~\citep{mohan-automlconf23a} can be utilized for designing better optimizers and multi-fidelity methods.
+
+Another departure from standard AutoRL is the policy update in RLHF, which is usually performed only on a subset of the weights due to the size of the \LLM~\citep{hu-iclr22a,glaese-arxiv22a}. 
+This subset of weights for the update depends on multiple factors, including the complexity of concepts in the data, preference scores, and the size of the \LLM.
+Methods for data generation through exploration and curriculum learning to adaptively select the best data for the policy update can serve particularly useful in this scenario~\citep{jiang-arxiv23}.
+Techniques from multi-objective optimization could be further used to balance data quality, policy updates and number of parameters to update. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Inference}
+
+Inference queries imply forward passes through billion-parameter models, leading to high deployment costs that can be computationally as well as ecologically costly. 
+The former is particularly important since a multitude of \LLMs fine-tuned to a variety of tasks serve large communities of users.
+As a consequence, mitigating these costs and maximizing the utility for the users should be the prime objective of this stage and results in a difficult multi-objective optimization problem.
+Automated pruning techniques \citep{chen-ijcai20, wang-emnlp20a} can help to reduce this cost. In addition, mixed precision \citep{shen-aaai2020a, dettmers-arxiv2022a}, which uses 16 bits (or even less) and 32 bits to represent floating point numbers, reduces memory usage and accelerates computations in training as well as inference~\citep{Yuan-air23a}.
+Similarly, adjusting the maximum number of generated tokens, i.e., the length of a response or the number of responses, in cases where the user asks for multiple ones, can help to reduce the cost but might harm the user benefit.
+Moreover, tuning hyperparameters that affect the randomness of the generated text, such as temperature or top-k adjustments, may increase the utility but naturally can impact the expected number of queries needed to achieve a desired output. 
+Notably, advanced decoding strategies \citep{zhao-arxiv23a} including repeated prompting and templates or chain-of-thought related concepts \citep{besta-arxiv23a,ning-arxi23a} may provide noticeable improvements. However, automatically optimizing inference via means of \AutoML is still an open challenge.
+
+Nevertheless, first works in the area of automated prompt engineering exist. \citet{shin-emnlp20a} demonstrate that (approximate) gradient-based optimization can lead to prompts that lead to better results than hand-designed prompts. Similarly, \citet{zhou-iclr23a} show that good prompts can be found in an automated fashion via an iterative interplay between several language models where one \LLM suggests prompts or adaptations to prompts and another \LLM rates these prompts. In general, prompt engineering is spurred by the phenomenon of in-context learning\citep{brown-neurips20a} allowing \LLMs to adjust their behavior through conditioning on input-output examples as part of a prompt without any changes to the underlying network weights. As such, work in the area of automated prompt engineering can also be seen as work in the area of in-context learning.
+
+\citet{wang-arxiv2023a} take a first step towards applying \AutoML for optimizing \LLM inference by leveraging BlendSearch \citep{wang-iclr2021a} and proposing a cost-based pruning strategy to optimize the inference hyperparameters of \LLMs. This demonstrates that \AutoML can indeed be used to optimize the inference stage of the \LLM lifecycle.
+
+On a more general level, knowledge distillation can be used to improve the inference speed of \LLMs by creating smaller (student) \LLMs with a similar performance to the original one (teacher) \citep{gu-arxiv23a,hsieh-acl23a}. \AutoML approaches can be used here as well to optimize the hyperparameters of the corresponding knowledge distillation algorithms. For example, the MiniLLM approach suggested by \citet{gu-arxiv23a} leverages a gradient descent algorithm together with an advanced clipping strategy, both of which have hyperparameters, which can be optimized. Similarly, the step-by-step distillation by \citet{hsieh-acl23a} has several hyperparameters that can be optimized with \AutoML approaches. Nevertheless, this can, in principle, be seen as yet another stage requiring a different \AutoML setup compared to optimizing the inference pipeline itself as one can build an inference pipeline even around the student \LLM obtained from the distillation process.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Challenge III: The Multitude of Performance Indicators}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Eventually, we aim at obtaining a well-performing \LLM system. A best practice for AutoML is to optimize the final performance of a system (or at least a very well-correlated proxy metric) to avoid any misalignment between the AutoML process and the important metrics after deployment of the system. However, it is not easy to answer what performance exactly entails and how it is quantified. This has several reasons: \begin{inparaenum}[(i)]
+    \item Standard machine learning already comes with many possible performance metrics, and choosing the correct ones involves assessing their importance, which depends on the given application. For example, besides accuracy, the community considers inference time for high-throughput, memory, and energy consumption for edge devices. In the context of multimodal \LLMs, various additional metrics may play a crucial role, such as image-text alignment~\citep{xu-cvpr18a, grimal-arxiv2023a} or adversarial robustness~\citep{zhao-neurips23a}. Multi-objective \AutoML allows optimizing for several of these performance metrics~\citep{moraleshernandez-arxiv21a,karl-evolearn23a}.
+    \item While training the base model, the downstream task is not known, but the base model needs to be as general as possible. This implies that we do not know the final performance metric in earlier training stages but have to rely on the capabilities of the pre-trained model regarding its performance after fine-tuning (which will take place at some later point). 
+    \item In view of the prevalence of \LLMs and the direct interaction with users, it is of utmost importance to consider the issue of bias and its implications \citep{kumar-etal-2023-language}.
+\end{inparaenum}
+
+Considering the importance of the latter, let us discuss decreasing the bias of language model output via fine-tuning with \AutoML in more detail. While language models themselves can be used as data generators for debiased data~\citep{schick-tacl21,hernandez-arxiv23}, as well as pre-defined sentence templates~\citep{liang-acl20}, \AutoML can assist in determining the amount of additional data necessary as well as the kind of data that should be generated (data for removing bias, neutralizing representations, or equalizing them). 
+Debiasing can also be interleaved with task objective fine-tuning~\citep{saravanan-arxiv23} considering that the duration and amount of data used in both phases are important hyperparameters for \AutoML methods to target.
+\citet{gira-ltedi22} have shown that it is possible to fine-tune only a subset of model weights in order to achieve less biased outcomes -- though selecting the correct parameters to tune is crucial for performance.
+Nevertheless, \AutoML systems can only assist in training fairer models; human input is required for centering values like fairness in the whole training pipeline~\citep{bender-facct21,weerts-arxiv23a}.
+
+Overall, as our elaboration shows, the topic of quantifying how good an \LLM is for a specific use case is a complicated topic, which has also been discussed intensively in the literature. For example, \citet{liang-tmlr23a} demonstrate that different metrics are of different importance in different \LLM use cases. Similarly, \citet{dehghani-iclr22a} elaborate on how detrimental the partial reporting of metrics can be for drawing final conclusions.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Challenge IV: Combination of Different Learning Paradigms and Modalities}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Closely related to Challenge II and III, current \AutoML packages are not well prepared for requirements for tuning the entire LLM training process because they commonly consider only a single learning paradigm at once. Training of \LLMs is particularly challenging since it combines stages of self-supervised learning, supervised learning, and even reinforcement learning.
+This implies that we need separate design and configuration spaces for each stage while ultimately aiming at jointly optimizing all of them~\citep{hutter-blog22a}. So far, configuration spaces for supervised classification learning already consider tenths or more than a hundred design decisions~\citep{feurer-aaai15a,zimmer-tpami21a,feurer-jmlr22a}. 
+However, so far, it is unknown how we would jointly optimize the entire pipeline since this poses the sub-challenges of (i) jointly optimizing potentially hundreds of design decisions with (ii) several performance indicators on (iii) an unknown distribution of downstream tasks. Ways to go forward with this would entail studying the importance and interactions between design decisions to find feasible and potentially independent subsets of them, development of proxy performance signals or multi-objective optimization and optimization across many possible downstream tasks.
+
+Furthermore, multi-modal \LLMs are increasingly recognized for their potential in capturing diverse data types such as audio or images, and it is yet to be seen how this multi-modality will influence the optimization of the entire pipeline. Most likely, this will impact how we apply multi-fidelity approaches for efficient \AutoML, e.g., how to choose informative fidelity types such as data subsets from different modalities and partial training of different components. Furthermore, this will further blow up the possible configuration space since all data modalities typically come with their own special design options. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Challenge V: Determining Neural Architectures for \LLMs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Choosing an appropriate neural architecture is a crucial, but non-trivial step in designing state-of-the-art deep neural networks, including \LLMs \citep{white-arxiv23a}. Currently, this is mostly done manually by a human expert \citep{hutter-blog22a}. In contrast to handcrafted discrete architectural choices, Neural Architecture Search (\NAS) aims at alleviating this manual effort  while offering large flexibility in the choices powered by (partial) automation~\citep{elsken-jmlr19a}. However, current \NAS methods have yet to find new innovative state-of-the-art architectures or parts thereof in a way that self-attention was found by human experts \citep{vaswani-neurips17a}. As such, they can be of great help in optimizing certain stages of the \LLM lifecycle, but cannot be applied off-the-shelf without, along other things, a well-designed and potentially over-time adapting search space containing suitable architectural choices -- let alone the computational challenges discussed earlier. 
+
+Recently, first efforts for tailoring \NAS methods towards transformer-based models \citep{chitty-ieeea22a} to meet the specific needs of \LLMs, have been made. 
+For instance, \citep{so-neurips2022a} present a search strategy designed for transformer language models, utilizing a search space of TensorFlow programs and evolution to search for models.
+AutoBERT-Zero \citep{gao-aaai2021a} specifically focuses on BERT models, introducing an inter-layer search space containing self-attention and convolution operations to provide flexibility in learning global and local dependencies at different layers, and proposing an operation-priority evolution strategy.
+Designed for vision transformers, Autoformer \citep{chen-iccv21b} utilizes a supernet training strategy called weight entanglement, entangling the weights of different blocks in the same layers during supernet training, and performs an evolutionary search over the supernets to find promising transformers.
+
+There are also some special characteristics that we take into account for applying \NAS for fine-tuning.
+As \citet{aghajanyan-acl21} point out, fewer parameters are required for fine-tuning than for pre-training, and according to \citet{lee-arxiv19}, only some of the layers actually need fine-tuning.
+Therefore, we would benefit from intelligent methods to select the layers requiring fine-tuning and the subset of learnable model parameters that hold the relevant encoding to the subsequent task. For example, simply tuning a random sample of the model parameters \citep{aghajanyan-acl21} or adding adapter layers after the attention layers and only tuning those \citep{houlsby-icml19} effectively reduces the number of learnable model parameters for fine-tuning. Another strategy in this regard is Low-Rank adaption, which freezes the weights from pre-training and introduces a correction term to them, which substantially reduces the number of parameters to train \citep{hu-iclr22a}.
+Leveraging \AutoML methods for selecting and tuning the right subset of learnable parameters or layers and appropriately configuring the additional architecture introduced may prove valuable for downstream performance as well as parameter efficiency.
+
+First empirical results show that \NAS is indeed a promising direction for supporting the fine-tuning of language models \citep{chitty-ieeea22a}.
+For instance, AdaBERT~\citep{chen-ijcai20} uses \NAS to automatically compress BERT for a specific task and
+\citet{mahabadi-acl21} train a hypernetwork of adapter layers with shared parameters. 
+Given its similarity to One-Shot \NAS \citep{bender-icml18a,brock-iclr18a,shi-neurips20a}, which uses a super-network, methods to train the hyper- or super-network might be transferable to optimizing \LLM fine-tuning. 
+
+When it comes to scaling models, parallelization of the base model training is an essential aspect and introduces new challenges in the design process.
+Parallelization induces architectural and hyperparameter design changes in the model, such as determining the optimal placement of batch normalization or residual connections to ensure stability and affect convergence speed and overall performance \citep{shoeybi-arxiv2019a}. 
+Acknowledging the significant impact on and necessity of parallelization for \LLMs, it becomes crucial for \NAS approaches to be parallel-aware.
+
+Benchmarks for NAS sped up the development of new NAS algorithms and are predominant in the NAS literature since vast amounts of architectures were already evaluated~\citep{ying-icml19a,dong-iclr20a,mehta-iclr22a} and further extended by surrogate interpolations to even more architectures~\citep{zela-iclr22a}.
+However, we are only aware of a single benchmark of NAS for NLP~\citep{klyuchnikov-tfas22a} that allows efficient benchmarking of different NAS approaches by evaluating about 14k different architectures. Unfortunately, these architectures are based on RNNs and not on modern transformers. Therefore, it is an open challenge how to provide a reproducible and efficient benchmark of NAS for LLMs to the community. For a general overview of desirable properties of NAS benchmarks, we refer to \citet{lindauer-jmlr20a}.
+
+\section{\LLMs for \AutoML}
+\label{sec:llms-for-automl}
+
+At the moment it seems that \LLMs have the potential to disrupt our society from a variety of angles, for example, in education \citep{kasneci-lid23a}, medicine \citep{alberts-jnmmi23a}, programming \citep{dakhel-jss23a}, or in law \citep{noonan-ssrn23}. As we illustrate in \autoref{fig:llms_for_automl_overview} and elaborate in the following sections, we expect that \LLMs will also disrupt \AutoML from various angles: 
+
+\begin{enumerate}[(i)]
+    \item Interacting with complex systems such as an \AutoML system is often challenging for non-expert users. The remarkable \NLP capabilities of \LLMs offer the opportunity to fundamentally redesign how humans interact with \AutoML systems both from the point of view of setting them up and interpreting their output. 
+    \item To unleash their full potential, \AutoML systems have to be configured adequately often requiring an expert. The knowledge distillation capabilities of \LLMs offer the opportunity to suggest a good initial configuration of an \AutoML system for a specific problem at hand.
+    \item \AutoML systems leverage several sub-components such as a neural performance predictor in many \NAS tools. As first work shows, these components can be replaced by \LLMs acting as meta-learned versions of the corresponding components.
+\end{enumerate}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1.\textwidth]{figures/llms_for_automl_overview_3.pdf}
+    \caption{Overview of options where \LLMs can be integrated into the \AutoML process.}
+    \label{fig:llms_for_automl_overview}
+\end{figure}
+
+\subsection{Opportunity I: Improving Human-Machine-Interaction with \LLMs}
+\label{subsec:hmi-with-llms}
+
+As natural language has always been the cornerstone of human communication, advances in \NLP gave rise to an increasing amount of chatbots in various applications over the last decade \citep{adamopoulou-mla20}. Until recently, however, most of these chatbots have been rather limited in their capabilities. As ChatGPT \citep{openai-openai22a} shows, \LLMs have the potential to alleviate this situation by allowing for significantly more powerful chatbots and better textual interaction with a user. In the context of \AutoML, we foresee two promising directions: Leveraging \LLMs
+\begin{inparaenum}[(i)]
+    \item as a user-friendly interface to \AutoML, and
+    \item to improve the interpretability of the \AutoML process.
+\end{inparaenum}
+
+
+\subsubsection{Opportunity I.a:  \LLMs as an Interface to \AutoML}
+\label{subsec:llms-as-interface-to-automl}
+
+The original promise of \AutoML was that it could automate some tasks of a data scientist to large degrees and thus democratize machine learning by allowing domain experts with little to no \ML knowledge to apply \ML to their domain. However, despite their success, many current \AutoML tools were not built around the user, but rather around algorithmic ideas. In particular, most of these tools allow for very limited interaction with a user in practice. This is also reflected in the reluctance of many researchers to use \AutoML tools \citep{blom-automl21a}. As a consequence, parts of the community have pushed towards a more human-centered \AutoML process aimed at supporting the data scientist such that they can work more efficiently \citep{lindauer-automlorg22,pfisterer-arxiv2019a}. Correspondingly, \AutoML can be seen to have two main target groups: 
+\begin{inparaenum}[(i)]
+    \item Domain experts with little \ML knowledge who want to apply off-the-shelf \ML to their problem, and
+    \item \ML experts who want to improve their workflow with automated tools that keep them in the loop. 
+\end{inparaenum}
+%
+Right now, most \AutoML tools require coding or at least some technical understanding and, in terms of usability, target the second group much more than the first one. 
+
+\LLMs enable us to fundamentally rethink how people interact with \AutoML systems and, in particular, help us design powerful interactive text-based interfaces such as chatbots. These can iteratively extract the requirements of a user across a conversation and, in the background, configure an \AutoML system correspondingly (see also Sec. \ref{subsec:llms-for-configuring-automl}) based on \ML best practices and knowledge about optimization runs on similar datasets encoded in the \LLM. In particular, such interactive systems can simplify many of the complicated design decisions affecting the \AutoML process. For example, choosing an appropriate metric for optimization can be challenging for a non-expert, but might be possible with a competent interactive chatbot asking questions which guide the user to choosing the correct one. Naturally, this also bears the danger of wrong \AutoML configurations (see Sec. \ref{sec:dangers-and-challenges}).
+
+Parts of this vision of conversational \AutoML assistants are already a reality with AI-based coding assistant tools such as GitHub Copilot \citep{copilot-github21a}. They can generate and suggest code to run \AutoML with the contextual information that the users give. Thereby, AI-based coding assistants already assist users in finding concrete \AutoML instantiations that best fit the requirement and the devices at hand. However, we envision assistants much more tailored to the needs of \ML practitioners. 
+
+\subsubsection{Opportunity I.b: Interpretability of the \AutoML Process}
+\label{subsec:interpretability-of-results}
+
+There has been a recent rise in methods trying to contribute to the aforementioned human-centered \AutoML paradigm \citep{pfisterer-arxiv2019a,lindauer-automlorg22,moosbauer-neurips21a,moosbauer-arxiv22a,segel-automl23a} by proposing ideas to improve the interactivity with the user and the interpretability of the \AutoML process. However, many of these works adapt rather classic interpretable machine learning methods to the \AutoML setting, whose results might remain rather complicated to understand for non-experts and do not provide any textual, easy-to-understand explanations. 
+
+\LLMs have the potential to significantly increase the user-friendliness of those interpretations by elaborating on them in the form of text. In particular, an \LLM initialized with the history of evaluated configurations or pipelines, e.g. a run history from an optimizer such as SMAC \citep{lindauer-jmlr22a}, Hyperopt \citep{komer-automl14a} or BoTorch \citep{balandat-neurips20a}, as context could help generate a textual optimization report elaborating on the final \AutoML result and details of the process itself. Ideally, the \LLM could additionally be contextualized with results of several ixAutoML methods as a strong foundation for the report. This may even include images, such as partial dependence plots~\citep{moosbauer-neurips21a}, as multimodal \LLMs allow to process images as well~\citep{li-arxiv2023a, zhang-arxiv2023a}. If the user has questions about the report or elements not covered by the report, the \LLM could also be used as part of a chatbot to answer those questions. Although there is an ongoing discussion in the community on what constitutes a good explanation in general, textual explanations seem to be highly trusted by users \citep{gilpin-dsaa18a}.
+
+\subsection{Opportunity II: \LLMs for Configuring \AutoML}
+\label{subsec:llms-for-configuring-automl}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1.\textwidth]{figures/llms_for_automl_configuration.pdf}
+    \caption{Visualization of the potential of \LLMs for the configuration of \AutoML (\Cref{subsec:llms-for-configuring-automl}) and \LLMs as components of \AutoML systems (\Cref{subsec:llms-for-simulating-automl}) at the example of a \AutoML process based on Bayesian Optimization.}
+    \label{fig:llms_for_automl_configuration}
+\end{figure}
+
+To fully shine, an \AutoML system must be set up correctly, including a suitable system configuration for the task at hand. Going even further, selecting among various \AutoML tools~\citep{thornton-kdd13a, feurer-nips15a, akiba-kdd19a, jin-sigkdd19a, erickson-arxiv20a, zimmer-tpami21a} can be important depending on the problem and hardware at hand. Although there exists work in the direction of removing the burden of selecting and configuring an \AutoML system \citep{feurer-automl18b,tornede-mlj22a,feurer-jmlr22a,moosbauer-tec22a}, setting up an \AutoML system without an expert can still be challenging. \LLMs offer a great opportunity to further improve this situation by suggesting a good configuration for the task at hand. Below and in Figure \ref{fig:llms_for_automl_configuration}, we outline several configuration options, which are often very important but difficult to choose correctly, even for experts. 
+
+The vast majority of \AutoML tools require the configuration of a search space of candidates from which solutions can be drawn. Depending on the concrete application, this usually spans several numerical, categorical, and ordinal hyperparameters -- often with dependencies between them. The concrete instantiation of this search space is crucial to find a well-performing pipeline quickly but is also hard to set up even for an expert. In particular, which kind of solutions (e.g. pipelines with or without preprocessing) are suitable, or which hyperparameters to tune and their concrete domains, are important to configure correctly. For example, choosing the domain of a hyperparameter to be small might benefit the search speed, but also bears the danger of missing the truly optimal value. Until now, this problem is either solved by an expert carefully configuring the \AutoML tool, by approaches that adaptively adjust the search space during the optimization process \citep{wistuba-ecml15a,nguyen-knowinfsys19a,hu-ieeetnnls22a,hu-eccv20a,chen-iccv19} or by integrating human expert knowledge as prior information guiding the search~\citep{souza-ecmlpkdd21a,hvarfner-iclr22a,mallik-metaws22a}.
+
+Similarly important -- especially from a Green \AutoML perspective \citep{tornede-jair23a} -- is the question of how long to run the \AutoML process. Choosing a too-long runtime might waste both time and resources, while too-short runtimes bear the danger of missing good solutions. \LLMs could provide first settings for maximum runtimes of AutoML tools based on the experience from other AutoML practitioners. Going even one step further, we could even leverage the knowledge encoded in an \LLM to check whether the \AutoML run has already converged or whether further tuning could still be promising. Recent work by \citet{makarova-automlconf22a} has shown that such an automatic termination is in principle possible, even without \LLMs, and allows for considerable resource savings. In principle, we could even imagine that given a sufficient amount of \AutoML studies with details on the configuration space being tuned, an LLM could also learn how much \AutoML budget (e.g., in terms of evaluated configurations) is typically used for different configuration spaces to achieve a strong result.
+
+Lastly, \LLMs could be used to configure the use of multi-fidelity approaches, such as Hyperband \citep{li-jmlr18a}. As recent work shows, the performance of multi-fidelity approaches is influenced by the choice of the fidelity types~\citep{deng-ecml22a} and the minimal/maximal amount of budget~\citep{bohdal-iclr2023a}. Correspondingly, choosing these correctly is crucial but also hard in practice, making an automated suggestion very helpful.
+
+\subsection{Opportunity III: \LLMs as Components of \AutoML Systems}
+\label{subsec:llms-for-simulating-automl}
+
+Most \AutoML systems are complex tools with a plethora of sub-systems and components that suit different purposes, such as estimating the performance of a pipeline \citep{white-neurips21a}, estimating the runtime of a pipeline \citep{mohr-tpami21a}, or choosing the next pipeline to evaluate. \LLMs offer the opportunity to replace many of these sub-systems as a meta-learned version thereof. Below and in Figure \ref{fig:llms_for_automl_configuration} we outline and showcase several of such opportunities.
+
+Almost all \AutoML systems leverage some form of solution candidate selection strategy that selects the next candidate to be evaluated such as an acquisition function in BO-based systems. The knowledge modeling capabilities of \LLMs and their access to tremendous amounts of meta-data about ML and AutoML runs offer the opportunity to replace these mostly hand-designed selection strategies with a meta-learned version in the form of an \LLM. First works in these directions are promising: GPT-NAS \citep{yu2023gptnas} leverages a GPT model to predict (parts) of a neural architecture, i.e., a solution candidate based on an encoding which is used for evolving architectures. GENIUS \citep{zheng2023gpt4} even goes a step further and replaces the whole architecture suggestion step with GPT-4. It iteratively prompts GPT-4 for an architecture, which it evaluates, and re-prompts GPT-4 with the performance asking for a better architecture. This process is continued until a stopping criterion is reached. Similarly, EvoPrompting \citep{chen2023evoprompting} leverages an \LLM to implement the crossover and mutation operator in an evolutionary \NAS approach. Likewise, \citet{nasier-arxiv23a} suggest to leverage \LLMs to generate individuals in an evolutionary \NAS approach.
+
+Moreover, the knowledge encoded in \LLMs can also be used in feature engineering, as recently demonstrated. CAAFE \citep{hollmann2023gpt} is a feature engineering method for tabular datasets that leverages an \LLM to iteratively propose additional code for feature engineering based on their descriptions and feedback back the evaluation of this code piece to the \LLMs. This contributes beyond AutoML to the ultimate goal of automated data science \citep{bie-cacm22a}.
+
+Furthermore, most \AutoML tools iteratively evaluate new solution candidates by training and validating. Naturally, this is a time-consuming process, especially if the training time of the solution candidate is extremely long, such as in deep learning. For this reason, some systems leverage meta-learned performance estimators such as meta-learned surrogate models in Bayesian optimization~\citep{vanschoren-automlbook19a} or neural performance predictors in \NAS \citep{white-neurips21a} which can replace some of the evaluations. Once again, \LLMs offer a great opportunity to serve as a special form of meta-learned replacement based on knowledge extracted from large amount of unstructured data, which is not accessible to standard meta-learned approaches. They can also serve as a basis to generate training data for simpler performance/training time estimators or surrogate models and potentially also replace the latter. \citet{chen-neurips22a} have demonstrated that their OptFormer approach is able to learn both a competitive surrogate model and an acquisition function from the optimization history of Google's Vizier \citep{song-icml22b} platform. Similarly, \citet{liu-iclr24a} highlight that their approach LLMABO can be used to improve a variety of \AutoML components such as warmstarting, surrogate modeling and candidate sampling.
+
+Going even further, both \citet{zhang-arxiv23b} and \citet{zhang-arxiv23a} suggest AutoML-GPT and MLCopilot, respectively, which fully work as a zero-shot \AutoML tool on their own. Given a textual problem description by the user and a knowledge base in the background, they suggest a pipeline and/or training procedure to achieve good performance on the specific problem. The problem itself can vary, but contains at least a description of the dataset a model is sought for, some form of search space description as a source of the model to be sought and a description on how performance is to be assessed. The search space can be a concrete class of models or even a concrete architecture such that the \LLM needs to find a complete pipeline or only good hyperparameters \citep{zhang-arxiv23b}. Note that these systems never evaluate a single \ML pipeline, but, in the case of AutoML-GPT, only use \LLMs to simulate the entire \AutoML process. \citet{tsai-arxiv23a} take a slightly different approach by using an \LLM to generate code to perform concrete \AutoML tasks in an iterative process which is controlled by another \LLM receiving the execution results and adjusting the prompt to the code \LLM correspondingly. Similarly, Aliro \citep{choi-bioinformatics23a} provide an \AutoML tool tailored towards medical data where \LLMs are used in the background to quickly generate code for user and case-specific analyses of the data.
+
+The knowledge encoded in \LLMs can, in principle, be derived from a multitude of data sources, including but not limited to academic papers, data science and ML competitions (e.g., Kaggle), ML benchmark platforms (e.g., OpenML~\citep{casalicchio-19a}), \AutoML benchmarks, or \AutoML runs with their corresponding performances.
+The increasing availability of open-source data and code may equip \LLMs with the capability to grasp intricate relationships between architectural choices, hyperparameters, performance outcomes, or runtimes.
+Such data can be used to tailor \LLMs to specific tasks, as done for example in GPT-NAS \citep{yu2023gptnas}, which is pre-trained on the NAS-Bench-101 dataset \citep{ying-icml19a} and fine-tuned on a dataset adopting 36 presently prevalent neural architectures. However, the successes of \LLMs in performing \NAS \citep{zheng2023gpt4} or suggesting a whole \AutoML pipeline \citep{zhang-arxiv23a, zhang-arxiv23b}, even without fine-tuning, suggests that the models can generalize their understanding from the wealth of information available.
+
+All of the examples above crucially depend on how the prompts for the \LLM are designed and how the knowledge gained so far is added as context to the prompts. For example, EvoPrompting \citep{chen2023evoprompting} adds the code of all previously evaluated architectures together with their evaluation results as an annotation to the prompt as context. Naturally, this can quickly lead to very large prompts, which can be challenging for current \LLMs, although recent work tries to alleviate the prompt size limitation \citep{yu-arxiv23a}.
+
+\section{Risks}
+\label{sec:dangers-and-challenges}
+
+Besides the numerous valuable ways to integrate \LLMs and \AutoML, the combination poses some risks. Below, we elaborate five risks combining \LLMs and \AutoML:
+
+\begin{enumerate}[(i)]
+    \item Using \LLMs for configuring \AutoML requires extracting meta-knowledge about \AutoML tasks to be fed into the \LLMs. Therefore, intensive and human-time-consuming prompt engineering is required to reliably extract that knowledge.
+    \item The usage of publicly available data to evaluate \AutoML approaches configured via \LLMs might be data snooping, as the \LLM might have already seen the data during training. The detection of prior knowledge of an \LLM about a given dataset becomes more and more important.
+    \item \LLMs are known to hallucinate from time to time, presenting false facts due to the lack of fact-checking. This could be crucial when \LLMs are used to configure \AutoML as inappropriate configurations could be used.
+    \item The full-text interaction of \LLMs seems to be quite trustworthy for laypeople, although the presented content might not be true at all. In combination with \AutoML, the user might mistakenly get a positive impression of the results.
+    \item Combining two resource-intensive research areas, i.e. \LLMs and \AutoML, will result in an even more resource-intensive research area. Thus, it is more important to be transparent about the resources used and find ways to be more efficient.
+\end{enumerate}
+
+\subsection{Risk I: Complicated Human-Interaction} We have leveraged the working assumption that \LLMs trained on a large corpus of text also encode knowledge about \AutoML tasks several times throughout this manuscript. Such knowledge could comprise a general understanding of what models perform well given a dataset description or which preprocessing is required for a specific task at hand. However, extracting such knowledge for the user in a reliable way depends on the specific prompt, leading to the task of prompt engineering for \AutoML \citep{sorensen-etal-2022-information}. Ideally, human-machine-interaction will make designing a concrete prompt obsolete by automatically constructing it in an automated fashion from a chat-like interaction with a user. However, this might only work to a certain extent and currently remains an open problem. Correspondingly, we risk that by leveraging \LLMs for \AutoML we only shift the barrier of entry from requiring coding and \ML knowledge to prompt engineering knowledge. 
+
+\subsection{Risk II: Evaluation}
+Any form of evaluation of an \AutoML approach leveraging \LLMs in some component needs to be performed with care. As \LLMs are trained on extreme amounts of unstructured data, it is quite likely that they see many openly available \ML datasets during training including corresponding test data or a condensed version thereof, such as a model trained on the data. Thus, evaluating an \AutoML pipeline that uses an \LLM on a dataset that was part of the training data of the underlying \LLM is akin to data snooping \citep{kok-us1984}. Correspondingly, the evaluation result would be strongly biased. We see two main strategies to circumvent this problem: First, we could evaluate it on datasets that are guaranteed not to have been seen by the \LLM during training, such as data generated after the \LLM has been trained \citep{faggioli2023perspectives}. Naturally, this raises the question of how to get such private datasets, which are still freely accessible for other researchers, of realistic nature in order to compare approaches, but still were not used by the \LLM in advance. Second, we could try to fine-tune an \LLM to remove any knowledge about a dataset from its model~\citep{yang-arxiv22a}. To achieve this, we would need to know how to detect prior knowledge of the \LLMs about any used dataset or a condensed version thereof. Once such knowledge is detectable, we would need to find a way to reliably remove it via fine-tuning. However, at this point in time, there is no approach guaranteeing that prior knowledge about a dataset can be fully removed. Overall, the evaluation of an \AutoML system featuring an \LLM is far from trivial and requires new protocols.  
+
+\subsection{Risk III: False Facts and Misuse}
+\LLMs are known to generate output sounding confident but featuring hallucinated knowledge \citep{ji-acmcs23a}, which might be indistinguishable or at least hard to distinguish from facts in some cases. Correspondingly, we may wonder whether any usage of \LLMs within \AutoML systems can lead to detrimental results, e.g., when misconfiguring the \AutoML via an \LLM by the user such that almost no runtime is granted, or the \LLM takes decisions like choosing the search space which might be inappropriate for the given problem. 
+A potential solution to this might be the integration with a knowledge graph \citep{hogan-acmcs22a} tailored towards \AutoML that can be used as a knowledge base to contextualize potential \LLM suggestions. Moreover, we should consider filters or safeguards for degenerate solutions output by the \LLM and resolve to predefined defaults in those cases.
+
+In general, when integrating \LLMs with \AutoML systems, we should keep in mind the potential for wrong \LLM output and how such output can be detected in a probabilistic approach. A big advantage over many other disciplines is that we can validate whether replies by the \LLM are correct by simply running an experiment and comparing the experiment result output by the \LLM and the result we obtain from the run~\citep{zheng2023gpt4,chen2023evoprompting,hollmann2023gpt}.
+
+\subsection{Risk IV: Trust and Explanations}
+Although improving the human-machine-interaction of \AutoML systems leveraging \LLMs (Sec.~\ref{subsec:hmi-with-llms}) has the potential to democratize \ML even more, it also bears dangers when more laypeople interact with such systems. For example, due to the full-text interaction with a user, there might be a lot of trust in the results, although the returned machine learning model might not be suitable for the given problem at all. Correspondingly, the attention of the user should be drawn to potential ambiguities in the interaction, and they should be made well aware of the assumptions the overall system makes due to the textual interaction. One way to address this issue could be to add further explanation approaches telling users how certain replies were generated~\citep{deb-arxiv23a}. 
+
+\subsection{Risk V: Resource Consumption} 
+Both \LLMs and \AutoML are resource-intensive research areas on their own. Combining them could lead to even higher resource consumption, raising the question if spending these resources is worth it. In view of the growing number of fine-tuned \LLMs for medical applications~\citep{han-arxiv23a,wu-arxiv23b}, it is quite likely that there will also be fine-tuned \LLMs for specialized \AutoML tasks. With the potential of easily generating more and more meta-knowledge for \AutoML by simply evaluating more \ML pipelines or hyperparameter configurations, it could even lead to a race of repeatedly fine-tuned tasks.\footnote{We note that in contrast to real \NLP tasks where human input is required, it is much easier to generate new examples of how \ML pipelines or \AutoML systems behave and perform.} Nevertheless, the potentially rich meta-knowledge stored in these \LLMs (see \cref{subsec:llms-for-configuring-automl}) could also lead to new efficiency gains in \AutoML. Overall, in the spirit of Green \AutoML \citep{tornede-jair23a}, it will be even more important to be transparent about the resources used when conducting research at this intersection, and to find ways to be more efficient on both sides.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+\LLMs already started to have big impact on \AutoML, both how \AutoML is designed for \LLMs, and how \LLMs can be leveraged for \AutoML. 
+Nevertheless, we are only at the beginning of a long journey to solve the many challenges and make use of the opportunities while considering the risks ahead of us. We strongly believe that we, as a community, will overcome those challenges and savour the remarkable opportunities that an integration of \LLMs and \AutoML offers.
+
+The biggest challenge of all can be boiled down to one fact: The training and maintenance of the most capable \LLMs requires immense resources, such that only a few groups worldwide are able to provide those systems. This implies several problems for the community: \begin{inparaenum}[(i)]
+    \item We are not easily able to study how \AutoML can be tailored toward training of \LLM base models;
+    \item We cannot easily check which data was used to train the models which bears risks in using and evaluating \LLMs for \AutoML;
+    \item We cannot easily add safeguards against misuse of \LLMs and \AutoML.
+\end{inparaenum}
+Correspondingly, it is even more problematic that the responsibility and control over \LLMs lie in those few hands of mostly private companies. In view of this, we believe that one of the next steps has to be the development an open-source \LLM with the specific goals of the \AutoML in mind.
+
+\subsubsection*{Acknowledgments}
+We would like to thank the wider AutoML community for various perspectives that have influenced this work. We would like to mention various discussions with the AutoML.org supergroup, the AutoML 2022 panel discussion on "AutoML in the age of large pretrained model" and breakout sessions at a small AutoML 2023 workshop in Paris on "AutoML \& LLMs". Indeed, our paper’s title was inspired by these events as well. In particular, we acknowledge (in alphabetic order): Steven Adriaensen, Deebadepta Dey, Carola Doerr, Katharina Eggensperger, Matthias Feurer, Neil Houlsby, Frank Hutter, Arjun Krishnakumar, Neeratyoy Mallik, Samuel Müller, Raghu Rajan, Elena Raponi, Zi Wang and Marc Zöller.
+
+Alexander Tornede, Sarah Segel and Marius Lindauer acknowledge funding by the European Union (ERC, ``ixAutoML'', grant no.101041029). Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. Neither the European Union nor the granting authority can be held responsible for them. Tanja Tornede acknowledges financial support in the GreenAutoML4FAS project (no. 67KI32007A) and Daphne Theodorakopoulos in the ZuSiNa project (no. 67KI21009A), both funded by the German Federal Ministry of the Environment, Nature Conservation, Nuclear Safety and Consumer Protection. Tim Ruhkopf acknowledges financial support by the Federal Ministry for Economic Affairs and Energy of Germany in the project CoyPu (no. 01MK21007L). 
+\begin{center}
+    \includegraphics[height=5cm]{figures/LOGO_ERC-FLAG_EU.pdf}
+\end{center}
+
+\bibliography{strings, lib, additional_refs_cleaned, proc}
+\bibliographystyle{tmlr}
+
+\appendix
+
+\end{document}

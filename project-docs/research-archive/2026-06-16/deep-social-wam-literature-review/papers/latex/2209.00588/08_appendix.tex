@@ -1,0 +1,216 @@
+\section{Models and Hyperparameters}
+\label{appendix:architectures}
+
+\subsection{Discrete autoencoder}
+
+Our discrete autoencoder is based on the implementation of \textsc{vqgan} \citep{vqgan}. We removed the discriminator, essentially turning the \textsc{vqgan} into a vanilla \textsc{vqvae} \citep{vqvae} with an additional perceptual loss \citep{johnson, larsen}.
+
+The training objective is the following:
+\begin{equation*}
+    \mathcal{L}(E, D, \mathcal{E}) = \norm{x - D(z)}_{1} + \norm{\mathrm{sg}(E(x)) - \mathcal{E}(z)}^{2}_{2} + \norm{\mathrm{sg}(\mathcal{E}(z)) - E(x)}^{2}_{2} + \mathcal{L}_{perceptual}(x, D(z))
+\end{equation*}
+
+Here, the first term is the reconstruction loss, the next two terms constitute the commitment loss (where $\mathrm{sg}(\cdot)$ is the stop-gradient operator), and the last term is the perceptual loss. 
+
+\begin{table}[h]
+  \caption{Encoder / Decoder hyperparameters. We list the hyperparameters for the encoder, the same ones apply for the decoder.}
+  \label{tables:autoencoder}
+  \centering
+  \begin{tabular}{lc}
+    \toprule
+    Hyperparameter     & Value \\
+    \midrule
+    Frame dimensions (h, w) & $64 \times 64$ \\
+    Layers & 4 \\
+    Residual blocks per layer & 2 \\
+    Channels in convolutions & 64 \\
+    Self-attention layers at resolution & 8 / 16 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \caption{Embedding table hyperparameters.}
+  \label{tables:autoencoder-embedding}
+  \centering
+  \begin{tabular}{lc}
+    \toprule
+    Hyperparameter     & Value \\
+    \midrule
+    Vocabulary size (N) & 512 \\
+    Tokens per frame (K) & 16 \\
+    Token embedding dimension (d) & 512 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Note that during experience collection in the real environment, frames still go through the autoencoder to keep the input distribution of the policy unchanged. See Algorithm \ref{alg:iris} for details.
+
+\subsection{Transformer}
+
+Our autoregressive Transformer is based on the implementation of minGPT \citep{mingpt}. It takes as input a sequence of $L(K + 1)$ tokens and embeds it into a $L(K + 1) \times D$ tensor using an $A \times D$ embedding table for actions, and a $N \times D$ embedding table for frames tokens. This tensor is forwarded through $M$ Transformer blocks. We use GPT2-like blocks \citep{radford_gpt2}, i.e. each block consists of a self-attention module with layer normalization of the input, wrapped with a residual connection, followed by a per-position multi-layer perceptron with layer normalization of the input, wrapped with another residual connection.
+
+\begin{table}[h]
+  \caption{Transformer hyperparameters}
+  \label{tables:transformer}
+  \centering
+  \begin{tabular}{lc}
+    \toprule
+    Hyperparameter     & Value \\
+    \midrule
+    Timesteps (L)     & 20 \\
+    Embedding dimension (D) & 256 \\
+    Layers (M) & 10 \\
+    Attention heads & 4 \\
+    Weight decay & 0.01 \\
+    Embedding dropout & 0.1 \\
+    Attention dropout & 0.1 \\
+    Residual dropout & 0.1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\newpage
+
+\subsection{Actor-Critic}
+
+The weights of the actor and critic are shared except for the last layer. The actor-critic takes as input a $64\times64\times3$ frame, and forwards it through a convolutional block followed by an LSTM cell \citep{a3c,lstm,Gers2000}. The convolutional block consists of the same layer repeated four times: a 3x3 convolution with stride 1 and padding 1, a ReLU activation, and 2x2 max-pooling with stride 2. The dimension of the LSTM hidden state is 512. Before starting the imagination procedure from a given frame, we burn-in \citep{r2d2} the 20 previous frames to initialize the hidden state.
+
+\begin{table}[h]
+  \caption{Training loop \& Shared hyperparameters}
+  \label{tables:shared}
+  \centering
+  \begin{tabular}{lc}
+    \toprule
+    Hyperparameter     & Value \\
+    \midrule
+    Epochs  & 600 \\
+    \# Collection epochs & 500 \\
+    Environment steps per epoch & 200 \\
+    Collection epsilon-greedy & 0.01 \\
+    Eval sampling temperature & 0.5 \\
+    Start autoencoder after epochs & 5 \\
+    Start transformer after epochs & 25 \\
+    Start actor-critic after epochs & 50 \\
+    Autoencoder batch size & 256 \\
+    Transformer batch size & 64 \\
+    Actor-critic batch size & 64 \\
+    \midrule
+    Training steps per epoch & 200 \\
+    Learning rate & 1e-4 \\
+    Optimizer & Adam \\ %\citep{adam}
+    Adam $\beta_1$ & 0.9 \\
+    Adam $\beta_2$ & 0.999 \\
+    Max gradient norm & 10.0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\newpage
+
+\section{Actor-critic learning objectives}
+\label{appendix:actor_critic}
+
+We follow Dreamer \citep{dreamerv1,dreamerv2} in using the generic $\lambda$-return, that balances bias and variance, as the regression target for the value network. Given an imagined trajectory $(\hat{x}_0, a_0, \hat{r}_0, \hat{d}_0, \dots, \hat{x}_{H-1}, a_{H-1}, \hat{r}_{H-1}, \hat{d}_{H-1}, \hat{x}_H)$, the $\lambda$-return can be defined recursively as follows:
+
+\begin{equation}
+\Lambda_t = 
+\begin{cases}
+    \hat{r}_t + \gamma (1 - \hat{d}_t) \Big[ (1 - \lambda) V(\hat{x}_{t+1}) + \lambda \Lambda_{t+1} \Big]   & \text{if}\quad t < H \\
+    V(\hat{x}_H)                                                                                            & \text{if}\quad t = H \\
+\end{cases}
+\end{equation}
+
+The value network $V$ is trained to minimize $\mathcal{L}_V$, the expected squared difference with $\lambda$-returns over imagined trajectories. 
+
+\begin{equation}
+\mathcal{L}_V = \mathbb{E}_\pi \Big[ \sum_{t=0}^{H-1} \big( V(\hat{x}_t) - \mathrm{sg} ( \Lambda_t ) \big)^2 \Big]
+\end{equation}
+
+Here, $\operatorname{sg}(\cdot)$ denotes the gradient stopping operation, meaning that the target is a constant in the gradient-based optimization, as classically established in the literature \citep{dqn, rainbow, dreamerv1}. % ddpg
+
+As large amounts of trajectories are generated in the imagination \textsc{mdp}, we can use a straightforward reinforcement learning objective for the policy, such as \textsc{reinforce} \citep{sutton}. To reduce the variance of \textsc{reinforce} gradients, we use the value $V(\hat{x}_t)$ as a baseline \citep{sutton}. We also add a weighted entropy maximization objective to maintain a sufficient exploration.  The actor is trained to minimize the following \textsc{reinforce} objective over imagined trajectories:  % cite reinforce
+
+\begin{equation}
+\mathcal{L}_\pi = - \mathbb{E}_\pi \Big[ \sum_{t=0}^{H-1} \log(\pi(a_t | \hat{x}_{\le t})) \operatorname{sg}(\Lambda_t - V(\hat{x}_t) ) + \eta \operatorname{\mathcal{H}}(\pi (a_t | \hat{x}_{\le t}))\Big]
+\end{equation}
+
+\begin{table}[h]
+  \caption{RL training hyperparameters}
+  \label{tables:rl_params}
+  \centering
+  \begin{tabular}{lc}
+    \toprule
+    Hyperparameter     & Value \\
+    \midrule
+    Imagination horizon (H) & $20$ \\
+    $\gamma$ & $0.995$ \\
+    $\lambda$ & $0.95$ \\
+    $\eta$ & $0.001$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\newpage
+
+\section{Optimality gap}
+\label{appendix:metrics}
+
+\input{figures/figure_optimality_gap}
+
+\section{\textsc{iris} Algorithm}
+\label{appendix:algorithm}
+
+\input{algo_1}
+
+\newpage
+
+\section{Autoenconding frames with varying amounts of tokens}
+\label{appendix:ablation_tokens}
+
+The sequence length of the Transformer is determined by the number of tokens used to encode a single frame and the number of timesteps in memory. Increasing the number of tokens per frame results in better reconstructions, although it requires more compute and memory.
+
+This tradeoff is particularly important in visually challenging games with a high number of possible configurations, where the discrete autoencoder struggles to properly encode frames with only 16 tokens. For instance, Figure \ref{fig:alien} shows that, when increasing the number of tokens per frame to 64 in \textit{Alien}, the discrete autoencoder correctly reconstructs the player, its enemies, and rewards.
+
+\input{figures/figure_alien}
+
+Table \ref{tab:appendix_more_tokens} displays the final performance of \textsc{iris} trained with 64 tokens per frame in three games. Interestingly, even though the world model is more accurate, the performance in Alien only increases marginally (+36\%). This observation suggests that Alien poses a hard reinforcement learning problem, as evidenced by the low performance of other baselines in that game. On the contrary, IRIS greatly benefits from having more tokens per frame for Asterix (+121\%) and BankHeist (+432\%).
+
+\input{table_2}
+
+
+\newpage
+
+\section{Beyond the sample-efficient setting}
+\label{appendix:moredata}
+
+\textsc{iris} can be scaled up by increasing the number of tokens used to encode frames, adding capacity to the model, taking more optimization steps per environment steps, or using more data. In this experiment, we investigate data scaling properties by increasing the number of environment steps from 100k to 10M. However, to maintain a training time within our computational resources, we lower the ratio of optimization steps per environment steps from 1:1 to 1:50. As a consequence, the results of this experiment at 100k frames would be worse than those reported in the paper.  
+
+\input{table_3}
+
+Table \ref{tab:appendix_moredata} illustrates that increasing the number of environment steps from 100k to 10M drastically improves performance for most games, providing evidence that \textsc{iris} could be scaled up beyond the sample-efficient regime. On some games, more data only yields marginal improvements, most likely due to hard exploration problems or visually challenging domains that would benefit from a higher number of tokens to encode frames (Appendix \ref{appendix:ablation_tokens}).
+
+\newpage 
+
+\section{Computational resources}
+\label{appendix:resources}
+
+For each Atari environment, we repeatedly trained \textsc{iris} with 5 different random seeds. We ran our experiments with 8 Nvidia A100 40GB GPUs. With two Atari environments running on the same GPU, training takes around 7 days, resulting in an average of 3.5 days per environment.
+
+SimPLe \citep{simple}, the only baseline that involves learning in imagination, trains for 3 weeks with a P100 GPU on a single environment. As for SPR \citep{spr}, the strongest baseline without lookahead search, it trains notably fast in 4.6 hours with a P100 GPU. 
+
+Regarding baselines with lookahead search, MuZero \citep{muzero} originally used 40 TPUs for 12 hours to train in a single Atari environment. \citet{efficientzero} train both EfficientZero and their reimplementation of MuZero in 7 hours with 4 RTX 3090 GPUs. EfficientZero's implementation relies on a distributed infrastructure with CPU and GPU threads running in parallel, and a C++/Cython implementation of MCTS. By contrast, \textsc{iris} and the baselines without lookahead search rely on straightforward single GPU / single CPU implementations.
+
+\vspace{1cm}
+
+\section{Exploration in Freeway}
+\label{appendix:freeway}
+
+The reward function in Freeway is sparse since the agent is only rewarded when it completely crosses the road. In addition, bumping into cars will drag it down, preventing it from smoothly ascending the highway. This poses an exploration problem for newly initialized agents because a random policy will almost surely never obtain a non-zero reward with a 100k frames budget.
+
+\input{figures/figure_freeway}
+
+The solution to this problem is actually straightforward and simply requires stretches of time when the UP action is oversampled. Most Atari 100k baselines fix the issue with epsilon-greedy schedules and argmax action selection, where at some point the network configuration will be such that the UP action is heavily favored. In this work, we opted for the simpler strategy of having a fixed epsilon-greedy parameter and sampling from the policy. However, we lowered the sampling temperature from 1 to 0.01 for Freeway, in order to avoid random walks that would not be conducive to learning in the early stages of training. As a consequence, once it received its first few rewards through exploration, \textsc{iris} was able to internalize the sparse reward function in its world model.
+
+\newpage 
+

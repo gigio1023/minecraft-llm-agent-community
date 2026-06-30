@@ -1,0 +1,19 @@
+\section{Self Forcing}
+
+\subsection{Overview}
+\label{subsec:sf_overview}
+
+Here, we give a brief overview of the original implementation of the Self Forcing algorithm. Let $N$ be the number of frames in the video sequence. We employ a few-step denoising strategy with a discretized noise schedule $\{\sigma_0=0, \dots, \sigma_K=1\}$. 
+A core component of Self Forcing is the ability to obtain a clean prediction from any intermediate noisy state. In Flow Matching, given a noisy latent $\mathbf{x}_{\sigma}$ and the vector field prediction $v_\theta(\mathbf{x}_{\sigma}, \sigma)$, the estimated clean data $\hat{\mathbf{x}}_0$ can be derived analytically: $\hat{\mathbf{x}}_0 = \mathbf{x}_{\sigma} - \sigma v_\theta(\mathbf{x}_{\sigma}, \sigma)$.
+
+During training, fully unrolling the denoising process for every frame is memory-prohibitive. To address this, Self Forcing employs a \textit{stochastic gradient truncation} strategy. For each training iteration, a random target noise level $\sigma_{stop} \sim \{\sigma_0, \dots, \sigma_K\}$ is sampled. The model generates the video autoregressively, but for each frame, the denoising process is truncated once it reaches $\sigma_{stop}$. The input to the next frame $i$ is conditioned on the clean estimates of the previous frames, derived from this truncated state:
+\[ \hat{\mathbf{x}}_0^{1:N} \sim p_{\theta} = \prod_{i=1}^N p_{\theta}(\hat{\mathbf{x}}_0^i \mid \hat{\mathbf{x}}_0^{<i}). \]
+The DMD loss is applied to the sequence of estimates $\hat{\mathbf{x}}_0^{1:N}$. Gradients are backpropagated only from this final truncation step, and in the original implementation, a stop-gradient operation is added to the KV cache. This random sampling of $\sigma_{stop}$ ensures that the model receives supervision across all noise levels while maintaining constant memory complexity with respect to the number of diffusion steps.
+
+\subsection{Teacher Forcing Mask Implementation}
+\label{subsec:teacher_forcing_mask}
+
+
+In \oursf, a special teacher forcing mask is used to re-simulate the final step of denoising across all frames in parallel. This mask enforces sliding window causality and that noisy frames can only attend to past clean frames. We present pseudocode in~\cref{alg:teacher_forcing_mask}. 
+
+\input{figs/algorithms/tf_mask}

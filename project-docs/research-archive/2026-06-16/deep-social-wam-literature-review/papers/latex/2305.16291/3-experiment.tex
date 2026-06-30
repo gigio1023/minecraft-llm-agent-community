@@ -1,0 +1,69 @@
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Experimental Setup} 
+\looseness=-1
+We leverage OpenAI's \texttt{gpt-4-0314}~\cite{openai2023gpt4} and \texttt{gpt-3.5-turbo-0301}~\cite{chatgpt} APIs for text completion, along with \texttt{text-embedding-ada-002}~\cite{embedding} API for text embedding. We set all temperatures to 0 except for the automatic curriculum, which uses temperature $=$ 0.1 to encourage task diversity. Our simulation environment is built on top of MineDojo~\cite{fan2022minedojo} and leverages Mineflayer~\cite{mineflayer} JavaScript APIs for motor controls. See Appendix, Sec.~\ref{supp:sec:experimental_setup} for more details.
+
+\subsection{Baselines}
+\looseness=-1
+Because there is no LLM-based agents that work out of the box for Minecraft, we make our best effort to select a number of representative algorithms as baselines. These methods are originally designed only for NLP tasks without embodiment, therefore we have to re-interpret them to be executable in MineDojo and compatible with our experimental setting:
+
+\textbf{ReAct}~\cite{yao2022react} uses chain-of-thought prompting~\cite{wei2022chain} by generating both reasoning traces and action plans with LLMs. We provide it with our environment feedback and the agent states as observations. 
+% We refer to this variant as ``\textbf{Voyager-ReAct}''.
+
+\looseness=-1
+\textbf{Reflexion}~\cite{shinn2023reflexion} is built on top of ReAct~\cite{yao2022react} with self-reflection to infer more intuitive future actions. We provide it with execution errors and our self-verification module.
+% We dub this variant ``\textbf{Voyager-Reflexion}''.
+
+\looseness=-1
+\textbf{AutoGPT}~\cite{autogpt} is a popular software tool that automates NLP tasks by decomposing a high-level goal into multiple subgoals and executing them in a ReAct-style loop. We re-implement AutoGPT by using GPT-4 to do task decomposition and provide it with the agent states, environment feedback, and execution errors as observations for subgoal execution. Compared with \voyager, AutoGPT lacks the skill library for accumulating knowledge, self-verification for assessing task success, and automatic curriculum for open-ended exploration.
+
+% \looseness=-1
+% The task is ``explore the world and get as many items as possible'' for all baselines. See supplementary for details of each baseline method.
+
+Note that we do not directly compare with prior methods that take Minecraft screen pixels as input and output low-level controls~\cite{nottingham2023embodied,cai2023openworld,wang2023describe}. It would not be an apple-to-apple comparison, because we rely on the high-level Mineflayer~\cite{mineflayer} API to control the agent. Our work's focus is on pushing the limits of GPT-4 for lifelong embodied agent learning, rather than solving the 3D perception or sensorimotor control problems. \voyager is orthogonal and can be combined with gradient-based approaches like VPT~\cite{openai2022vpt} as long as the controller provides a code API. We make a system-level comparison between \voyager and prior Minecraft agents in Table.~\ref{supp:table:prior_comparison}.
+
+\subsection{Evaluation Results}
+\looseness=-1
+We systematically evaluate \voyager and baselines on their exploration performance, tech tree mastery, map coverage, and zero-shot generalization capability to novel tasks in a new world. 
+
+\textbf{Significantly better exploration.} Results of exploration performance are shown in Fig.~\ref{fig:main_experiment}. \voyager's superiority is evident in its ability to consistently make new strides, discovering 63 unique items within 160 prompting iterations, $3.3 \times$ many novel items compared to its counterparts. On the other hand, AutoGPT lags considerably in discovering new items, while ReAct and Reflexion struggle to make significant progress, given the abstract nature of the open-ended exploration goal that is challenging to execute without an appropriate curriculum.
+
+\textbf{Consistent tech tree mastery.} 
+\looseness=-1
+The Minecraft tech tree tests the agent's ability to craft and use a hierarchy of tools. 
+Progressing through this tree (wooden tool $\rightarrow$ stone tool $\rightarrow$ iron tool $\rightarrow$ diamond tool) requires the agent to master systematic and compositional skills. 
+Compared with baselines, \voyager unlocks the wooden level $15.3 \times$ faster (in terms of the prompting iterations), the stone level $8.5 \times$ faster, the iron level $6.4 \times$ faster, and \voyager is the only one to unlock the diamond level of the tech tree  (Fig.~\ref{fig:diagram} and Table.~\ref{table:tech_tree}). This underscores the effectiveness of the automatic curriculum, which consistently presents challenges of suitable complexity to facilitate the agent's progress.
+
+\textbf{Extensive map traversal.} \voyager is able to navigate distances $2.3 \times$ longer compared to baselines by traversing a variety of terrains, while the baseline agents often find themselves confined to local areas, which significantly hampers their capacity to discover new knowledge (Fig.~\ref{fig:map}).
+
+\input{tables/tech_tree_table}
+\input{figures/map}
+
+\textbf{Efficient zero-shot generalization to unseen tasks.}
+To evaluate zero-shot generalization, we clear the agent's inventory, reset it to a newly instantiated world, and test it with unseen tasks.
+For both \voyager and AutoGPT, we utilize GPT-4 to break down the task into a series of subgoals.
+Table.~\ref{table:downstream} and Fig.~\ref{fig:downstream} show \voyager can consistently solve all the tasks, while baselines cannot solve any task within 50 prompting iterations. What's interesting to note is that our skill library constructed from lifelong learning not only enhances \voyager's performance but also gives a boost to AutoGPT. This demonstrates that the skill library serves as a versatile tool that can be readily employed by other methods, effectively acting as a plug-and-play asset to enhance performance.
+\input{tables/downstream_table}
+\input{figures/downstream}
+
+\subsection{Ablation Studies}
+\looseness=-1
+We ablate 6 design choices (automatic curriculum, skill library, environment feedback, execution errors, self-verification, and GPT-4 for code generation) in \voyager and study their impact on exploration performance (see Appendix, Sec.~\ref{supp:sec:ablations} for details of each ablated variant). Results are shown in Fig.~\ref{fig:ablation}. We highlight the key findings below: 
+\begin{itemize}
+    \item \textbf{Automatic curriculum is crucial for the agent's consistent progress.} The discovered item count drops by $93\%$ if the curriculum is replaced with a random one, because certain tasks may be too challenging if attempted out of order. On the other hand, a manually designed curriculum requires significant Minecraft-specific expertise, and does not take into account the agent's live situation. It falls short in the experimental results compared to our automatic curriculum. 
+    \item \textbf{\voyager w/o skill library exhibits a tendency to plateau in the later stages.} This underscores the pivotal role that the skill library plays in \voyager. It helps create more complex actions and steadily pushes the agent's boundaries by encouraging new skills to be built upon older ones. 
+    \item \textbf{Self-verification is the most important among all the feedback types}. Removing the module leads to a significant drop ($-73\%$) in the discovered item count. Self-verification serves as a critical mechanism to decide when to move on to a new task or reattempt a previously unsuccessful task. 
+    \item \textbf{GPT-4 significantly outperforms GPT-3.5 in code generation} and obtains $5.7 \times$ more unique items, as GPT-4 exhibits a quantum leap in coding abilities. This finding corroborates recent studies in the literature ~\cite{bubeck2023sparks,liu2023summary}. 
+\end{itemize}
+
+\input{figures/ablation}
+\input{figures/human}
+
+\subsection{Multimodal Feedback from Humans}
+\voyager does not currently support visual perception, because the available version of GPT-4 API is text-only at the time of this writing. However, \voyager has the potential to be augmented by multimodal perception models~\cite{liu2023prismer,driess2023palme} to achieve more impressive tasks. We demonstrate that given human feedback, \voyager is able to construct complex 3D structures in Minecraft, such as a Nether Portal and a house (Fig.~\ref{fig:human}). There are two ways to integrate human feedback: 
+\begin{enumerate}[label=(\arabic*)]
+    \item Human as a critic (equivalent to \voyager's self-verification module): humans provide visual critique to \voyager, allowing it to modify the code from the previous round. This feedback is essential for correcting certain errors in the spatial details of a 3D structure that \voyager cannot perceive directly.
+    \item Human as a curriculum (equivalent to \voyager's automatic curriculum module): humans break down a complex building task into smaller steps, guiding \voyager to complete them incrementally. This approach improves \voyager's ability to handle more sophisticated 3D construction tasks.
+\end{enumerate}

@@ -1,0 +1,162 @@
+\section{State-of-the-art Reward Model Selection} \label{sec:rm-selection}
+
+We consider the top-10 sequence classifier RMs on RewardBench on December 2nd, 2024 as evaluation candidates.
+Out of the 10, there are some model families with multiple models.
+In those cases, we only consider the most recent version, specifically ignoring Skywork/Skywork-Reward-Gemma-2-27B (we have Skywork/Skywork-Reward-Gemma-2-27B-v0.2), Skywork/Skywork-Reward-Llama-3.1-8B (we have Skywork/Skywork-Reward-Llama-3.1-8B-v0.2), and LxzGordon/URM-LLaMa-3-8B (we have LxzGordon/URM-LLaMa-3.1-8B). This leaves 7 models:
+\begin{enumerate}
+    \item Ray2333/GRM-Llama3.2-3B-rewardmodel-ft
+    \item Ray2333/GRM-Llama3-8B-rewardmodel-ft
+    \item Skywork/Skywork-Reward-Llama-3.1-8B-v0.2
+    \item LxzGordon/URM-LLaMa-3.1-8B
+    \item nicolinho/QRM-Llama3.1-8B
+    \item internlm/internlm2-20b-reward
+    \item Skywork/Skywork-Reward-Gemma-2-27B-v0.2
+\end{enumerate}
+
+We also consider the top-10 generative classifiers on RewardBench on the same date as candidates, though only 3 are publicly accessible:
+\begin{enumerate}
+    \item Skywork/Skywork-Critic-Llama-3.1-8B
+    \item Skywork/Skywork-Critic-Llama-3.1-70B
+    \item facebook/Self-taught-evaluator-llama3.1-70B
+\end{enumerate}
+
+We also evaluate \texttt{gpt-4o-2024-11-20}.
+The models in Figure~\ref{fig:pretrained-rms} follow the same order as the ones listed above.
+
+\section{Full Examples for All Transformations} \label{sec:full-examples}
+
+Tables \ref{tab:benchmark-examples-controlled-full} to \ref{tab:benchmark-examples-safety-full} exemplify all 28 transformations in \benchmark and list the subsets in RewardBench on which they are applicable.
+
+\section{Instruction Prompts} \label{sec:instructions}
+
+Here we include various prompts we use instruct language models for various tasks. For paraphrasing, we use:
+\begin{verbatim}
+Paraphrase the following text while
+maintaining the style: """{text}"""
+Make sure the meaning is **completely**
+the same without any changes. Respond only
+with the paraphrase and **no extra
+text** at all; for example, do NOT preface
+with anything like "Here is the
+paraphrased text:".
+\end{verbatim}
+
+For LM-based automatic evaluation of model outputs,
+and also to evaluate GPT-4o as a RM, 
+we use a near-identical prompt from \citet{wu-etal-2024-reuse}, which was in turn adapted from \citet{alpaca_eval}.
+\begin{verbatim}
+I want you to create a leaderboard of
+different large-language models. To do
+so, I will give you the instructions
+(prompts) given to the models, and the
+responses of two models. Please rank the
+models based on which response would be
+preferred by humans. All inputs are
+python dictionaries.
+
+Here is the prompt:
+{  
+    "instruction": """[INPUT]""",
+}
+
+Here are the outputs of the models:
+[   
+    {  
+        "model": "model_1",
+        "answer": """[GENERATION1]"""
+    },
+    {  
+        "model": "model_2",
+        "answer": """[GENERATION2]"""
+    }
+]
+
+Respond 1 or 2 to indicate the better
+output. Please provide the ranking that
+the majority of humans would give.
+\end{verbatim}
+
+To evaluate generative RMs, we also need a prompt similar in spirit to the above.
+The RMs come with specific versions that they have been trained on, which we follow.
+We refer readers to the respective models, listed in \S\ref{sec:rm-selection}, for those prompts.
+
+\section{The Effect of Response Length in LM Judges} \label{sec:length-effect}
+
+Prior work has shown that automatic LM judges have a bias for length~\citep{wang2023how,singhal2023long}. We want to confirm that our consistent RMs have a higher win rate not because it caters to this bias by simply encouraging longer sequences.
+To test this, we consider a smaller sample where the two responses (from our regularized RM vs. vanilla-trained RM) differ by no more than 3 tokens in length.
+We also ignore cases where the two responses are identical.
+Depending on the setting, this leaves 100-250 samples.
+When using Llama-3-70B as the judge, on \bon (RewardBench)/\bon (UltraFeedback)/RAFT (RewardBench), the regularized RM has win rates 58\%/57\%/52\% against the vanilla-trained RM.
+When using Qwen2.5-72B as the judge, the regularized RM has win rates 50\%/54\%/47\%.
+Thus, overall, our regularized RM still outperforms the vanilla-trained RM even when the response length is more strictly controlled.
+
+\section{Full \benchmark Results} \label{sec:full-results}
+
+For presentation simplicity, we showed aggregated results in \S\ref{sec:evaluation}. Here, we show the complete results in Figures \ref{fig:pretrained-rms-controlled-full} to \ref{fig:pretrained-rms-targeted-full} and Table~\ref{tab:full-results} (which correspond to the same numbers).
+
+\section{Raw Reward Changes on \benchmark} \label{sec:score-changes}
+
+Most of our evaluation focuses on robustness to relative response ranking under \benchmark transformations.
+Ideally, though, robust RMs should also assign similar raw rewards under transformations that maintain exact equivalence (though not all of the \benchmark transformations satisfy this criterion).
+Figures \ref{fig:pretrained-rms-controlled-scores} to \ref{fig:pretrained-rms-targeted-scores} show that SOTA RMs have large changes in the assigned rewards to the chosen and rejected responses under the transformations.\footnote{For comparability, we normalize all scores into $[0, 1]$, if it is not already, using sigmoid.}
+For example, the Swap Format transformation, which swaps the answer format to math questions between the chosen and rejected responses, should not affect the assigned rewards. However, we see a large reward degradation for the chosen response and an improvement for the rejected response. This suggests that the RMs overfit to the particular answer formats.
+
+\section{Training Details} \label{sec:training-details}
+
+We train our RMs and aligned models using the OpenRLHF framework~\citep{hu2024openrlhfeasytousescalablehighperformance}. We mostly reuse its default hyperparameters.
+
+\paragraph{Reward Models.}
+We train all RMs for 2 epochs over our training data with batch size 128 and learning rate $9\times 10^{-6}$.
+We train with bfloat16.
+We truncate the RM input to 2048 tokens.
+
+\paragraph{Alignment.}
+For \bon, we sample $n=64$ responses from the SFT model and then rerank.
+UltraFeedback does not have a train-test split.
+When doing \bon on UltraFeedback, we use its first 3000 instances for evaluation to be comparable in size to RewardBench (which has 2985) instances.
+For RAFT, we use a random 90\% split of UltraFeedback for training and reserve the rest for validation; the trained model is evaluated on RewardBench.
+Specifically, we take the best-scored reranked response for UltraFeedback and perform supervised finetuning for 3 epochs with batch size 64 and learning rate $5\times10^{-6}$.
+We train with bfloat16 and use a weight decay of 0.1.
+We truncate the input to 2048 tokens.
+
+\input{sections/ex_table_full}
+
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/consistency_rewardbench_pretrained_perturbations_first_Controlled_full.pdf}
+    \caption{The change of RM ranking accuracy under meaning- or ranking-preserving (controlled) \benchmark transformations.}
+    \label{fig:pretrained-rms-controlled-full}
+\end{figure*}
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/consistency_rewardbench_pretrained_perturbations_first_Natural_full.pdf}
+    \caption{The change of RM ranking accuracy under meaning- or ranking-preserving (natural) \benchmark transformations.}
+    \label{fig:pretrained-rms-natural-full}
+\end{figure*}
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/consistency_rewardbench_pretrained_perturbations_first_Targeted_full.pdf}
+    \caption{The change of RM ranking accuracy under meaning- or ranking-preserving (targeted) \benchmark transformations.}
+    \label{fig:pretrained-rms-targeted-full}
+\end{figure*}
+
+\input{sections/result_tables}
+
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/consistency_rewardbench_pretrained_score_perturbations_first_Controlled.pdf}
+    \caption{The change of RM rewards assigned to the chosen (left in each vertical band; green/red) and rejected (right; blue/yellow) responses, before and after controlled \benchmark transformations.}
+    \label{fig:pretrained-rms-controlled-scores}
+\end{figure*}
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/consistency_rewardbench_pretrained_score_perturbations_first_Natural.pdf}
+    \caption{The change of RM rewards assigned to the chosen (left in each vertical band; green/red) and rejected (right; blue/yellow) responses, before and after natural \benchmark transformations.}
+    \label{fig:pretrained-rms-natural-scores}
+\end{figure*}
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/consistency_rewardbench_pretrained_score_perturbations_first_Targeted.pdf}
+    \caption{The change of RM rewards assigned to the chosen (left in each vertical band; green/red) and rejected (right; blue/yellow) responses, before and after targeted \benchmark transformations.}
+    \label{fig:pretrained-rms-targeted-scores}
+\end{figure*}

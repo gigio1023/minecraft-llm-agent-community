@@ -1,0 +1,766 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2026_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+% \input{math_commands.tex}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage[normalem]{ulem}
+\usepackage{titletoc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{cleveref}
+\crefname{algocf}{algorithm}{algorithms}
+\Crefname{algocf}{Algorithm}{Algorithms}
+\usepackage{multicol}
+\usepackage{tcolorbox}
+\usepackage{float}
+\usepackage[ruled,vlined]{algorithm2e}
+\tcbuselibrary{breakable}
+\tcbuselibrary{listings}
+\tcbuselibrary{listingsutf8}
+\usepackage{subcaption}
+\usepackage{fvextra}
+\usepackage{adjustbox}
+\DefineVerbatimEnvironment{MyVerbatim}{Verbatim}{breaklines=true}
+% nicer diff display
+\lstdefinelanguage{Diff}{
+  sensitive=false,
+  morekeywords={diff,index,---,+++},               % keywords
+  morecomment=[f][\color{red!80!black}]{-},         % lines beginning with '-'
+  morecomment=[f][\color{green!60!black}]{+},       % lines beginning with '+'
+}
+\lstdefinestyle{diffstyle}{
+  language=Diff,
+  basicstyle=\ttfamily\scriptsize,
+  columns=fullflexible,
+  frame=single,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{black!2},
+  breaklines=true,
+  breakatwhitespace=true,
+  postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+  xleftmargin=1em,
+  xrightmargin=1em,
+  aboveskip=0.5em,                        % less vertical padding
+  belowskip=0.5em,
+  commentstyle=\itshape,                  % context lines
+  keywordstyle=\bfseries\color{blue!70!black}, % diff/index/@@...
+}
+\lstset{style=diffstyle}
+
+
+% \newif\ifcomment
+% \commenttrue % enable comments
+% % \commentfalse
+% \newcommand{\jc}[1]{\textcolor{blue}{\ifcomment JC: #1\else\fi}}
+% \newcommand{\jcsout}[1]{\textcolor{blue}{\ifcomment JC: \sout{#1}\else\fi}}
+% \newcommand{\jcc}[1]{\textcolor{blue}{\ifcomment(JC Comment: #1)\else#1\fi}}
+% \newcommand{\jz}[1]{\textcolor{olive}{(\ifcomment JZ: #1\else\fi)}}
+% \newcommand{\jzsout}[1]{\textcolor{olive}{\ifcomment JZ: \sout{#1}\else\fi}}
+% \newcommand{\cl}[1]{\textcolor{orange}{(\ifcomment CL: #1\else\fi)}}
+% \newcommand{\clout}[1]{\textcolor{orange}{\ifcomment CL: \sout{#1}\else\fi}}
+% \newcommand{\sh}[1]{\textcolor{violet}{\ifcomment SH: #1\else\fi}}
+% \newcommand{\shout}[1]{\textcolor{violet}{\ifcomment SH: \sout{#1}\else\fi}}
+% \newcommand{\rl}[1]{\textcolor{pink}{(\ifcomment RL: #1\else\fi)}}
+% \newcommand{\rlout}[1]{\textcolor{pink}{\ifcomment RL: \sout{#1}\else\fi}}
+% \newcommand{\todo}[1]{\textcolor{red}{\ifcomment(\textbf{TODO}: #1)\else\fi}}
+
+\title{Darwin G\"odel Machine: Open-Ended Evolution of Self-Improving Agents}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+% \author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
+% about author (webpage, alternative address)---\emph{not} for acknowledging
+% funding agencies.  Funding acknowledgements go at the end of the paper.} \\
+% Department of Computer Science\\
+% Cranberry-Lemon University\\
+% Pittsburgh, PA 15213, USA \\
+% \texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
+% \And
+% Ji Q. Ren \& Yevgeny LeNet \\
+% Department of Computational Neuroscience \\
+% University of the Witwatersrand \\
+% Joburg, South Africa \\
+% \texttt{\{robot,net\}@wits.ac.za} \\
+% \AND
+% Coauthor \\
+% Affiliation \\
+% Address \\
+% \texttt{email}
+% }
+
+\author{%
+Jenny Zhang\textsuperscript{*,1,2} \quad
+Shengran Hu\textsuperscript{*,1,2,3} \quad
+Cong Lu\textsuperscript{1,2,3} \quad
+Robert Lange\textsuperscript{\dag,3} \quad
+Jeff Clune\textsuperscript{\dag,1,2,4}
+\\
+\textsuperscript{1}University of British Columbia \quad
+\textsuperscript{2}Vector Institute \quad
+\textsuperscript{3}Sakana AI \quad
+\textsuperscript{4}Canada CIFAR AI Chair
+\\
+\texttt{\{jennyzzt,srhu,conglu\}@cs.ubc.ca}, \texttt{robert@sakana.ai}, \texttt{jeff.clune@ubc.ca}
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+\footnotetext[1]{co-first authors \quad \textsuperscript{†} co-senior authors}
+\renewcommand{\thefootnote}{\arabic{footnote}}
+
+\maketitle
+
+\begin{abstract}
+Most of today's AI systems are constrained by human-designed, fixed architectures and cannot autonomously and continuously improve themselves. The scientific method, on the other hand, is a cumulative and open-ended system, where each innovation builds upon previous artifacts, enabling future discoveries. There is growing hope that the current manual process of advancing AI could itself be automated. If done safely, such automation would accelerate AI development and allow us to reap its benefits much sooner. This prospect raises the question of how AI systems can endlessly improve themselves while getting better at solving relevant problems. Meta-learning can automate the discovery of novel algorithms, but is limited by first-order improvements and the human design of a suitable search space. The G\"odel machine~\citep{schmidhuber2007godel} proposed a theoretical alternative: a self-improving AI that repeatedly modifies itself in a provably beneficial manner. Unfortunately, proving that most changes are net beneficial is impossible in practice. We introduce the Darwin G\"odel Machine (DGM), a novel self-improving system that iteratively modifies its own code (thereby also improving its ability to modify its own codebase) and empirically validates each change using coding benchmarks. Inspired by Darwinian evolution and open-endedness research, the DGM grows an archive of generated coding agents. It samples agents from this archive, which self-modify to create new, interesting versions of themselves. This open-ended exploration forms a growing tree of diverse, high-quality agents and allows the parallel exploration of many different paths through the search space. Empirically, the DGM automatically improves its coding capabilities (e.g., better code editing tools, long-context window management, peer-review mechanisms), increasing performance on SWE-bench from 20.0\% to 50.0\%, and on Polyglot from 14.2\% to 30.7\%. Furthermore, the DGM significantly outperforms baselines without self-improvement or open-ended exploration. All experiments were done with safety precautions (e.g., sandboxing, human oversight). Overall, the DGM represents a significant step toward self-improving AI, capable of gathering its own stepping stones along a path that unfolds into endless innovation.
+All code is open-sourced at \href{https://github.com/jennyzzt/dgm}{https://github.com/jennyzzt/dgm}.
+\end{abstract}
+
+% \vspace{-2mm}
+\section{Introduction}
+\label{sec:intro}
+% \vspace{-2mm}
+
+Scientific progress is cumulative and open-ended, with each breakthrough standing on the shoulders of countless prior insights. In the same way, our most advanced AI systems are built upon a long lineage of innovations. For instance, transformers~\citep{vaswani2017attention}, the backbone of current large language models (LLMs)~\citep{brown2020language}, did not emerge in isolation but were built upon years of past innovations, such as recurrent neural networks~\citep{linnainmaa1970representation, amari1972learning,  hopfield1982neural, rumelhart1985learning} and attention mechanisms~\citep{schmidhuber1990learning, bahdanau2015neural, kim2017structured, parikh2016decomposable}. However, most of today’s AI systems remain bound by fixed, human-designed architectures that learn within predefined boundaries, without the capacity to autonomously rewrite their own source code to self-improve. As a result, each advancement in AI development still leans heavily on human interventions, tethering the pace of progress. This paper investigates the intriguing possibility of safely automating the search for ever-better AI. One can imagine an AI system that, like scientific discovery itself, becomes an engine of its own advancement: building upon its past, recursively improving, and propelling itself toward more advanced capabilities.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/conceptual.pdf}
+% \vspace{-2mm}
+\caption{\textbf{Darwin G\"odel Machine.} The DGM iteratively builds a growing archive of agents by interleaving self-modification with downstream task evaluation. Agents in the archive are selected for self-modification through open-ended exploration.}
+\label{fig:conceptual}
+% \vspace{-6mm}
+\end{figure}
+
+\citet{schmidhuber2007godel} presented a class of mathematically rigorous, self-referential, self-improving problem solvers. It relies on formal proofs to justify code rewrites, ensuring that any self-modification is provably beneficial. However, in practice and without restrictive assumptions about the system, it is impossible to formally prove whether a modification to an AI system will be beneficial. For example, while it may seem that an LLM-based coding agent would benefit from access to more tools (e.g., code search, test runners), the actual impact depends heavily on the model’s training and task context (e.g., a testing tool that is optimized for one setup may confuse the agent when working with others). Instead of requiring formal proofs, we empirically validate self-modifications against a benchmark, allowing the system to improve and explore based on observed results. This approach mirrors biological evolution, where mutations and adaptations are not verified in advance but are produced, trialed, and then selected via natural selection. We also take inspiration from Darwinian evolution~\citep{darwin2023origin} and investigate the effectiveness of maintaining a library of previously discovered agents to serve as stepping stones for future generations.
+
+We propose the \textbf{Darwin G\"odel Machine (DGM)}, a self-referential, self-improving system that writes and modifies its own code to become a better coding agent. Each self-modification requires the DGM to edit its own codebase. We use Python, which is Turing-complete, giving the DGM the potential to build any computable machine. Our framework envisions agents that can rewrite their own training scripts (including training a new foundation model (FM)). However, we do not show that in this paper, as training FMs is computationally intensive and would introduce substantial additional complexity, which we leave as future work. Instead, this paper focuses on improving the design of coding agents with frozen pretrained FMs (e.g., tool use, workflows). The DGM alternates between self-modification and evaluation phases. During the self-modification phase, selected coding agents from the archive generate modified versions of themselves. During the evaluation phase, each modified agent is tested on a coding benchmark, estimating the agent's coding capabilities, and then added to the archive. By improving its own capabilities through this loop, the DGM becomes better at both solving coding tasks and making future self-improvements. A key assumption is that an increase in performance on coding benchmarks indicates better coding capabilities, and hence better ability to self-modify and self-improve. Furthermore, the DGM maintains an archive of generated coding agents, initialized with only one agent, and continuously accumulates all generated variants over time. To support continual self-improvement, the DGM draws inspiration from open-endedness research~\citep{wang2019paired, fernandopromptbreeder, faldor2025omni}, accumulating diverse stepping stones (i.e., interesting yet suboptimal solutions or features that may enable future breakthroughs). This open-ended exploration encourages the discovery of novel and potentially useful self-modifications beyond immediate performance gains.
+
+We present results on two coding benchmarks: SWE-bench~\citep{jimenez2024swebench} and Polyglot~\citep{gauthier2024polyglot}. The DGM automatically improves itself from 20.0\% to 50.0\% on SWE-bench, and from 14.2\% to 30.7\% on Polyglot. We show that self-improvement enables continued progress, as the DGM outperforms the baseline where the same base agent is repeatedly used to modify and generate new agents without self-improvement. We also show that open-ended exploration and keeping an archive of all previously generated agents lead to the discovery of better coding agents. The DGM outperforms the baseline of not having open-ended exploration (i.e., a baseline without the accumulation of an archive of interestingly different stepping stones), where the coding agent always builds off the most recent version of itself. Overall, the DGM represents a step toward AI systems that can build upon their own prior innovations and improve recursively. We consider and discuss safety aspects extensively, including sandboxing and traceability of self-modifications, to ensure responsible experimentation (\Cref{sec:safety}). By advancing the possibility of safe, self-referential, self-improving models, the DGM moves us closer to AI that not only learns but evolves in an open-ended, self-accelerating trajectory, much like science itself.
+
+% \vspace{-2mm}
+\section{Related Work}
+\label{sec:related}
+% \vspace{-2mm}
+
+\textbf{Open-Endedness.}
+A grand challenge for driving unbounded innovation is designing open-ended AI systems that continuously generate novel and learnable artifacts~\citep{stanley2017open}. \citet{hughes2024open} characterized open-endedness as a system's capacity to generate sequences of artifacts that are both novel and learnable from an observer's perspective. A central difficulty lies in structuring and exploring vast search spaces to consistently produce artifacts that are interesting to humans~\citep{clune2019ai, jiang2023general}. Early progress drew on quality-diversity algorithms, goal-directed exploration, intrinsic motivation, and learning-progress frameworks~\citep{pugh2016quality, ecoffet2019go, lehman2011novelty, oudeyer2007intrinsic}, while recent advances leverage large-scale foundation models (FMs) as proxies for human interestingness and versatile engines for generating and evaluating novel behaviors across diverse domains~\citep{brown2020language, hu2025automated, zhang2024omni}. However, these approaches have yet to close the self-referential self-improvement loop, meaning improvements on downstream tasks do not translate into enhanced capabilities for self-modification or the acceleration of further innovations. We aim to mimic the acceleration of science and technology, where new tools and discoveries catalyze the creation of even more discoveries. How can we emulate nature's arc of evolution, which bends not only toward complexity but also an ever greater capacity to evolve~\citep{dawkins2019evolution, gerhart2007theory, hendrikse2007evolvability}?
+
+\textbf{Meta-Learning FM Agents.}
+Many FM-based agents are handcrafted. Some building blocks include prompt engineering~\citep{chen2023unleashing, schulhoff2024prompt}, chain-of-thought~\citep{wei2022chain, yao2023react, hu2023ThoughtCloning, guo2025deepseek, lightman2023let, muennighoff2025s1, zelikman2024quiet}, self-reflection \citep{shinn2023reflexion, yao2023react, madaan2303self}, multi-agent debate \citep{zhuge2023mindstorms, liang2023encouraging, khan2024debating}, memory~\citep{liu2023think, zhong2024memorybank, modarressi2023ret}, temperature sampling \citep{zhu2024hot}, and retrieval augmented generation~\citep{lewis2020retrieval}. The manual composition of these components limits the system's abilities to the ingenuity of its human designer. More recently, several meta-learning approaches have emerged that leverage FM to automatically optimize prompts~\citep{fernandopromptbreeder, meta2022human, khattab2023dspy,cheng2025trace,yuksekgonul2024textgrad,yuan2024evoagent} and design agentic modules~\citep{zhang2024aflow, zhou2024symbolic, yin2024g, zhugegptswarm, rosser2025agentbreeder, zhang2025multi, ye2025mas, gao2025flowreasoner, nie2025weak, su2025debflow, zhang2025gnns,niu2025flow}. The Automated Design of Agentic Systems \citep[ADAS,][]{hu2025automated} iteratively generates downstream agents with a fixed meta-agent, evaluates them against a target benchmark, and incorporates feedback to refine subsequent generations. In contrast, the DGM is a single system that both solves downstream tasks (i.e., coding problems) and refines its own implementation (i.e., its codebase), removing the need for a fixed, handcrafted meta-agent and enabling self-referential improvements.
+
+\textbf{Self-Improving AI.}
+Early on, various researchers outlined theoretical and conceptual approaches to self-improvement \citep{good1966speculations, schmidhuber1987evolutionary, schmidhuber2007godel}. Some practical approaches to automated self-improvement include systems defined by neural network weight parameterizations~\citep{schmidhuber1993self, hall2007self, hobbhahn2025swebenchmini, kirsch2022self, irie2022modern, irie2025metalearning, lu2023arbitrary, havrilla2024glore}. \citet{metz2021training} developed a gradient-based optimizer that is self-referentially meta-trained using a variant of population-based training~\citep{jaderberg2017population}. \citet{lange2023discovering} extended this approach to gradient-free learning. \citet{silver2017mastering} used self-play to continuously evolve agents, achieving superhuman performance in challenging domains such as chess and Go. More closely related to the DGM are recent approaches that leverage FM-based agents for self-improvement~\citep{yin2024g, robeyns2025self, hu2024self, zelikman2024self, huang2022large, singh2023beyond}. \citet{zelikman2024self} use a meta-agent to generate downstream agents, updating the meta-agent based on the meta-utility derived from the generated solutions. \citet{yin2024g} use a single system to both solve downstream tasks and recursively modify itself. However, the downstream tasks or the meta-utility do not always align with the capabilities required for self-improvement. In the DGM, improvement in downstream tasks directly reflects an increase in self-improvement ability, enabling the potential for self-accelerating progress. Most similar is concurrent work by \citet{robeyns2025self}, which also has a single agent recursively solving coding problems and modifying its own codebase. The main difference from \citet{robeyns2025self} (and also \citet{zelikman2024self, yin2024g}) is that the DGM has an open-ended exploration loop, encouraging self-modifications beyond immediate performance gains and thus avoiding stagnation in suboptimal states. \Cref{app:related} also discusses additional related work on program synthesis and Darwinian evolution.
+
+% \vspace{-2mm}
+\section{Darwin G\"odel Machine}
+\label{sec:methods}
+% % \vspace{-2mm}
+
+A G\"odel Machine is a theoretical idea of an AI that searches for ways that \emph{provably} improve itself~\citep{schmidhuber2007godel}. In this paper, we propose Darwin G\"odel Machine (DGM), an attempt to realize the long-held dream of creating a G\"odel Machine. The DGM relaxes the G\"odel Machine's impractical requirement of theoretically \emph{proving} that a change will improve the system, instead requiring \emph{empirical evidence} from experiments to demonstrate that a proposed new version enhances performance. Additionally, since the DGM relies on empirical evidence of improvement, it may get stuck in a local optimum within the vast search space of possible systems (i.e., all computable algorithms). To address this, the DGM maintains an archive of discovered solutions during the search, facilitating open-ended exploration rather than relying on evolving a single solution. Since the principles echo Darwinian evolution~\citep{darwin2023origin} (\Cref{app:related}), where new innovations emerge by selecting an entity from an archive of previously discovered solutions, modifying it, and keeping it if it is interestingly new~\citep{zhang2024omni, faldor2025omni, stanley2015greatness}, we call our algorithm a Darwin G\"odel Machine (\Cref{fig:conceptual}).
+
+\textbf{Self-referential Self-improvement of Coding Agents.}
+The DGM is initialized with only one coding agent, and its progression is evaluated on coding benchmarks. A coding agent is defined as a single system, implemented with a code repository and powered by frozen pretrained foundation models (FMs), capable of reading, writing, and executing code. Code, when expressed in a general-purpose Turing-complete language (e.g., Python), is a powerful medium for building and improving intelligent systems because it can represent any computable process. Recent works~\citep{hu2025automated, zhang2024aflow} demonstrate that such agents can be improved through meta-learning of their designs (e.g., prompts, workflows, and tools), which are implemented in their code repository. Therefore, we define self-improvement as a coding task that involves modifying the design of an agent's own components (i.e., its own code, which does not include the open-ended exploration process described in the next paragraph). The key motivation is that the empirical evidence must reflect the system's ability to both self-improve and solve downstream tasks. By configuring the DGM as a coding agent and testing its coding capabilities, the observed improvements demonstrate not only enhanced performance in downstream tasks but also the capacity for further self-improvement, as self-improvement is fundamentally a coding task that modifies the coding agent's own code repository.
+
+\textbf{Population-based Open-ended Exploration.}
+Starting from a single initial coding agent, the DGM builds an archive of all discovered agents. In each iteration, the DGM selects parent agents to self-modify and branch off to produce new agents. Parent selection is roughly proportional to each agent's performance score and inversely proportional to the number of its children with codebase-editing functionality (\Cref{app:parent-select}). This favors high-performing agents that have been underexplored (i.e., have fewer existing children), thereby promoting both exploitation of strong performers and exploration of promising but less-sampled lineages. All agents retain a non-zero selection probability, ensuring that any path to improvement remains feasible given sufficient compute. 
+Each selected parent analyzes its own benchmark evaluation logs, proposes the next feature to implement, and receives this proposal as a problem statement to execute (\Cref{app:selfimprove-prompts}). The parent then implements the suggested feature into its own codebase, generating a new coding agent. Each newly generated agent is quantitatively evaluated on a chosen coding benchmark to estimate its coding abilities. Only agents that compile successfully and retain the ability to edit a given codebase are added to the DGM archive, as only they can continue self-modification. All others are discarded. The cycle of parent selection, self-modification, and evaluation continues, progressively growing the archive of solutions. Importantly, we note that archived solutions can serve as stepping stones that result in improvements much later than their original discovery, making our approach substantially different from hill-climbing agentic design approaches \citep{robeyns2025self}. Currently, the open-ended exploration process (i.e., archive maintenance, parent selection) is fixed and not modifiable by the DGM, which we leave as an avenue for future work. \Cref{app:pseudocode} shows the pseudocode for the DGM algorithm.
+
+% % \vspace{-4mm}
+\section{Experiments}
+\label{sec:experiments}
+% \vspace{-2mm}
+
+\Cref{sec:experiment-setup} describes the experimental setup, including the initial coding agent that initializes the DGM. We conduct experiments on two coding benchmarks: SWE-bench~\citep{jimenez2024swebench} and Polyglot~\citep{gauthier2024polyglot} (\Cref{sec:benchmarks}). For each benchmark, we compare the DGM against two baselines: DGM without self-improving agents and DGM without open-ended exploration (\Cref{sec:baselines}). Across all experiments, we find that the DGM outperforms both baselines, showing that the self-improvement mechanism and open-ended exploration are essential for sustained performance gains (\Cref{sec:results}). Furthermore, we show that the features discovered by the DGM transfer across models, benchmarks, and tasks (\Cref{sec:results}).
+
+% \vspace{-2mm}
+\subsection{Experiment Setup}
+\label{sec:experiment-setup}
+% \vspace{-2mm}
+
+The DGM is initialized with a single coding agent. This base agent is built around a frozen FM and augmented with tool use capabilities~\citep{schick2023toolformer, anthropic_tool_use_2024}. The FM autonomously determines its action at each step, using whichever tool it deems appropriate. The base agent has access to two tools: a Bash tool for executing bash commands, and an edit tool for viewing and editing directories and entire files (\Cref{app:initial-agent}). The agent receives a single input prompt that specifies the location of the target repository, the problem statement, and the repository's testing framework (\Cref{app:initial-agent}). The base agent is intentionally lightweight to provide a simple starting point from which self-improvement can be clearly demonstrated. We run the DGM for 80 iterations (generating one new agent per iteration), with two iterations running in parallel for SWE-bench and four for Polyglot (\Cref{app:parent-select}). During self-modifications, coding agents are powered by Claude 3.5 Sonnet (New)~\citep{anthropic2024claude35sonnet} in both SWE-bench and Polyglot experiments. During benchmark evaluation, coding agents are powered by Claude 3.5 Sonnet (New) for SWE-bench and o3-mini~\citep{openai2025o3mini} for Polyglot (\Cref{app:fm-hyperparam}).
+
+% \vspace{-2mm}
+\subsection{Benchmarks}
+\label{sec:benchmarks}
+% \vspace{-2mm}
+
+We evaluate the DGM on two popular benchmarks that assess different aspects of coding tasks to validate the algorithm's effectiveness across various use cases. Both SWE-bench and Polyglot are benchmarks that evaluate how well AI agents solve coding tasks automatically. Given a code repository and a task instruction, the agent is expected to make changes to the repository in order to fulfill the task. Both SWE-bench and Polyglot are widely used benchmarks~\citep{zhang2024autocoderover, zhang2024rest, xia2024agentless, cao2024spider2, GoogleDeepMind2025GeminiThinking,aider2024} that require the AI agent to navigate a code repository, understand the interplay between functions in different files, and spot small errors in convoluted code. SWE-bench only has Python tasks, while Polyglot has tasks in multiple programming languages. Another difference is that each SWE-bench task may require edits to multiple files, whereas each Polyglot task primarily involves implementing a solution from scratch in a single file (although the agent still needs to examine other files to understand what changes are necessary), resulting in fewer file edits overall.
+
+\textbf{SWE-bench.} To avoid wasting compute on unsolvable tasks, we use SWE-bench Verified~\citep{openai2024sweverified}, a human-filtered subset of SWE-bench~\citep{jimenez2024swebench} where all tasks are solvable. Throughout this paper, the term SWE-bench refers by default to to the SWE-bench Verified subset.
+
+\textbf{Polyglot.} Polyglot includes tasks in multiple programming languages (C++, Rust, Python, etc.)~\citep{gauthier2024polyglot}. Compared to SWE-bench, one of the most widely used coding benchmarks and likely included in the training sets of FMs, Polyglot is more niche and less likely to be included in FMs' post-training data. Additionally, Polyglot is primarily used by its developer to evaluate Aider~\citep{aider2024}. This provides an opportunity to compare automatically designed agents with a representative coding agent in the community, which has been continuously developed and tested against the Polyglot benchmark over a year by human developers. Finally, Polyglot enables testing of the DGM's ability to generalize across multiple programming languages beyond just Python. We follow the Polyglot leaderboard setup~\citep{gauthier2024polyglot}, with one key difference: the leaderboard reports pass@2, where the agent can view feedback from ground-truth tests once, whereas we report pass@1, where the agent never sees ground-truth test results.
+
+Since it is expensive to evaluate on the full benchmarks (\Cref{app:cost-estimate}), we use a staged evaluation strategy to estimate the coding agent's performance. In general, we evaluate the coding agent on more tasks when we are more confident that it is a relatively strong performer. We first evaluate each coding agent on a set of 10 tasks to verify basic codebase-editing functionality. Only agents that retain the ability to edit code can solve downstream coding tasks or perform further self-modifications. Agents that pass this initial stage are then evaluated on an expanded set of 50 tasks. For SWE-bench, tasks are selected based on SWE-bench-verified-mini~\citep{hobbhahn2025swebenchmini}, which is designed to be a representative sample of the full benchmark (\Cref{app:swebench-tasks}). For Polyglot, tasks are chosen as a random subset of the full benchmark (\Cref{app:polyglot-tasks}). Because the LLMs we use are inherently stochastic, performance can be noisy. We use smaller subset evaluations to estimate general effectiveness and identify top candidates. For SWE-bench, if a coding agent achieves over 40\% success (a heuristic chosen based on the noise observed in preliminary runs) on the 60-task subset and ranks among the top two performers in the archive, it is then evaluated on 200 tasks (140 plus the previous 60) to more accurately assess its true coding capability (\Cref{app:swebench-tasks}). For Polyglot, if a coding agent achieves over 40\% success on the 10-task subset, it is evaluated on an expanded 50-task subset (\Cref{app:polyglot-tasks}).
+
+% \vspace{-2mm}
+\subsection{Baselines}
+\label{sec:baselines}
+% \vspace{-2mm}
+
+To isolate and evaluate the contribution of the DGM's core components, we compare the DGM against two baselines: DGM without self-improving agents (\textbf{DGM w/o self-improve}) and DGM without open-ended exploration (\textbf{DGM w/o open-ended exploration}). DGM w/o self-improve replicates the approach of ADAS~\citep{hu2025automated} in this setting, wherein the meta agent responsible for modifying the coding agents remains fixed as the base agent throughout the experiment (\Cref{alg:dgm-wo-selfimprove}). This baseline allows us to assess the role of iterative self-improvement in accelerating the evolution of better coding agents. DGM w/o open-ended exploration eliminates the use of an archive and always self-modifies the latest stored version of itself (\Cref{alg:dgm-wo-openended}). If a coding agent self-modifies to the point where it loses the basic functionality required to edit a codebase, it can no longer modify itself or solve any coding task. Therefore, DGM w/o open-ended exploration retains the latest version of itself that still maintains the basic functionality for codebase editing. This baseline allows us to evaluate the impact of having an archive and the well-documented beneficial principles of open-ended exploration~\citep{clune2019ai, stanley2015greatness, zhang2024omni, fernandopromptbreeder, lee2020learning, samvelyan2024rainbow, colas2022autotelic} in guiding the agent's evolution.
+
+In addition to the learned baselines, we compare the DGM against handcrafted, open-source solutions. For SWE-bench, we take the state-of-the-art (SoTA) open-source solution that has been checked (i.e., the SWE-bench team was able to reproduce the results) (\Cref{app:swebench-sota}). For Polyglot, we take the representative agent (Aider)~\citep{aider2024}, which is open-sourced and designed to support multiple programming languages and large codebase editing (\Cref{app:polyglot-sota}). For a fair comparison, we measure the percentage of solved tasks on the same benchmark subsets used to evaluate the DGM (\Cref{app:swebench-tasks}, \Cref{app:polyglot-tasks}). These values are shown as dotted horizontal lines in \Cref{fig:dgm-comparisons}.
+
+% \vspace{-2mm}
+\subsection{Results}
+\label{sec:results}
+% \vspace{-2mm}
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/dgm_comparisons.pdf}
+        \label{fig:dgm-comparisons-swe}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/dgm_comparisons_polyglot.pdf}
+        \label{fig:dgm-comparisons-polyglot}
+    \end{subfigure}
+    % \vspace{-5mm}
+    \caption{\textbf{Self-improvement and open-ended exploration enable the DGM to continue making progress and improve its performance.} The DGM automatically discovers increasingly better coding agents and performs better on both (Left) SWE-bench and (Right) Polyglot. It outperforms baselines that lack either self-improvement or open-ended exploration, showing that both components are essential for continual self-improvement. These scores are obtained from evaluating on the benchmark subsets detailed in \Cref{sec:benchmarks}.}
+    \label{fig:dgm-comparisons}
+    % \vspace{-3mm}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/dgm_archive.pdf}
+    \includegraphics[width=0.45\textwidth]{figures/dgm_progress.pdf}
+    % \vspace{-2mm}
+    \caption{\textbf{The DGM automatically self-improves to become a better coding agent.} (Left) Archive of coding agents generated during the DGM run on SWE-bench. Each node represents a coding agent, with node 0 corresponding to the base agent. Node color indicates performance on SWE-bench (percentage of solved tasks), while border color reflects the number of tasks for which the agent was evaluated. Edges show which agents self-modified to produce the offsprings. Many paths to innovation traverse lower-performing nodes, and key innovations (like node 24) lead to an explosion of innovations built on top of them. Both properties underscore the benefits of open-ended search. (Right) Progress plot of the DGM on SWE-bench. The light blue line shows the average score of all agents possessing basic codebase-editing functionality. The blue line tracks the best score achieved by any agent in the archive at each iteration. The dark line shows the lineage of the final best-discovered agent and its precursor nodes, which includes two performance dips. This illustrates the benefits of open-ended search, which explores a diverse set of interesting stepping stones instead of focusing only on branching off the best solution found so far.}
+    \label{fig:dgm-archive}
+    \label{fig:dgm-progress}
+    % \vspace{-6mm}
+\end{figure}
+
+After 80 iterations of the DGM, the coding agent's performance increases from 20.0\% to 50.0\% on SWE-bench, and from 14.0\% to 38.0\% on Polyglot (\Cref{fig:dgm-comparisons}). Since the DGM is evaluated on only 50 tasks in the Polyglot experiment setup (\Cref{sec:benchmarks}), we additionally evaluate both the base agent and the best DGM-discovered agent on the full Polyglot benchmark to more accurately estimate the improvement. On the full Polyglot benchmark, the DGM improves the coding agent from 14.2\% to 30.7\%. This shows that the DGM can automatically self-improve to create a better coding agent. Moreover, the performance of the best DGM-discovered agent is comparable to that of the checked, open-source, human-designed SoTA on SWE-bench (\Cref{fig:dgm-comparisons}). On Polyglot, although the DGM starts with a base agent whose performance is lower than that of Aider, it discovers an agent that far surpasses Aider (\Cref{fig:dgm-comparisons}). The DGM-discovered agents are comparable to or outperform handcrafted agents on both benchmarks. While the SoTA SWE-bench agent and Aider were painstakingly shaped by human efforts, the DGM hints at a future in which such ingenuity is automated, evolving through self-referential cycles of continuous self-improvements.
+
+The DGM automatically improves both the tools and the workflow of how FMs are utilized (\Cref{fig:dgm-progress}). For example, the DGM enhanced the edit tool to allow more granular file viewing (by lines) and more precise file editing (by string replacement), instead of always viewing or replacing the entire file. Workflow improvements include making multiple attempts to solve a task and using another FM to evaluate and select the best solution. Other workflow improvements include considering previous attempts when generating subsequent ones. \Cref{app:best-agent-dgm} and \Cref{app:best-agent-dgm-polyglot} show all modifications leading up to the final best-discovered agents on SWE-bench and Polyglot respectively. 
+
+Because open-ended exploration allows branching from any agent in the archive with non-zero probability, the DGM can get out of deceptive dips or peaks in performance. For example, at iterations 4 and 56 of the experiment on SWE-bench, although the agent's score temporarily fell below that of its parent, the DGM was still able to explore innovations along that path and create a new agent that outperformed all of its predecessors (\Cref{fig:dgm-progress}). Furthermore, open-ended exploration allows different implementations of the same target functionality to be attempted. For example, while the goal is to provide finer‑grained editing tools, the specific implementation of this feature can vary greatly and hence lead to very different performance (\Cref{app:supp-dgm-diffimpl}). The DGM can explore multiple implementations to find the most suitable one and avoid getting trapped in a suboptimal one.
+
+The DGM outperforms the baselines of DGM w/o self-improve and DGM w/o open-ended exploration on both benchmarks (\Cref{fig:dgm-comparisons}). Without updating the meta agent that modifies coding agents, DGM w/o self-improve improves the agents in early iterations, but its gains taper off quickly (\Cref{app:plots-swe}). In DGM w/o open-ended exploration, only the most recent agent is retained, so a poorly performing self-modification makes subsequent improvements harder to achieve (\Cref{app:plots-swe}).
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/transfer_model_task.pdf}
+    % \vspace{-3mm}
+    \caption{\textbf{Transfer between Models, Benchmarks, and Tasks.} The superior performance of DGM-discovered agents can be transferred across (Left) different models, (Middle) benchmarks, and (Right) different programming language tasks in Polyglot, such as from Python tasks to C++ tasks.}
+    \label{fig:transfer-overview}
+    % \vspace{-4mm}
+\end{figure}
+        
+To evaluate the generality of the improvements from the DGM, we tested the base agent (\Cref{sec:experiment-setup}) and the best agent discovered during the DGM run (\Cref{fig:dgm-comparisons}) with different FMs than those used during optimization. For SWE-bench, where the DGM was run using Claude 3.5 Sonnet (New), we replaced the FM with Claude 3.7 Sonnet~\citep{anthropic2025claude37} or o3-mini, and evaluated on 200 tasks (\Cref{fig:transfer-overview}, Left). With o3-mini, the base agent achieved 23.0\% and the DGM-discovered agent 33.0\%. With Claude 3.7 Sonnet, the base agent achieved 19.0\% and the DGM-discovered agent 59.5\%. These results suggest that the DGM yields improvements that generalize across FMs, rather than being tightly coupled to the specific FM used during its run (\Cref{fig:transfer-overview}). Model transfer results on Polyglot are presented in \Cref{app:polyglot-model}.
+
+Furthermore, we investigate the transferability of the DGM-discovered agent across different benchmarks and programming languages. First, we evaluate the best DGM-discovered agent from one benchmark (e.g., SWE-bench) on a completely held-out benchmark (e.g., Polyglot), and vice versa (\Cref{fig:transfer-overview}, Middle). The best agent evolved on SWE-bench achieves 28.9\% on Polyglot, compared to the initial agent's baseline of 14.2\%. Conversely, the best agent evolved on Polyglot achieves 24.5\% on SWE-bench, outperforming the original baseline of 20.0\%. Since each agent was optimized without ever accessing the alternate benchmark, these evaluations represent truly held-out tests. The consistent performance gains across benchmarks support our claim that DGM's improvements reflect general skill acquisition rather than overfitting or exploitation of benchmark-specific artifacts. Second, we experiment with a version of the DGM trained exclusively on Python tasks from Polyglot and then transfer the discovered agent to tasks in other languages. Focusing primarily on Python tasks slightly improves performance on Python tasks but reduces performance on non-Python tasks compared to the DGM trained on all languages (\Cref{fig:transfer-overview}, Right). However, after being transferred from Python to other unseen languages during the search, the agent still achieves performance comparable to that of the DGM trained on all languages and substantially outperforms both the base agent and Aider. These results demonstrate the robustness of the discovered improvements, showing that they do not overfit to a specific programming language. We also present additional results in \Cref{app:add-results}.
+
+% \vspace{-2mm}
+\section{Safety Discussion}
+\label{sec:safety}
+% \vspace{-2mm}
+
+Systems capable of self-improvement, such as the DGM, represent a step toward more autonomous AI development, aligning with long-standing goals in the field of making capable AI that can benefit humanity~\citep{schmidhuber1987evolutionary, clune2019ai, markoff2016machines, lehman2023machine}. However, this capability introduces unique safety considerations stemming from the system's ability to autonomously modify its own code. Modifications optimized solely for benchmark performance might inadvertently introduce vulnerabilities or behaviors misaligned with human intentions, even if they improve the target metric~\citep{bostrom2020ethical}. In particular, if evaluation benchmarks do not fully capture all desired agent properties (e.g., safety and robustness), the self-improvement loop could amplify misalignment over successive generations. Iterative self-modification could also lead to increasingly complex and uninterpretable internal logic, hindering human understanding, oversight, and control~\citep{sheth2025safety, anwar2024foundational, greenblatt2024alignment, ganguli2022red}.
+
+Recognizing these challenges, the current implementation and experimental setup of the DGM incorporates several safeguards. All agent execution and self-modification processes are conducted within isolated sandboxed environments, limiting their ability to affect the host system, and thereby mitigating the risk of unintended actions. Each execution within the sandbox is subjected to a strict time limit, reducing the risk of resource exhaustion or unbounded behavior. The self-improvement process is currently confined to the well-defined domain of enhancing performance on specific coding benchmarks by modifying the agent's own Python codebase, thus limiting the scope of potential modifications. Additionally, we actively monitor agent performance and code changes, with the DGM archive providing a traceable lineage of modifications for review. At this stage, we have found no evidence of harmful or malicious behavior in the generated agents, and the self-modifications have been primarily focused on improving coding capabilities.
+
+Conversely, a significant potential benefit of the self-improvement paradigm is that it could, in principle, be directed toward enhancing safety and interpretability themselves. We conduct a preliminary investigation into how the DGM can be deployed in AI safety settings to develop countermeasures for FM hallucination (\Cref{app:dgm-halluc}). Just as the DGM learns to improve its coding capabilities, it could potentially discover and integrate better internal safeguards or modify itself for greater transparency (e.g., incorporating principles akin to Constitutional AI~\citep{bai2022constitutional}), if such properties were included in its evaluation criteria~\citep{rosser2025agentbreeder}. This suggests a promising, albeit challenging, pathway in which self-improvement becomes a tool for building more trustworthy AI systems. Additional research could also explore weaving Constitutional AI in from the start, though the challenge would be incentivizing the system to retain these directives (an option worth exploring is to create an unmodifiable part of the system to be able to evaluate at halt the rest).
+
+The DGM demonstrates the potential of self-improving AI while still operating within safe research boundaries due to the current limitations of frontier FMs and effective mitigations like sandboxing. \Cref{app:safety} presents additional discussion on broader safety uncertainties. We include this safety discussion proactively to raise awareness about the emerging prospect of self-improving AI systems and their associated safety implications, particularly as these systems inevitably become more capable~\citep{yudkowsky2008artificial, bostrom2002a,ecoffet2020open, bengio2024managing,clune2019ai}. Accordingly, we advocate for continued investigation into the safe and beneficial evolution of AI-Generating Algorithms~\citep{clune2019ai} and self-improving systems.
+
+% \vspace{-2mm}
+\section{Conclusion and Limitations}
+\label{sec:conclusion}
+% \vspace{-2mm}
+
+We introduce the Darwin G\"odel Machine (DGM), the first self-improving system powered by FMs with open-ended exploration, where progress on its evaluation benchmarks can directly translate into better self-improvement capabilities. We demonstrate the automatic discovery of better tools and FM systems, resulting in better performance on two benchmarks: SWE-bench and Polyglot. Through self-improvement and open-ended exploration, the DGM shows a continuous increase in performance, bringing us one step closer to self-accelerating, self-improving AI systems.
+
+We demonstrate that the DGM can autonomously achieve performance on par with openly available solutions. However, it still falls short of closed-source SoTA SWE-bench solutions. An open question is whether running the DGM for longer would continue to yield performance gains and eventually surpass closed-source solutions. These closed-source solutions often rely on elaborately handcrafted techniques developed by teams of highly skilled experts. Since FMs have yet to match the capabilities of such experts (e.g., in reasoning), the DGM currently requires extensive compute to discover improvements. A single run of the DGM on SWE-bench, as presented in \Cref{sec:experiments}, takes about 2 weeks and incurs significant API costs (\Cref{app:cost-estimate}). We hypothesize that further progress will require more efficient use of computational resources and the development of better reasoning skills.
+
+Since this version of the DGM is mainly powered by FMs, it is inherently limited by the capabilities of the underlying FM. Hence, an exciting future direction is to extend self-modification beyond just prompts or FM workflows, to include more computationally intensive methods, such as rewriting its own training script to update the FM itself. While this version of the DGM focuses on coding, AI systems are increasingly applied across a wide range of domains (e.g., computer vision, creative writing). Another promising extension is to develop self-improving AI systems capable of enhancing themselves beyond just the coding domain. A key assumption in this work is that coding benchmarks are a good reflection of the agent's ability to self-improve, since the self-modification task requires the agent to modify its own codebase. However, one could envision an alternative approach that co-evolves the target task distribution~\citep{faldor2025omni, wang2023robogen}, thereby removing the constraint of self-improvement being tied to a single objective, as in true open-ended processes. \Cref{app:future-work} presents additional potential directions for future work. As we continue to explore this powerful technology, we must also keep safety front and center, as discussed in \Cref{sec:safety}.
+
+In conclusion, the DGM represents a significant step toward the automation of AI development through self-improving systems capable of editing their own codebase. While current limitations in compute and reasoning constrain its full potential, continued advances in FMs and infrastructure may unlock more powerful and general-purpose self-improvements. Provided that the safety concerns are carefully navigated (\Cref{sec:safety}), the future of self-improving AI systems and AI-Generating Algorithms~\citep{clune2019ai} holds immense promise to open-endedly evolve AI, continually rewriting or retraining itself in pursuit of greater capabilities aligned with human values.
+
+\newpage
+\input{iclr_things/ethics_statement}
+\input{iclr_things/reproducibility_statement}
+\newpage
+
+% \subsubsection*{Author Contributions}
+% If you'd like to, you may include  a section for author contributions as is done
+% in many journals. This is optional and at the discretion of the authors.
+
+\subsubsection*{Acknowledgments}
+This research was supported by the Vector Institute, the Canada CIFAR AI Chairs program, a grant from Schmidt Futures, an NSERC Discovery Grant, and a generous donation from Rafael Cosman. Resources used in preparing this research were provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute (https://vectorinstitute.ai/partnerships/current-partners/). Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not necessarily reflect the views of the sponsors. We also thank Aaron Dharna, Ben Norman, Cédric Colas, Sam Devlin, and Shyam Sudhakaran for insightful discussions and feedback.
+
+\bibliography{main}
+\bibliographystyle{iclr2026_conference}
+
+\clearpage
+\appendix
+
+\crefalias{section}{appendix}      % treat \section in appendix as 'appendix'
+\crefalias{subsection}{appendix}   % optional, if you reference subsections
+
+\section*{\LARGE Appendix}
+
+\section*{Table of Contents}
+
+\startcontents[sections]
+\printcontents[sections]{l}{1}{\setcounter{tocdepth}{2}}
+
+\clearpage
+
+\section{Additional Results}
+\label{app:add-results}
+\subsection{Baselines on SWE-bench}
+\label{app:plots-swe}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/dgm_wo_selfimprove.pdf}
+    \caption{\textbf{DGM without self-improving agents.} Keeping the meta-agent that is modifying and producing the next coding agents the same, DGM w/o self-improve is unable to continuously improve over time. (Left) Archive of coding agents generated during the DGM w/o self-improve run on SWE-bench. Each node represents a coding agent, with node 0 corresponding to the base agent. Node color indicates performance on SWE-bench (percentage of solved tasks), while border color reflects the number of tasks for which the agent was evaluated. Edges show which agents self-modified to produce the offsprings. (Right) Progress plot of the DGM w/o self-improve on SWE-bench. The light green line shows the average score of all agents possessing basic codebase-editing functionality. The green line tracks the best score achieved by any agent in the archive at each iteration. The dark line shows the lineage of the final best-discovered agent and its precursor nodes.}
+    \label{fig:dgm-no-selfimprove}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/dgm_wo_openended.pdf}
+    \caption{\textbf{DGM without open-ended exploration.} Removing the archive, DGM w/o open-ended exploration always uses the most recent agent to self-modify and makes very little progress on SWE-bench. (Left) Archive of coding agents generated during the DGM w/o open-ended exploration run on SWE-bench. Each node represents a coding agent, with node 0 corresponding to the base agent. Node color indicates performance on SWE-bench (percentage of solved tasks), while border color reflects the number of tasks for which the agent was evaluated. Edges show which agents self-modified to produce the offsprings. (Right) Progress plot of the DGM w/o open-ended on SWE-bench. The orange line shows the average score of all agents possessing basic codebase-editing functionality. The light orange line tracks the best score achieved by any agent in the archive at each iteration. The dark line shows the lineage of the final best-discovered agent and its precursor nodes.}
+    \label{fig:dgm-no-openended}
+\end{figure}
+
+\subsection{Generality across models on Polyglot}
+\label{app:polyglot-model}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/transfer_model_polyglot.pdf}
+    \caption{\textbf{Transfer between Models on Polyglot}}
+    \label{fig:transfer-model-polyglot}
+\end{figure}
+
+In addition to testing the transfer models on SWE-bench (see \Cref{sec:results}, \Cref{fig:dgm-comparisons}), we also present the transfer results on Polyglot in this section. On Polyglot (\Cref{fig:transfer-model-polyglot}), where the DGM was run with o3-mini, we replaced the FM with Claude 3.5 Sonnet (New) or Claude 3.7 Sonnet, and evaluated on the full benchmark (\Cref{fig:transfer-overview}, Middle). With Claude 3.5 Sonnet (New), the initial agent achieved 32.0\% and the DGM-discovered agent 33.3\%. With Claude 3.7 Sonnet, the initial agent achieved 35.6\% and the DGM-discovered agent 36.8\%. These results suggest that the DGM yields improvements that generalize across FMs, rather than being tightly coupled to the specific FM used during its run (\Cref{fig:transfer-overview}).
+
+\subsection{Ablation of Parent Selection}
+To further study the impact of the parent selection mechanism in DGM, we introduce DGM Greedy. DGM Greedy always selects the best-performing node as the parent to branch from, rather than giving every node a non-zero probability of being branched off (roughly proportional to their performance score and number of children) as in this implementation of the DGM (\Cref{app:parent-select}). This ablation replicates the approach of \citet{robeyns2025self} in this setting. As shown in \Cref{tab:DGM-greedy}, DGM Greedy achieves 39.7\% and 30.0\% on SWE-bench and Polyglot, respectively, compared to 50.0\% and 38.0\% by this implementation of DGM. These results demonstrate that allowing all solutions in the archive to serve as potential stepping stones can lead to greater improvements over time, underscoring the importance of open-ended exploration.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of DGM, its ablations, and baselines on SWE-bench and Polyglot benchmarks.}
+\label{tab:DGM-greedy}
+\begin{adjustbox}{max width=\textwidth} % Restricting table to page width
+\begin{tabular}{lcc}
+\toprule
+\textbf{Method} & \textbf{SWE-bench} & \textbf{Polyglot} \\
+\midrule
+DGM & 50.0\% & 38.0\% \\
+DGM w/o Open-ended exploration & 23.0\% & 14.0\% \\
+DGM w/o Self-improve & 39.0\% & 28.0\% \\
+DGM Greedy & 39.7\% & 30.0\% \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Additional Statistics of DGM runs}
+\textbf{Percentage of Generated Agents with Basic Code-Editing Functionality.}
+To gain deeper insights into the DGM process, we analyze the percentage of generated agents that possess basic code-editing functionality on the SWE-bench benchmark. As shown in \Cref{tab:code_editing}, DGM exhibits the highest percentage of producing agents with basic codebase-editing functionality. These results highlight the effectiveness of both open-ended exploration and self-improvement components in the DGM, where open-ended exploration enables the search to escape local optima, while self-improvement enhances the ability to generate better agents.
+
+\begin{table}[H]
+\centering
+\caption{Percentage of generated agents with basic code-editing functionality on SWE-bench.}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lc}
+\toprule
+\textbf{Method} & \textbf{Percentage with Basic Code-Editing Functionality} \\
+\midrule
+DGM & 51.3\% \\
+DGM w/o Open-ended exploration & 32.5\% \\
+DGM w/o Self-improve & 32.5\% \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\label{tab:code_editing}
+\end{table}
+
+\textbf{Stability of DGM Runs.}
+To evaluate the stability of DGM, we run the DGM algorithm three times on the Polyglot benchmark and analyze the variance in performance. The DGM achieved a mean accuracy of 40.7\% with a standard deviation of 2.3\%, indicating that the DGM can achieve consistent and reproducible results across runs.
+
+
+\section{Additional Related Work}
+\label{app:related}
+
+\textbf{Open-Endedness (part 2).}
+Early approaches to open-endedness explored different mechanisms to balance learnability and interestingness. Quality-diversity algorithms sought to illuminate vast solution spaces with diverse, high-performing behaviors~\citep{pugh2016quality, chatzilygeroudis2021quality, mouret2015illuminating, nguyen2015innovation}. Other methods emphasized goal-directed exploration~\citep{ecoffet2019go, ecoffet2021first, schaul2015universal, andrychowicz2017hindsight, eysenbach2018diversity}, intrinsic motivation~\citep{lehman2011novelty, oudeyer2007intrinsic, li2014encouraging, pathak2017curiosity}, or learning progress frameworks~\citep{kanitscheider2021multi, gaven2025magellan, baranes2013active, colas2019curious, colas2022autotelic, jiang2021prioritized, dennis2020emergent, schmidhuber2008driven, schmidhuber2013powerplay, kompella2017continual}. More recently, large-scale foundation models (FMs)~\citep{brown2020language, radford2019language} have emerged as powerful proxies for human notions of interestingness~\citep{zhang2024omni,faldor2025omni,sancaktar2025sensei} and effective mutation operators to propose novel solutions in code~\citep{romera2024mathematical,Novikov2025AlphaEvolve,lehman2023evolution,faldor2025omni,hu2025automated}. FMs can guide autotelic agents~\citep{colas2022autotelic, colas2023augmenting, colas2022language}, model human preferences for quality and diversity~\citep{bradley2023quality, ding2023quality, wang2023diversity, klissarov2023motif, klissarov2024maestromotif, samvelyan2024rainbow, lim2024large, havrilla2024surveying}, design reward functions~\citep{wiering1997hq, wang2023voyager, ma2023eureka, faldor2025omni}, create simulated environments~\citep{sudhakaran2023mariogpt, nasir2023practical, aki2024llm, nasir2024word2world, bruce2024genie, parkerholder2024genie2, schmidhuber2013powerplay}, drive ever-evolving multi-agent dynamics~\citep{dharna2024quality, zhou2025autoredteamer}, search diverse ambulating robot morphologies~\citep{lehman2023evolution}, and search expansive solution spaces for benchmark or objective optimization~\citep{lange2024large, zhang2024omni, faldor2025omni, hu2025automated, lu2024intelligent, romera2024mathematical, fernandopromptbreeder, lu2024ai, khan2024debating, lu2025automated, liu2024evolution, Novikov2025AlphaEvolve}.
+
+\textbf{Program Synthesis.}
+Program synthesis~\citep{alur2018search, polozov2015flashmeta, buchi1990solving, gulwani2011automating, ellis2021dreamcoder} seeks to generate code meeting external specifications such as input-output examples or logical formulas. Hybrid approaches combine symbolic methods with neural or FM guidance: for instance, \citet{li2024guiding} uses LLM suggestions to steer symbolic search in SyGuS settings, improving over pure enumeration. \citet{barke2024hysynth} blends LLM completions with a learned surrogate model to guide synthesis in DSLs. \citet{shi2023lambdabeam} uses neural policies to build higher-order and lambda abstractions during search, outperforming both LLM-only and symbolic baselines on list manipulation tasks. The DGM differs in focusing not just on producing programs for external tasks, but also on agent self-modification, rewriting its own implementation to improve its capacity for future self-improvement.
+
+\textbf{Inspiration from Darwinian Evolution.}
+This work is heavily inspired by the mechanisms of Darwinian evolution~\citep{darwin2023origin}, notably variation (mutation), selection, and the preservation of lineages (stepping stones), and brings them into the realm of self-modifying coding agents. In DGM, an archive of past agent versions is maintained, from which parent agents are sampled; then mutations (i.e., code edits) generate new offspring agents, which are empirically evaluated on coding benchmarks; successful ones are added to the archive, enabling parallel exploration of multiple evolutionary trajectories (\Cref{sec:methods}). This mirrors how biological evolution~\citep{edwards2000genetical, wright1932roles} preserves genetic diversity~\citep{mayr1982growth}, leverages variation~\citep{kimura1979neutral}, and uses natural selection to retain beneficial mutations~\citep{dobzhansky1970genetics}.
+
+\section{Algorithmic Details}
+
+\subsection{Initial Coding Agent}
+\label{app:initial-agent}
+
+In this section, we present the details of the tools available to the initial coding agent (\Cref{sec:experiment-setup}) and its task prompt.
+
+Information of the given Bash tool:
+\input{initial_agent/bash_tool}
+
+Information of the given Edit tool:
+\input{initial_agent/edit_tool}
+
+Task prompt:
+\input{initial_agent/prompt}
+
+\subsection{Parent Selection}
+\label{app:parent-select}
+
+At each DGM iteration, we select a subset of agents from the archive as parents to self-modify and produce new child agents (\Cref{sec:methods}). The details of the parent selection process, inspired by \citet{ecoffet2019go}, are outlined below. Future work could explore alternative search and exploration methods \citep{coulom2006efficient, silver2016mastering, herr2025llm}.
+
+At each iteration \(t\) of the DGM run, let
+\[
+\mathcal{A}^t = \{a_1^t, a_2^t, \dots, a_N^t\}
+\]
+be the archive of candidate agents.  We first define the eligible set
+\[
+\mathcal{E}^t = \bigl\{\,a_i^t \in \mathcal{A}^t : \alpha_i < 1 \bigr\},
+\]
+i.e.\ only those agents whose performance score is not yet perfect. We then sample \(k\) parents (with replacement) from \(\mathcal{E}^t\) in proportion to a combined measure of performance and number of children with codebase-editing functionality. Concretely, for each agent \(a_i^t \in \mathcal{E}^t\):
+
+\begin{align}
+\text{(performance)}\quad & \alpha_i \;=\; \mathrm{performance}(a_i^t), 
+\\
+\text{(children count)}\quad & n_i \;=\; \mathrm{functioning\_children\_count}(a_i^t),
+\\[6pt]
+\text{(sigmoid‐scaled performance)}\quad 
+& s_i \;=\; \frac{1}{1 + \exp\!\bigl(-\lambda\,(\alpha_i - \alpha_0)\bigr)},
+\\[4pt]
+\text{(novelty bonus)}\quad 
+& h_i \;=\; \frac{1}{1 + n_i},
+\\[4pt]
+\text{(unnormalized weight)}\quad 
+& w_i \;=\; s_i\,h_i,
+\\[4pt]
+\text{(selection probability)}\quad 
+& p_i \;=\; \frac{w_i}{\sum_{j=1}^{N} w_j},
+\\[8pt]
+\text{(sampling)}\quad 
+& \{\,\text{parents}\,\} \;\sim\; \mathrm{Categorical}\bigl(\{p_i\}_{a_i^t \in \mathcal{E}^t}\bigr)\quad\text{(draw \(k\) samples).}
+\end{align}
+
+Here, \(\lambda>0\) controls the sharpness of the sigmoid, and \(\alpha_0\) is the midpoint accuracy. We set \(\lambda=10\) and \(\alpha_0=0.5\). \(k\) determines how many self-improvements are done in parallel during each iteration of the DGM run. We set \(k=2\) in SWE-bench experiments, and \(k=4\) in Polyglot experiments.
+
+\subsection{Self-Improve Prompts}
+\label{app:selfimprove-prompts}
+
+In every iteration, an agent is chosen to self-modify. For this step, the current implementation of DGM leverages a separate FM to diagnose improvement opportunities, which are then passed to the coding agent for implementation. To identify the next potential improvement, the evaluation logs from the chosen agent's performance on the coding benchmark are fed into the FM. While the current implementation relies on an additional diagnostic step, there are no fundamental limitations preventing the DGM from autonomously analyzing its own performance, generating improvement hypotheses, and implementing subsequent modifications. We chose to use OpenAI's o1 model~\citep{openai2024o1} for this purpose, as we found it had better reasoning capabilities than other FMs available at the time of our experiments. The prompts used for this diagnosis are provided below. From the diagnostic output, the \texttt{implementation\_suggestion} and \texttt{problem\_description} are extracted and passed to the coding agent as its self-modification task.
+
+Self-improve diagnosis prompt for SWE-bench experiments:
+\input{selfimprove_prompts/swebench}
+
+While the private test patch is included in the diagnosis prompt, one could imagine that an easy way for the agent to score well on the task would be to hard code the solutions. However, from manual inspection of the logs and agent modifications, we have not observed any problematic logic or behavior indicative of memorization or overfitting to specific private test cases. Furthermore, improvements discovered on one task or LLM model often generalize well to others (\Cref{fig:transfer-overview}), showing that these improvements are not task-specific but instead reflect general changes that enhance overall performance.
+
+Additional prompt for Polyglot experiments:
+
+\begin{tcolorbox}[breakable,colback=orange!5!white, colframe=orange!80!black, title=Additional Prompt for o3-mini Tool Use and Polyglot]
+\scriptsize
+\begin{MyVerbatim}
+### DOC: tool function schema
+
+Carefully consider whether to add/enhance the current tool or edit the workflow in forward()
+
+Pay special attention to making sure that "required" and "type" are always at the correct level of nesting. For example, "required" should be at the same level as "properties", not inside it.
+Make sure that every property, no matter how short, has a type and description correctly nested inside it.
+Other arguments than you have seen are not permitted. For example, in "edit_line_ranges" with "type": "array", arguments like "minItems" and "maxItems" are not permitted.
+
+...
+
+Here is the log for the coding agent trying to solve a programming task. 
+A task is in one programming language, but the coding agent needs to deal with different languages including C++, Go, Java, JavaScript, Python, and Rust.
+\end{MyVerbatim}
+\end{tcolorbox}
+
+
+\subsection{Pseudocode}
+\label{app:pseudocode}
+
+This is the pseudocode of the DGM algorithm, described in \Cref{sec:methods}:
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\SetAlgoLined
+\KwIn{Initial coding agent $g_0$, benchmark suite $B$, maximum iterations $T$}
+\KwOut{Archive of agents $\mathcal{A}$}
+%— Initialization —%
+\BlankLine
+$s_0 \leftarrow \text{evaluate}(g_0, B)$ \tcp*{Evaluate the base agent}
+\textbf{initialize} $\mathcal{A} \leftarrow \{(g_0, s_0)\}$ \tcp*{Start with the base agent}
+%— Evolutionary loop —%
+\For{$t \leftarrow 1$ \KwTo $T$}{
+    $\mathcal{P} \leftarrow \text{SelectParents}(\mathcal{A})$\ \tcp*{Select parent agents}
+
+    \ForEach{$p \in \mathcal{P}$}{
+        $c \leftarrow p.\text{modify}(p)$\ \tcp*{Self-modification}
+        $s \leftarrow \text{evaluate}(c, B)$\ \tcp*{Evaluate on benchmark}
+
+        \If{$c.\text{is\_valid}()$}{
+            $\mathcal{A} \leftarrow \mathcal{A} \,\cup\, \{(c, s)\}$\ \tcp*{Keep children capable of code editing}
+        }
+    }
+}
+\Return{$\mathcal{A}$}
+\caption{Darwin Gödel Machine}
+\label{alg:dgm}
+\end{algorithm}
+
+This is the pseudocode of the baseline DGM without self-improving agents, described in \Cref{sec:baselines}:
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\SetAlgoLined
+\KwIn{Initial coding agent $g_0$, benchmark suite $B$, maximum iterations $T$}
+\KwOut{Archive of agents $\mathcal{A}$}
+%— Initialization —%
+\BlankLine
+$s_0 \leftarrow \text{evaluate}(g_0, B)$ \tcp*{Evaluate the base agent}
+\textbf{initialize} $\mathcal{A} \leftarrow \{(g_0, s_0)\}$ \tcp*{Start with the base agent}
+%— Evolutionary loop —%
+\For{$t \leftarrow 1$ \KwTo $T$}{
+    $\mathcal{P} \leftarrow \text{SelectParents}(\mathcal{A})$\ \tcp*{Select parent agents}
+
+    \ForEach{$p \in \mathcal{P}$}{
+        $c \leftarrow g_0.\text{modify}(p)$\ \tcp*{Modify with base agent}
+        $s \leftarrow \text{evaluate}(c, B)$\ \tcp*{Evaluate on benchmark}
+
+        \If{$c.\text{is\_valid}()$}{
+            $\mathcal{A} \leftarrow \mathcal{A} \,\cup\, \{(c, s)\}$\ \tcp*{Keep children capable of code editing}
+        }
+    }
+}
+\Return{$\mathcal{A}$}
+\caption{Darwin Gödel Machine without Self-improving agents}
+\label{alg:dgm-wo-selfimprove}
+\end{algorithm}
+
+This is the pseudocode of the baseline DGM without open-ended exploration, described in \Cref{sec:baselines}:
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\SetAlgoLined
+\KwIn{Initial coding agent $g_0$, benchmark suite $B$, maximum iterations $T$}
+\KwOut{Archive of agents $\mathcal{A}$}
+%— Initialization —%
+\BlankLine
+$s_0 \leftarrow \text{evaluate}(g_0, B)$ \tcp*{Evaluate the base agent}
+\textbf{initialize} $\mathcal{A} \leftarrow \{(g_0, s_0)\}$ \tcp*{Start with the base agent}
+%— Evolutionary loop —%
+\For{$t \leftarrow 1$ \KwTo $T$}{
+    $\mathcal{P} \leftarrow \text{SelectParents}(\mathcal{A})$\ \tcp*{Select parent agents}
+
+    \ForEach{$p \in \mathcal{P}$}{
+        $c \leftarrow p.\text{modify}(p)$\ \tcp*{Self-modification}
+        $s \leftarrow \text{evaluate}(c, B)$\ \tcp*{Evaluate on benchmark}
+
+        \If{$c.\text{is\_valid}()$}{
+            $\mathcal{A} \leftarrow \{(c, s)\}$\ \tcp*{Only keep the latest agent}
+        }
+    }
+}
+\Return{$\mathcal{A}$}
+\caption{Darwin Gödel Machine without Open-ended exploration}
+\label{alg:dgm-wo-openended}
+\end{algorithm}
+
+\section{Experiment Details}
+
+\subsection{Hyperparameters for Foundation Models}
+\label{app:fm-hyperparam}
+
+\Cref{tab:fm-hyperparam} shows the foundation model used in each experiment setting, as described in \Cref{sec:experiment-setup}. Since SWE-bench is a more challenging coding benchmark, we use a stronger coding model, Claude 3.5 Sonnet (New) (based on our preliminary testing). To enable faster iterations and avoid the same rate limits as Claude, we use o3-mini for Polyglot experiments. The temperature for all FMs in every setting is set to 1.0.
+
+\begin{table}[H]
+\centering
+\caption{Foundation models used in each experiment setting.}
+\label{tab:fm-hyperparam}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Benchmark & SWE-bench & Polyglot \\ \midrule
+Self-modification & Claude 3.5 Sonnet (New) & Claude 3.5 Sonnet (New) \\
+Evaluation & Claude 3.5 Sonnet (New) & o3-mini \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Benchmark Details}
+
+\subsection{Cost Estimate}
+\label{app:cost-estimate}
+
+The estimated cost of completing a single run of the DGM on SWE-bench, as presented in \Cref{sec:experiments}, is about USD 22,000. In comparison, the estimated cost of completing a single run of either baseline (DGM w/o self-improve or DGM w/o open-ended exploration) on SWE-bench is about USD 10,000. Although the DGM is considerably more costly than the baselines, a method that can continuously improve, even at a higher cost, is preferable to one that fails to improve or stagnates at a level of performance that may never match that of the DGM. A more granular break down is:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{LLM} & \textbf{Benchmark} & \textbf{Number of Tasks} & \textbf{Cost Estimate (USD)} \\ \midrule
+Claude 3.5 Sonnet (New) & SWE-bench & 60 & \$350 \\
+o3-mini & Polyglot & 60 & \$5 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+We acknowledge that the current experiments on SWE-bench require considerable compute. Hence, we also include experiments on another benchmark, Polyglot, with significantly lower costs. This suggests that expenses vary greatly by task complexity, with SWE-bench being among the more complex and resource-intensive coding benchmarks. Moreover, several impactful methods (e.g., LLM training at its inception) were characterized substantial computational demands initially. Similar to these pioneering works, we hope to open the door to future research on improving the efficiency and scalability of our approach. In addition, many leading coding agents on the SWE-bench leaderboard are backed by industrial companies employing expert full-time researchers and engineers, which incurs substantial human labor costs. In contrast, our approach achieves SoTA-level performance through fully autonomous self-improvement without human intervention, potentially offering greater efficiency when considering the comparative costs of specialized AI development talent versus API usage. Finally, as FMs continue to improve and compute costs continue to decline, methods like the DGM will become increasingly efficient and accessible.
+
+Also, higher-performing agents discovered by the DGM do indeed incur greater inference costs than the initial agent, but cost and performance are not strictly correlated, where some expensive agents underperform cheaper ones.
+
+\subsection{SWE-bench Tasks}
+\label{app:swebench-tasks}
+
+Initial 10 tasks for verifying basic functionality of a coding agent:
+\input{swebench_tasks/small}
+
+Additional 50 tasks for estimating general effectiveness of a coding agent:
+\input{swebench_tasks/medium}
+
+Additional 140 tasks for more accurate assessment of a coding agent's performance:
+\input{swebench_tasks/big}
+
+\subsection{Polyglot Tasks}
+\label{app:polyglot-tasks}
+
+Initial 10 tasks for verifying basic functionality of a coding agent:
+\input{polyglot_tasks/small}
+
+Additional 50 tasks for estimating general effectiveness of a coding agent:
+\input{polyglot_tasks/medium}
+
+\subsection{SWE-bench State-of-The-Art}
+\label{app:swebench-sota}
+At the time of writing this paper (16 April 2025), the highest performing, checked (i.e., the SWE-bench team received access to the system and were able to reproduce the patch generations), open-source entry on SWE-bench Verified is OpenHands + CodeAct v2.1 (claude-3-5-sonnet-20241022)~\citep{wang2024openhands}, achieving 53.0\%. Only considering the same subset of 200 tasks used by the DGM (\Cref{app:swebench-tasks}), OpenHands + CodeAct v2.1 (claude-3-5-sonnet-20241022) achieves 51.0\%.
+
+\subsection{Polyglot Representative Agent}
+\label{app:polyglot-sota}
+
+Aider~\citep{aider2024}, a popular coding agent in the community, was published in Spring 2024. It has garnered over 33,000 stars on GitHub and has been continuously developed and tested against the Polyglot benchmark for over a year by human developers, primarily to evaluate its performance. Aider has also become a standard baseline for assessing the performance of different models, with the current top performers on the Polyglot benchmark being a mix of o3 (high) and GPT-4.1. We adopt a setup similar to that of the Polyglot leaderboard, with one key difference: the leaderboard reports pass@2 performance, where the agent can view feedback from ground-truth tests once. In contrast, we use a pass@1 setting, where the agent never sees the results of ground-truth tests, as we believe this more closely reflects realistic coding applications.
+
+\section{Best-Discovered Agents}
+
+\subsection{DGM on SWE-bench}
+\label{app:best-agent-dgm}
+Diff patches contributing to the best agent discovered by the DGM on SWE-bench:
+\input{best_discovered_agent/diff0}
+\input{best_discovered_agent/diff1}
+\input{best_discovered_agent/diff2}
+\input{best_discovered_agent/diff3}
+\input{best_discovered_agent/diff4}
+\input{best_discovered_agent/diff5}
+
+\subsection{DGM on Polyglot}
+\label{app:best-agent-dgm-polyglot}
+
+Diff patches contributing to the best agent discovered by the DGM on Polyglot:
+\input{best_discovered_agent_polyglot/diff0}
+\input{best_discovered_agent_polyglot/diff1}
+\input{best_discovered_agent_polyglot/diff2}
+\input{best_discovered_agent_polyglot/diff3}
+
+\section{Similar Target Functionality, Different Implementations}
+\label{app:supp-dgm-diffimpl}
+For the same target functionality, the suggestions provided to the coding agents and the resulting implementations can differ significantly, leading to large variations in coding capability and benchmark performance. For example, consider nodes 6 and 24 in the DGM run on SWE-bench (\Cref{fig:dgm-archive}). Both aimed to enhance the existing editor tool to support finer‑grained file editing. However, the implementation for node 6 retained the original \texttt{edit} command and added the parameters \texttt{edit\_type} and \texttt{edit\_actions}, whereas the implementation for node 24 replaced the original \texttt{edit} command with a new \texttt{str\_replace} command. Despite targeting similar functionality, the feature suggestions and thus the implementation details differed greatly, as did their performance. Node 6 achieved only 23.3\%, while node 24 achieved 40.5\%.
+
+Feature suggestion to obtain node 6:
+\input{diff_implementations/node6_feature}
+
+Feature suggestion to obtain node 24:
+\input{diff_implementations/node24_feature}
+
+Implementation of suggested feature to obtain node 6:
+\input{diff_implementations/node6_implementation}
+
+Implementation of suggested feature to obtain node 24:
+\input{diff_implementations/node24_implementation}
+
+
+
+\section{Case Study: Solving Hallucination}
+\label{app:dgm-halluc}
+The DGM can be used to optimize objectives beyond just coding, as discussed as a potential direction for future work in \Cref{sec:safety}. In this section, we show that the DGM can address hallucinations of tool use by FMs. Through feedback from evaluation logs, the DGM improves hallucination detection mechanisms and ultimately discovers ways to resolve these hallucinations. We provide a more detailed discussion of when these hallucinations occur, the DGM setup, and the resulting solutions. Finally, we present an example of objective hacking, where the agent optimizes for the quantifiable metric rather than truly fulfilling the spirit of the task and solving the underlying problem.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{solve_halluc/dgm_halluc.pdf}
+    \caption{\textbf{The DGM solving hallucination of tool use in FMs.} Archive of coding agents generated during the DGM run on SWE-bench to solve hallucination from FMs. Each node represents an agent, with node 0 corresponding to the base agent. Node color indicates solved hallucination score, while border color reflects whether the agent has basic codebase-editing functionality. Edges show which agents self-modified to produce the offsprings.}
+    \label{fig:dgm-halluc}
+\end{figure}
+
+\textbf{When hallucination occurs.}
+When the input context to Claude 3.5 Sonnet (New) (Claude) is very long, including all previous tool use inputs and outputs, we found that Claude tends to hallucinate tool usage. Instead of actually making a tool call, it outputs the tool input and output as plain text. This is an example of Claude hallucinating tool use, claiming that the Bash tool was used to run tests and that the tool output suggests that all tests passed, but Claude did not invoke any tools, and the tool results were entirely hallucinated in plain text:
+\input{solve_halluc/halluc_example}
+
+\textbf{DGM setup.}
+We run this experiment on SWE-bench. Other than the number of SWE-bench tasks we evaluate each coding agent on, and the final scoring function of the DGM, all other settings remain the same as in the main experiments (\Cref{sec:methods}). The initial coding agent and all agents generated during the DGM run are evaluated on only 3 SWE-bench tasks. We use just 3 tasks because if hallucination occurs in one, it is likely to occur in others as well. Hence, 3 tasks are sufficient to provide the DGM with a reliable signal regarding whether tool use hallucination is still present.
+
+\textbf{Solve hallucination score.}
+We score each generated agent based on how effectively it prevents hallucinations, with higher scores indicating fewer hallucinations and better performance. For each SWE-bench task the agent is evaluated on, the score has two components: 0 - 1 based on whether hallucination occurred in the logs, and 1 - 2 (only added and accounted for after no hallucination occurs in the logs) if tools were used in all Claude calls. The final solve hallucination score is computed as the average across all evaluated tasks. To detect hallucination in the logs, we insert special tokens when actual tool use occurs and then check if these tokens appear in the model's plain-text output, indicating that the model mimicked tool use without actually invoking any tools. Importantly, the hallucination checking functions are hidden from the coding agent during self-modification. We found that objective hacking (i.e., optimizing for the measurable objective instead of truly solving the underlying problem) occurs more frequently when these functions are not hidden.
+
+\textbf{Results.}
+We run the DGM for 150 iterations. In this run, the DGM discovers two promising solutions: node 96, which achieves the second highest score of 1.67, and node 114, which achieves a perfect score of 2.0 (\Cref{fig:dgm-halluc}).
+Node 96 addresses hallucination to some extent, achieving a score of 1.67 without objective hacking. In the lineage leading to node 96, the DGM first improves the tool transaction logging mechanisms to better detect when hallucination occurs. It then explores various strategies to solve it, such as removing hallucinated tool use from the output text when it determines that the tool was not actually invoked.
+Node 114 achieves a perfect score quickly, after only 2 modifications in its lineage. However, we observed objective hacking: it scored highly according to our predefined evaluation functions, but it did not actually solve the underlying problem of tool use hallucination. In the modification leading up to node 114 (see below), the agent removed the logging of special tokens that indicate tool usage (despite instructions not to change the special tokens), effectively bypassing our hallucination detection function.
+
+\input{solve_halluc/halluc_hack}
+
+In conclusion, the DGM can be applied beyond the coding domain, and we highlighted a case of objective hacking. Similar to reward hacking in reinforcement learning~\citep{skalse2022defining}, objective hacking occurs when a system optimizes for a predefined, quantifiable objective rather than fulfilling the spirit of the task or solving the intended problem. This observation supports arguments made in prior works~\citep{zhang2024omni, faldor2025omni}, which suggest that optimizing quantitative measures often leads to undesirable or pathological outcomes, and aligns with Goodhart's law~\citep{strathern1997improving} -- "When a measure becomes a target, it ceases to be a good measure."
+
+\section{Additional Safety Discussion}
+\label{app:safety}
+
+Any advancement that increases the autonomous capabilities of AI systems introduces its own set of safety considerations~\citep{bengio2024managing}, especially for systems that improve in an open-ended way~\citep{ecoffet2020open, clune2019ai}. \Cref{sec:safety} discusses these concerns and outlines concrete, actionable steps for mitigating them. We call for much more research into and discussion regarding AI safety, including deep thought and discussion amongst all stakeholders in society on the complicated question of what exactly counts as safe AI. We are confident the work we have done was never unsafe (\Cref{sec:safety}), but scaled up versions of it could be. As with all transformative technologies, the ultimate impact of such AI systems remains deeply uncertain, and good arguments can be made both for the case that it will bring about tremendous good and tremendous harm. These uncertainties highlight the need for sustained, inclusive, and multidisciplinary discussion (not only from current experts but also from a wider and more diverse community) on how to navigate these developments.
+
+\section{Additional Future Work Directions}
+\label{app:future-work}
+
+While this paper has shown the potential of the Darwin G\"odel Machine in iteratively improving coding agents via open‐ended exploration and empirical validation, several extensions could address current limitations and push AI beyond its already growing role in inspiring culture and advancing science. The following directions outline promising avenues for further research.
+
+\textbf{Autonomously Improving the Open-ended Exploration Process.}
+In this version of the DGM, the open-ended exploration process described in \Cref{sec:methods} is kept fixed, which might hence impede the system's self-acceleration potential. This design choice was made due to limited computational budget. If we were to evolve this part of the algorithm, it could require exponentially more compute to identify processes that yield the same improvements shown in \Cref{sec:results}. Nevertheless, since the open-ended exploration loop itself is implemented in code, it can in principle be edited and improved by a coding agent. There are many possible implementations of open-ended exploration, for example, using alternative search mechanisms that balance exploration and exploitation~\citep{herr2025llm}, keeping only the most interesting agents in the archive~\citep{faldor2025omni}, or leveraging the generated agent population as an ensemble~\citep{samvelyan2024rainbow}. A promising future work direction is to allow the agent to modify the open-ended exploration process, thereby autonomously improving not only its own capabilities but also the meta-process that allocates limited compute to drive self-improvement and self-acceleration.
+
+\textbf{Role of Humans in Autonomous AI Systems.}
+In the current formulation of the DGM, proposed self-modifications are autonomously evaluated without any human intervention. However, as autonomous systems grow in complexity and influence, the question of how humans should remain involved becomes increasingly pressing. Should human oversight be framed as an optimization objective, incorporated through techniques such as reinforcement learning from human feedback~\citep{ouyang2022training}, or distilled into FMs that act as preference judges~\citep{bai2022constitutional}? Each of these approaches raises challenges in terms of scalability, reliability, and alignment with evolving human values. The role of humans in guiding, constraining, or co-evolving with autonomous AI remains an open question. Exploring this dynamic is a promising avenue for future research, as it touches not only on technical feasibility but also on broader philosophical and societal considerations.
+
+\textbf{DGM with Advanced Foundation Models.}
+Recent FMs have advanced dramatically, enabling scaffolds to become simpler on current coding benchmarks \citep{yang2024sweagent}. It is possible that in some settings, like current coding benchmarks, certain engineering efforts in scaffolding might be downplayed by the improvement of the FMs. However, many scaffolding components (advanced tools, parallel workflows, external memory, proxy verification, etc.) still fundamentally can not be internalized by FMs and will be essential for more complex real-world tasks beyond today’s benchmarks. Future work to explore how different components in agents will emerge with different FMs could be a promising direction. 
+
+\textbf{Evolving Generalist Agent.}
+We believe some degree of task-specific adaptation is indeed expected and even desirable, since fundamentally different types of tasks (e.g., in our case, multi-file Python repository edits vs. primarily single-file, multi-language implementations) naturally require distinct scaffolding components. Crucially, this very property highlights a unique advantage of self-improving systems like the DGM: it replaces laborious manual efforts to design specialized agents for diverse tasks with a fully automated evolutionary process. This motivates an exciting future direction of running the DGM on a large, diverse set of tasks to evolve a true generalist agent. Also, currently we only evaluated DGM on two coding benchmarks. While we believe these two benchmarks differ substantially in task structure (multi-file Python repository edits vs. primarily single-file, multi-language implementations), providing strong evidence of generality, additional benchmarks would further strengthen evaluations.
+
+\end{document}

@@ -1,0 +1,118 @@
+\section{Hyper Parameters}
+\label{sec:hparams}
+
+We use the convolutional and deconvolutional networks from \citet{ha2018worldmodels}, a GRU \citep{cho2014gru} with $200$ units as deterministic path in the dynamics model, and implement all other functions as two fully connected layers of size $200$ with ReLU activations \citep{nair2010relu}. Distributions in latent space are $30$-dimensional diagonal Gaussians with predicted mean and standard deviation.
+
+We pre-process images by reducing the bit depth to 5 bits as in \citet{kingma2018glow}. The model is trained using the Adam optimizer \citep{kingma2014adam} with a learning rate of $10^{-3}$, $\epsilon=10^{-4}$, and gradient clipping norm of $1000$ on batches of $B=50$ sequence chunks of length $L=50$. We do not scale the KL divergence terms relatively to the reconstruction terms but grant the model $3$ free nats by clipping the divergence loss below this value. In a previous version of the agent, we used latent overshooting and an additional fixed global prior, but we found this to not be necessary.
+
+For planning, we use CEM with horizon length $H=12$, optimization iterations $I=10$, candidate samples $J=1000$, and refitting to the best $K=100$. We start from $S=5$ seed episodes with random actions and collect another episode every $C=100$ update steps under $\epsilon\sim\Normal(0,0.3)$ action noise. The action repeat differs between domains: cartpole ($R=8$), reacher ($R=4$), cheetah ($R=4$), finger ($R=2$), cup ($R=4$), walker ($R=2$). We found important hyper parameters to be the action repeat, the KL-divergence scales $\beta$, and the learning rate.
+
+\section{Planning Algorithm}
+\input{algorithms/planning}
+
+\clearpage
+\section{Multi-Task Learning}
+\label{sec:exp_multi}
+\input{figures/score_multi/figure_avg}
+\input{figures/score_multi/figure}
+
+\clearpage
+\section{Latent Overshooting}
+\label{sec:exp_overshooting}
+\input{figures/score_overshooting/figure}
+
+\clearpage
+\section{Activation Function}
+\label{sec:exp_activation}
+\input{figures/score_activation/figure}
+
+\clearpage
+\section{Bound Derivations}
+\label{sec:derivs}
+
+\paragraph{One-step predictive distribution}
+
+The variational bound for latent dynamics models $\p(o_{1:T},s_{1:T}|a_{1:T})=\prod_t\p(s_t|s_{t-1},a_{t-1})\p(o_t|s_t)$ and a variational posterior $\q(s_{1:T}|o_{1:T},a_{1:T})=\prod_t\q(s_t|o_{\leq t},a_{<t})$ follows from importance weighting and Jensen's inequality as shown,
+\begin{equation}
+\begin{aligned}
+\ln\p(o_{1:T}|a_{1:T})
+&\triangleq\ln\E[\bigg]{\p(s_{1:T}|a_{1:T})}{\prod_{t=1}^T \p(o_t|s_t)} \\
+&=\ln\E[\bigg]{\q(s_{1:T}|o_{1:T},a_{1:T})}{\prod_{t=1}^T \p(o_t|s_t)\p(s_t|s_{t-1},a_{t-1})/\q(s_t|o_{\leq t},a_{<t})} \\
+&\geq\E[\bigg]{\q(s_{1:T}|o_{1:T},a_{1:T})}{\sum_{t=1}^T \ln\p(o_t|s_t)+\ln\p(s_t|s_{t-1},a_{t-1})-\ln\q(s_t|o_{\leq t},a_{<t})} \\
+&=\sum_{t=1}^T \Big(
+  \describe{\Ebelow{\q(s_t|o_{\leq t},a_{<t})}{\ln\p(o_t|s_t)}}{reconstruction}
+  -\describe{\Ebelow[\big]{\q(s_{t-1|o_{\leq t-1},a_{<a-1}})}{\KL{\q(s_t|o_{\leq t},a_{<t})}{\p(s_t|s_{t-1},a_{t-1})}}}{complexity} \Big).
+\end{aligned}
+\label{eq:elbo_deriv}
+\end{equation}%
+
+\paragraph{Multi-step predictive distribution}
+
+The variational bound on the $d$-step predictive distribution $\pr[p_d](o_{1:T},s_{1:T}|a_{1:T})=\prod_t\p(s_t|s_{t-d},a_{t-1})\p(o_t|s_t)$ and a variational posterior $\q(s_{1:T}|o_{1:T},a_{1:T})=\prod_t\q(s_t|o_{\leq t},a_{<t})$ follows analogously. The second bound comes from moving the log inside the multi-step priors, which satisfy the recursion $\p(s_t|s_{t-d},a_{t-d-1:t-1})=\E{\p(s_{t-1}|s_{t-d},a_{t-d-1:t-2})}{\p(s_t|s_{t-1},a_{t-1})}$.
+\begin{equation}
+\begin{aligned}
+\ln\pr[p_d](o_{1:T}|a_{1:T})
+&\triangleq\ln\E[\bigg]{\pr[p_d](s_{1:T}|a_{1:T})}{\prod_{t=1}^T\p(o_t|s_t)} \\
+&=\ln\E[\bigg]{\q(s_{1:T}|o_{1:T},a_{1:T})}{\prod_{t=1}^T \p(o_t|s_t)\p(s_t|s_{t-d},a_{t-d-1:t-1})/\q(s_t|o_{\leq t},a_{<t})} \\
+&\geq\E[\bigg]{\q(s_{1:T}|o_{1:T},a_{1:T})}{\sum_{t=1}^T \ln\p(o_t|s_t)+\ln\p(s_t|s_{t-d},a_{t-d-1:t-1})-\ln\q(s_t|o_{\leq t},a_{<t})} \\
+&\geq\E[\bigg]{\q(s_{1:T}|o_{1:T},a_{1:T})}{\sum_{t=1}^T \ln\p(o_t|s_t)+\Ebelow{\p(s_{t-1}|s_{t-d},a_{t-d-1:t-2})}{\ln\p(s_t|s_{t-1},a_{t-1})}-\ln\q(s_t|o_{\leq t},a_{<t})} \\
+&=\sum_{t=1}^T \Big(
+  \describe{\E{\q(s_t|o_{\leq t},a_{<t})}{\ln\p(o_t|s_t)}}{reconstruction}
+  -\describe{\Ebelow[\big]{\p(s_{t-1}|s_{t-d},a_{t-d-1:t-2})\q(s_{t-d}|o_{\leq t-d},a_{<t-d})}{\KL{\q(s_t|o_{\leq t},a_{<t})}{\p(s_t|s_{t-1},a_{t-1})}}}{multi-step prediction} \Big).
+\end{aligned}
+\label{eq:dstep_deriv}
+\end{equation}%
+Since all expectations are on the outside of the objective, we can easily obtain an unbiased estimator of this bound by changing expectations to sample averages.
+
+\paragraph{Relation between one-step and multi-step predictive distributions}
+
+We conjecture that the multi-step predictive distribution $\pr[p_d](o_{1:T})$ lower bounds the one-step predictive distribution $\p(o_{1:T})$ of the same latent sequence model model in expectation over the data set. Since the latent state sequence is Markovian, for $d\geq 1$ we have the data processing inequality
+\begin{gather}
+\begin{aligned}
+\MI{s_t;s_{t-d}} &\leq \MI{s_t;s_{t-1}} \\
+\H{s_t}-\H{s_t|s_{t-d}} &\leq \H{s_t}-\H{s_t|s_{t-1}} \\
+\E{}{\ln\p(s_t|s_{t-d})} &\leq \E{}{\ln\p(s_t|s_{t-1})} \\
+\E{}{\ln\pr[p_d](o_{1:T})} &\leq \E{}{\ln\p(o_{1:T})}.
+\end{aligned}
+\label{eq:dataproc_deriv}
+\end{gather}
+Therefore, any bound on the multi-step predictive distribution, including \cref{eq:dstep_deriv} and \cref{eq:latov}, is also a bound on the one-step predictive distribution.
+
+\clearpage
+\section{Additional Related Work}
+\label{sec:more_related_work}
+
+\paragraph{Planning in state space}
+
+When low-dimensional states of the environment are available to the agent, it is possible to learn the dynamics directly in state space. In the regime of control tasks with only a few state variables, such as the cart pole and mountain car tasks, PILCO \citep{deisenroth2011pilco} achieves remarkable sample efficiency using Gaussian processes to model the dynamics. Similar approaches using neural networks dynamics models can solve two-link balancing problems \citep{gal2016deeppilco,higuera2018synthesizing} and implement planning via gradients \citep{henaff2018planbybackprop}. \citet{chua2018pets} use ensembles of neural networks, scaling up to the cheetah running task. The limitation of these methods is that they access the low-dimensional Markovian state of the underlying system and sometimes the reward function. \citet{amos2018awareness} train a deterministic model using overshooting in observation space for active exploration with a robotics hand. We move beyond low-dimensional state representations and use a latent dynamics model to solve control tasks from images.
+
+\paragraph{Hybrid agents}
+
+The challenges of model-based RL have motivated the research community to develop hybrid agents that accelerate policy learning by training on imagined experience \citep{kalweit2017blending,nagabandi2017mbmf,kurutach2018modeltrpo,buckman2018steve,ha2018worldmodels}, improving feature representations \citep{wayne2018merlin,igl2018dvrl}, or leveraging the information content of the model directly \citep{weber2017i2a}. \citet{srinivas2018upn} learn a policy network with integrated planning computation using reinforcement learning and without prediction loss, yet require expert demonstrations for training.
+
+\paragraph{Multi-step predictions}
+
+Training sequence models on multi-step predictions has been explored for several years. Scheduled sampling \citep{bengio2015scheduled} changes the rollout distance of the sequence model over the course of training. Hallucinated replay \citep{talvitie2014hallucinated} mixes predictions into the data set to indirectly train multi-step predictions. \citet{venkatraman2015dad} take an imitation learning approach. Recently, \citet{amos2018awareness} train a dynamics model on all multi-step predictions at once. We generalize this idea to latent sequence models trained via variational inference.
+
+\paragraph{Latent sequence models}
+
+Classic work has explored models for non-Markovian observation sequences, including recurrent neural networks (RNNs) with deterministic hidden state and probabilistic state-space models (SSMs). The ideas behind variational autoencoders \citep{kingma2013vae,rezende2014vae} have enabled non-linear SSMs that are trained via variational inference \citep{krishnan2015deepkalman}. The VRNN \citep{chung2015vrnn} combines RNNs and SSMs and is trained via variational inference. In contrast to our RSSM, it feeds generated observations back into the model which makes forward predictions expensive. \citet{karl2016dvbf} address mode collapse to a single future by restricting the transition function, \citep{moerland2017learning} focus on multi-modal transitions, and \citet{doerr2018prssm} stabilize training of purely stochastic models. \citet{buesing2018dssm} propose a model similar to ours but use in a hybrid agent instead for explicit planning.
+
+\paragraph{Video prediction}
+
+Video prediction is an active area of research in deep learning. \citet{oh2015atari} and \citet{chiappa2017recurrent} achieve visually plausible predictions on Atari games using deterministic models. \citet{kalchbrenner2016vpn} introduce an autoregressive video prediction model using gated CNNs and LSTMs. Recent approaches introduce stochasticity to the model to capture multiple futures \citep{babaeizadeh2017sv2p,denton2018stochastic}. To obtain realistic predictions, \citet{mathieu2015deep} and \citet{vondrick2016generating} use adversarial losses. In simulated environments, \citet{gemici2017temporalmemory} augment dynamics models with an external memory to remember long-time contexts. \citet{van2017vq} propose a variational model that avoids sampling using a nearest neighbor look-up, yielding high fidelity image predictions. These models are complimentary to our approach.
+
+\clearpage
+\section{Video Predictions}
+\label{sec:prediction}
+\input{figures/prediction/figure}
+
+\clearpage
+\section{State Diagnostics}
+
+\input{figures/diagnostics/figure}
+
+\clearpage
+\section{Planning Parameters}
+
+\input{figures/mpc/figure}

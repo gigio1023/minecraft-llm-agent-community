@@ -1,0 +1,149 @@
+% =========================
+% Scenario Walkthroughs
+% =========================
+\Needspace{6\baselineskip}
+\section{Scenario Walkthroughs of \systemname{}}
+\label{sec:scenario-walkthroughs}
+
+\noindent
+These walkthroughs show how the system is intended to behave when the framework and model work well together. They illustrate plan previews, brief clarifying questions, in-game execution through Mineflayer, and outcome judgment by the validator. The walkthroughs are meant to be illustrative, not evaluative; empirical results, including failures, are reported in Section~\ref{sec:evaluation}.
+
+% ------------------------------------------------------------
+% Scenario 1
+% ------------------------------------------------------------
+
+\vspace{-2.5mm}
+
+\subsection{S1: Bookmark a landmark, then fetch a tool}
+
+\noindent
+\textbf{Memory write.}
+During casual exploration, the player types:
+\emph{“remember this as \texttt{weapon\_storage}.”}
+The utterance is routed as \texttt{memory\_update} (Fig.~\ref{fig:user-intent}) and stored as a named landmark with coordinates and provenance \textit{told}. The interface remains legible throughout. Primary play stays in the main window, while a small companion camera indicates the agent’s current view (Fig.~\ref{fig:ui-appx}).
+
+\noindent
+\textbf{Request and plan preview.}
+Later, at a mine entrance, the player issues:
+\emph{“get me a \texttt{pick\_axe}.”}
+The router classifies this as \texttt{task(request)}, after which the planner compiles a short plan and renders a one-line preview (Fig.~\ref{fig:planner}):
+\emph{go to \texttt{weapon\_storage} $\rightarrow$ select a pickaxe $\rightarrow$ return}.
+The active subtask exposes its parameters and defaults for inspection (Fig.~\ref{fig:planner}\panel{c}).
+
+\noindent
+\textbf{Single clarification.}
+When multiple pickaxes satisfy the request, the planner asks exactly one targeted question (Fig.~\ref{fig:user-intent}):
+\emph{“Which pickaxe, iron or diamond?”}
+The response is applied immediately to the active subtask and persisted as a scoped preference with provenance \textit{told}.
+
+\noindent
+\textbf{Execution and judgment.}
+Mineflayer code is generated, reviewed, and executed with capped retries (Fig.~\ref{fig:code-review}). Completion is judged using bounded in-world evidence, including state deltas, nearby entities or blocks, and a short window of recent chat (Fig.~\ref{fig:taskfeedback}). On success, the plan advances. Otherwise, a bounded repair prompt allows the player to choose how to proceed.
+
+\noindent\textit{Logged.}
+Routing and plan-build latency; clarification issued and answered; memory reads and writes; code-generation and review iterations; execution time; validator decision and rationale.
+
+% ------------------------------------------------------------
+% Scenario 2
+% ------------------------------------------------------------
+\vspace{-2.5mm}
+\subsection{S2: Collect 20 oak logs}
+
+\noindent
+\textbf{Request and defaults.}
+The player requests:
+\emph{“collect 20 oak logs.”}
+The planner previews a compact plan in chat (Fig.~\ref{fig:planner}):
+\emph{locate trees $\rightarrow$ move to nearest tree $\rightarrow$ harvest to \texttt{count=20} $\rightarrow$ return}.
+With no relevant prior context, the first subtask adopts a conservative default \texttt{search\_radius} of 100 (Fig.~\ref{fig:planner}\panel{c}).
+
+\noindent
+\textbf{Contextual update.}
+Before acting, the planner asks a single contextual question (Fig.~\ref{fig:context-qn}\panel{a}):
+\emph{“Are there known oak trees nearby?”}
+The reply,
+\emph{“within 10 blocks,”}
+updates the active plan in place (\texttt{search\_radius} \(100 \rightarrow 10\)) and is written as a scoped preference for future oak-tree searches (Fig.~\ref{fig:context-qn}\panel{b}).
+
+\noindent
+\textbf{Execution and judgment.}
+Generated code reflects the updated parameter and emits legible progress updates during execution (Fig.~\ref{fig:code-review}). A lightweight review flags robustness issues before dispatch. The evaluator produces a structured \texttt{TaskFeedback} record from bounded evidence (Fig.~\ref{fig:taskfeedback}). On success, execution proceeds to the next subtask. On failure or low confidence, the player selects a bounded repair such as retrying with an adjusted parameter, backtracking, or revising the goal.
+
+\noindent\textit{Logged.}
+We record plan preview latency, whether a clarification was issued and answered, exact plan deltas, distance to first harvest, time to completion, memory preference writes, and the validator’s decision and rationale.
+
+\noindent
+Together, these scenarios capture the benchmark’s intended interaction loop: \emph{preview} a short plan, \emph{bind} missing slots with a single targeted question, \emph{execute} within Mineflayer’s envelope, and \emph{judge} outcomes from bounded in-world evidence, while keeping the human explicitly in the loop for recovery when execution does not go as planned.
+
+
+
+% % =========================
+% % Scenario Walkthroughs (target behavior under success)
+% % =========================
+% % \clearpage
+% \Needspace{6\baselineskip}
+% \section{Scenario Walkthroughs of \systemname{}}
+
+% \label{sec:scenario-walkthroughs}
+
+% \noindent
+% These walkthroughs illustrate \emph{target behavior} when the evaluation framework and the model align: brief plan previews, single-turn slot binding, Mineflayer-bounded execution, and validator-backed judging. They are \emph{illustrative, not additional results}; our empirical snapshot, including failures, appears in Section~\ref{sec:evaluation}.
+
+% % ------------------------------------------------------------
+% % Scenario 1: Landmark + tool fetch (memory + ambiguity resolution)
+% % ------------------------------------------------------------
+% \subsection{S1 - Bookmark a landmark, then fetch a tool under ambiguity}
+
+% \noindent
+% \textbf{Setup and memory write.}
+% During casual exploration the player spots a convenient chest and types:
+% \emph{“remember this as \texttt{weapon\_storage}.”}
+% The input is routed as \texttt{memory\_update} (see Fig.~\ref{fig:user-intent}) and stored as a named landmark with coordinates and provenance \textit{told}. The UI remains legible: primary play stays in the main window, while the small companion camera indicates what the agent “sees” (Fig.~\ref{fig:ui}).
+
+% \noindent
+% \textbf{Task request and plan preview.}
+% Minutes later, at a mine entrance, the player issues:
+% \emph{“get me a \texttt{pick\_axe}.”}
+% The router classifies this as \texttt{task(request)}; the planner compiles a short plan and renders a one-line preview (Fig.~\ref{fig:planner}): \emph{go to \texttt{weapon\_storage} $\rightarrow$ select a pickaxe $\rightarrow$ return to player}. The subtask record exposes parameters and defaults (Fig.~\ref{fig:planner}\panel{c}).
+
+% \noindent
+% \textbf{Resolving ambiguity with one question.}
+% If multiple pickaxes are valid, the planner asks exactly one targeted question (Fig.~\ref{fig:user-intent}):
+% \emph{“Which pickaxe—iron or diamond?”}
+% The player answers \emph{“diamond.”} The framework immediately applies the answer to the active subtask and persists it as a scoped preference with provenance \textit{told}.
+
+% \noindent
+% \textbf{Execution and validator.}
+% Code is generated against Mineflayer APIs and reviewed (Fig.~\ref{fig:code-review}); retries are capped. On approval, execution proceeds and the evaluator later judges completion from bounded evidence: inventory/equipment and position deltas, nearby entities/blocks, and recent chat (Fig.~\ref{fig:taskfeedback}). Success advances the plan; otherwise a bounded repair prompt is surfaced for the player to choose the next step.
+
+% \noindent\textit{What the harness records.}
+% Routing and plan-build latencies; whether a clarification was issued/answered; memory read/write events (landmark bind, preference write); code-gen/review iterations; execution time; validator decision and rationale.
+
+% % ------------------------------------------------------------
+% % Scenario 2: Mixed-initiative gathering with slot binding + reuse
+% % ------------------------------------------------------------
+% \subsection{S2 - Collect 20 oak logs with clarifying question}
+
+% \noindent
+% \textbf{Task request and defaults.}
+% The player requests:
+% \emph{“collect 20 oak logs.”}
+% The planner produces a compact plan and previews it in chat (Fig.~\ref{fig:planner}): \emph{locate oak trees $\rightarrow$ move to nearest tree $\rightarrow$ harvest until \texttt{count=20} $\rightarrow$ return}. With no prior context, the first subtask adopts a conservative default \texttt{search\_radius} of 100 (visible in the subtask record, Fig.~\ref{fig:planner}\panel{c}).
+
+% \noindent
+% \textbf{One contextual question, immediate plan delta.}
+% Before acting, the planner issues a single, contextual question (Fig.~\ref{fig:context-qn}\panel{a}):
+% \emph{“Are there known oak trees nearby?”}
+% The player replies:
+% \emph{“within 10 blocks.”}
+% The active plan is updated in place (\texttt{search\_radius} \(100 \rightarrow 10\)) and the answer is persisted as a scoped preference for future oak-tree searches (Fig.~\ref{fig:context-qn}\panel{b}).
+
+% \noindent
+% \textbf{Execution, review, and judging.}
+% Code generation reflects the updated parameter (\texttt{searchRadius = 10}) and emits legible progress updates (Fig.~\ref{fig:code-review}\panel{a}); a lightweight review flags robustness issues before dispatch (Fig.~\ref{fig:code-review}\panel{b}). The evaluator then consumes bounded evidence—chat window and pre/post state diffs—to produce a \texttt{TaskFeedback} record with a pass/fail and short rationale (Fig.~\ref{fig:taskfeedback}). On success the harness proceeds to the next subtask; on failure or low confidence, it offers a bounded repair and lets the player choose whether to retry with an adjusted parameter, backtrack, or issue a revised goal.
+
+% \noindent\textit{What the harness records.}
+% Plan preview latency; whether a clarifying question was issued/answered; exact plan delta (\texttt{search\_radius: 100 $\rightarrow$ 10}); distance to first harvest; time-to-completion; memory preference write; and the validator’s decision and rationale.
+
+% \noindent
+% Together, these scenarios depict the target interaction loop under the benchmark: \emph{preview} a short plan, \emph{bind} missing slots with a single question, \emph{execute} within Mineflayer’s envelope, and \emph{judge} from bounded, in-world evidence while keeping the human in the loop for recovery when things do not go as planned.

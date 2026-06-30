@@ -1,0 +1,58 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{g+gu}{@@ \PYGZhy{}60,19 +60,55 @@ class MLPDenoiser(nn.Module):}
+\PYG{+w}{ }        self.input\PYGZus{}mlp1 = SinusoidalEmbedding(embedding\PYGZus{}dim, scale=25.0)
+\PYG{+w}{ }        self.input\PYGZus{}mlp2 = SinusoidalEmbedding(embedding\PYGZus{}dim, scale=25.0)
+\PYG{+w}{ }
+\PYG{g+gd}{\PYGZhy{}        self.network = nn.Sequential(}
+\PYG{g+gi}{+        self.global\PYGZus{}network = nn.Sequential(}
+\PYG{+w}{ }            nn.Linear(embedding\PYGZus{}dim * 3, hidden\PYGZus{}dim),
+\PYG{+w}{ }            *[ResidualBlock(hidden\PYGZus{}dim) for \PYGZus{} in range(hidden\PYGZus{}layers)],
+\PYG{+w}{ }            nn.ReLU(),
+\PYG{+w}{ }            nn.Linear(hidden\PYGZus{}dim, 2),
+\PYG{+w}{ }        )
+\PYG{+w}{ }
+\PYG{g+gi}{+        self.local\PYGZus{}network = nn.Sequential(}
+\PYG{g+gi}{+            nn.Linear(embedding\PYGZus{}dim * 3, hidden\PYGZus{}dim),}
+\PYG{g+gi}{+            *[ResidualBlock(hidden\PYGZus{}dim) for \PYGZus{} in range(hidden\PYGZus{}layers)],}
+\PYG{g+gi}{+            nn.ReLU(),}
+\PYG{g+gi}{+            nn.Linear(hidden\PYGZus{}dim, 2),}
+\PYG{g+gi}{+        )}
+\PYG{g+gi}{+}
+\PYG{g+gi}{+        self.upscale = nn.Linear(2, 4)}
+\PYG{g+gi}{+        self.downscale = nn.Linear(2, 2)}
+\PYG{g+gi}{+}
+\PYG{g+gi}{+        \PYGZsh{} Modify the weight network to have an additional hidden layer and use LeakyReLU}
+\PYG{g+gi}{+        self.weight\PYGZus{}network = nn.Sequential(}
+\PYG{g+gi}{+            nn.Linear(embedding\PYGZus{}dim, hidden\PYGZus{}dim),}
+\PYG{g+gi}{+            nn.LeakyReLU(0.2),}
+\PYG{g+gi}{+            nn.Linear(hidden\PYGZus{}dim, hidden\PYGZus{}dim // 2),}
+\PYG{g+gi}{+            nn.LeakyReLU(0.2),}
+\PYG{g+gi}{+            nn.Linear(hidden\PYGZus{}dim // 2, 2),}
+\PYG{g+gi}{+            nn.Softmax(dim=\PYGZhy{}1)  \PYGZsh{} Ensure weights sum to 1}
+\PYG{g+gi}{+        )}
+\PYG{g+gi}{+}
+\PYG{+w}{ }    def forward(self, x, t):
+\PYG{+w}{ }        x1\PYGZus{}emb = self.input\PYGZus{}mlp1(x[:, 0])
+\PYG{+w}{ }        x2\PYGZus{}emb = self.input\PYGZus{}mlp2(x[:, 1])
+\PYG{+w}{ }        t\PYGZus{}emb = self.time\PYGZus{}mlp(t)
+\PYG{g+gd}{\PYGZhy{}        emb = torch.cat([x1\PYGZus{}emb, x2\PYGZus{}emb, t\PYGZus{}emb], dim=\PYGZhy{}1)}
+\PYG{g+gd}{\PYGZhy{}        return self.network(emb)}
+\PYG{g+gi}{+        global\PYGZus{}emb = torch.cat([x1\PYGZus{}emb, x2\PYGZus{}emb, t\PYGZus{}emb], dim=\PYGZhy{}1)}
+\PYG{g+gi}{+}
+\PYG{g+gi}{+        \PYGZsh{} Global branch}
+\PYG{g+gi}{+        global\PYGZus{}output = self.global\PYGZus{}network(global\PYGZus{}emb)}
+\PYG{g+gi}{+}
+\PYG{g+gi}{+        \PYGZsh{} Local branch with upscaling}
+\PYG{g+gi}{+        x\PYGZus{}upscaled = self.upscale(x)}
+\PYG{g+gi}{+        x1\PYGZus{}upscaled\PYGZus{}emb = self.input\PYGZus{}mlp1(x\PYGZus{}upscaled[:, 0])}
+\PYG{g+gi}{+        x2\PYGZus{}upscaled\PYGZus{}emb = self.input\PYGZus{}mlp2(x\PYGZus{}upscaled[:, 1])}
+\PYG{g+gi}{+        local\PYGZus{}emb = torch.cat([x1\PYGZus{}upscaled\PYGZus{}emb, x2\PYGZus{}upscaled\PYGZus{}emb, t\PYGZus{}emb], dim=\PYGZhy{}1)}
+\PYG{g+gi}{+        local\PYGZus{}output = self.local\PYGZus{}network(local\PYGZus{}emb)}
+\PYG{g+gi}{+}
+\PYG{g+gi}{+        \PYGZsh{} Calculate dynamic weights based on timestep}
+\PYG{g+gi}{+        weights = self.weight\PYGZus{}network(t\PYGZus{}emb)}
+\PYG{g+gi}{+}
+\PYG{g+gi}{+        \PYGZsh{} Combine global and local outputs with learnable weighting}
+\PYG{g+gi}{+        output = weights[:, 0].unsqueeze(1) * global\PYGZus{}output + weights[:, 1].unsqueeze(1) * local\PYGZus{}output}
+\PYG{g+gi}{+        return output, weights}
+\end{Verbatim}

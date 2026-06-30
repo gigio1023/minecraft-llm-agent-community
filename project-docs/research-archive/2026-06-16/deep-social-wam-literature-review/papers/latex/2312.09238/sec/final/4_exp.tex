@@ -1,0 +1,188 @@
+\section{Experiment}
+\label{sec:exp}
+
+\subsection{Environment Setup}
+We mainly use the harvest mode in the MineDojo~\cite{fan2022minedojo} environment to verify the model's ability to play Minecraft. 
+The training pseudo code of Auto MC-Reward is shown in Algorithm~\ref{alg:pseudo}. 
+We set up the following challenging tasks for model performance comparison and ablation study:
+
+\begin{itemize}
+    \item \textbf{Exploring diamond ore \includegraphics[width=0.02\textwidth]{figs/icon/diamond_ore.png} on the 11-th floor underground}: Initially, the agent~\includegraphics[width=0.02\textwidth]{figs/icon/steve2.jpg}  is equipped with an iron pickaxe on the 11-th floor underground. When the diamond ore is within the visible range and the distance is less than 2 distance units, the task is deemed completed. The difficulty of the task lies in the fact that diamonds are very rare, lava frequently appears during exploration, leading to death, and the maximum number of steps is limited to 60,000. When steps exceed the limit, the trajectory is considered failed. Long-term exploration can demonstrate the advantages of dense rewards.
+    \item \textbf{Approaching tree \includegraphics[width=0.02\textwidth]{figs/icon/oak_log.png} in plains biome \includegraphics[width=0.018\textwidth]{figs/icon/plains.png}}: The task is considered successful if the tree is within the agent's~\includegraphics[width=0.02\textwidth]{figs/icon/steve2.jpg} visible range and the distance is less than 1 distance unit. The difficulty of the task lies in the fact that the trees are very sparse on plains, which is extremely detrimental to sparse reward functions. The maximum number of steps is limited to 2,000 steps.
+    \item \textbf{Approaching specific animal (\emph{e.g.} cow \includegraphics[width=0.02\textwidth]{figs/icon/cow.jpg}, sheep \includegraphics[width=0.02\textwidth]{figs/icon/sheep.jpg}) in plains biome \includegraphics[width=0.018\textwidth]{figs/icon/plains.png}}: The task is considered successful if the animal is within the agent's~\includegraphics[width=0.02\textwidth]{figs/icon/steve2.jpg} visible range and the distance is less than 2 distance unit. The difficulty of the task is that the animals are constantly moving. The maximum number of steps is limited to 2,000 steps.
+    \item \textbf{Obtaining diamond \includegraphics[width=0.023\textwidth]{figs/icon/diamond.png}}: The agent~\includegraphics[width=0.02\textwidth]{figs/icon/steve2.jpg} needs to complete the whole process of mining diamonds, including key behaviors such as finding and obtaining materials on the surface, crafting, digging down, going back to the ground, and mining stone/iron ore/diamond ore. The tech tree is shown in Figure~\ref{fig:mine_diamond}.
+\end{itemize}
+
+
+\subsection{Implementation Details}
+\label{sec:imple_detail}
+\noindent\textbf{LLM Prompt.} The components of the input prompts for Trajectory Analyzer include task description, game information, statistical metrics, and information on failed trajectories. Components of the input prompts for Reward Designer and Reward Critic includes task description, game information, input parameters, and reward function requirements and format. We use GPT-4~\cite{openai2023gpt} for all the LLM components, and set temperature to 0.3. Since the LLMs are only used once for each whole agent training instead of each action, their computation overhead is negligible.
+
+\begin{itemize}
+    \item \textbf{Instruction}: Instructions on initializing, updating and handling execution error of reward function for Reward Designer, reviewing function for Reward Critic, and analyzing trajectory for Trajectory Analyzer.
+    \item \textbf{Task description}: The objective, initial conditions, success criteria, and task flow. For example, for the explore diamond task, the objective is ``to find and approach a diamond, achieving a high success rate while avoiding death.'' The initial condition is ``agent at y level 11 with an iron pickaxe.'' The success criteria is ``being less than 1 meter from the nearest diamond block'', and the task flow is ``horizontally explore to find a diamond, face it, and approach it''. In the task description, we do not provide prior game strategy information (task challenges, DFS exploration strategies, or avoiding lava, etc.) to ensure the method's versatility.
+    \item \textbf{Game information}: Game version, block names, field of view, action space, and units of measurement. Game information provides knowledge about the game's simulation environment, not game strategy.
+    \item \textbf{Statistical metrics and information on failed trajectories}: success rates, and actions sequences, reward sequences, final inventory and nearby blocks of $K=10$ failed trajectories. If a trajectory exceeds $L=32$ steps, it is truncated to the last 32 steps.
+     \item \textbf{Input parameters}: The nearest distance of each block type within the visible range in the current and previous steps, changes in inventory between adjacent steps, health points, and the agent's location in each past step. The memory is also provided as an input parameter for storing information to monitor changes across different steps. We provide explanation and examples of the parameters in the input prompt.
+     \item \textbf{Reward function requirements and format}: We require the Designer to write a dense function and a sparse function, and consider only the sign of the two functions' return values, not the magnitude. The detail of the scale constraints is in Section~\ref{sec:designer}.
+\end{itemize}
+
+\begin{figure}[!tb]
+    \centering
+    \includegraphics[width=0.48\textwidth]{figs/lava_cow_v2.png}
+    \caption{The trajectories of the new behaviors. (a) Avoid lava \includegraphics[width=0.015\textwidth]{figs/icon/lava.png} when exploring for diamond ore \includegraphics[width=0.015\textwidth]{figs/icon/diamond_ore.png}. (b) Attack cow \includegraphics[width=0.015\textwidth]{figs/icon/cow.jpg} in plains.}
+    \label{fig:lava_cow}
+    \vspace{-10pt}
+\end{figure}
+
+\begin{table*}[tb!]
+    \centering
+    \caption{Comparison with other reward methods on three Minecraft tasks. Max steps for exploring tree \includegraphics[width=0.018\textwidth]{figs/icon/oak_log.png} and cow \includegraphics[width=0.018\textwidth]{figs/icon/cow.jpg} are set to 2000. $^{\dag}$Sparse reward receives a low death rate because it is often stuck in the same place or move in a small area without encountering lava \includegraphics[width=0.015\textwidth]{figs/icon/lava.png}.}
+    \vspace{-0.5em}
+    \fontsize{8.0pt}{10.0pt}\selectfont
+    \setlength{\tabcolsep}{1.5mm} 
+    \setlength{\abovecaptionskip}{2mm} 
+        \renewcommand\arraystretch{1.2}
+    \resizebox{0.98\textwidth}{!}{
+        \begin{tabular}{cc|cccc|cc|cc}
+         \toprule
+        \multirow{2}{*}{\textbf{Method}} &\multirow{2}{*}{\textbf{Reward}} & \multicolumn{4}{c|}{\textbf{Explore Diamond Ore~\includegraphics[width=0.018\textwidth]{figs/icon/diamond_ore.png} Underground}} & \multicolumn{2}{c|}{\textbf{Approach Tree~\includegraphics[width=0.018\textwidth]{figs/icon/oak_log.png} on Plains}} & \multicolumn{2}{c}{\textbf{Approach Cow~\includegraphics[width=0.018\textwidth]{figs/icon/cow.jpg} on Plains}} \\ 
+        \cline{3-10}
+        & & avg. dist. $\uparrow$ & death (\%) $\downarrow$ & lava escape (\%) $\uparrow$ & succ. (\%) $\uparrow$ & avg. step $\downarrow$ & succ. (\%) $\uparrow$ & avg. step $\downarrow$ & succ. (\%) $\uparrow$  \\ \hline
+         \textbf{Naive Handcraft} & - & 85.7 & 74.3 & 1.5 & 18.6 & 1993 & 2.1 & 1956 & 10.8 \\
+         \textbf{Imitation Learning} & - & 102.2 & 55.6 & 46.8 & 38.9 & 1988 & 2.5 & 1772 & 22.4 \\
+         \textbf{RL} & Sparse & 16.8 & 1.5$^{\dag}$ & 0 & 0.5 & 1936 & 4.3 & 1854 & 12.6 \\
+         \textbf{RL} & Dense (Curiosity) & 102.6 & 55.1 & 46.0 & 39.3& 1672 & 45.8& 1477 & 13.7 \\
+         \textbf{RL} & Dense (Self-Imitation) & 104.0 & 54.8 & 47.2 & 39.7 & 1532 & 42.5 & 1280 & 23.5 \\
+         \textbf{RL} & Dense (MineCLIP) & 105.9 & 54.0 & 47.8 & 40.5 & 1022 & 65.6 & 1206 & 44.9 \\
+         \textbf{Ours} & Dense (LLM) & \textbf{142.8} & \textbf{45.2} & \textbf{70.0} & \textbf{45.2} & \textbf{972} & \textbf{73.4} & \textbf{1134} & \textbf{56.3} \\
+         \bottomrule
+\end{tabular}}
+    \label{table:ablation_il_rl}
+    \vspace{-8pt}
+\end{table*}
+
+\begin{table}[!tb]
+\caption{Comparison with previous methods on success rates of obtaining diamond \includegraphics[width=0.018\textwidth]{figs/icon/diamond.png}. We list observations that are used in the inference phase. Auto MC-Reward achieves a remarkable success rate without exploiting unfair information (\emph{i.e.} Lidar and Voxel) during inference.}
+\vspace{-0.5em}
+
+\centering
+\resizebox{0.45\textwidth}{!}{
+
+\begin{tabular}{@{}cll|c@{}}
+\toprule
+\textbf{Method} & \textbf{Controller} & \textbf{Observation} & \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}\textbf{Diamond}\\ \textbf{Succ. (\%)}\end{tabular}} \\ 
+\midrule
+Human~\cite{baker2022video} & - & - & 50.0 \\ \midrule
+DreamerV3~\cite{hafner2023mastering} & RL & RGB, Status & 0.01 \\
+DEPS~\cite{wang2023describe} & IL & RGB, Status, Voxel & 0.6 \\
+VPT~\cite{baker2022video} & IL + RL & RGB & 20.0 \\
+GITM~\cite{zhu2023ghost} & Handcraft & Lidar, Voxel, Status & 55.0 \\
+Ours & IL (GITM-guided) & RGB, GPS & 28.8 \\
+Ours & IL + RL & RGB, GPS & 36.5 \\
+\bottomrule
+\end{tabular} }
+\label{tab:comparison}
+\end{table}
+
+\begin{table}[t]
+    \centering
+    \caption{Ablations on Reward Critic and Trajectory Analyzer for explore diamond ore \includegraphics[width=0.015\textwidth]{figs/icon/diamond_ore.png} task. The first row corresponds to using the sparse reward from the original environment. $^{\dag}$Sparse reward receives a low death rate because it is often stuck in the same place or move in a small area without encountering lava \includegraphics[width=0.015\textwidth]{figs/icon/lava.png}.}
+    \vspace{-0.5em}
+    \fontsize{8.5pt}{12.0pt}\selectfont
+    \setlength{\tabcolsep}{1.8mm}
+    \setlength{\abovecaptionskip}{2.3mm}
+    \renewcommand\arraystretch{1}
+    \resizebox{0.48\textwidth}{!}{
+        \begin{tabular}{c c c | c c c c}
+        \toprule
+        \textbf{Designer} &
+        \textbf{Critic} & \textbf{Analyzer} & \textbf{Avg. Dist. $\uparrow$} & \textbf{Death $\downarrow$} & \textbf{Lava Esc. $\uparrow$} & \textbf{Succ. $\uparrow$} \\ \hline
+        % - & - & 102.2 & 55.6 & 46.8 & 38.9 \\
+         & & & 16.8 & 1.5$^{\dag}$ & 0 & 0.5 \\
+        $\checkmark$ & & & 75.8 & 58.2 & 30.4 & 35.1 \\
+        $\checkmark$ & $\checkmark$ & & 95.2 & 49.3 & 40.7 & 40.5 \\
+        $\checkmark$ & & $\checkmark$ & 130.6 & 47.8 & 64.8 & 43.1 \\
+        $\checkmark$ & $\checkmark$ & $\checkmark$ & \textbf{142.8} & \textbf{45.2} & \textbf{70.0} & \textbf{45.2} \\
+        \bottomrule
+    \end{tabular}}
+    \label{table:critic_analyzer}
+    \vspace{-10pt}
+\end{table}
+
+
+
+\noindent\textbf{Imitation Learning Details.}\label{sec:il}
+When large labeled datasets do not exist, the canonical strategy for training capable agents is RL, which is inefficient and expensive to sample for hard-exploration problems~\cite{berner2019dota,jaderberg2019human,baker2022video}, 
+\emph{e.g.} mining diamond in Minecraft. Therefore, in order to more efficiently explore the effectiveness of the LLM-based reward function design mechanism proposed in this paper, we pre-trained some foundation models through imitation learning as done by VPT~\cite{baker2022video}. Specifically, we use GITM~\cite{zhu2023ghost} to continuously perform Diamond Mining task and record important observation data of each frame, such as RGB, action, inventory, GPS, compass, structured actions, etc. In the end, we collect about 11 million image data, totaling about 153 hours (the control frequency is 20 Hz) of game videos. Subsequently, we train these data through fully supervised learning by using Impala CNN~\cite{espeholt2018impala} and Transformer~\cite{vaswani2017attention} as backbone, and obtained several foundation models. The main differences between the foundation models are different biomes (forest and plains), temporal frames (16 and 128), and whether goal embedding is used. 
+In subsequent experiments, these foundation models were used in two different purposes:
+\begin{itemize}
+    \item Give the RL model preliminary basic Minecraft gameplay capabilities, \emph{e.g.} forward/back, turn left/right, attack, etc. For some tasks that have not been learned (\emph{e.g.} approaching cows in Figure~\ref{fig:lava_cow}(b)) or not learned well (\emph{e.g.} avoid lava in Figure~\ref{fig:lava_cow}(a), explore tree on plains) in imitation learning, 
+    RL algorithms can be studied more efficiently. 
+    \item In the Diamond Mining task, the diamond collection success rate, lava escape rate, death rate, etc. between the RL model and the imitation learning model are compared to demonstrate the superiority of the proposed method.
+\end{itemize}
+
+\noindent\textbf{RL Training Details.}
+We use proximal policy optimization (PPO) algorithm~\cite{schulman2017proximal} with generalized advantage estimation (GAE)~\cite{schulman2015high} to train our RL model. We use $\gamma=0.99$ and $\lambda=0.95$ for all of our experiments, and the total training frames is 256,000.
+To prevent catastrophically forgetting or overly aggressive policy update during RL training, we follow VPT~\cite{baker2022video} to apply an auxiliary Kullback-Leibler (KL) divergence loss between the RL model and the frozen pre-trained policy. We also normalize the reward based on the trajectory returns to constrain the gradient scales of different tasks. See Appendix for details. 
+
+\subsection{Main Results}
+
+\noindent\textbf{Baselines.} We compare our Auto MC-Reward against the following methods:
+
+\begin{itemize}
+    \item\textbf{Naive Handcraft}: The agent keeps moving (and mining for diamond exploring task) in one direction with a small probability of turning left/right.
+    \item\textbf{Imitation Learning}: Our foundation model pre-trained with GITM-generated data, as introduced in Section~\ref{sec:imple_detail}.
+    \item\textbf{RL with Sparse Reward}: Use only the reward from the original environment, \emph{i.e.} only receives a reward when the success criteria is completed.
+    \item\textbf{RL with Curiosity Dense Reward}~\cite{pathak2017curiosity}: Encourage the agent to discover and learn about parts of the environment that it has not encountered before.
+    \item\textbf{RL with Self-Imitation Dense Reward}~\cite{oh2018self}: Encourage the agent to replicate its past actions that led to high rewards.
+    \item\textbf{RL with MineCLIP~\cite{fan2022minedojo} Dense Reward}: Use MineCLIP to calculate the dense reward based on the similarity between RGB frames and task objectives.
+\end{itemize}
+
+\noindent\textbf{Results on Diamond Ore \includegraphics[width=0.02\textwidth]{figs/icon/diamond_ore.png} Exploring Task.}
+For the plain imitation learning model, fitting the training data makes it lack the awareness of avoiding lava, so it often dies in lava during the search for diamonds, and only has 38.9\% success rate under the limit of 60,000 steps, as shown in Table~\ref{table:ablation_il_rl}. In contrast, our Auto MC-Reward makes the agent realize the importance of avoiding lava by continuously improving the dense reward function, and the final success rate has increased to 45.2\% with 70\% lava escape success rate. Figure~\ref{fig:lava_cow}(a) demonstrates good awareness of avoiding lava. Based on the same reinforcement learning algorithm, the disadvantages of sparse reward functions in long-horizon tasks are undoubtedly revealed. By watching the videos of collected trajectories, we find that using sparse functions often leads to irreversible behavior, such as being unable to break the surrounding ores to move due to maintaining a head-up posture. Although a low death rate of 1.5\% is achieved, the actual average moving distance is only 16.8, and the success rate is only 0.5\%. Due to the similar scenes underground, MineCLIP cannot give differentiated rewards, so its performance is close to the initial imitation learning model. Other baselines, like curiosity and self-imitation dense reward, also have mediocre performance and the success rate has not been significantly improved. 
+
+\noindent\textbf{Results on Tree \includegraphics[width=0.02\textwidth]{figs/icon/oak_log.png} Approaching Task.}
+Since trees are extremely sparse on the plain, the imitation learning model and the RL model with sparse reward cannot perform well, with only 2.5\% and 4.3\% success rates respectively, and their average action steps are close to the maximum limit.
+MineCLIP dense reward receives a success rate of 65.6\% since it can provide positive reward when tree is visible. Curiosity and self-imitation methods also achieve better results than imitation learning.
+For Auto MC-Reward, Reward Designer uses a strategy of giving positive rewards for getting closer and deducting rewards for going away, so that the agent learns to slowly approach the target, ultimately achieving 73.4\% success rate with only 972 average steps.
+
+\begin{figure}[!tb]
+    \centering
+    \includegraphics[width=0.42\textwidth]{figs/mine_diamond.png}
+    \vspace{-2mm}
+    \caption{The tech tree of obtaining diamond. The green squares are tasks to be optimized with Auto MC-Reward, \emph{i.e.} obtaining log \includegraphics[width=0.015\textwidth]{figs/icon/oak_log.png}, cobblestone \includegraphics[width=0.015\textwidth]{figs/icon/cobblestone.png}, iron ore \includegraphics[width=0.015\textwidth]{figs/icon/iron_ore.png} and diamond \includegraphics[width=0.018\textwidth]{figs/icon/diamond.png}.}
+    \vspace{-15pt}
+    \label{fig:mine_diamond}
+    
+\end{figure}
+
+\noindent\textbf{Results on Cow \includegraphics[width=0.02\textwidth]{figs/icon/cow.jpg} Approaching Task.}
+The task of exploring for cows does not appear in the training data of imitation learning, so the zero-shot ability on this task is not ideal, with about 22.4\% success rate and average steps close to the maximum limit. By checking the videos, we find most of the successful cases are due to good luck without intention to actively approach the target. The same experimental conclusion is also obtained in the experiment of sparse reward function.
+Similar to the Tree Approaching Task, the superior dense reward function design mechanism makes our agent 43.7\% (56.3\% vs. 12.6\%) higher than sparse reward, as listed in Table~\ref{table:ablation_il_rl}. Another dense reward MineCLIP also shows strong performance in this task, but due to the need to calculate the similarity of images and texts at all times during training, the efficiency is unacceptable.
+
+\noindent\textbf{Results on Obtaining Diamond \includegraphics[width=0.023\textwidth]{figs/icon/diamond.png}.}
+We verify the proposed method on a more difficult task, that is, the tech tree of collecting diamonds, as shown in Figure~\ref{fig:mine_diamond}. As mentioned before, our foundation imitation learning model already has a certain ability from birth to diamond mining. We use the proposed method to optimize several key tasks in the process to increase the success rate of final diamond acquisition. The green parts in Figure~\ref{fig:mine_diamond} are the tasks that need to be optimized, \emph{i.e.} obtaining log, cobblestone, iron ore and diamond. We conduct experiments in two biomes in Minecraft, and the cumulative success rate is shown in Figure~\ref{fig:linechart}. Specifically, the lower death rate allows our agent to have a higher success rate in mining iron ore and diamond, and ultimately achieves 36.5\% success rate on forest biome, which is 7.7\% higher than the imitation learning model. As for plains, the difficulty of obtaining log makes the imitation learning model unable to complete any tasks. Auto MC-Reward overcomes the difficulty of obtaining log, thus achieving a 28.1\% success rate in obtaining diamonds.
+Table~\ref{tab:comparison} provides a rough comparison of several different methods on the task of mining diamonds. We achieve a high success rate without exploiting unfair information (\emph{i.e.} Lidar and Voxel) during the inference phase.
+
+\subsection{Ablation studies}
+
+\noindent\textbf{Effectiveness of Reward Designer.}
+The first row of Table~\ref{table:critic_analyzer} is an RL experiment with a sparse reward function. As mentioned before, it cannot explore diamonds normally. After adding Reward Designer, it regained the ability to explore under a dense reward function.
+
+\begin{figure}[!tb]
+    \centering
+    \includegraphics[width=0.46\textwidth]{figs/linechart.png}
+    \caption{Cumulative success rates for 4 key items of obtaining diamond on forest \includegraphics[width=0.015\textwidth]{figs/icon/forest.png} and plains \includegraphics[width=0.015\textwidth]{figs/icon/plains.png}. In terms of diamond, the performance comparison between imitation learning and Auto MC-Reward in two biomes are: 28.8\% vs. 36.5\%, and 0\% vs. 28.1\%.}
+    \label{fig:linechart}
+    \vspace{-10pt}
+\end{figure}
+
+\noindent\textbf{Effectiveness of Reward Critic.}
+As listed in Table~\ref{table:critic_analyzer}, the success rate of exploring diamonds has increased from 35.1\% to 40.5\% by adding Reward Critic, because it can reduce the syntax and semantic errors in the code,
+making the training process more effective and sufficient.
+For example, the Trajectory Analyzer concludes that the agent died in lava and asks the Reward Designer to add relevant penalties. However, without being checked by Critic for semantic errors, it is possible that the added code snippet uses the word ``magma'' instead of the correct one ``lava''. This will result in insufficient learning of lava avoidance, which is reflected in a 2.1\% (43.1\% vs. 45.2\%) success rate difference.
+
+\noindent\textbf{Effectiveness of Trajectory Analyzer.}
+As observed in Table~\ref{table:critic_analyzer}, Trajectory Analyzer is the key to improve the success rate of completing tasks. It summarizes the reasons for failure to be fed into Reward Designer, allowing it to iteratively modify an appropriate dense reward function to guide the agent to overcome difficulties. In terms of Diamond Exploring Task, Trajectory Analyzer provides timely feedback on the potential risks of lava, which greatly improves the survival rate and moving distance, ultimately improving the success rate from 40.5\% to 45.2\%.
+

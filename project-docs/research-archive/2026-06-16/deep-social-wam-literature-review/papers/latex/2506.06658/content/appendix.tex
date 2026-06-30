@@ -1,0 +1,492 @@
+\setcounter{figure}{0}
+\renewcommand{\thefigure}{A\arabic{figure}}
+\renewcommand{\thetable}{A\arabic{table}}
+
+\section{Tasks and Text Prompts}
+Below we list the tasks and associated text prompts used for evaluating SILVR.  Tasks with demonstrations seen during training of the in-domain model are denoted with an asterisk.
+
+\begin{table}[h]
+\centering
+\small
+
+\setlength{\tabcolsep}{4.8pt}
+\scalebox{0.8}{
+
+\begin{tabular}{@{}lll@{}}
+\toprule
+Task             & In-Domain Model Prompts                         & Internet-Domain Model Prompts                                                         \\ \midrule
+Coffee Button$^*$     & coffee button                         &  a robot arm pressing the coffee machine button                               \\
+Door Open$^*$     & door open                         & a robot arm reaching a door handle and pulling it to open the door                                                                    \\
+Drawer Open$^*$     & drawer open                         & a robot arm opening a drawer by pulling its white handle backward                                                                      \\
+Peg Unplug Side$^*$     & peg unplug side                         & a robot arm unplugging a peg by pulling it from the right to the left                                                                     \\
+Plate Slide Side$^*$       & plate slide side                           & a robot arm sliding a plate from the left into the net on the right side                                                             \\ 
+Push$^*$      & push                          & a robot arm pushing an object forward to a green sphere                                       \\
+Reach$^*$     & reach & a robot arm reaching a red sphere \\
+Sweep$^*$    & sweep & a robot arm moving an object to the left side of the table \\
+Door Close       & door close                           & a robot arm pushing a door to close it                                                                 \\
+Window Close     & window close                         & a robot arm closing a window by pulling its handle from the left to the right                                                                      \\
+Window Open      & window open                          & a robot arm opening a window by pushing its handle from the right to the left                                                                      \\
+Drawer Close     & drawer close                         & a robot arm closing a drawer by pushing its white handle forward                                                                      \\
+Faucet Close     & faucet close                         & a robot arm pulling a faucet counterclockwise                                                                      \\
+Faucet Open      & faucet open                          & a robot arm pushing a faucet clockwise                                                                      \\
+Handle Press     & handle press                         & a robot arm pressing down a handle                                                                      \\
+Handle Press Side     & handle press side                & a robot arm pressing down a handle on the side                                                                      \\
+Dial Turn     & dial turn                          & a robot arm turning a dial counterclockwise                                                                      \\
+Plate Slide     & plate slide                          & a robot arm sliding a plate forward into the net                                                                      \\
+Reach Wall     & reach wall                          & a robot arm reaching toward a red sphere over a wall                                                                      \\
+Button Press Wall    & button press wall                         & a robot arm reaching over a wall to press a button                                                                      \\ \midrule
+Push Red Cup$^*$     & red                         & a robot arm pushing the red cup                                                                      \\
+Push Blue Cup$^*$     & blue                         & a robot arm pushing the blue cup                                                                      \\
+Push Green Cup$^*$     & green                         & a robot arm pushing the green cup                                                                      \\
+Push Pink Cup$^*$     & pink                         & a robot arm pushing the pink cup                                                                      \\
+Push Orange Cup     & orange                         & a robot arm pushing the orange cup                                                                      \\
+Push Purple Cup     & purple                         & a robot arm pushing the purple cup       \\
+\midrule
+Open Red Drawer$^*$     & red                         & a robot arm opening the red drawer                                                                      \\
+Open Green Drawer$^*$     & green                         & a robot arm opening the green drawer                                                                      \\
+Open Blue Drawer$^*$     & blue                         & a robot arm opening the blue drawer                                                                     \\
+Open Yellow Drawer     & yellow                         & a robot arm opening the yellow drawer
+\\\bottomrule
+\end{tabular}
+}
+\vspace{1em}
+\caption{\textbf{Task-Prompt Pairs.} We include a comprehensive list of tasks and their text prompts for in-domain training and evaluation. ``$*$'' denotes tasks seen during initial training of the in-domain model.  We also provide the prompts used to interface with the internet-pretrained text-to-video model during adaptation with IPA.}
+\label{table:text_prompts}
+\end{table}
+
+\section{Implementation Details}
+\label{sec:implement_appendix}
+We provide detailed architecture configurations of the models used in SILVR, and their relevant hyperparameter settings below.
+
+\textbf{MLP Inverse Dynamics Model:} Following prior work~\citep{luo2025solving}, we design one choice of inverse dynamics model as a small MLP network built on top of a pretrained pixel-based representation network.  The MLP-IDM takes as input the embeddings of two video frames, which are extracted using VC-1~\citep{majumdar2023vc1}, and outputs a prediction of the action that enables the transition between the provided frames.
+
+For the Panda arm experiments, the MLP-IDM is tasked with predicting the end effector position of the last frame provided.  This is then executed in the physical environment through inverse kinematics.  Furthermore, the two video frames have a frameskip of 16; the frequency at which the camera is queried for trajectories is so high such that two temporally consecutive frames is not more substantially meaningful than just observing the last frame.  For MetaWorld experiments, the two video frames are consecutive, and thus have a frameskip of 1.
+
+The total parameter count of the MLP-IDM used in real-world experimentation is 85.81M. Of these, 85.80M parameters are inherited from VC-1 whereas our MLP-IDM design contributes only an additional 10759 parameters due to the additional MLP on top.
+
+In our real-world experiments, we reuse the same MLP-IDM for all tasks within the same environments, and do not perform any finetuning during the SILVR iterations with subsequently self-collected data.  In such a way, the MLP-IDM is trained on a set of seen tasks, but applied to a novel task without further modification.  The subsequent success on such novel tasks therefore highlights not only the robustness of the MLP-IDM learned, but also the visual quality of the synthesized visual plans. The detailed hyperparameters of MLP-IDM training are provided in Table~\ref{table:inv_dyn_hparams}.
+
+\begin{table}[ht]
+\centering
+\small
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+Hyperparameter    & Value \\ \midrule
+Input Dimension  & 1536      \\
+Output Dimension (Panda) & 7      \\
+Training Epochs  & 20      \\
+Learning Rate    & 1e-5      \\
+Optimizer        & AdamW     \\ \bottomrule
+\end{tabular}
+
+\vspace{1em}
+\caption{\textbf{Hyperparameters of MLP Inverse Dynamics Model Training.}  We list the relevant hyperparameters of training the MLP inverse dynamics model.}
+\label{table:inv_dyn_hparams}
+\end{table}
+
+\textbf{Diffusion Inverse Dynamics Model (DIDM):} Whereas the MLP-IDM does continue to facilitate self-improvement for MetaWorld experiments through SILVR, we find that the most performant implementation for our simulated experiments was a Diffusion Inverse Dynamics Model (DIDM).  The DIDM is built off the UNet implementation of a Diffusion Policy~\citep{chi2023diffusionpolicy}; it is modified to take in not only the current frame but also a frame 9 timesteps into the future and outputs an action chunks of size 8.  We further implement the DIDM to operate directly in StableDiffusion latent space, where each frame is of dimension (64,64,4), rather than RGB space of (512,512,3) for further speed efficiency.  The DIDM is initially trained on the 8 seen-task set (with 25 initial demonstrations per task) for 200 epochs, with a learning rate of 1e-4, and a batch size of 128.  At each SILVR iteration on MetaWorld, the DIDM is further finetuned on the 30 collected demonstrations for 30 epochs, reusing a lr of 1e-4, and with a batch size of 30.
+
+\begin{table}[ht]
+\centering
+\small
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+Hyperparameter    & Value \\ \midrule
+Input Dimension  & 32768      \\
+Output Dimension (MetaWorld) & 4      \\
+Training Epochs  & 200      \\
+Learning Rate    & 1e-4      \\
+Optimizer        & AdamW     \\ \bottomrule
+\end{tabular}
+
+\vspace{1em}
+\caption{\textbf{Hyperparameters of Diffusion Inverse Dynamics Model Training.}  We list the relevant hyperparameters of training the diffusion inverse dynamics model.}
+\label{table:diff_dyn_hparams}
+\end{table}
+
+
+\textbf{In-Domain Model:} We reuse the implementation of a small-scale diffusion model that conditions on both natural language and an initial pixel frame from~\citep{ko2024avdc}.  To improve text-conditioned capabilities of the model, we add an additional Cross-Attention layer to every level of the U-Net, which attends to the CLIP-encoded text prompt. Specifically, we instantiate UNet with 3 ResNet blocks for MetaWorld settings and 2 ResNet blocks for Panda arm tasks. We report the detailed list of model parameters in Table~\ref{table:avdc_params}. In total, the in-domain model consists of 179.91M parameters for MetaWorld and 156.58M parameters for Real-World experiments. We perform initial in-domain training for 70K training steps on MetaWorld and 88K steps on Panda, with a batch size of 8 and a learning rate of 2e-5. In each SILVR iteration, we finetune the in-domain video model for 10K steps with with a batch size of 4 and a learning rate of 1e-6 on MetaWorld. On Panda Arm, we finetune for 8,000 steps with a batch size of 8 and a learning rate of 2e-5 on Cup Pushing and for 10,000 steps with a batch size of 8 and a learning rate of 1e-5 on Drawer Opening. All experiments are performed on a single NVIDIA A6000 or RTX3090 GPU.
+
+\begin{table}[ht]
+\centering
+\setlength{\tabcolsep}{4.8pt}
+\scalebox{0.9}{
+\begin{tabular}{@{}ll@{}}
+\toprule
+Component   & \# Parameters (Millions) \\
+\midrule
+U-Net (MetaWorld) & 116.71 \\
+U-Net (Panda Arm) & 93.38 \\
+Text Encoder (\texttt{openai/clip-vit-base-patch32}) & 63.2 \\
+\bottomrule
+\end{tabular}
+}
+
+\vspace{1em}
+\caption{\textbf{In-Domain Model Components.} SILVR relies on a small in-domain text-to-video model, which we base our implementation off of prior work~\citep{ko2024avdc}.  We list the size of the components of the model architecture used.}
+\label{table:avdc_params}
+\end{table}
+
+\textbf{Internet-Domain Model:} Following Adapt2Act~\citep{luo2025solving}, we employ AnimateDiff~\citep{guo2023animatediff} as the frozen internet-pretrained video model for inverse probabilistic adaptation. Additionally, we use SparseCtrl~\citep{Guo2024ECCV_SparseCtrl_Adding_Sparse} to enable image-conditioned video generation. Model components and their parameter counts are listed in Table~\ref{table:animatediff_params}. In total, AnimateDiff consists of 2.005B parameters.
+
+\begin{table}[ht]
+\centering
+\setlength{\tabcolsep}{4.8pt}
+\scalebox{0.9}{
+\begin{tabular}{@{}ll@{}}
+\toprule
+Component   & \# Parameters (Millions) \\
+\midrule
+VAE (Encoder) & 34.16 \\
+VAE (Decoder) & 49.49 \\
+U-Net & 1302.16 \\%865.91 \\
+Text Encoder & 123.06 \\
+ControlNet & 496.73 \\
+\bottomrule
+\end{tabular}
+}
+
+\vspace{1em}
+\caption{\textbf{AnimateDiff Components.} IPA relies on a internet-scale text-to-video model; in this work we use AnimateDiff.  We thus list the size of components of the AnimateDiff checkpoint used.  The checkpoint is used purely for inference, and is not modified or updated in any way. Note that the VAE Decoder is not utilized in our framework.}
+\label{table:animatediff_params}
+\end{table}
+
+\textbf{Visual Planning Hyperparameters:} In visual planning, we predict 8 future frames conditioned on the current observation and task prompt. We follow~\citep{luo2025solving} to perform DDIM~\citep{song2021ddim} sampling for 25 steps to synthesize visual plans, in which the text-conditioning guidance scale is set to 2.5 for MetaWorld experiments and 7.0 for Panda Arm Pushing. We use 0.5 as the prior strength for inverse probabilistic adaptation.
+
+\textbf{Choices of Control Loop:} Visual planning provides the user control over the quality of execution against the speed. In our experiments, each visual plan consists of 9 frames, including one current observation and eight future frames, and can be translated into 8 actions. By performing open-loop control, we execute all 8 actions from a single visual plan sequentially in the environment without any re-planning. While synthesizing a visual plan can often involve multiple sampling steps and thus be time-consuming, open-loop control greatly improves the interaction efficiency. However, since open-loop control does not adjust the control actions based on the feedback from the environment, the subsequent actions from the plan might become suboptimal to the latest states and cause error accumulation. To mitigate this issue, closed-loop control adjusts the action for every interaction step. Specifically, we execute only the first action from the plan, and perform re-planning based on the new observation received from the environment. Although this control style allows us to interact most reliably, it incurs a large computational overhead due to frequent re-planning. To balance the execution quality and efficiency, we can flexibly choose a control loop between the two extremes of open-loop and closed-loop. For example, we execute half of the plan (e.g. 4 actions) before re-planning, which we reference as semi-open-loop control.
+
+To achieve the best execution speed, we employ open-loop control in Panda Arm Pushing and Drawer Opening tasks, in which we discover that visual plans can be performed decently, with negligible deviation in the real execution. For all MetaWorld experiments, we utilize semi-open-loop control to balance performance and efficiency.
+
+
+\textbf{Behavior Cloning Improvement Loop}: A Diffusion Policy is initially trained on the same data as used in SILVR for 150 epochs with learning rate 1e-4 and batch size 64. For each iteration, we deploy the diffusion policy to interact with the environment and collect 30 task demonstrations. The policy will then be fine-tuned on the successful data filtered by ground-truth task success signals for 50 epochs with batch size 30 and learning rate 1e-4. 
+
+\textbf{SILVR-Distilled Diffusion Policy}: After applying SILVR, we optionally distill the visual planning components into a diffusion policy.  This has the benefit of lightweight, fast inference for final deployment, while still leveraging the self-improving benefits of visual models during the training process, thus balancing both worlds.  The architecture of the DP is consistent with that used in the DSRL and BCIL experiments.  During distillation, the visual planner teacher model first collects 120 demonstrations from the environment.  Then, a DP is trained for 300 epochs with a batch size of 64 and a learning rate of 1e-4 on only these 120 demonstrations collected by the teacher.
+
+In essence, SILVR can be thought of as composed of two systems.  The slower system is the video planner approach, where the advantage appears in greater autonomous improvement capabilities.  The faster system is the distilled diffusion policy, which although has weaker self-improvement, can capture the current performance of the slower system and be deployed with fast inference.
+
+\textbf{DSRL Implementation}: We utilize the open-source implementation of DSRL~\citep{wagenmaker2025steering} for our experiments.  We maintain the vast majority of parameters from the default setting, but make sure to collect 30 demonstrations for each iteration as in SILVR. When optimizing over the collected experience, we utilize a comparable amount of gradient steps with the amount found in the default settings of DSRL; we use a batch size of 256 with 60000 gradient steps per update.  We find that given the same amount of experience and a sufficiently large update budget, DSRL is unable to match the iterative performance improvements of SILVR.  This highlights the sample inefficiency of reinforcement learning, which may need extra experience to successfully bootstrap a value function for the novel task of interest.
+
+We performed a light ablation, comparing a roughly equivalent amount of gradient updates with SILVR (150 gradient steps per update) against the amount of updates used across multiple standard robotic tasks provided by the DSRL publicly available codebase, and found no significant difference in improvement trend.  This suggests that the bottleneck for self-improvement through DSRL is not update computation, but experience collection; on the other hand, SILVR demonstrates significantly better sample efficiency for iterative self-improvement.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Iteration & 0           & 1           & 2           & 3           & 4           \\ \midrule
+DSRL (150 Updates)   & 10.1 (±0.1)  & 8.9 (±0.6)   & 8.6 (±1.0)   & 9.4 (±0.1)   & 8.3 (±0.2)   \\
+DSRL (60000 Updates) & 9.4 (±1.7)   & 8.3 (±1.6)   & 7.4 (±0.9)   & 7.5 (±3.4)   & 7.7 (±3.4)   \\ \bottomrule
+\end{tabular}
+\caption[]{\textbf{DSRL Performance Ablation over Different Update Rates.} We report mean success rate and standard deviation across three iterations for DSRL with different numbers of updates per iteration. We show that the bottleneck for DSRL is not gradient updates, but collected experience.}
+\label{table:dsrl_update_comparison}
+\end{table}
+
+\vspace{-1em}
+\section{MetaWorld Task Performance Decomposition}
+
+\begin{table}[h!]
+\centering
+\setlength{\tabcolsep}{4.8pt}
+\scalebox{0.58}{
+\begin{tabular}{@{}lllllllllll@{}}
+\toprule
+Iteration         & 0                            & 1                             & 2                             & 3                             & 4                             & 5                             & 6                             & 7                             & 8                             & 9                             \\ \midrule
+Button Press Wall & 0.0 ($\pm$0.0)  & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   \\
+Dial Turn         & 4.4 ($\pm$1.9)  & 25.6 ($\pm$22.7) & 17.8 ($\pm$15.8) & 23.3 ($\pm$20.8) & 24.4 ($\pm$19.0) & 25.6 ($\pm$22.2) & 28.9 ($\pm$25.9) & 36.7 ($\pm$31.8) & 36.7 ($\pm$32.8) & 34.4 ($\pm$30.2) \\
+Door Close        & 35.6 ($\pm$6.9) & 57.8 ($\pm$26.9) & 58.9 ($\pm$25.2) & 74.4 ($\pm$15.8) & 72.2 ($\pm$18.4) & 80.0 ($\pm$13.3) & 81.1 ($\pm$11.7) & 83.3 ($\pm$8.8)  & 78.9 ($\pm$12.6) & 85.6 ($\pm$5.1)  \\
+Drawer Close      & 1.1 ($\pm$1.9)  & 11.1 ($\pm$7.7)  & 20.0 ($\pm$6.7)  & 21.1 ($\pm$6.9)  & 20.0 ($\pm$12.0) & 31.1 ($\pm$10.7) & 27.8 ($\pm$10.7) & 27.8 ($\pm$13.5) & 28.9 ($\pm$19.0) & 31.1 ($\pm$13.5) \\
+Faucet Close      & 17.8 ($\pm$6.9) & 27.8 ($\pm$25.2) & 41.1 ($\pm$20.1) & 50.0 ($\pm$24.0) & 66.7 ($\pm$26.5) & 67.8 ($\pm$13.9) & 73.3 ($\pm$16.7) & 80.0 ($\pm$13.3) & 73.3 ($\pm$17.3) & 77.8 ($\pm$3.8)  \\
+Faucet Open       & 6.7 ($\pm$6.7)  & 24.4 ($\pm$18.4) & 37.8 ($\pm$6.9)  & 57.8 ($\pm$6.9)  & 60.0 ($\pm$8.8)  & 82.2 ($\pm$1.9)  & 78.9 ($\pm$10.2) & 80.0 ($\pm$10.0) & 71.1 ($\pm$11.7) & 77.8 ($\pm$10.2) \\
+Handle Press      & 35.6 ($\pm$7.7) & 41.1 ($\pm$10.2) & 40.0 ($\pm$3.3)  & 56.7 ($\pm$8.8)  & 58.9 ($\pm$13.5) & 56.7 ($\pm$3.3)  & 63.3 ($\pm$5.8)  & 70.0 ($\pm$5.8)  & 72.2 ($\pm$9.6)  & 67.8 ($\pm$5.1)  \\
+Handle PressSide  & 18.9 ($\pm$5.1) & 31.1 ($\pm$12.6) & 48.9 ($\pm$19.0) & 72.2 ($\pm$13.5) & 60.0 ($\pm$8.8)  & 70.0 ($\pm$14.5) & 75.6 ($\pm$8.4)  & 66.7 ($\pm$6.7)  & 68.9 ($\pm$18.4) & 65.6 ($\pm$11.7) \\
+Plate Slide       & 17.8 ($\pm$5.1) & 26.7 ($\pm$16.7) & 33.3 ($\pm$17.3) & 47.8 ($\pm$15.8) & 52.2 ($\pm$11.7) & 70.0 ($\pm$5.8)  & 60.0 ($\pm$5.8)  & 62.2 ($\pm$18.4) & 71.1 ($\pm$15.0) & 66.7 ($\pm$12.0) \\
+Reach Wall        & 10.0 ($\pm$5.8) & 32.2 ($\pm$1.9)  & 22.2 ($\pm$9.6)  & 30.0 ($\pm$6.7)  & 27.8 ($\pm$5.1)  & 35.6 ($\pm$13.9) & 26.7 ($\pm$3.3)  & 24.4 ($\pm$8.4)  & 26.7 ($\pm$12.0) & 30.0 ($\pm$3.3)  \\
+Window Close      & 3.3 ($\pm$3.3)  & 10.0 ($\pm$0.0)  & 25.6 ($\pm$36.0) & 14.4 ($\pm$13.5) & 16.7 ($\pm$15.3) & 20.0 ($\pm$15.3) & 21.1 ($\pm$13.5) & 20.0 ($\pm$12.0) & 34.4 ($\pm$13.5) & 25.6 ($\pm$8.4)  \\
+Window Open       & 25.6 ($\pm$5.1) & 44.4 ($\pm$18.4) & 56.7 ($\pm$11.5) & 74.4 ($\pm$1.9)  & 71.1 ($\pm$13.5) & 74.4 ($\pm$7.7)  & 81.1 ($\pm$11.7) & 73.3 ($\pm$8.8)  & 72.2 ($\pm$15.0) & 74.4 ($\pm$3.8)  \\ \midrule
+AVG               & 14.7 ($\pm$0.6) & 27.7 ($\pm$1.9)  & 33.5 ($\pm$2.2)  & 43.5 ($\pm$2.6)  & 44.2 ($\pm$4.5)  & 51.1 ($\pm$4.0)  & 51.5 ($\pm$3.0)  & 52.0 ($\pm$5.0)  & 52.9 ($\pm$5.2)  & 53.1 ($\pm$3.8)  \\ \bottomrule
+\end{tabular}
+}
+\vspace{1em}
+\caption[]{\textbf{MetaWorld Task Performance.} We provide a detailed list of task performance for the leftmost plot in Figure~\ref{fig:silvr_iter10}. We report the mean success rate and standard deviation aggregated over $3$ seeds each, across 10 iterations.  We reiterate that none of these 12 tasks had been seen a priori during initial in-domain video model training.}
+\label{table:silvr_expert_task_perf_decomposition}
+\end{table}
+
+\section{Generalization Capabilities between Visual Planning and Action-Predictive BC}
+
+Our results suggest that visual planning has some default generalization and self-improvement benefits for decision-making compared to using direct action-prediction BC policies.  We hypothesize that modeling consistent visual motions can extract more training signal from the provided data than modeling action sequences directly, as there is more supervisory training signal from pixels than low-dimensional actions.  Indeed, as shown in the MetaWorld portion of Figure~\ref{fig:franka_sail_visual_plans_comparison_all_tasks}, for initial iteration 0 on a novel task concerning an unseen object, the visual planner still manages to generate coherent motions for the robot arm even if it blurs out the specific novel object interaction. These coherent motions, even if the specific object interaction is not modeled correctly (or even blurred) initially, can still be accurately translated by the IDM into meaningful robot actions; thus visual planning may have additional generalization benefits. On the other hand, the basic BC policy does not model visual details but predicts a sequence of actions entirely from the conditioning frame; having overfit to its training set, when faced with a novel object in the scene it may predict highly suboptimal actions, thus leading to poorer generalization.
+
+
+
+
+\section{Full MetaWorld Suboptimal Results}
+
+As mentioned in Section~\ref{sec:suboptimal_sail}, we evaluate SILVR on 12 unseen MetaWorld tasks with suboptimal initial in-domain data. We provide a detailed task performance breakdown in  Figure~\ref{fig:silvr_suboptimal_task_perf_decomposition} and Table~\ref{table:silvr_suboptimal_detailed_task_perf}. We observe that most tasks, as well as average performance, exhibit an improving trend overall across iterations, demonstrating the robustness of SILVR to initial data quality.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/mw_sail_expert_vs_suboptimal_with_average_all.pdf}
+    \caption{\textbf{SILVR Curves with suboptimal in-domain data.} For each task, we plot the mean success rate across 5 iterations, aggregated over $3$ seeds.}
+    \label{fig:silvr_suboptimal_task_perf_decomposition}
+\end{figure}
+
+
+
+
+
+
+\begin{table}[ht]
+\centering
+\setlength{\tabcolsep}{4.8pt}
+\scalebox{0.9}{
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Iteration         & 0           & 1            & 2            & 3            & 4            \\ \midrule
+Button Press Wall & 2.2 ($\pm$1.9)  & 2.2 ($\pm$3.8)   & 11.1 ($\pm$10.2) & 36.7 ($\pm$32.1) & 23.3 ($\pm$20.8) \\
+Dial Turn         & 2.2 ($\pm$1.9)  & 15.6 ($\pm$12.6) & 31.1 ($\pm$13.5) & 28.9 ($\pm$23.4) & 35.6 ($\pm$11.7) \\
+Door Close        & 5.6 ($\pm$3.8)  & 75.6 ($\pm$18.4) & 70.0 ($\pm$8.8)  & 88.9 ($\pm$7.7)  & 90.0 ($\pm$3.3)  \\
+Drawer Close      & 14.4 ($\pm$6.9) & 40.0 ($\pm$21.9) & 46.7 ($\pm$20.3) & 57.8 ($\pm$29.1) & 64.4 ($\pm$28.3) \\
+Faucet Close      & 0.0 ($\pm$0.0)  & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 1.1 ($\pm$1.9)   \\
+Faucet Open       & 0.0 ($\pm$0.0)  & 1.1 ($\pm$1.9)   & 1.1 ($\pm$1.9)   & 7.8 ($\pm$8.4)   & 15.6 ($\pm$16.8) \\
+Handle Press      & 33.3 ($\pm$5.8) & 34.4 ($\pm$6.9)  & 62.2 ($\pm$15.0) & 75.6 ($\pm$13.9) & 63.3 ($\pm$21.9) \\
+Handle Press Side & 24.4 ($\pm$1.9) & 45.6 ($\pm$9.6)  & 57.8 ($\pm$10.2) & 75.6 ($\pm$20.4) & 76.7 ($\pm$5.8)  \\
+Plate Slide       & 0.0 ($\pm$0.0)  & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 0.0 ($\pm$0.0)   & 2.2 ($\pm$1.9)   \\
+Reach Wall        & 25.6 ($\pm$5.1) & 32.2 ($\pm$6.9)  & 28.9 ($\pm$7.7)  & 50.0 ($\pm$6.7)  & 52.2 ($\pm$6.9)  \\
+Window Close      & 2.2 ($\pm$1.9)  & 4.4 ($\pm$1.9)   & 22.2 ($\pm$12.6) & 24.4 ($\pm$21.7) & 30.0 ($\pm$23.3) \\
+Window Open       & 4.4 ($\pm$1.9)  & 11.1 ($\pm$6.9)  & 16.7 ($\pm$12.0) & 12.2 ($\pm$6.9)  & 37.8 ($\pm$22.7) \\ \midrule
+AVG               & 9.5 ($\pm$0.3)  & 21.9 ($\pm$0.9)  & 29.0 ($\pm$2.3)  & 38.1 ($\pm$4.9)  & 41.0 ($\pm$4.4)  \\ \bottomrule
+\end{tabular}
+}
+\vspace{1em}
+\caption[]{\textbf{SILVR Performance with Suboptimal Initial Data.} For each task, we report the mean success rate and standard deviation aggregated over $3$ seeds, across 5 iterations.}
+\label{table:silvr_suboptimal_detailed_task_perf}
+\end{table}
+
+Additionally, we provide BCIL and DSRL performance with suboptimal in-domain data in Table~\ref{table:baseline_suboptimal_results}. Surprisingly, we observe that BCIL benefits more from suboptimal initialization. We hypothesize that the exploration brought by initial random actions is crucial for bootstrapping the Diffusion Policy performance in BCIL.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Iteration & 0          & 1           & 2           & 3           & 4           \\ \midrule
+DSRL      & 7.4 (±3.8) & 7.1 (±0.6)  & 8.6 (±1.3)  & 7.8 (±1.0)  & 8.1 (±0.8)  \\
+BCIL      & 8.1 (±1.0) & 21.6 (±0.9) & 29.1 (±2.3) & 37.2 (±6.1) & 39.6 (±5.3) \\ \bottomrule
+\end{tabular}
+\caption[]{\textbf{Baseline Performance with Suboptimal Initial Data.} We report the mean success rate and standard deviation across 12 unseen tasks, aggregated over $3$ seeds each.}
+\label{table:baseline_suboptimal_results}
+\end{table}
+
+
+
+
+
+
+
+\section{MetaWorld Component Ablations}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Iteration & 0          & 1           & 2           & 3           & 4           \\ \midrule
+Finetuning All (SILVR)      & 14.7 (±0.6) & 27.7 (±1.9)  & 33.5 (±2.2)  & 43.5 (±2.6)  & 44.2 (±4.5)  \\
+No IDM Finetuning      & 14.1 (±1.6) & 22.2 (±3.1) & 24.6 (±2.5) & 24.8 (±1.7) & 26.8 (±1.9) \\
+Only IDM Finetuning      & 15.0 (±1.8) & 24.4 (±3.2) & 27.7 (±3.5) & 26.9 (±4.1) & 29.8 (±3.4) \\ \bottomrule
+\end{tabular}
+\caption[]{\textbf{Component Update Ablations.} We report the mean success rate and standard deviation across 12 unseen tasks, aggregated over $3$ seeds each.}
+\label{table:component_ablation_results}
+\end{table}
+
+We investigate the importance of finetuning different visual planning components with respect to online experience on final task performance in the MetaWorld suite.  We find that in contrast with the real-world experiments, keeping the IDM frozen for the MetaWorld suite struggles to adjust to novel objects and motions, resulting in modest performance gains even when the video model improves.  Similarly, we have found that when the IDM is finetuned but the video model is not, there are indeed some performance gains most likely from better translation of the base generalization ability of the video model; but performance also saturates quickly.  Thus, under situations with heavy novelty such as across objects and motions, updating both components with respect to online experience is critical. Meanwhile, in real-world experiments, we observed that the initially trained IDMs are inherently robust to novel tasks, in which many motions learned from seen tasks can be reused, and can be utilized directly to great effect without additional finetuning.
+
+
+
+\newpage
+\section{Additional Plan Visualizations}
+We show additional visual plans for SILVR, across multiple environments and tasks, along with their execution results.
+\label{sec:additional_qualitative_visuals}
+
+\subsection{SILVR with Ground-Truth Filtering}
+Visual plans and their executions for SILVR with Ground-Truth filtering are illustrated below.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/drawer_close_iter0_2.pdf}
+    \caption{\textbf{SILVR on Drawer Close with Ground-Truth filtering.}}
+    \label{fig:drawer_close_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/window_close_iter0_2.pdf}
+    \caption{\textbf{SILVR on Window Close with Ground-Truth filtering.} }
+    \label{fig:window_close_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/rpo_iter0_2.pdf}
+    \caption{\textbf{SILVR on Orange Cup Pushing (Red/Pink/Orange) with Ground-Truth filtering.}}
+    \label{fig:rpo_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/rgo_iter0_2.pdf}
+    \caption{\textbf{SILVR on Orange Cup Pushing (Red/Green/Orange) with Ground-Truth filtering.}}
+    \label{fig:rgo_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/bpp_iter0_2.pdf}
+    \caption{\textbf{SILVR on Purple Cup Pushing (Blue/Pink/Purple) with Ground-Truth filtering.}}
+    \label{fig:bpp_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/rgp_iter0_2.pdf}
+    \caption{\textbf{SILVR on Purple Cup Pushing (Red/Green/Purple) with Ground-Truth filtering.}}
+    \label{fig:rgp_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/yg_iter0_2.pdf}
+    \caption{\textbf{SILVR on Yellow Drawer Opening (Yellow/Green) with Ground-Truth filtering.}}
+    \label{fig:yg_iter0_2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/yb_iter0_2.pdf}
+    \caption{\textbf{SILVR on Yellow Drawer Opening (Yellow/Blue) with Ground-Truth filtering.}}
+\end{figure}
+\FloatBarrier
+
+\newpage
+\subsection{SILVR without Filtering}
+Visual plans and their executions for SILVR without filtering are illustrated below.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/drawer_close_iter0_2_no_filtering.pdf}
+    \caption{\textbf{SILVR on Drawer Close without filtering.}}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/bpo_iter0_2_no_filtering.pdf}
+    \caption{\textbf{SILVR on Orange Cup Pushing (Blue/Pink/Orange) without filtering.}}
+\end{figure}
+
+
+
+
+
+
+\FloatBarrier
+\newpage
+\subsection{Corrective Influence of Internet-Scale Video Model Adaptation}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ipa_vs_in_domain_orange_cup.pdf}
+    \caption{\textbf{Push Orange Cup}}
+    \label{fig:ipa_vs_in_domain_orange_cup}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ipa_vs_in_domain_purple_cup.pdf}
+    \caption{\textbf{Push Purple Cup}}
+    \label{fig:ipa_vs_in_domain_purple_cup}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ipa_vs_in_domain_yellow_drawer.pdf}
+    \caption{\textbf{Open Yellow Drawer}}
+    \label{fig:ipa_vs_in_domain_yellow_drawer}
+\end{figure}
+\FloatBarrier
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ipa_vs_in_domain_mw_drawer_2.pdf}
+    \caption{\textbf{Drawer Close}}
+    \label{fig:ipa_vs_in_domain_mw_drawer}
+\end{figure}
+\FloatBarrier
+
+
+\newpage
+\subsection{Long-Horizon Task Evaluation}
+
+Whereas the experiments thus far have demonstrated how SILVR can iteratively improve performance on single tasks, a natural question to consider is how applicable it is to complex tasks.  We note that many long-horizon tasks can be broken down into atomic tasks with shorter horizons, for which SILVR can already demonstrate clear and robust self-improvement behaviors.  We thus investigate how SILVR, by learning individual abilities, naturally facilitates the direct iterative improvement of a sequential long-horizon tasks where success rate depends on the full completion of behaviors in a specific order.
+
+In particular, we construct an experiment of pushing cups in an order specified by natural language.  For example, in Figure~\ref{fig:push_rog} the prompt is ``Push Cups in the order of Red, Orange, Green", where success is only satisfied if done so in the correct order.  We evaluate SILVR checkpoints automatically using a VLM, implemented as Gemini 2.5, to determine what atomic skill (e.g., pushing the cup of a specific color) to currently execute from the instruction sequence and when to switch to the subsequent one by querying if the visual execution of the current atomic skill was successful.
+
+
+We find that over successive iterations, despite only applying SILVR to individual atomic tasks, the performance on the overall long-horizon tasks improves.  This suggests that for arbitrary complex long-horizon tasks of interest, SILVR can be combined with an efficient subtask segmentation mechanism to improve individual performance on atomic behaviors and thus improve the final overall performance on long-horizon sequential compositions.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/long_horizon_rog_ffs.pdf}
+    \caption{\textbf{Push Cups in the order of Red, Orange, and Green.} The final-iteration visual planner completed the long-horizon task, whereas those from the first two iterations failed.}
+    \label{fig:push_rog}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/long_horizon_bpg_fss.pdf}
+    \caption{\textbf{Push Cups in the order of Blue, Purple, and Green.} The visual planners of the last two iterations completed the long-horizon task, whereas the one from the first iteration failed.}
+    \label{fig:push_bpg}
+\end{figure}
+
+\FloatBarrier
+\subsection{Visualizing Failure Cases of Final-Iteration Visual Planners}
+Below we visualize the failure cases from the final-iteration visual planners across both real-world and simulation task settings. Most real-world failures arise from semantically incorrect visual plans, in which the robot arm attempts to push the cup (Figure~\ref{fig:failure_mode_final_orange} and~\ref{fig:failure_mode_final_purple}) or open the drawer (Figure~\ref{fig:failure_mode_final_yellow}) of a wrong color, whereas in simulation, we observe a mixture of execution (Figure~\ref{fig:failure_mode_final_plate_slide}) and semantic  (Figure~\ref{fig:failure_mode_final_button_press}) errors, both of which can contribute to unsuccessful task completion.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/failure_model_final_iter_orange_cup.pdf}
+    \caption{\textbf{Push the Orange Cup (Iteration 2)}}
+    \label{fig:failure_mode_final_orange}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/failure_model_final_iter_purple_cup.pdf}
+    \caption{\textbf{Push the Purple Cup (Iteration 2) }}
+    \label{fig:failure_mode_final_purple}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/failure_model_final_iter_yellow_drawer.pdf}
+    \caption{\textbf{Open the Yellow Drawer (Iteration 2)}}
+    \label{fig:failure_mode_final_yellow}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/failure_model_final_iter_mw_plate_slide.pdf}
+    \caption{\textbf{Plate Slide (Iteration 9)}}
+    \label{fig:failure_mode_final_plate_slide}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/failure_model_final_iter_mw_button_press_wall.pdf}
+    \caption{\textbf{Button Press Wall (Iteration 9)}}
+    \label{fig:failure_mode_final_button_press}
+\end{figure}
+\FloatBarrier
+
+
+
+
+
+

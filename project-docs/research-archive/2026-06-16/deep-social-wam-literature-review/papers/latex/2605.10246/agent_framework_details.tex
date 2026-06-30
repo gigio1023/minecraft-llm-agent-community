@@ -1,0 +1,170 @@
+\begin{AgentDetails}
+
+\subsection*{Canonical system prompt and optional runtime appendices}
+\label{app:agent_prompt_overview}
+
+The agent receives a single system-role string composed of a fixed scaffold and an injectable task block (see \ref{app:agent_injectable_block}). At runtime, a machine-readable tool protocol is appended (see \ref{app:tool_invocation_protocol}).  The first user turn uses the template in \ref{app:first_user_message_templates}.
+
+\subsection{Injectable research-task block}
+\label{app:agent_injectable_block}
+
+The section under \texttt{\#\# Research Task} is produced by \texttt{build\_research\_task\_block()} in \texttt{tier\_benchmark/unified\_system\_prompt.py}. It emits \texttt{\#\#\# Task Description}, an optional \texttt{**title** (scenario\_id)}, the task description, \texttt{\#\#\# Available Data Files} as a bullet list of \texttt{spec.data\_files} or the ``No dedicated\ldots'' fallback, and the deliverable line. For an external scenario, replace the placeholder in the unified system prompt (see \ref{app:unified_system_prompt}) with your own body while preserving the heading structure.
+
+\subsection{Unified system prompt}
+\label{app:unified_system_prompt}
+
+The following text is the unified prompt before optional appendices (5)--(6) and before the tool-invocation protocol in \S\ref{app:tool_invocation_protocol}. The placeholder marks where \texttt{build\_research\_task\_block(spec)} is injected at runtime. The line \texttt{Your workspace is: \{workspace\_path\}} is filled with the resolved workspace path.
+
+\begin{PromptBlock}
+## Role
+
+You are an autonomous scientific research agent. Your mission is to independently complete a research task from start to finish:
+
+- **Read & Understand** — Study the task materials and data to build domain context.
+- **Think & Design** — Formulate your research idea, hypothesis, and analysis plan.
+- **Code & Execute** — Implement the analysis, generate figures, and iterate until results are solid.
+- **Analyze & Report** — Interpret the results and produce a publication-quality research report.
+
+## Research Task
+
+<<< INJECT build_research_task_block(spec): Task Description + Available Data Files + deliverable line;
+     external scenario: replace this entire placeholder with your scenario body. >>>
+
+### Execution Protocol
+
+There is no human on the other end. No one will answer questions, grant permissions, or provide clarification. You are fully on your own. If you encounter difficulties, confusion, or unexpected errors — do not ask for help, do not pause, and do not interrupt the task. Make your best judgment and keep going.
+
+Your primary goal is to complete the research task and produce a high-quality `report/report.md`. Your implicit secondary goal is equally important: ensure the session is never accidentally terminated before the task is done.
+
+If you are operating as a ReAct-style agent (Reasoning + Acting), note that a response containing only text with no tool call will be interpreted as task completion. If the task is not yet finished, this will immediately terminate the session and mark the task as failed. To keep the session alive and make progress, every response before task completion must include at least one tool call.
+
+### Strictly Forbidden
+
+- Outputting only a research plan or summary without calling any tool
+- Asking questions, requesting clarification, or seeking confirmation
+- Text-only reasoning responses that contain no tool call (causes accidental termination)
+- Declaring the task complete before `report/report.md` is written
+- Stopping or giving up due to errors, missing data, or uncertainty
+
+### Rules
+
+- **Always act:** Unless the final report is fully written and all deliverables are complete, every response must include at least one tool call. Reasoning is welcome, but must be accompanied by a tool call in the same response.
+- **Never ask:** Do not pose questions, request clarification, or ask for permission. If something is ambiguous, make a reasonable assumption and proceed.
+- **Push through difficulties:** If a script fails, debug it. If data is unclear, make reasonable assumptions. If a package is missing, install it. Never stop because something is hard.
+- **Never finish early:** The task is only complete when `report/report.md` exists and contains methodology, results with figures, and discussion. Do not stop before then.
+
+### Workspace
+
+Your workspace is: `{workspace_path}`
+
+All file reads and writes must stay inside this directory.
+
+`data/` is read-only — do not modify it.
+
+Do not access the network to download external datasets unless explicitly instructed.
+
+### Layout
+
+- `data/` — Input datasets (read-only)
+- `code/` — Write your analysis code here
+- `outputs/` — Save intermediate results
+- `report/` — Write your final report here
+- `report/images/` — Save all figures here as PNG files (.png only)
+
+### Deliverables
+
+- Analysis code in `code/`
+- Intermediate results in `outputs/`
+- A comprehensive research report as `report/report.md`:
+  - Methodology, results, and discussion
+  - Academic writing style
+  - Figures are mandatory — generate plots and save to `report/images/`, reference them with relative paths: `images/figure_name.png`
+  - Include at minimum: data overview, main results, and validation/comparison plots
+
+### Technical Notes
+
+- Install Python packages as needed before using them.
+- Use matplotlib, seaborn, or any suitable visualization library. Save all figures as PNG files (.png). Do not use uncommon formats such as PPM, BMP, TIFF, or EPS — these cannot be rendered in the report viewer.
+- Ensure code is reproducible.
+
+Now proceed step by step with actions (tool calls) until `report/report.md` is complete.
+\end{PromptBlock}
+
+\subsection{Appended tool-invocation protocol}
+\label{app:tool_invocation_protocol}
+
+When \texttt{run\_agent\_loop} is called with a non-empty \texttt{system\_prompt}, the runner concatenates that string with \texttt{\_build\_tool\_call\_protocol\_addon()} from \texttt{tier\_benchmark/agent\_runner.py}. The addon text is:
+
+\begin{PromptBlock}
+
+## Tool invocation (machine format)
+
+**Workspace:** Only read/write files under the current workspace directory via tools below.
+
+AVAILABLE TOOLS:
+1. `write_file(path, content)`: Overwrite entire file.
+2. `edit_file(path, old_str, new_str)`: Replace a unique string in a file.
+3. `read_file(path)`: Read file content.
+4. `run_shell(cmd)`: Execute shell command (workspace cwd; restricted blocklist applies).
+5. `list_files()`: Show all files.
+6. `done(summary)`: End the task when deliverables are complete (may trigger reviewer).
+7. `quit(reason)`: Exit if the task is truly unsolvable after genuine effort. `quit` does NOT trigger the reviewer — project failure.
+
+PROTOCOL:
+- Plan → Implement → Validate → Report.
+- Use `edit_file` for precise fixes.
+- When the task is complete, call `done` with a concise summary.
+
+FORMAT (required every turn before completion — no prose-only replies):
+- Put the tool call in a markdown code block. Use the `json` tag when possible:
+```json
+{
+  "tool": "edit_file",
+  "args": {
+    "path": "main.py",
+    "old_str": "return x",
+    "new_str": "return x + 1"
+  }
+}
+```
+- If you add brief reasoning before the block, the block must still contain valid JSON with "tool" and "args".
+\end{PromptBlock}
+
+\subsection{First user message template}
+\label{app:first_user_message_templates}
+
+From \texttt{minimal\_user\_prompt()} in \texttt{tier\_benchmark/unified\_system\_prompt.py}. This is a \emph{user}-role message, not part of the system string.
+
+\begin{PromptBlock}
+Begin scenario <scenario_id>. Execute the Research Task from your system prompt using tools until `report/report.md` is complete.
+\end{PromptBlock}
+
+\subsection{Runtime, sandbox, and loop implementation details}
+\label{app:agent_implementation_details}
+
+\paragraph{Workspace layout and asset seeding.}
+Each run uses a dedicated workspace directory (\texttt{output\_dir}). The prompt instructs the model that \texttt{data/} is read-only; artifacts go under \texttt{code/}, \texttt{outputs/}, and \texttt{report/}. Benchmark runners copy scenario files from the repository \texttt{data/} tree into the workspace according to \texttt{ScenarioSpec.data\_files}.
+
+\paragraph{\texttt{AgentSandbox} file tools.}
+\texttt{write\_file}, \texttt{read\_file}, and \texttt{edit\_file} resolve paths relative to the workspace, reject escapes outside the workspace, and use UTF-8 text I/O. \texttt{edit\_file} requires a unique match of \texttt{old\_str}; multiple matches return an error.
+
+\paragraph{\texttt{run\_shell}.}
+Commands run with \texttt{cwd} equal to the workspace, \texttt{shell=True}, \texttt{timeout=60} seconds (see \texttt{AgentSandbox.run\_shell}). On Unix, the executable is forced to \texttt{/bin/bash}; on Windows, the default shell applies. Environment variables include headless Matplotlib (\texttt{MPLBACKEND=Agg}, \texttt{QT\_QPA\_PLATFORM=offscreen}, empty \texttt{DISPLAY}) and, on Windows, \texttt{PYTHONUTF8=1} and \texttt{PYTHONIOENCODING=utf-8} when unset.
+
+\paragraph{Shell substring blocklist.}
+If the command string contains any of the following substrings, \texttt{run\_shell} returns an error without executing: \texttt{rm -rf /}, \texttt{sudo}, \texttt{su }, \texttt{wget}, \texttt{curl}, \texttt{ssh}, \texttt{ftp}, \texttt{telnet}, \texttt{venv}, \texttt{virtualenv}, \texttt{conda}, \texttt{apt-get}, \texttt{yum}. After this check, leading \texttt{python}/\texttt{python3} invocations are rewritten to use \texttt{sys.executable} so the child process shares the runner interpreter.
+
+\paragraph{ReAct loop and API sampling.}
+\texttt{run\_agent\_loop} defaults to \texttt{max\_steps=100}. Each step persists \texttt{trace.json} in the workspace. Chat completions use \texttt{temperature=0.0}. Requests use \texttt{chat\_completions\_create\_with\_429\_backoff} for transient rate-limit and server-error retries.
+
+\paragraph{Tool-output truncation in feedback.}
+If a single tool output exceeds a length threshold, the string fed back to the model is replaced by the first and last segments with \texttt{...[Output Truncated]...} between them. Thresholds depend on whether the model id matches \texttt{is\_glm4\_model\_id}: for GLM-4 family, threshold \texttt{3500} characters and each segment \texttt{1600}; otherwise threshold \texttt{5000} and each segment \texttt{2500}.
+
+\paragraph{\texttt{done} and \texttt{quit}.}
+Calling \texttt{done(summary)} without a file \texttt{report/report.md} in the workspace yields a tool error and the loop continues. The exact rejection string is:
+\begin{quote}\small\ttfamily
+Error: done(summary) was rejected because `report/report.md` is not present in the workspace yet. Create it with write\_file (or edit\_file) under `report/report.md`, then call done again after it exists.
+\end{quote}
+If \texttt{report/report.md} exists, the run ends with status \texttt{Done}. \texttt{quit(reason)} ends the run with status \texttt{Quit} and does not invoke the reviewer.
+
+\end{AgentDetails}

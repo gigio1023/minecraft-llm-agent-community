@@ -1,0 +1,117 @@
+\section{Multiplayer Training Dataset}
+\label{sec:appendix_train_dset}
+\subsection{Episode Types}
+\label{subsec:appendix_episode_types}
+
+Our dataset contains 14 distinct episode types that cover the 4 broader Minecraft game mechanics. We describe the episode types in~\cref{tab:episode_types_details}.
+
+
+\begin{table}[h]
+\centering
+\small
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\caption{Episode types in our training dataset.}
+\label{tab:episode_types_details}
+
+\begin{tabularx}{\linewidth}{llY}
+\toprule
+\textbf{Episode Name} & \textbf{Category} & \textbf{Description} \\
+\midrule
+buildStructure & Building & Each bot builds a wall or tower in front of the other, or bots build a platform together at midpoint \\
+buildTower & Building & Both bots build a tall 1-block tower by jumping and placing blocks underneath themselves. \\
+buildHouse & Building & Bots build a house together. \\
+towerBridge & Building & Bots build a 1-block tower by jumping, then build a bridge connecting the two towers, and meet. \\
+pve & Combat & Bots defend two random positions on the ground, facing each other against spawning mobs. \\
+pvp & Combat & Bots equip swords and fight each other. \\
+collector & Mining & One bot digs underground to search and mine ores within line-of-sight, while the other bot follows and places torches. \\
+mine & Mining & Bots dig 1 block underground and mine their way towards each other. \\
+placeAndMine & Mining & Bots stand facing each other. One bot places blocks, and the other one destroys them. \\
+chase & Movement & One bot runs away in a zig-zag pattern and the other bot pursues it. \\
+orbit & Movement & Bots move in a circular trajectory around a shared center, periodically looking at each other. \\
+straightLineWalk & Movement & One bot runs towards and past the other bot, then spins to look at it. \\
+walkLook & Movement & One or both bots move in a random direction with just WASD actions in front of each other. \\
+walkLookAway & Movement & One bot moves in a random direction, looks away, looks back at the other bot. The other observes. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+
+\subsection{Episode filtering}
+
+Due to the teleportation logic we use before every episode to diversify the terrain, the bots might end up underwater in some of the episodes, as shown in~\cref{fig:underwater_episode}. The underwater mechanics break the logic of most of our episodes, so we choose not to include those. Out of 6000 episodes collected in the ``Normal'' world, 340 are underwater. Leveraging the fact that Minecraft shows oxygen bubbles in the GUI, see~\cref{fig:bubbles_gui}, when the character is underwater, we filter out the water episodes using a linear classifier that we run on the episode frames, detecting the bubble icons. The classifier achieves a 100\% accuracy.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/assets/underwater_episode.jpg}
+    \caption{An episode where a bot has been teleported underwater.}
+    \label{fig:underwater_episode}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/assets/bubbles_gui.png}
+    \caption{The ``bubbles'' HUD template PNG used to filter underwater episodes.}
+    \label{fig:bubbles_gui}
+\end{figure}
+
+\subsection{Action Space}
+
+\label{subsec:appendix_action_space}
+
+The gold standard of actions for a Minecraft dataset for world modeling is the VPT ~\cite{baker2022videopretrainingvptlearning} dataset, which contains the full range of Minecraft game actions. \solarisengine and hence our multiplayer dataset come close to it and support everything except for inventory opening/closing and raw mouse movement recording (only relative pitch/yaw character rotations are recorded). These two limitations don't allow \solarisengine to capture GUI activities such as inventory manipulation and crafting. Another difference between VPT and our multiplayer dataset is that we record and store actions in the form of semantic actions (either continuous or discrete) instead of raw keyboard and mouse events, as the VPT dataset does. The full list of actions recorded by \solarisengine and available in our multiplayer training dataset is presented in ~\cref{tab:action_space}.
+
+\begin{table}[h]
+\centering
+\small
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\caption{Action space of our multiplayer dataset. ``Sustained'' denotes action is recorded for as long as it lasts. ``Once'' denotes action is recorded for one tick only, usually applicable to instantaneous events.}
+\label{tab:action_space}
+
+\begin{tabularx}{\linewidth}{llY}
+\toprule
+\textbf{Action key} & \textbf{Type} & \textbf{Description} \\
+\midrule
+forward       & bool/sustained & Player moving forward (W). \\
+back          & bool/sustained & Player moving backward (S). \\
+left          & bool/sustained & Player strafing left (A). \\
+right         & bool/sustained & Player strafing right (D). \\
+jump          & bool/sustained & Player jumping. \\
+sprint        & bool/sustained & Player sprinting. \\
+sneak         & bool/sustained & Player sneaking. \\
+camera        & vec2f/sustained & Change in player camera orientation (yaw, pitch). \\
+attack        & bool/once & Player attacks. \\
+use           & bool/once & Player uses / interacts with the environment. \\
+mount         & bool/once & Player mounts an entity/vehicle. \\
+dismount      & bool/once & Player dismounts. \\
+place\_block  & bool/once & Player places a block using the currently selected item. \\
+place\_entity & bool/once & Player places an entity item. \\
+mine          & bool/sustained & Player mining a block. \\
+hotbar.1      & bool/once & Player selects hotbar slot 1. \\
+hotbar.2      & bool/once & Player selects hotbar slot 2. \\
+hotbar.3      & bool/once & Player selects hotbar slot 3. \\
+hotbar.4      & bool/once & Player selects hotbar slot 4. \\
+hotbar.5      & bool/once & Player selects hotbar slot 5. \\
+hotbar.6      & bool/once & Player selects hotbar slot 6. \\
+hotbar.7      & bool/once & Player selects hotbar slot 7. \\
+hotbar.8      & bool/once & Player selects hotbar slot 8. \\
+hotbar.9      & bool/once & Player selects hotbar slot 9. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+
+\subsection{Mouse Action Distribution}
+
+Most of our episode types use the Pathfinder Mineflayer plugin for intelligent navigation of our bots. Pathfinder operates at the maximum camera speed of 178 degrees per second. Although we use manual camera movements (not controlled by Pathfinder) in our dataset, which provides camera action at random, lower value ranges, the distribution of camera action of our dataset is heavily skewed towards the fast camera moves originating in Pathfinder, as shown in~\cref{fig:mouse_act_histogram}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figs/assets/mouse_act_histogram.png}
+    \caption{A histogram showing the mouse action magnitude distribution in our training dataset.}
+    \label{fig:mouse_act_histogram}
+\end{figure}
+

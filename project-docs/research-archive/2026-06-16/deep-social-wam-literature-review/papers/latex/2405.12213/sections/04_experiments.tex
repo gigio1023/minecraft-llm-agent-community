@@ -1,0 +1,127 @@
+\section{Experiments}
+\label{sec:experiments}
+
+Our experiments provide an empirical analysis of \method{}, evaluating its ability to serve as a general robotic foundation model across several axes:
+\begin{enumerate}
+    \item Can \method{} control multiple robot embodiments and solve language and goal tasks out of the box?
+    \item Do \method{} weights serve as a good initialization for data-efficient finetuning to new tasks and robots, and does it improve over training from scratch and commonly used pretrained representations?
+
+    \item Which design decisions in \method{} matter most for building generalist robot policies?
+\end{enumerate}
+
+\paragraph{Evaluation setups} We evaluate \method's capabilities across a representative spectrum of \nsetups{}~robot learning setups at \ninstitutions{}~institutions (see \cref{fig:eval_setups}).
+We test \method's ability to control different robots out-of-the-box (``zero-shot'') for language and goal image tasks using robot setups that match the pretraining data, where all robots are controlled with delta end-effector control actions and the observation spaces are RGB images. We also evaluate \method{} for data-efficient finetuning to new environments and tasks, including with new observations (force-torque inputs in ``Berkeley Insertion''),  new action spaces (joint position control in ``Berkeley Pick-Up'') and new robot embodiments (``Berkeley Coke'' and ``Berkeley Bimanual'').
+Each of the finetuning setups uses $\sim100$ in-domain demonstrations and finetunes in $<5$~hours on a NVIDIA~A5000 GPU, using the same hyperparameters across all setups (see Appendix~\ref{sec:app:hyperparams}). Our evaluation tasks test \method's ability to interact with diverse objects (\eg ``WidowX BridgeV2''), solve long-horizon tasks (\eg ``Stanford Coffee'') and perform precise manipulation (\eg ``Berkeley Insertion''). For more details on each evaluation setup, see Appendix~\ref{sec:app:robot_setups}.
+
+
+
+\paragraph{Comparisons} We compare \method's ability to control multiple robots out-of-the-box to the best openly available generalist robot policy, \textbf{RT-1-X}~\citep{open_x_embodiment_rt_x_2023}, using the released checkpoint. Similar to \method, RT-1-X is pretrained on the Open X-Embodiment robot dataset and aims to control multiple robots zero-shot, thus providing a natural point of comparison. We also compare the zero-shot capabilities of \method{} to \textbf{RT-2-X}, a 55 billion parameter vision-language model finetuned on the Open X-Embodiment dataset to produce robot actions. The RT-1-X and RT-2-X models \citep{open_x_embodiment_rt_x_2023} are trained on a more restricted subset of 350K episodes (compared to \ntrajs{} episodes for \method).
+We further compare \method's performance as a policy initialization for data efficient finetuning to two common approaches: (1)~training on the target domain demonstrations \emph{from scratch} and (2)~using pretrained visual representations. While a number of prior works have proposed other pretraining schemes for imitation finetuning~\citep{ebert2021bridge, Du2023BehaviorRF, fang2023rh20t}, to our knowledge no prior method provides a pretrained \emph{policy} that has been demonstrated to finetune successfully to \emph{new} observation and action spaces. However, pretrained visual representations such as VC-1~\citep{vc2023} have been used in this way, and therefore we use these methods as another point of comparison.
+
+For finetuning, we found that training our large transformer architecture from scratch overfit quickly on the small datasets. Instead, we obtained better from-scratch results using a canonical policy architecture employed by many prior works: a ResNet visual encoder with FiLM~\citep{perez2018film} language conditioning, combined with a small transformer action decoder trained with a diffusion objective, similar to \citep{brohan2022rt,zhao2023learning,chi2023diffusionpolicy,lynch2023interactive}. Our instantiation of this architecture has 28M parameters (similar to RT-1 \cite{brohan2022rt}). We adopt this as our from-scratch baseline (\textbf{``ResNet+Transformer Scratch''}). We also compare to a pretrained visual representation following the procedure of \citet{majumdar2023we}. A ViT-B visual encoder is initialized to the VC-1 weights~\citep{majumdar2023we}, a state-of-the-art visual representation pretrained on 4,000~hours of ego-centric videos and ImageNet, and combined with an MLP action decoder. The full model is trained to predict expert actions using an MSE loss (\textbf{``VC-1''}).
+
+
+\subsection{\method{} Controls Multiple Robots Out-of-the-Box}
+\label{sec:exp_zero_shot}
+
+\begin{table*}[th]
+\centering
+\footnotesize
+\resizebox{\textwidth}{!}{\begin{tabular}{lccccccc}
+\toprule
+& Berkeley Insertion$^*$  & Stanford Coffee & CMU Baking  & Berkeley Pick-Up$^\dagger$ & Berkeley Coke & Berkeley Bimanual$^\dagger$ & Average\\
+
+\midrule
+
+ResNet+Transformer Scratch & 10\% & 45\% & 25\% & 0\% & 20\% & 20\% & 20\%\\
+
+VC-1~\citep{majumdar2023we} & 5\% & 0\% & 30\% & 0\% & 10\% & 50\% & 15\% \\
+
+\method{} (Ours) & \textbf{70\%} & \textbf{75\%} & \textbf{50\%} & \textbf{60\%} & \textbf{100\%} & \textbf{80\%} & \textbf{72\%}\\
+
+\bottomrule
+\end{tabular}}
+\caption{\textbf{Finetuning Evaluation.} \method{} enables data-efficient finetuning to new domains and out-performs training from scratch as well as state-of-the-art pretrained visual representations. Each domain uses $\sim100$ target demonstrations and the same finetuning hyperparameters. In each domain, success rates are averaged over 20 trials. $*$: New observation input (force-torque proprioception). $\dagger$: New action space (joint position control).}
+\label{tab:finetune_exps}
+\end{table*}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/zero_shot.pdf}
+    \caption[]{\textbf{Zero-Shot Evaluation.} Out-of-the-box, \method{} can control multiple robots in environments from the pretraining data. When using natural language to specify tasks, \method{} outperforms RT-1-X~\citep{open_x_embodiment_rt_x_2023}, the current best openly available generalist robot policy across three different robot embodiments and setups. \method{} also performs similarly to RT-2-X~\citep{zitkovich2023rt} on the tested WidowX and RT-1 Robot tasks.\textsuperscript{1} }
+    \label{fig:eval_zero_shot}
+\end{figure}
+\footnotetext{\textsuperscript{1}For the WidowX, since RT-2-X is not openly available, we report the RT-2-X numbers from~\cite{black2023zero} (dashed bar) and use the same tasks for the Octo and RT-1-X evaluations. For the RT-1 Robot, the authors of RT-2-X kindly performed the evaluations for us.}
+
+We compare the zero-shot manipulation capabilities of \method{}, RT-1-X, and RT-2-X in \cref{fig:eval_zero_shot}. We evaluated on several tasks selected from the pre-training dataset including picking and placing, wiping a table with a cloth, and opening and closing drawers. For each robot, we selected two language tasks from the corresponding OXE dataset and performed 10 trials per task with varying initial conditions (details in Appendix \ref{sec:app:robot_setups}). The chosen tasks are ``in-distribution'' from the pre-training data, but the evaluation requires methods to generalize to new object positions, lighting conditions, backgrounds, and distractor objects. While all methods acted reasonably across tasks in the pretraining environments, we found that on average \method{} had a 29\% higher success rate than RT-1-X (35M parameters). For the WidowX and RT-1 Robot evaluations, we also compared to RT-2-X (55 billion parameters)~\citep{zitkovich2023rt} and found that \method{} performed similarly.
+
+
+Additionally, while RT-1-X and RT-2-X only support conditioning on language instructions, \method{} also supports conditioning on goal images. We evaluated our model on the WidowX tasks using goal image conditioning and found that it achieved a 25\% higher success rate than when evaluated with language conditioning. This is likely because goal images provide more information about how to achieve the task. In the BridgeV2 domain, we performed a fine-grained analysis of the zero-shot capabilities in \cref{tab:gen-type}; measuring performance on setups seen in the dataset, and for novel environments, scenes, and skills. While the \method{} model achieves high success on novel objects, zero-shot performance slightly degrades in a new scene, and high degradation for novel behaviors like flipping or precise insertion.
+
+
+\subsection{\method{} Enables Data-Efficient Learning in New Domains}
+\label{sec:exp_finetuning}
+
+
+We report data-efficient finetuning results to new domains in \cref{tab:finetune_exps}. We find that finetuning \method{} leads to better policies than starting from scratch or with the pretrained VC-1 weights. On average across the six evaluation setups (detailed in Appendix \ref{sec:app:robot_setups}), \method{} outperforms the next best baseline by 52\%. Importantly, we use the same  recipe and hyperparameters for fine-tuning \method{} on all evaluation tasks (see \cref{sec:train_objective}),
+making this a good default configuration.
+
+The results also underline \method's ability to accommodate new observations (force-torque inputs for ``Berkeley Insertion''), action spaces (joint position control for ``Berkeley Pick-Up'') and new robot embodiments (``Berkeley Coke'' and ``Berkeley Bimanual''). This makes \method{} applicable to a wide range of single and dual arm robotic manipulation problems that go beyond a single camera input and end-effector position control.
+
+
+
+\subsection{Design Decisions for Generalist Robot Policy Training}
+\label{sec:ablations}
+
+We have demonstrated the effectiveness of \method{} as a zero-shot multi-robot controller and as an initialization for policy finetuning. We next analyze the effects of different design decisions on the performance of the \method{} policy. Concretely, we focus on the following aspects: (1)~model architecture, (2)~training data, (3)~training objective, and (4)~model scale. Unless noted otherwise, we perform all ablations on the \method{}-Small model due to our compute budget.
+
+
+
+
+
+
+
+
+
+
+\begin{table}
+\centering
+\resizebox{\linewidth}{!}{\begin{tabular}{ccc}
+\toprule
+&& Aggregate Performance\\
+
+\midrule
+&\method{}-Small (Ours) & \textbf{83\%} \\
+\midrule
+
+\parbox[t]{2mm}{\multirow{1}{*}{\rotatebox[origin=c]{90}{\textsc{data}}}}& RT-X dataset mix \vspace{0.13cm} \citep{open_x_embodiment_rt_x_2023} & 60\% \\
+& Single robot dataset (Bridge Data) & 43\% \\
+\midrule
+
+\parbox[t]{2mm}{\multirow{1}{*}{\rotatebox[origin=c]{90}{\textsc{policy}}}}& Discretized Action Prediction \vspace{0.13cm} \citep{open_x_embodiment_rt_x_2023} & 18\% \\
+& Continuous Action Prediction (MSE) \vspace{0.13cm} & 35\% \\
+\midrule
+\parbox[t]{2mm}{\multirow{1}{*}{\rotatebox[origin=c]{90}{\textsc{arch}}}}& \vspace{0.4cm}
+Resnet-50 + Transformer\citep{open_x_embodiment_rt_x_2023} & 70\% \\
+\bottomrule
+\end{tabular}}
+
+\caption{\textbf{Model Ablations.} We achieve best performance when using the ViT architecture, diffusion action head, and wide training data mixture. All evaluations are performed on the WidowX setup. Success rates are averaged over 40 trials across two language-conditioned tasks and two goal-conditioned tasks.}
+\label{tab:ablations}
+\end{table}
+
+\paragraph{Model architecture} Prior transformer-based policy designs typically encode input images with large ResNet-style~\citep{he2016deep} encoders and fuse the resulting image features with a comparatively small transformer~\citep{brohan2022rt,open_x_embodiment_rt_x_2023,shah2023vint,chi2023diffusionpolicy,zhao2023learning,mees2022matters,shridhar2023perceiver}. Instead, we opt for a ``transformer-first'' architecture that uses very shallow CNN patch encoders and concentrates most of the parameters and FLOPS in the transformer backbone, similar to canonical vision transformer architectures~\citep{dosovitskiy2020image}. In Table \ref{tab:ablations} we show that this scalable architecture leads to substantially improved performance when training on the full Open X-Embodiment data mix. Importantly, we found ResNet-based architectures to perform better than ViTs when training on small datasets, \eg in our ``from scratch'' comparisons, underlining that large transformer policies are uniquely suited for scalable training on diverse datasets.
+
+\paragraph{Training data} \method{} is trained on the most diverse cross-embodied robot dataset to date, a mix of \ndatasets{}~datasets that we manually curated from the Open X-Embodiment dataset~\citep{open_x_embodiment_rt_x_2023} (see \cref{sec:train_data}). We ablate the impact of this training mix by comparing to \method{} models trained on a smaller mix of 11~datasets used in training the RT-X models~\cite{open_x_embodiment_rt_x_2023} and a baseline trained only on data from the target robot domain. In Table \ref{tab:ablations} we show that the performance of \method{} increases as we increase the number of training datasets. This suggests that expanding the data mix to even more datasets may further improve policy performance. We will leave this for future work, along with a more thorough investigation of best practices for data curation.
+
+\paragraph{Training objective} We compare \method{}'s diffusion decoding training objective (see \cref{sec:train_objective}) to common alternatives from prior work: simple MSE loss~\citep{bojarski2016end,levine2016end} and cross-entropy loss on discretized actions~\citep{brohan2022rt,zitkovich2023rt}. In Table \ref{tab:ablations} we find that \method{}'s diffusion training objective leads to substantially improved performance. This improvement is likely because the diffusion head can model multi-modal action distributions (unlike the MSE head) while retaining the precision of continuous actions (unlike the discrete head). Qualitatively, the policy acts more decisively than MSE-trained policies, and more precisely than those trained with discretized actions. 
+
+\paragraph{Model scale} We compare \method{} models of three different sizes following the ladder of common vision transformer models~\citep{zhai2022scaling}: \method{}-Tiny (\tinynparams), \method{}-Small (\smallnparams{}), and \method{}-Base (\largenparams{}). In Figure \ref{fig:scaling} we show that the zero-shot performance of the policy scales with increasing model size. We find that the Base model is more robust to initial scene configuration than the Small model, and is less prone to early grasp attempts, indicating the larger model has better visual scene perception.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/orca_scaling.pdf}
+    \caption{\textbf{Model Scaling.} The performance of \method{} improves with larger model sizes on both UR5 and WidowX tasks. Success rates are averaged over 10 trials on one language-conditioned task per robot.}
+    \label{fig:scaling}
+\end{figure}

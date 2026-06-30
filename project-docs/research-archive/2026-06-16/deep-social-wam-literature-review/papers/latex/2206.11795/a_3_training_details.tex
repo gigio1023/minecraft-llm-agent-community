@@ -1,0 +1,120 @@
+\section{Inverse Dynamics Model Training Details}
+\label{appendix:training_details_IDM}
+\subsection{IDM Architecture}
+\label{appendix:training_details_IDM_architecture}
+The IDM model has approximately 0.5 billion trainable weights. The input to the IDM is 128 consecutive image frames (128 frames of video), each of which has dimensions $128 \times 128 \times 3$. The IDM is tasked with predicting the action at each frame.
+All image pixel values are first divided by 255.0 such that they lie within the range $[0, 1]$. The first layer of the IDM is a 3-D convolution with 128 learnable filters with a temporal kernel width of 5 and spatial kernel widths of 1. This convolution is non-causal, meaning that embeddings at time index $t$ are functions of pixel values at times $t-2$, $t-1$, $t$, $t+1$, and $t+2$. We found this layer to be extremely important in IDM training as it incorporates neighboring temporal information immediately, and we show results comparing IDM performance with and without this layer in Figure~\ref{fig:idm_3dconv}. This comparison was made on the default (1962-hour) IDM dataset.
+
+\begin{figure}[bthp]
+\begin{center}
+\includegraphics[width=\linewidth]{assets/idm_3d_conv.pdf}
+\end{center}
+\caption{Effect of 3-D Convolution in the IDM Architecture.}
+\label{fig:idm_3dconv}
+\end{figure}
+
+This initial temporal convolutional layer is followed by a ResNet\cite{he2016deep} image processing network. In this part of the model, no extra temporal information is shared between neighboring frames; however, since each frame was first processed with the temporal convolution, some temporal information is present at this stage. The ResNet image processing network is comprised of three subsequent stacks with widths $W = \{64, 128, 128\}$. Each stack is comprised of, in order, (1) an initial 3x3 convolutional layer with 1-pixel zero padding at the embedding boundary (such that the outgoing embedding dimensions are the same as the incoming embedding dimension) with $W$ output channels, (2) a 3x3 max pooling with stride 2 and padding 1 such that the embedding width and height are halved, and (3) two classic ResNet blocks as defined in \citet{he2016deep} with each layer also having $W$ output channels.
+
+The output of the ResNet stack is flattened into a 1-dimensional vector of size $2^{17} = 131072$ (one vector for each frame in the video) such that at this stage there are 128 vectors of size 131072. Each vector is independently processed with two frame-wise dense layers with 256 output activations and then 4096 output activations, respectively. The result is then fed through 4 subsequent non-causal (umasked) residual transformer\cite{vaswani2017attention} blocks. Each block first has an unmasked attention layer, i.e. frames may attend to future frames, with 32 attention heads of dimension 128 each and a surrounding residual connection that skips this layer. The embedding is then passed through a frame-wise dense layer with output dimension 16384 and another with output dimension returning to 4096; a single residual connection skips past this pair of frame-wise dense layers (not skipping past each layer separately, but skipping the pair). All dense layers have their weights tied through time, so each frame in the video is processed with the same weights.
+
+Finally, independent dense layer heads for each action are pulled from the final embedding -- a 2 class on/off categorical parameterized with a softmax for each available key as well as a 11-way categorical for both the discretized horizontal and vertical mouse movements (See Appendix~\ref{appendix:action_space} for details on the action space).
+
+Each dense layer or convolutional layer in the network is preceded by a layernorm\cite{ba2016layer} and followed by a ReLU non-linearity. Weights are initialized with Fan-In initialization\cite{lecun2012efficient} and biases are initialized to zero. 
+
+\subsection{IDM Training}
+\label{appendix:training_details_IDM_training}
+The total loss for the network is the sum of each independent action prediction loss (one for each key and one for both mouse directions). Each independent loss is the negative log-likelihood of the correct action. We use the ADAM\cite{kingma2014adam} optimizer with a linear learning rate decay.
+We use an initial learning rate of 0.003, a batch size of 128 (where each item in the batch is a video sequence of 128 frames), and a weight decay of 0.01. 
+Hyperparameters were tuned in preliminary experiments. The IDM is trained on our contractor collected dataset for 20 epochs. This took 4 days on 32 A100 GPUs.
+
+We add data augmentation to each video segment; augmentations are randomly sampled once per segment such they are temporally consistent. Using the Pytorch\cite{pytorch} transforms library, we adjust the hue by a random factor between -0.2 and 0.2, saturation between 0.8 and 1.2, brightness between 0.8 and 1.2, and contrast between 0.8 and 1.2. We also randomly rotate the image between -2 and 2 degrees, scale it by a random factor between 0.98 and 1.02, shear it between -2 and 2 degrees, and translate it between -2 and 2 pixels in both the $x$ and $y$ dimensions.
+
+Due the large computational cost of running all of the experiments in this paper, training results are from one run of training (for IDM, BC, and RL training): this non-ideal situation is mitigated because deep learning training tends to be low variance \cite{dauphin2014identifying, yosinski2014transferable} and because we often have data points from sweeps (e.g.\ on dataset size) that suggest overall trends.
+
+\subsection{Generating Pseudo Labels with the IDM}
+Section~\ref{section:results_IDM} shows that inverse dynamics modeling is a much easier task than behavioral cloning because IDMs can be non-causal. The IDM is trained to simultaneously predict all 128 actions for each video sequence, so the IDM will effectively be causal for frames at the end of the video clip because future frames are not included in the sequence. For this reason, we apply the IDM over a video using a sliding window with stride 64 frames and only use the pseudo-label prediction for frames 32 to 96 (the center 64 frames). By doing this, the IDM prediction at the boundary of the video clip is never used except for the first and last frames of a full video.
+
+\section{Foundation Model Behavioral Cloning}
+\subsection{Foundation Model Architecture}
+The behavioral cloning model architecture is the same as the IDM architecture described in Appendix \ref{appendix:training_details_IDM_architecture} except that we modify the architecture so that it is causal (i.e. cannot see the future when making predictions). This means the BC architecture does not have the initial non-causal convolution the IDM has (this layer is omitted completely). Furthermore, the residual transformer layers are now causally masked (as is standard in language modeling) and we do Transformer-XL-style\cite{dai2019transformer} training where frames can attend to keys and values from past batches within the same video. We also use a Transformer-XL-style relative attention position embedding.
+
+\subsection{Null Action Filtering}
+The most common action humans take is the null action (no keypresses or mouse movements), which accounts for 35\% of all actions they take. Among other reasons, a player may take the null action to wait for something in the game to finish, to pause between actions, or to take a break to grab a glass of water. Early on in the project we found that the BC model would take a much larger fraction than 35\% of null actions, often upwards of 95\%. In order to prevent this behavior we removed frames with null actions from the dataset. We compare a few different treatments: we filter nulls if there have been 1, 3, or 21 frames of consecutive null actions, and include a treatment that does not perform any null filtering. Null action filtering generally helps, increasing all crafting rates (Figure~\ref{fig:a_null_and_joint} left).
+Filtering only groups of 3 performed slightly better than filtering all null action or groups of 21. Initial experiments indicated that filtering all null actions was better; however, after further model tuning and after we had already trained our largest models, we found that filtering only groups of 3 or more null actions performed best. Due to compute constraints we were not able to redo all experiments with this setting, but doing so would be a reasonable choice for any future work.
+
+\subsection{Joint Hierarchical Action Space}
+We originally worked with a factored action space, where each keypress could be independently on or off, and this choice was independent of whether the mouse was being moved. This could cause issues for modeling the human behavior distribution exactly. Say for a given state, humans either with 50\% probability (a) move forward and attack or with 50\% probability (b) move left and drop their item. The best a factored distribution can do is to assign 50\% probability to each of the 4 constituent actions because it chooses to press each button simultaneously and independently. See Appendix~\ref{appendix:action_space} for details on the entire action space.
+
+\begin{figure}[t]
+\begin{subfigure}{0.5\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/null_action_filtering.pdf} 
+\end{subfigure}
+\begin{subfigure}{0.5\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/joint_action_space.pdf} 
+\end{subfigure}
+\caption{\textbf{(Left)} Effect of Null Action Filtering during training. We compare environment metrics and number of sampled null action during rollouts (rightmost group of columns) for the following treatments: no null action filtering (blue), filtering all null actions (green), filtering only groups of 3 or more null actions (red), and filtering only groups of 21 or more null actions (purple).
+\textbf{(Right)} Hierarchical versus Factored Action Spaces.}
+\label{fig:a_null_and_joint}
+\end{figure}
+
+For this reason, we implemented a joint distribution over actions; however, the full joint distribution over 20 binary buttons and two mouse movement dimensions discretized into 11 bins each would result in in $2^{20} \times 11^2 \approx 1.2\times10^8$ possible combinations. This is far too large for many reasons, e.g.\ the final layer from  the transformer stack with a dimension of 4096 would need to be mapped to each combination resulting in $4096 \times 1.2\times10^8 \approx 5.2 \times 10^{11}$ parameters for this final layer alone. In order to reduce this we noted that many buttons in Minecraft have no effect when simultaneously pressed; for example, if a player tries to move forward and backward at the same time, they remain in place. Below we list the the sets of mutually exclusive actions. Furthermore, the inventory button is exclusive with all other buttons and mouse movement.
+
+\begin{center}
+\begin{tabular}{ |c|c|p{0.55\linewidth}| } 
+\hline
+ \textbf{Mutually Exclusive Actions}\\ 
+ \hline
+ \texttt{forward}, \texttt{back} \\
+ \texttt{left}, \texttt{right} \\
+ \texttt{sprint}, \texttt{sneak} \\
+ \texttt{hotbar.[1-9]} \\
+\hline
+\end{tabular}
+\end{center}
+
+Even reducing the joint action space to reflect these mutually exclusive combinations still results in a huge action space when combined with the discretized mouse movements, i.e. $3^3\times10\times2^4\times11^2 + 1 \approx 5.2\times10^5$. 
+This calculation results from $3^3$ for the 3 sets of 2 mutually exclusive keys above where taking neither in the set is an option, $\times10$ for the 9 hotbar keys or no hotbar keypress, $\times2^4$ for the remaining binary 4 keys: \texttt{use}, \texttt{drop}, \texttt{attack}, and \texttt{jump}, $\times11^2$ for mouse movements, and finally $+1$ for the \texttt{inventory} button which is mutually exclusive with all other actions. $\sim5.2\times10^5$ is still quite large so we chose to implement a hierarchical binary action for camera being moved or not. If this action is on, then there is a secondary discrete action head with 121 classes (the joint distribution of mouse movements because each discretized mouse direction has 11 bins) that determines where to move the mouse. If the hierarchical action is off, then there is no mouse movement, loss for the secondary mouse movement action is masked during training, and the secondary action head need not be sampled during evaluations. While this no longer models the full joint distribution, 
+it is quite a bit better than the factored action space since dependencies between keypresses as well as whether or not to move the mouse (although not which mouse movement) are modeled jointly. The resulting action space has dimension $3^3\times10\times2^4\times 2 + 1 = 8461$ (the $11^2$ dimensional multiplier for camera movement has been replaced by a multiplier of 2 here, corresponding to a binary action for whether or not to move the mouse) with an additional 121-dimension head for the joint camera movements. In the future it would be interesting to implement sequential conditional action spaces to more completely model the joint distribution.
+
+In Figure~\ref{fig:a_null_and_joint} (right) we compare environment rollout performance between BC models with the hierarchical joint action space and with the factored action space. Environment statistics are fairly comparable; however, we see that the factored action space model samples far more null actions. This is an important example of the factored action space failing to correctly model the distribution in the dataset because, due to null action filtering, there are 0 null actions in the dataset these models train on. Despite this, the factored model samples many null actions because the prediction for each key is not conditioned on other keypresses.
+
+\subsection{Foundation Model Training}
+The foundation model training is similar to the IDM training, with the exception of labels being IDM-generated pseudo labels. The hyperparameters used for foundation model training are listed in Table \ref{table:a_foundation_hps}.
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{ |c|c|p{0.55\linewidth}| }
+\hline
+ \textbf{Hyperparameter} & \textbf{Value} \\  
+ \hline
+ Learning rate & 0.002147 \\
+ Weight decay & 0.0625 \\
+ Epochs & 30 \\
+ Batch size & 880 \\
+ \hline
+\end{tabular}
+\end{center}
+\caption{\label{table:a_foundation_hps}Hyperparameters for foundation model training}
+\end{table}
+
+\section{Behavioral Cloning Fine-Tuning}
+Behavior cloning fine-tuning is similar to the foundation model training, except we either use a focused subset of all the videos (\texttt{early\_game} dataset, described in \ref{appendix:early_game_data}) with pseudo labels, or contractor data (\texttt{contractor\_house} dataset, described in \ref{appendix:contractor_house_data}) with ground-truth labels.
+The hyperparameters used for behavior cloning fine-tuning are listed in Table \ref{table:a_bc_hps}. We used 16 A100 GPUs for about 6 hours when fine-tuning on \texttt{contractor\_house} dataset, and 16 A100 GPUs for about 2 days when fine-tuning on \texttt{early\_game} dataset. 
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{ |c|c|p{0.55\linewidth}| }
+\hline
+ \textbf{Hyperparameter} & \textbf{Value} \\  
+ \hline
+ Learning rate & 0.000181 \\
+ Weight decay & 0.039428 \\
+ Epochs & 2 \\
+ Batch size & 16 \\
+ \hline
+\end{tabular}
+\end{center}
+\caption{\label{table:a_bc_hps}Hyperparameters for behavior cloning fine-tuning}
+\end{table}

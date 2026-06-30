@@ -1,0 +1,219 @@
+\section{Evaluation}
+\label{sec:experiments}
+
+We evaluate our \modelname{} models in a diverse set of simulated and real-world benchmarks. Our simulation experiments are conducted on three distinct benchmarks designed to systematically assess the effectiveness of our model across various robot embodiments and manipulation tasks. In our real-world experiments, we investigate the model's capability on a suite of tabletop manipulation tasks with the GR-1 humanoid robot. These experiments aim to demonstrate \modelname{}'s ability to acquire new skills from a limited number of human demonstrations.
+%
+
+\begin{figure}[t]
+\centering
+% \includegraphics[width=\textwidth]{assets/simulation_tasks.pdf}
+% \includegraphics[width=0.8\textwidth]{assets/fig_task_v4.pdf}
+% \includegraphics[width=\textwidth]{assets/fig_task_v5.pdf}
+\includegraphics[width=\textwidth]{assets/fig_task_v6.pdf}
+\caption{\textbf{Simulation Tasks.} Our simulation experiments use tasks from two open-source benchmarks (RoboCasa~\citep{robocasa2024} in the top row and DexMimicGen~\citep{jiang2024dexmimicen} in the middle row) and a newly developed suite of tabletop manipulation tasks that closely resemble our real-world tasks (bottom row). We provide Omniverse renderings of the tasks above.}
+\label{fig:sim_tasks}
+\end{figure}
+
+\subsection{Simulation Benchmarks}
+\label{sec:sim_bench}
+
+Our simulation experiments comprise two open-source benchmarks from prior work~\citep{robocasa2024,jiang2024dexmimicen}, as well as a newly developed suite of tabletop manipulation tasks designed to closely mirror our real-world task settings. We meticulously choose these benchmarks for evaluating our models across different robot embodiments and diverse manipulation tasks. Our model checkpoints, together with the publicly available simulation environments and datasets, ensure the reproducibility of our key results. Fig.~\ref{fig:sim_tasks} illustrates some example tasks from these three benchmarks. 
+% \checkthis{@Ajay and @Runyu, please create a double-column figure showcasing example tasks of from the three, similar to Fig 4 in https://arxiv.org/pdf/2410.24185}
+% \textbf{@Soroush Nasiriany (PIC)} together with @Yu Fang, @Zhenyu Jiang, @Runyu Ding
+
+\begin{itemize}
+    \item \textbf{RoboCasa Kitchen (24 tasks, RoboCasa)}
+    
+    RoboCasa~\citep{robocasa2024} features a collection of tasks in simulated kitchen environments. We focus on 24 ``atomic'' tasks that involve foundational sensorimotor skills such as pick-and-place, door opening and closing, pressing buttons, turning faucets, and more. For each task, we use the publicly available dataset of 3000 demonstrations featuring the Franka Emika Panda arm, all generated with MimicGen~\citep{mandlekar2023mimicgen}.
+    The observation space includes three RGB images captured from cameras positioned on the left, right, and at the wrist. The state representation comprises the position and rotation of both the end-effector and the robot base, as well as the gripper’s state. The action space is defined by the relative position and rotation of the end-effector along with the gripper state.
+    We follow the same training and evaluation protocol outlined by~\cite{robocasa2024}.
+    
+    \item \textbf{DexMimicGen Cross-Embodiment Suite (9 tasks, DexMG)}
+    
+    DexMimicGen~\citep{jiang2024dexmimicen} includes an array of nine bimanual dexterous manipulation tasks requiring precise two-arm coordination. Together, these tasks cover three bi-manual robot embodiments: (1) \textit{Bimanual Panda Arms with Parallel-Jaw Grippers}: tasks include threading, piece assembly, and transport. The state/action space consists of the end-effector position and rotation of both arms, as well as the gripper states; (2) \textit{Bimanual Panda Arms with Dexterous Hands}: tasks include box cleanup, drawer cleanup, and tray lifting. The state/action space consists of the end-effector position and rotation of both arms and hands; (3) \textit{GR-1 Humanoid with Dexterous Hands}: tasks include pouring, coffee preparation, and can sorting. The state/action space consists of the joint position and rotation of both arms and hands, along with the waist and neck.
+    We generate 1000 demonstrations for each task using the DexMimicGen data generation system and evaluate the model's ability to generalize to novel object configurations.
+    
+    \item \textbf{GR-1 Tabletop Tasks (24 tasks, GR-1)}
+    
+    This dataset serves as a digital counterpart to real-world humanoid datasets, enabling systematic evaluations that inform the performance of real-robot deployment. This benchmark focuses on dexterous hand control using the GR-1 humanoid robot equipped with Fourier dexterous hands. Compared to DexMG, this benchmark features a significantly larger variety of objects with diverse placements. We model a total of 18 rearrangement tasks, which have a similar structure to the pre-training tasks outlined in 
+    Sec.~\ref{datasets:synthetic-datasets}, \ie, rearranging objects from a source to a target receptacle. Each task involves a unique combination of receptacles, and these combinations are unseen in our pre-training data.
+    Like the pre-training tasks, most tasks involve distractor objects and receptacles that require the model to pay attention to the task language.
+    We additionally feature six tasks that involve placing objects into articulated objects (\ie, cabinets, drawers, and microwaves) and closing them.
+    The observation space includes one RGB image captured from an egocentric camera positioned on the robot's head.
+    The state/action space consists of the joint position and rotation of both arms and hands, along with the waist and neck. 
+    We optionally include in our datasets the end effector-based actions for controlling the arms, as the native action space for controlling the whole-body IK controller is end effector-based.
+    We generate 1000 demonstrations for each task using the DexMimicGen system. %data generation system.
+    % Camera images and language instruction tokens are the main observations provided to our model for training and inference. Across different embodiments, these factors vary. For example, different robots may have multiple or single views with varying resolutions, and different task categories are expressed in descriptive natural language. In addition to external sensory inputs, proprioception—such as joint positions and velocities—provides crucial information about the robot’s internal state. Based on these observations, the model generates actions to control the robot. Generally, robot controllers operate in two modes: end-effector control and joint position control. Our model supports both modes and can switch between them seamlessly.
+
+
+
+
+    
+\end{itemize}
+
+% \checkthis{
+% \begin{enumerate}
+%     \item \textbf{GR-1 Tabletop Tasks (GR-1)}: This dataset serves as a digital counterpart to real-world humanoid datasets, enabling seamless transfer between simulation and real-world deployment. This benchmark focuses on dexterous hand control using the GR-1 humanoid robot equipped with Fourier dexterous hands.
+%     \item \textbf{RoboCasa Kitchen (RoboCasa)}: This dataset consists of 24 atomic tasks from the RoboCasa paper, performed using a Panda single-arm robot. These tasks cover a diverse set of fundamental robot skills: (1) pick and place, (2) open and close doors, (3) open and close drawers, (4) twist knobs, (5) turn levers, (6) press button. The observation space includes three RGB images captured from cameras positioned on the left, right, and at the wrist. The state representation comprises the position and rotation of both the end-effector and the robot base, as well as the gripper’s state (open/closed). The action space is defined by the relative position and rotation of the end-effector along with the gripper state.
+%     \item \textbf{DexMimicGen Cross-Embodiment Suite (DexMG)}: This dataset consists of 9 environments from the DexMimicGen paper, covering 3 bi-manual robot embodiments, each with 3 distinct tasks: (1) \textbf{Bimanual Panda Arms with Parallel-Jaw Grippers} – Used for tasks like threading, piece assembly, and transport. The state/action space includes the end-effector position and rotation of both arms, as well as the gripper states; (2) \textbf{Bimanual Panda Arms with Dexterous Hands} – Used for tasks such as box cleanup, drawer cleanup, and tray lifting. The state/action space consists of the end-effector position and rotation of both arms and hands; (3) \textbf{GR-1 Humanoid with Dexterous Hands} – Used for complex tasks like pouring, coffee preparation, and can sorting. The state/action space includes the joint position and rotation of both arms and hands, along with the waist and neck.
+% \end{enumerate}
+% }
+
+\subsection{Real-World Benchmarks}
+\label{sec:real_bench}
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\linewidth]{assets/real_gr1_task_figure.pdf}
+ \caption{\textbf{Real-World Tasks.} All images are captured from policy rollouts of \modellarge{} and models post-trained from \modellarge{}. \textbf{(Top) Pre-training evaluations.} We design two manipulation tasks to assess our pretrained models. The left image shows a left-to-right handover, while the right image illustrates the placement of novel objects into an unseen target container.
+\textbf{(Bottom) Post-training evaluations.} We introduce four distinct task categories. From top to bottom, we present examples of object-to-container pick-and-place, articulated object manipulation, industrial object manipulation, and multi-agent coordination.
+    }
+\label{fig:real_gr1_task}
+\end{figure}
+
+We introduce a diverse and meticulously designed set of tabletop manipulation tasks, aimed at evaluating and post-training our models on human demonstrations. These tasks emphasize critical aspects of real-world dexterity, including precise object manipulation, spatial reasoning, bimanual coordination, and multi-agent collaboration. We carefully categorize our benchmarks into four distinct types, ensuring a rigorous evaluation of model performance. We show some example tasks from our real-world benchmarks in Fig.~\ref{fig:real_gr1_task}.
+
+\begin{itemize}
+
+    \item \textbf{Object-to-Container Pick-and-Place (5 tasks, Pick-and-Place)}
+    
+    This category evaluates the model’s ability to grasp objects and place them into designated containers, a fundamental capability for robotic manipulation. Tasks include transferring objects between common household containers such as trays, plates, cutting boards, baskets, placemats, bowls, and pans. These scenarios test fine motor skills, spatial alignment, and adaptability to different object geometries. To rigorously assess generalization, we evaluate models on both seen and unseen objects.
+
+    \item \textbf{Articulated Object Manipulation (3 tasks, Articulated)}
+    
+    These tasks assess the model's ability to manipulate articulated storage compartments. The model must grasp an object, place it into a storage unit such as a wooden chest, dark cabinet, or white drawer, and then close the compartment. These tasks introduce challenges in constrained motion control and precise placement within limited spaces. Generalization is tested with both seen and unseen objects.
+
+    \item \textbf{Industrial Object Manipulation (3 tasks, Industrial)}
+    
+    We design this category for industrial scenarios, which involve three structured workflows and tool-based interactions: 1) \textit{Machinery Packing}: Pick up various machinery parts and tools and place them into a designated yellow bin; 2) \textit{Mesh Cup Pouring}: Grasp a mesh cup containing small industrial components (\eg, screws and bolts) and pour its contents into a plastic bin; and 3) \textit{Cylinder Handover}: Pick up a cylindrical object, transfer it from one hand to the other, and place it into a yellow bin.
+    These tasks closely mirror real-world industrial applications, making them highly relevant benchmarks for assessing dexterity in structured environments.
+
+    \item \textbf{Multi-Agent Coordination (2 tasks, Coordination)}
+    
+    Collaborative tasks require synchronization between multiple agents, emphasizing role coordination and adaptive decision-making:
+    1) \textit{Coordination Part 1}: Pick up a cylinder, place it into a mesh cup, and hand it over to another robot; and 2) \textit{Coordination Part 2}: The receiving robot places the cylinder into one yellow bin, then pours the remaining contents of the mesh cup into another yellow bin.
+    
+\end{itemize}
+
+These carefully designed benchmarks introduce structured, goal-driven interactions to test whether a model can seamlessly adapt to real-world applications. To build a high-quality post-training dataset, we let human operators collect task-specific data for durations ranging from 15 minutes to 3 hours, depending on task complexity. We then filter out low-quality trajectories to maintain data integrity. By incorporating a diverse set of task requirements --- spanning precise single-agent manipulation to complex multi-agent coordination—our benchmark provides a rigorous testbed for evaluating generalization, adaptability, and fine-tuned control in human-like manipulation tasks.
+
+
+
+\subsection{Experiment Setup}
+%
+Our evaluation experiment consists of post-training  \modelname{} and baseline models as described in Sec.~\ref{sec:training_details} in a data-limited setting and evaluating the policy success rate in our simulated and real benchmarks described in Sections~\ref{sec:sim_bench} and~\ref{sec:real_bench}, respectively. 
+%
+By default we use a global batch size of 1024 and train for 60k steps.
+%
+For the DexMimicGen Cross-Embodiment Suite, where each embodiment contains relatively few tasks and the overall training data is limited, we used a smaller batch size of 128 for~\modellarge{}.
+
+\paragraph{\textbf{Baselines}}
+To demonstrate the effectiveness of diverse pretraining of \modelname{}, we compare with two established baselines, BC-Transformer~\citep{robomimic2021} and Diffusion Policy~\citep{chi2024diffusionpolicy}. We describe the details of these two methods below:
+\begin{itemize}
+    \item \textbf{BC-Transformer} is a Transformer-based behavior cloning policy in RoboMimic~\citep{robomimic2021}. It consists of a Transformer architecture for processing observation sequences and a Gaussian Mixture Model (GMM) module for modeling action distributions. The policy takes 10 observation frames as input and predicts the next 10 actions.
+    \item \textbf{Diffusion Policy}~\citep{chi2024diffusionpolicy} models action distributions through a diffusion-based generative process. It employs a U-Net architecture that progressively removes noise from random samples to generate precise robot actions conditioned on observation sequences. It takes a single frame of observations as input and produces 16 action steps in one inference pass.
+\end{itemize}
+
+\paragraph{Evaluation Protocol} 
+%
+For simulated benchmark evaluation, we report the average success rate over 100 trials, taking the maximum score of the last 5 checkpoints, where checkpoints are written every 500 training steps, following the protocol from RoboCasa~\citep{robocasa2024}.
+
+For real robot evaluation, we employ a partial scoring system to capture model behavior across different execution phases, ensuring a fine-grained assessment of performance. We report the average success rate over 10 trials for each task, except for the task of \textit{Pack Machinery}; for this task, we report the success rate of how many objects out of the 5 machinery parts and tools are placed into the bin, given a time-limit of 30 seconds. We conduct only 5 trials due to the time constraint. Additionally, to assess the model’s efficiency in a low-data regime, we subsample 10\% of the full dataset for each task and evaluate whether the model can still learn effective behaviors.
+
+\subsection{Quantitative Results}
+\label{sec:quant_results}
+
+\paragraph{Pre-training Evaluations} 
+To evaluate the generalization capabilities of our pretrained checkpoint, we design two tasks on the real GR-1 humanoid robot (Fig.~\ref{fig:real_gr1_task}). In the first task, the robot is instructed to place an object on the bottom shelf. However, the object is intentionally positioned to the left of its left hand, requiring a coordinated bimanual strategy. The robot must first grasp the object with its left hand, transfer it within reach of the right hand, and then complete the placement onto the shelf.
+In the second task, the robot is instructed to place a novel object into an unseen target container. For each task, we evaluate the pretrained \modellarge{} model using five different objects, with three trials per object. \modellarge{} achieves a success rate of 76.6\% (11.5/15) in the first coordinated setting and 73.3\% (11/15) in the second setting involving novel object manipulation. 0.5 stands for grasping the object correctly but failing to place the object into the container. The high performance under these two evaluation settings illustrates the effectiveness of large-scale pre-training.
+
+
+
+% \begin{figure}[!t]
+%     \centering
+%     \includegraphics[width=\linewidth]{assets/zero_shot.pdf}
+%     \caption{Illustration of the two manipulation tasks used to evaluate our pretrained checkpoint. The left image depicts a left-to-right handover, while the right image demonstrates the placement of novel objects into an unseen target container. 
+%     Our model achieves a success rate of \textbf{11.5/15} (\textbf{76.6\%}) trials in the first setting and \textbf{11/15} (\textbf{73.3\%}) trials in the second setting. \checkthis{@Guanzhi to update this figure} (0.5 stands for grasping the object correctly but failing to place the object into the container.)} %\checkthis{it is not clear what half a success is. I.e. how can we get 11.5/15?} }
+% \end{figure}
+
+
+\paragraph{Post-training Evaluations} 
+%
+In simulation, we compare the quantitative results for our post-trained \modelname{} models against from-scratch baselines in the three simulation benchmarks (Table~\ref{tab:main_quant_sim}). 
+%
+For each benchmark, we post-train using 30, 100, and 300 demonstrations per task (24 tasks for RoboCasa, 9 tasks for DexMG, and 24 tasks for GR-1).
+%
+We observe that \modelname{} consistently outperforms the baseline models across benchmark tasks and dataset sizes.
+%
+In Appendix~\ref{sec:appendix_posttrain_details}, we include the full results and a bar plot (Fig.~\ref{fig:sim_posttraining}) for comparison.
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Simulation Results.} Average success rate across three simulation benchmarks, using 100 demonstrations per task. \modelname{} outperforms both baselines, especially on the GR-1 task where it outperforms by more than 17 \%.}
+\label{tab:main_quant_sim}
+\begin{tabular}{lcccc}
+\toprule
+     & RoboCasa  & DexMG     & 
+GR-1 & Average  \\ \midrule
+BC Transformer &          26.3\%         &  53.9\%  &   16.1\%  & 26.4\% \\
+Diffusion Policy   &      25.6\%          &  56.1\%&    32.7\%  &  33.4\%\\ %\midrule
+\modellarge{}                       &    \textbf{32.1\%}    & \textbf{66.5\%}&  \textbf{50.0\%}  & \textbf{45.0}\%\\ 
+\bottomrule
+\end{tabular}
+\end{table}
+
+%
+On the real robot, we compare \modellarge{} against Diffusion Policy, training on 10\% of the human teleoperation dataset and the full dataset (Table~\ref{tab:main_quant_real} and \FIGREF{fig:real_gr1}).
+%
+\modellarge{}, achieves a significantly higher success rate across all tasks, outperforming Diffusion Policy by 32.4\% in the 10\% Data setting and by 30.4\% in the Full Data setting. Notably, \modellarge{} trained on just 10\% of the data performs only 3.8\% lower than Diffusion Policy trained on the full dataset, highlighting its data efficiency. 
+
+% \begin{figure}[!thbp]
+%     \centering
+%     \includegraphics[width=\linewidth]{assets/real_gr1.pdf}
+%     \caption{Average policy success rate on real-world manipulation tasks with the GR-1 humanoid robots.}
+%     \label{fig:real_gr1}
+% \end{figure}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Real-World Results.} Average policy success rate on real-world tasks with the GR-1 humanoid robots. \modelname{} beats the diffusion policy baseline and shows strong results even with very little data.}
+\label{tab:main_quant_real}
+\begin{tabular}{lccccc}
+\toprule
+                                        & Pick-and-Place      & Articulated & Industrial & Coordination  & Average \\ \midrule
+Diffusion Policy (10\% Data)  & 3.0\% & 14.3\% & 6.7\% & 27.5\% & 10.2\% \\
+Diffusion Policy (Full Data)  & 36.0\% & 38.6\% & 61.0\%  &  62.5\% & 46.4\%\\ \midrule
+\modellarge{} (10\% Data)      & 35.0\% & 62.0\% & 31.0\% & 50.0\% & 42.6\%\\
+\modellarge{} (Full Data)      &  \textbf{82.0}\% & \textbf{70.9}\% & \textbf{70.0}\%  & \textbf{82.5}\% & \textbf{76.8}\%\\ 
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Post-training w/ Neural Trajectories Evaluations}
+\begin{figure}[!thbp]
+    \centering
+    \includegraphics[width=\linewidth]{assets/dream_figure.pdf}
+    \caption{\textbf{Neural Trajectories Ablations}. In the RoboCasa simulation, we show using neural trajectories for post-training across 3 data regimes (30, 100, and 300 per task).  In the real world, we show results only on the low-data regime (10\% of the demonstrations). We co-train with 3k neural trajectories per task for RoboCasa and 100 neural trajectories per task for real-world tasks. We explore using both latent and IDM-labeled actions in simulation and only IDM-labeled actions for the real robot.}
+    \label{fig:real_gr1}
+\end{figure}
+We show some preliminary results of using neural trajectories during post-training for the RoboCasa benchmark for simulation evaluation and Pick-and-Place (seen) and Industrial for the real-world evaluation in Figure \ref{fig:real_gr1}. We observe that GR00T N1 co-trained with neural trajectories consistently results in substantial gains compared to GR00T N1 only trained on real-world trajectories: +4.2\%, +8.8\%, +6.8\% on average for 30, 100, and 300 data-regimes, respectively, for RoboCasa and +5.8\% on average across the 8 tasks with the GR-1 Humanoid. 
+
+When comparing LAPA and IDM labels in RoboCasa, an interesting pattern emerges: LAPA slightly outperforms IDM in the relatively low-data regime (30), but as more data becomes available (100 and 300), the performance gap between LAPA and IDM widens. This trend is intuitive— with more data for IDM training, the pseudo-action labels become increasingly aligned with real-world actions, leading to stronger positive transfer. Since GR-1 Humanoid is a relatively ``high-data'' regime for us, we only utilize IDM actions for neural trajectory co-training in the real world.
+
+\subsection{Qualitative Results}
+How does this behavior look qualitatively? To answer this, we consider the task ``Turn Sink Spout'' in RoboCasa --- in the 100 sample regime, the DP baseline gets 11.8\% success rate whereas \modelname{} gets 42.2\%. The DP baseline often gets confused about the semantics of the tasks. 
+From Table~\ref{tab:main_quant_sim}, we see that \modelname{} has strong results in the low-data regime. It is natural, in the limit of large fine-tuning datasets, that the effect of pre-training dwindles.
+% \paragraph{Simulation}
+% We illustrate typical trajectories for \modelname{} and the DP baseline in \Cref{fig:qual_sim}. The task is to turn the sink spout to the right. While \modelname{} completes the task, the DP baseline instead attempts to move to the left.
+
+
+% \checkthis{PIC: @Johan and @Guanzhi}
+% \paragraph{Real GR-1 Humanoid}
+
+When prompting the pre-trained \modelname{} model with the task instruction ``Pick up the red apple and place it in the basket,'' one of the tasks in our post-training benchmark, we observe interesting behavioral patterns. In this scenario, we intentionally position the apple to the left of the humanoid hand. Despite seeing few similar tasks during pretraining and exhibiting jerkier motions, the pretrained checkpoint uses its left hand to grasp the apple, hands it over to the right hand, and then places it into the basket. We provide the visualization of this behavior in \FIGREF{fig:gr1-pretraining-qualitative-examples}. In contrast, the post-trained checkpoint fails in this scenario. Since all post-training data exclusively involve the right hand without any inter-hand transfer, the post-trained policy loses the capability to perform this behavior.
+
+For post-trained \modelname{}, we observed that, compared to the baseline Diffusion Policy, its motion is generally much smoother, and its grasping accuracy is significantly higher. 
+In contrast, the Diffusion Policy baseline suffers from immobility during the initial frames and frequently exhibits inaccurate grasping, resulting in a low success rate in our real-world benchmarks. We provide visualizations of two policy rollout examples in \FIGREF{fig:gr1-posttraining-qualitative-examples}.
+
+\subsection{Limitations}
+%
+Currently, our \modelname{} model focuses primarily on short-horizon tabletop manipulation tasks. In future work, we aim to extend its capabilities to tackle long-horizon loco-manipulation, which will require advancements in humanoid hardware, model architecture, and training corpora. We anticipate a stronger vision-language backbone will enhance the model’s spatial reasoning, language understanding, and adaptability. Our synthetic data generation techniques --- leveraging video generation models and automated trajectory synthesis systems --- have shown great promise. However, existing methods still face challenges in generating diverse and counterfactual data, while adhering to the laws of physics, limiting the quality and variability of synthetic datasets. We aim to enhance our synthetic data generation techniques to further enrich our data pyramid for model training. Furthermore, we plan to explore novel model architectures and pre-training strategies to improve the robustness and generalization capabilities of our generalist robot models.

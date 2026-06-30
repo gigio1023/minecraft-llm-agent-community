@@ -1,0 +1,17 @@
+\section{Case Study Design: Imitating $\mathbb{X}$ Users}
+\label{sec:twon}
+
+We now instantiate our framework using data from $\mathbb{X}$. Our implementation focuses on user behavior function $b^i$ while acknowledging simplifications in other framework components. We estimate communicative behavior by minimizing $L_b(\widehat{m}_{t+1}, m_{t+1})$ across three action types: posts, replies, and reply-likelihood.
+
+The imitation of agent behavior $b$ is further separated into distinct subtasks: \emph{Posting} behavior is characteristic for the content creator user group and the \emph{Replying} behavior for reactive users. In our data, the former category includes politicians, policy makers, and institutional news outlets, characterized by their role in initiating discussions and setting conversational agendas. The latter comprises individual users whose primary mode of engagement involves responding to and amplifying existing content through platform-specific mechanics such as replies, retweets, and reactions. This asymmetric structure reflects the empirically observed power-law distribution of participation in social networks, where a small percentage of users generate most of the original content \citep{carron2014describing, sun2014understanding}.
+
+An overview of the different agent behaviors that we empirically evaluate in the next sections is provided in Table~\ref{tab:methods:task} and is described below.
+
+\paragraph{Imitating Posting Behavior}
+We model party-specific content generation patterns through the extracted topics and the public information (name and party affiliation) of the individuals - in our case politicians. Given a specified topic, the model learns to generate content that reflects both the broad party stance and individual variations in expression style.
+
+\paragraph{Imitating Replying Behavior}
+The reply generation system operates on a context-aware framework that processes historical interaction patterns. The historical interaction context is represented as a sequence of <Post, Reply> pairs, encoded as few shot examples during the alignment process. The model maintains consistent user behavior by implementing a constraint mechanism that prevents top-level post-generation, restricting outputs to reply-only contexts. 
+
+\paragraph{Estimating Replying Likelihood}
+The goal of this task is to predict whether a synthetic social network user would respond to a post based on their history of interaction. The system processes historical interactions and a current post using a fine-tuned BERT model \cite{zhang2023twhin} to generate embeddings by calculating the pooled mean of its input representations. Historical interactions and the post are separately processed through quadratic linear layers with ReLU activation, maintaining dimensions related to historical data and encoder size. The post embedding is repeated to match each historical entry and combined using element-wise multiplication with the history representation, establishing an interaction between past patterns and current post features. These combined representations are fed into a classification layer, producing a prediction score between 0 and 1 to indicate the likelihood of a synthetic user replying to the post.

@@ -1,0 +1,121 @@
+\needspace{4\baselineskip}
+\section{Quality and Erosion Analysis}\label{sec:appendix-quality}
+
+\subsection{Code Quality Examples}\label{sec:appendix-quality-examples}
+
+This subsection reproduces the two \codesearch{} code fragments referenced in \autoref{sec:quality-dims}. \autoref{lst:dispatch-erosion} illustrates structural erosion, and \autoref{fig:verbosity-example} illustrates verbosity.
+
+\begin{figure}[h]
+\begin{lstlisting}[caption={Structurally eroded \texttt{find\_matches\_in\_file()} in \codesearch{} at $\ckpt{5}$ (117 lines total). Nearly all decision-point mass ends up in one function.},label={lst:dispatch-erosion}]
+def find_matches_in_file(text, path, language, rules):
+    ...
+    for rule in rules:
+        if kind == "exact":
+            ...
+        elif kind == "regex":
+            ...
+        elif kind == "pattern":
+        else: ...
+
+        if iterable is not None:
+            for match in iterable:
+                ...
+        if kind == "pattern":
+            for match in iter_pattern_matches(...):
+                ...
+        for node in iter_tree_nodes(source_root):
+            if not node_matches_selector(selector, node):
+                ...
+    return matches
+\end{lstlisting}
+\end{figure}
+
+\begin{figure}[h]
+\begin{lstlisting}[caption={Overly verbose code from \codesearch{}. Identity list comprehension instead of \texttt{filter}, empty checks instead of building around iteration, and single-use variables.},label={fig:verbosity-example}]
+for posix_path, full_path, language in source_files:
+    applicable_rules = [
+        r for r in all_compiled_rules
+        if language in r["languages"]
+    ]
+    if not applicable_rules:
+        continue
+    with open(full_path, "r", encoding=encoding) as f:
+        content = f.read()
+    matches = find_matches_in_content(
+        content, applicable_rules, language
+    )
+    if not matches:
+        continue
+    match_list.extend(matches)
+all_matches = deduplicate_matches(match_list)
+return all_matches
+\end{lstlisting}
+\end{figure}
+
+\subsection{Erosion Example: \texttt{forge/main} Across Eight Checkpoints}\label{sec:appendix-erosion-example}
+
+On \texttt{forge}, Opus~4.7's \texttt{main()} grows \erosionForgeMainCcMultiplier$\times$ in cyclomatic complexity over \erosionForgeNumCkpts{} checkpoints, from CC \erosionForgeMainCcFirst{} to CC \erosionForgeMainCcLast{}, and from \erosionForgeMainLinesFirst{} to \erosionForgeMainLinesLast{} lines. The increase is monotonic across every checkpoint. \autoref{lst:erosion-main-cp1} shows the $\ckpt{1}$ implementation, a six-line \texttt{argparse} setup followed by a small dispatch ladder. \autoref{lst:erosion-main-cp8} shows the $\ckpt{8}$ implementation, in which \texttt{argparse} has been removed and replaced with a manual \texttt{while}-loop that handles each flag in two parallel branches, one for the \verb|--X val| form and one for \verb|--X=val|. This pair of branches is repeated for seven flags before control passes to a nested resource-by-command dispatch ladder. No shared helper is introduced across the seven flag pairs, despite the per-flag template being uniform.
+
+\begin{figure}[h]
+\begin{lstlisting}[caption={\texttt{main()} from Opus~4.7's \texttt{forge} solution at $\ckpt{1}$. Argument parsing is delegated to \texttt{argparse}; dispatch is a single \texttt{if/elif} ladder.},label={lst:erosion-main-cp1}]
+def main():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--data-dir", required=True)
+    parser.add_argument("resource")
+    parser.add_argument("command")
+    parser.add_argument("rest", nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+
+    if args.resource != "blueprint":
+        emit_error("validation_error", f"unknown resource: {args.resource}")
+
+    cmd, rest = args.command, args.rest
+    if cmd == "create":   cmd_create(args.data_dir)
+    elif cmd == "list":   cmd_list(args.data_dir)
+    elif cmd == "get":    cmd_get(args.data_dir, rest[0])
+    # ... two more branches ...
+    else:
+        emit_error("validation_error", f"unknown command: {cmd}")
+\end{lstlisting}
+\end{figure}
+
+\begin{figure}[h]
+\begin{lstlisting}[caption={\texttt{main()} from Opus~4.7's \texttt{forge} solution at $\ckpt{8}$, abridged to expose structure. The \texttt{argparse} call has been removed; each of seven flags is handled by an identical pair of branches. After parsing, a nested \texttt{if resource == ...: if cmd == ...} ladder dispatches over seven resources.},label={lst:erosion-main-cp8}]
+def main():
+    argv = sys.argv[1:]
+    data_dir = revision_arg = config_path = role = scope = None
+    rules_file_flag = None
+    cleaned, i = [], 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok == "--data-dir":
+            if i + 1 >= len(argv):
+                emit_error("validation_error", "--data-dir requires a value")
+            data_dir = argv[i + 1]; i += 2
+        elif tok.startswith("--data-dir="):
+            data_dir = tok[len("--data-dir="):]; i += 1
+        # ... same two-branch pattern repeats verbatim for
+        #     --revision, --config, --rules-file, --role, --scope
+        #     (six more flags, twelve more branches) ...
+        else:
+            cleaned.append(tok); i += 1
+
+    # ... config load, revision negotiation (~30 lines) ...
+
+    if resource == "blueprint":
+        if cmd == "create":  cmd_create(data_dir, ...)
+        elif cmd == "list":  cmd_list(data_dir, ...)
+        # ... five more cmd branches ...
+        else: emit_error("validation_error", f"unknown command: {cmd}")
+    elif resource == "revision":
+        # ... same cmd-ladder shape, six more resources ...
+\end{lstlisting}
+\end{figure}
+
+\subsection{Erosion Sensitivity}\label{sec:erosion-sensitivity}
+
+We vary the high-CC cutoff (8, 10, 12) and the size term (no size term, $\sqrt{\text{SLOC}}$, linear SLOC) around the reported erosion family. Across all nine variants, the result is stable: predictive correlation with next-checkpoint pass rate stays near zero, while predictive correlation with next-checkpoint cost stays positive.
+
+\input{sections/generated/appendix_erosion_sensitivity_table}
+
+Size-heavy baselines such as LOC and max CC remain stronger raw cost predictors, but the erosion-family conclusion does not depend on the exact threshold or size term.

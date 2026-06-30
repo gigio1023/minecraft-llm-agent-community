@@ -1,0 +1,149 @@
+\section{Causal Dynamics Learning for Task-Independent State Abstraction (\textsc{cdl})}
+\label{sec:approach}
+In this section, we introduce \textsc{cdl}, which learns a causal dynamics model and then derives a state abstraction that supports learning a wide range of tasks, from the learned causal relationships.
+
+\subsection{Background}
+\subsubsection{Markov Processes}
+
+We consider the agent's interaction with the environment as a Markov Process defined as $\mathcal{M} = (\mathcal{S}, \mathcal{A}, \mathcal{P})$, where $\mathcal{S} \subseteq \mathbb{R}^{d_\mathcal{S}}$ is the $d_\mathcal{S}$-dimensional state space, $\mathcal{A} \subseteq \mathbb{R}^{d_\mathcal{A}}$ is the $d_\mathcal{A}$-dimensional action space, $\mathcal{P}$ is the transition function. The state space consists of $d_\mathcal{S}$ state variables, one for each dimension of the state space, denoted as $\{\mathcal{S}^i\}_{i=1}^{d_\mathcal{S}}$. 
+
+
+\subsubsection{Causal Graphical Models}
+\label{subsec:causal_graphical_model}
+A causal graphical model \cite{pearl2009causality} is defined by a distribution $p_X$ over $d$ random variables $X^1, \dots, X^d$ and a Directed Acyclic Graph $\mathcal{G}=(V, E)$. Each node $i \in V = \{1, \dots, d\}$ is associated with a random variable $X^i$ and each edge $(i \rightarrow j) \in E$ represents that $X^i$ is a \textbf{direct cause} of $X^j$, i.e., $X^j$ depends on $X^i$ during the data generation process. 
+Then the distribution can be specified as
+\begin{equation}
+    p_X(x^1, \dots, x^d) = \prod_{i=1}^d p_{X^i}(x^i | \textbf{PA}_i),
+    \label{eq:causal_graphical_model}
+\end{equation}
+where $\textbf{PA}_i$ is the set of parents of the node $i$ in the graph $\mathcal{G}$.
+
+For simplicity, in the remainder of the paper, we denote $v^{1:n}$ (or $v_{1:n}$) for an abbreviation of a set of variables $\{v^i\}_{i=1}^n$ (or $\{v_i\}_{i=1}^n$) and will omit the subscript of distributions, i.e., $p_V(v) = p(v)$ and $p_V(v | w) = p(v | w)$.
+
+
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.7\columnwidth]{contents/figures/illustrative.png}
+  \vspace{-10pt}
+  \caption{\small \textbf{(a)} an example causal dynamics model. \textbf{(b)} state variables can be split into three types: controllable (green), action-relevant (orange), and action-irrelevant (blue). The dashed arrow represents whether it exists does not affect $s^5$ to be action-irrelevant. \textbf{(c)} the causal graph can be split into three subgraphs, one for each type of state variable.}
+  \label{fig:causal_illustration}
+  \vspace{-10pt}
+\end{figure}
+
+\subsection{Problem Definition}
+\label{subsec:problem_definition}
+
+We begin with a formal definition of controllable, action-relevant, and action-irrelevant state variables. If we are given the causal graphical model of a Markov Process with $V=\{s^{1 : \dS}_t, a_t, s^{1 : \dS}_{t+1} \}$ as nodes and $E$ as edges describing causal relationships from $s^{1 : \dS}_t$ and $a_t$ to $s^{1 : \dS}_{t+1}$, ancestors of a state variable $s^i$ are defined as all nodes that have a directed path leading to node $s^i$ (not necessarily from the immediate previous time step but can be from any previous step). For example, for the causal dynamics model shown in Fig. \ref{fig:causal_illustration} (a), $s^4$ is an ancestor of $s^2$ as there is a path of $s^4_t \rightarrow s^3_{t+1} \rightarrow s^2_{t+2}$. Descendants of nodes are defined in the same way but in the opposite direction. Then we have:
+
+\textbf{Definition 1} (Controllable State Variables) $s^\mathcal{C}$ are the descendants of the action $a_t$.
+
+\textbf{Definition 2} (Action-Relevant State Variables) $s^\mathcal{R}$ are ancestors of controllable state variables, excluding those already belonging to $s^\mathcal{C}$.
+
+\textbf{Definition 3} (Action-Irrelevant State Variables) $s^\mathcal{I}$ are those that belong to neither $s^\mathcal{C}$ nor $s^\mathcal{R}$.
+
+In the above definitions, $\mathcal{C}, \mathcal{R}$, and $\mathcal{I}$ are the set of state dimension indices for controllable, action-relevant, and action-irrelevant state variables respectively.
+
+Given these definitions, the type of each state variable in the example causal dynamics model is shown in Fig. \ref{fig:causal_illustration} (b). Further in (c), one may notice that the causal graph can be split into three parts, allowing us to rewrite the transition probabilities as $\mathcal{P}(s_{t+1} | s_{t}, a_t)= p(s^\mathcal{C}_{t+1} | s^\mathcal{C}_{t}, s^\mathcal{R}_{t}, a_t) \cdot p(s^\mathcal{R}_{t+1} | s^\mathcal{R}_{t}) \cdot p(s^\mathcal{I}_{t+1} | s^\mathcal{R}_{t}, s^\mathcal{I}_{t})$,
+where the edge from $s^\mathcal{R}_{t}$ to $s^\mathcal{I}_{t+1}$ is optional as it does not change the split of state variables ($s^\mathcal{I}$ are still neither $a_t$'s descendants nor $s^\mathcal{C}$'s ancestors).
+
+Then \textsc{cdl} forms the state abstraction $\phi$ by omitting action-irrelevant state variables, i.e., $\phi(s_t) = (s^\mathcal{C}_t, s^\mathcal{R}_t)$, and the dynamics in the abstract space can be expressed by removing the subgraph involving action-irrelevant state variables, remaining a causal dynamics model itself, as follows:
+\begin{align}
+    \mathcal{P}(\phi(s_{t+1}) | \phi(s_t), a_t) = p(s^\mathcal{C}_{t+1} | s^\mathcal{C}_{t}, s^\mathcal{R}_{t}, a_t) \cdot p(s^\mathcal{R}_{t+1} | s^\mathcal{R}_{t}). \nonumber
+\end{align}
+
+This state abstraction $\phi$ can be used to solve any \textit{actively-accomplishable} downstream task.
+Here, downstream tasks are those defined in the same Markov Process so that the agent can use $\phi$ to solve the task by learning the provided rewards.
+Meanwhile, actively-accomplishable means that the reward function of the task only depends on controllable and action-related state variables $(s^\mathcal{C}, s^\mathcal{R})$.
+Additionally, if the task involves extra variables $\mathcal{V}$, e.g., a \textit{varying} goal $g_t$ for certain controllable state variables to reach, those variables should also be provided so that the agent can learn the reward accurately.
+Notice that actively-accomplishable tasks do not cover those involving action-irrelevant state variables (e.g., for the example in Fig. \ref{fig:method_comparison}, a reward of $+1$ for opening door A when the clock shows 1 pm and $0$ otherwise).
+However, as the reward function of a task can be arbitrarily designed using any state variable, being able to solve all tasks means that no state variable can be omitted (i.e., no state abstraction). We assume that in practice, it is relatively uncommon for a task’s reward function to involve action-irrelevant state variables, making $\phi$ fairly generally applicable.
+
+So far, we have defined three types of state variables and the derived state abstraction for a known causal dynamics model. However, for real-world problems, such a model is usually not accessible. Instead, agents can only collect transition data via its interactions with the environment. Hence, this paper introduces a novel method that: (1) learns a \textbf{causal} dynamics model $F_\theta: \mathcal{S} \times \mathcal{A} \rightarrow \mathcal{S}$, (2) learns a transition collection policy $\pi: \mathcal{S} \rightarrow \mathcal{A}$ to learn $F_\theta$ efficiently, (3) derives the state abstraction $\phi: \mathcal{S} \rightarrow \mathcal{S}^\mathcal{C} \times \mathcal{S}^\mathcal{R}$ and dynamics $F^\phi_\theta$ in the abstract space, (4) learns a reward predictor for any actively-accomplishable task in the abstract space $R_\varphi: \phi(\mathcal{S}) \times \mathcal{A} \ (\times \mathcal{V}) \rightarrow \mathbb{R}$, and (5) uses planning methods to solve the task with the learned $F^\phi_\theta$ and $R_\varphi$.
+
+\subsection{Causal Dynamics Learning}
+
+The key challenge when learning a causal dynamics model is to determine whether a causal edge exists between two state variables, i.e., $s_t^i \rightarrow s^j_{t+1}$. First, adapting the work from \citet{mastakouri2021necessary}, we present a method for inferring whether such a causal relationship exists, based on the following assumptions about the ground truth dynamics model:
+
+\textbf{Assumptions}\\
+A1. Causal Markov condition and Faithfulness in the underlying dynamics (definitions in appendix Sec. \ref{app:definitions}).\\
+A2. The state is fully observable and the dynamics is Markovian.\\
+A3. The edge $s_t^i \rightarrow s^i_{t+1}$ exists for all state variables $s^i$.\\
+A4. No simultaneous or backward edges in time, i.e., for all $i, j$, $s_t^i \nrightarrow s^j_{t}$ and $s_t^i \nrightarrow s^j_{t-1}$.\\
+A5. The transitions for each state variable are independent, i.e., $\mathcal{P}(s_{t+1}|s_t, a_t) = \prod_{j=1}^\dS p(s^j_{t+1}|s_t, a_t)$
+
+Except for A4, which requires no redundant information in state variables (e.g., state variables that include both joint angles and the end-effector of a robot arm), and A5, which does not necessarily hold for rich observation spaces (e.g., images), these assumptions are commonly made for causal inference and dynamic systems. Moreover, for partially observable or high-dimensional state spaces, low-dimensional disentangled representations that encode the space can be learned to adhere to A2 and A5.
+
+\begin{theorem}
+\label{thm:causal_sufficient_condition}
+Assuming A1 - A5, we define the conditioning set $\{a_t, s_t \setminus s^i_t\}=\{a_t, s^1_t, \dots, s^{i-1}_t, s^{i+1}_t, \dots, s^\dS_t\}$. Then, for any two state variables at indices $i$ and $j$, if $s_t^i \notind s^j_{t+1} | \{a_t, s_t \setminus s^i_t\}$, then $s_t^i \rightarrow s^j_{t+1}$. Similarly, if $a_t \notind s^j_{t+1} | s_t$, then $a_t \rightarrow s^j_{t+1}$.
+\end{theorem}
+
+Proof in appendix Sec. \ref{app:theorem_proof}. This result shows that the causal relationship between state variables (or between the action and any state variable) can be inferred with one Conditional Independence Test (\textsc{cit}). For simplicity, in the remainder of the paper, we will only describe the \textsc{cit} between two state variables, $s_t^i \notind s^j_{t+1} | \{a_t, s_t \setminus s^i_t\}$. For the test between the action and the state variable, $a_t \notind s^j_{t+1} | s_t$, the same method applies by changing $s_t^i$ to $a_t$ and the conditioning set according to Theorem \ref{thm:causal_sufficient_condition}. 
+
+In theory, the \textsc{cit} between $s_t^i$ and $s^j_{t+1}$ can be made by measuring the Conditional Mutual Information, $\textsc{cmi}^{ij}$:
+\begin{align}
+\label{eq:cmi}
+& \mathop{\mathbb{E}}\limits_{s_t,a_t,s^j_{t+1}}\left[\log\frac{p(s^i_t, s^j_{t+1} | \{a_t, s_t \setminus s^i_t\})}{p(s^i_t | \{a_t, s_t \setminus s^i_t\})p(s^j_{t+1} | \{a_t, s_t \setminus s^i_t\})}\right] \nonumber\\
+=& \mathop{\mathbb{E}}\limits_{s_t,a_t,s^j_{t+1}}\left[\log\frac{p(s^j_{t+1} | a_t, s_t)}{p(s^j_{t+1} | \{a_t, s_t \setminus s^i_t\})}\right],
+\end{align}
+where the expectation is over the joint distribution of $\{s_t,a_t,s^j_{t+1}\}$, all $p$ are the ground truth conditional densities, and the derivation of Eq. \eqref{eq:cmi} is in the appendix Sec. \ref{app:cmi_eq_derivation}. If $\textsc{cmi}^{ij} \ge \epsilon$ where $\epsilon$ is a pre-defined threshold, it suggests that $s^i_t$ is necessary to predict $s^j_{t+1}$ accurately, $s_t^i \notind s^j_{t+1} | \{a_t, s_t \setminus s^i_t\}$ is true, and the causal edge $s_t^i \rightarrow s^j_{t+1}$ exists.
+
+In practice, as the ground truth joint distribution and conditional densities are unknown, the expectation is computed over the collected transition data $\mathcal{D}$ and \textsc{cdl} learns predictive models $\hat{p}(s^j_{t+1} | a_t, s_t), \hat{p}(s^j_{t+1} | \{a_t, s_t \setminus s^i_t\})$ to approximate conditional densities.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.9\columnwidth]{contents/figures/architecture.png}
+  \vspace{-15pt}
+  \caption{\small The predictive model for the state variable $s^j_{t+1}$. Different conditional densities can be represented by applying different masks $M_j$. $\hat{p}(s^j_{t+1} | \{a_t, s_t \setminus s^i_t\})$ is shown as an example in the figure.}
+  \label{fig:architecture}
+  \vspace{-15pt}
+\end{figure}
+
+However, computing $\textsc{cmi}^{ij}$ for all state variable pairs requires training $(d_\mathcal{S})^2$ predictive models, which is intractable. Instead, we develop a novel architecture and training paradigm which reduces the requirement to $\dS$ models. 
+As shown in Fig. \ref{fig:architecture}, to predict each state variable $s^j_{t+1}$:
+(1) the action and all current state variables are individually mapped to features $f^a_j(a_t), f^1_j(s^1_t), \dots, f^\dS_j(s^\dS_t)$ where each feature is a $d_f$-dimensional vector;
+(2) certain features are masked to $-\infty$ according to a binary map $M_j$; 
+(3) the overall feature $h_j$ is computed by taking the element-wise max of all features; and
+(4) a predictive network $q_j$ takes $h_j$ as input and predicts the distribution of $s^j_{t+1}$. 
+This architecture can represent conditional densities with different masks $M_j$:
+(1) for $\hat{p}(s^j_{t+1} | a_t, s_t)$, none of the features is masked; 
+(2) for $\hat{p}(s^j_{t+1} | \{a_t, s_t \setminus s^i_t\})$, the feature $f^i_j(s^i_t)$ is masked to $-\infty$ so that it will not be used to predict $s^j_{t+1}$, as shown in Fig. \ref{fig:architecture}; and 
+(3) for $\hat{p}(s^j_{t+1} | \textbf{PA}_{s^j})$, after deriving parents of $s^j_{t+1}$ from $\{\textsc{cmi}^{ij}\}_{i=1}^{\dS}$), all non-parent features are masked to $-\infty$.
+
+The architecture described above predicts one state variable $s^j_{t+1}$, and the whole causal dynamics model $F_\theta$ consists of $\dS$ such models, where $\theta$ parameterizes all feature extractors $\{f^a_j, f^{1:\dS}_j\}_{j=1}^\dS$ and predictive networks $q_{1:\dS}$.
+To train $\theta$, we maximize the following log-likelihood:
+\begin{align}
+\label{eq:dynamics_loss}
+\mathcal{L}_\theta = \sum\limits_{j=1}^\dS \big[& \log\hat{p}(s^j_{t+1} | a_{t}, s_t) + \log\hat{p}(s^j_{t+1} | \{a_{t}, s_t \setminus s^i_t\}) \nonumber \\
+& + \log\hat{p}(s^j_{t+1} | \textbf{PA}_{s^j})\big],
+\end{align}
+where $i$ is uniformly sampled from $\{1,\dots,\dS\}$ for each $j$, and $\textbf{PA}_{s^j}$ are inferred from $\{\textsc{cmi}^{ij}\}_{i=1}^{\dS}$ learned so far. In Equation \ref{eq:dynamics_loss}, the first two predictive likelihoods train models necessary to evaluate $\textsc{cmi}^{ij}$, and the last prediction likelihood finetunes the performance of the inferred causal dynamics model $\hat{p}(s^j_{t+1} | \textbf{PA}_{s^j})$. We split the collected transition data $\mathcal{D}$ into the training part used to maximize $\mathcal{L}_\theta$ and the validation part for evaluating $\textsc{cmi}$.
+
+After training, \textsc{cdl} evaluates the causal graph by checking if each $\textsc{cmi}^{ij} \ge \epsilon$ and derives the learned state abstraction $\phi(s) = (\hat{s}^\mathcal{C}, \hat{s}^\mathcal{R})$ from the learned causal graph, according to Definitions 1-3 (for a ground truth variable or distribution $x$, we denote $\hat{x}$ as its learned prediction or distribution). The dynamics in the abstract space $F^\phi_\theta$ can also be derived by omitting the prediction networks for action-irrelevant state variables $\hat{s}^\mathcal{I}$.
+
+\subsection{Policy Learning for Transition Collection}
+
+The collected transition data $\mathcal{D}$ are important to accurate causal dynamics learning, as they are used in predictive model training (Eq. \ref{eq:dynamics_loss}) and $\textsc{cmi}$ evaluations (Eq. \ref{eq:cmi}). An ideal transition collection policy $\pi$ would cover all state-action pairs to expose causal relationships thoroughly and actively explore states where the causal dynamics model is not accurate.
+
+To this end, an RL agent is used for transition collection with a reward function that is the prediction difference between the dense predictor and the causal predictor learned so far:
+\begin{align}
+\label{eq:policy_reward}
+r_t = \tanh \left(\tau \cdot \sum\limits_{j=1}^\dS \log \frac{\hat{p}(s^j_{t+1} | s_t, a_t)}{\hat{p}(s^j_{t+1} | \textbf{PA}_{s^j})}\right),
+\end{align}
+where $\tau$ is the scaling factor and $\tanh$ is used to keep the reward bounded. This reward motivates taking transitions where the dense predictor is better than the causal predictor, which usually suggests the learned causal graph is inaccurate. 
+
+\subsection{Policy Learning for Downstream Tasks}
+\label{subsec:task_learning}
+
+When solving actively-accomplishable downstream tasks, like many MBRL algorithms, \textsc{cdl} simultaneously (1) learns a reward predictor with the abstract state, action, and any provided extra variables as input, $R_\varphi: \phi(\mathcal{S}) \times \mathcal{A} \ (\times \mathcal{V}) \rightarrow \mathbb{R}$, and (2) uses a planning algorithm with the learned dynamics and reward predictor for action selection. As the reward predictor is learned in an abstract space rather than the full state space, it is more sample-efficient and less vulnerable to spurious correlations brought about by excessive information (i.e., action-irrelevant state variables). Meanwhile, planning in the abstract space also reduces the computation cost by relieving the need to roll out action-irrelevant state variables.
+
+The reward predictor is modeled as a neural network and trained by minimizing the prediction error,
+\begin{equation}
+    \varphi^* = \argmin_\varphi \mathbb{E}_{(s_t, a_t, g_t, r_t) \sim \mathcal{B}} \ \mathcal{L}(R_\varphi(\phi(s_t), a_t, g_t), r_t),
+    \label{eq:reward_loss}
+\end{equation}
+where $\mathcal{B}$ is the task data collected so far, and $\mathcal{L}$ can take any loss function (we experiment with the absolute value of the prediction error).
+
+For planning, we use the cross entropy method (\textsc{cem}, \citet{rubinstein1997optimization}), a population-based optimization algorithm, to search for the best action with the learned dynamics and reward predictor. For each time step $t$, depending on whether the action is continuous or discrete, \textsc{cem} initializes a time-dependent belief over the optimal action sequence $a_{t:t+L} \sim \mathcal{N}(\mu_{t:t+L}, \sigma^2_{t:t+L})$ or $\text{Categorical}(\alpha_{t:t+L})$ where $L$ is the planning length. Starting from a unit normal distribution for $\mathcal{N}$ or a uniform distribution for $\text{Categorical}$, it repeatedly samples $J$ candidate action sequences, evaluates them based on cumulative rewards, and updates the action belief to the distribution of the top $K$ candidates. After $N$ iterations, the planner returns $\mu_t$ or $\argmax \alpha_t$ as the current optimal action.

@@ -1,0 +1,61 @@
+\section{Link to other research areas}\label{sec:related_research_areas}
+
+This section briefly discusses the fields related to learning with rejection. 
+\subsection{Uncertainty quantification}
+    \label{sec:uncertainty}
+
+The field of uncertainty quantification \changed{(UQ)} aims to measure how uncertain \changed{a learned model's predictions are}~\citep{Kendall2017}. It distinguishes between two types of uncertainties: aleatoric uncertainty, which is the randomness in the data, and epistemic uncertainty, which is the lack of knowledge. Aleatoric uncertainty arises from non-deterministic relations between features and the target, while epistemic uncertainty can be caused by a small training set or incorrect model bias. For instance, when predicting the outcome of tossing an unfair coin, initially we lack historical data, resulting in high data-epistemic uncertainty. As we observe more coin tosses, data-epistemic uncertainty decreases, but aleatoric uncertainty remains due to the stochastic nature of the coin flip~\citep{Senge2014}.
+
+\changed{These uncertainties are inherently related to rejection. Rejecting examples due to high aleatoric uncertainty falls into the ambiguity rejection scenario. On the other hand, high epistemic uncertainty due to the lack of data may cause either ambiguity or novelty rejection. That is, if an example is similar to the training set but its prediction strongly depends on the choice of the dataset (e.g., close to the predictor's decision boundary for classification tasks), then this gives rise to an ambiguity rejection.
+Alternatively, if an example is dissimilar to any of the training examples, this leads to a novelty rejection.
+}
+
+\changed{Methods for UQ can be applied within learning with rejection.
+UQ focuses on obtaining (calibrated) estimates that meaningfully convey the level of uncertainty~\citep{Kotelevskii2022}, which learning with rejection can leverage to allow the model to abstain when the uncertainty is high~\citep{Perello-Nieto2017,Kompa2021}. While calibrated uncertainty estimates are not always necessary for learning with rejection, they can be important. For instance, calibrated uncertainty estimates enable setting an optimal threshold that minimizes the empirical risks~\citep{Chow1970a}.
+}
+
+%\jesse{Is it misprediction risk? Or just risk? I guess I'd say minimizes the chosen risk metric. no?}
+            
+            
+\subsection{Anomaly detection}
+
+Anomaly detection~\citep{Prasad2009} is a Data Mining task aimed at identifying examples that deviate from expected behavior in a dataset. It is closely linked to novelty rejection because anomalies, being rare and substantially different from the training data, fall under the category of novelties~\citep{Ulmer2020,Pimentel2014,Markou2003}. Anomaly detectors are often utilized for novelty rejection within a separate rejector architecture.
+
+Adding a reject option to anomaly detectors allows them to abstain from processing examples when a clear decision cannot be made~\citep{Perini2020,Perini2023}. However, enabling this option in unsupervised anomaly detection poses two challenges. First, most confidence metrics assume a supervised setting, relying on measuring the distance to a decision surface. However, in anomaly detection, a hard decision surface may not always exist, necessitating specialized metrics that consider the model bias of the detector~\citep{Perini2020}. Second, the lack of labeled data makes it difficult to train a rejector using standard performance metrics. Instead, unsupervised techniques are employed, leveraging performance metrics that measure the stability of the anomaly detector itself~\citep{Perini2020a}.
+
+
+\subsection{Active learning}
+
+Active learning~\citep{Settles2009b,Fu2013,Zhang2014,Nguyen2019b} involves the interaction between a learning algorithm and an oracle who provides feedback to guide the learner. Its purpose is to reduce the need for labeling large amounts of data while still achieving high predictive performance. The algorithms focus on identifying the examples that would be most beneficial for the learner to label, thus minimizing the associated labeling costs.
+
+Active learning and learning with rejection share the focus on uncertain examples~\citep{Amin2021}. However, they differ in their motivations for addressing uncertainty. In active learning, uncertainty is crucial during training to improve efficiency by minimizing the amount of labeled data required for an accurate model. In contrast, learning with rejection aims to capture uncertainty at test time to prevent mispredictions. Its focus is on avoiding unreliable predictions based on uncertain examples. 
+
+\changed{Another difference is that outliers are not always considered. For instance, methods based on discriminative learning cannot express low-density regions. \citet{Sharma2017} determine uncertain examples based on evidence measures that support the positive ($E_{+1}$) or negative class ($E_{-1}$) in binary classification. An example $x$ has an uncertain class if $E_{+1}(x) \approx E_{-1}(x)$. Two cases are distinguished based on the magnitude of the evidence: if both $E_{+1}$ and $E_{-1}$ are large, the model is uncertain because of strong, but conflicting evidence for both classes, while if both $E_{+1}$ and $E_{-1}$ are small, the model is uncertain because of insufficient evidence for either class. Because both cases assume that a model is uncertain if $P(Y|X)\approx 0.5$ when using a uniform prior, they both correspond to our ambiguity rejection scenario.
+%
+%the proposed approach relies on the class conditional probability $P(Y|X)$ to measure the evidence, both cases correspond to the ambiguity rejection scenario.
+%
+%we are in presence of conflicting evidence, otherwise insufficient evidence. However, since both $E_{+1}$ and $E_{-1}$ solely depend on class conditional probabilities, they do not take the class density into account. Therefore, it is not possible to identify outliers whereas novelty rejection wants to identify such examples. On the other hand, if both classes are balanced, the uncertain examples are around the decision boundary and the setting thus corresponds to ambiguity rejection. 
+}
+
+\changed{Combining active learning with machine learning with rejection} could be of great use~\citep{Korycki2019,Puchkin2022,Shekhar2020a}. When the interaction with an oracle is possible, it may be of interest to query the rejected test examples. New data types could be identified by novelty rejection, while ambiguity rejection may fine-tune the decision boundary.
+
+
+
+\subsection{Class-incremental / incomplete learning}
+
+Typically, learned models assume knowledge of all possible classes during training. However, class-incremental learning focuses on models that adapt during deployment to detect and predict novel classes that were not seen during training.
+
+Novelty rejection and class-incremental learning both operate under an open-world assumption and aim to detect novel examples compared to the training set. However, there are two key differences. First, class-incremental learning specifically targets examples belonging to novel classes, distinguishing them from outliers. In contrast, novelty rejection techniques do not prioritize this distinction. Second, class-incremental learning involves detecting novel class examples and retraining the model to recognize them. 
+
+Novelty rejection techniques can be considered in class-incremental learning. Moreover, both techniques can be combined into a single pipeline, by adapting incremental models with novelty rejected examples. For instance, such examples can be used as prototypes in a \gls{knn} model.
+
+\subsection{Delegating classifiers}
+%\removed{Delegating (or cautious) classifiers involves using an ensemble of models to improve predictions compared to a single model~\citep{Ferri2004,Ferri2004a}. Specifically, the classification task is divided and assigned to multiple classifiers, each responsible for making predictions on a subset of the input data. By distributing the workload among multiple classifiers, one obtains a gain in terms of overall accuracy and robustness for the classification process.}
+
+\changed{Similar to learning with rejection, the approach of delegation involves the use of a classifier, which only classifies examples with high confidence and delegates the prediction for the remaining examples~\citep{Temanni2007,Khodra2016}. The delegated examples are given to another, more specialized, classifier which makes a prediction~\citep{Ferri2004a,Prasad2008}. In contrast, learning with rejection usually assumes that the user will inspect any rejected examples. Furthermore, delegation can be developed as a chain, where the next classifier makes a prediction for the examples for which the previous model was too uncertain~\citep{Giraud-Carrier2022}.}
+
+
+\subsection{Meta-learning}
+Meta-learning, also known as ``learning to learn'', explores methods and techniques for automatically learning the characteristics, behaviors, and performance of machine learning models~\citep{Bock1988,Vanschoren2018}. It aims to develop higher-level knowledge that guides the learning process itself~\citep{Brazdil2009,Gridin2022}.
+
+Despite having different goals and levels of abstraction, meta-learning can provide valuable insights and approaches for the context of learning \changed{with rejection}. For instance, meta-learning algorithms analyze the behavior and performance of classifiers on different datasets to derive general knowledge about their strengths, weaknesses, and limitations~\citep{Abbasi2012,Tremmel2022,Cohen2022}. This knowledge can then be used to make informed decisions about when to reject predictions. Moreover, meta-learning algorithms can identify relevant features or attributes that are informative for determining when to reject predictions~\citep{Filchenkov2016,Shen2020a}. By focusing on important features, rejectors can make more accurate decisions.

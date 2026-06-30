@@ -1,0 +1,90 @@
+
+
+\section{Case Study: Complex Question Answering}\label{sec:qa}
+
+In this case study, we explore the multi-hop question answering task with the HotPotQA~\citep{yang2018hotpotqa} dataset in the open-domain ``fullwiki'' setting. For retrieval, we use a search index of the official Wikipedia 2017 ``abstracts'' dump of HotPotQA. Search is conducted by a ColBERTv2~\citep{santhanam2021colbertv2} retriever. The HotPotQA test set is hidden, so we reserve the official validation set for our testing, and sample 1000 examples for that. We sub-divide the training set into 70\%/30\% train/validation splits. In the training (and thus validation) split, we keep only examples marked as ``hard'' in the original dataset, which matches the designation of the official validation and test sets. For training and for reporting development results, we sample 200 and 300 examples respectively.
+
+\paragraph{Programs Considered}\label{sec:qa-programs}
+
+Our simplest baseline is the \texttt{vanilla} program used in the previous case study on GSM8K (Sec~\ref{sec:mw}); the \texttt{"question -> answer"} signature is universal enough that it will work for this task (and many others) when compiled appropriately.
+
+Our baseline RAG program is the one given in Section~\ref{sec:programs} as a simple example of RAG with a \texttt{dspy.ChainOfThought} layer. We will see that this program does not excel at HotPotQA, and this motivates us to evaluate two multi-hop programs.
+
+To that end, we first test ReAct \citep{yao2022react}, a multi-step agent for tool use, which is implemented as a built-in module in DSPy. In the simplest case, a ReAct module for a particular signature can be declared as follows in DSPy:
+
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+react = dspy.ReAct("question -> answer", tools=[dspy.Retrieve(k=1)], max_iters=5)
+\end{lstlisting}
+\end{samepage}
+We also test the following custom program, which simulates the information flow in Baleen \citep{khattab2021baleen} and IRRR \citep{qi2020retrieve} and has similarities to IRCoT \citep{trivedi2022interleaving}.
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false,basicstyle=\fontsize{6}{6}\ttfamily]
+class BasicMultiHop(dspy.Module):
+    def __init__(self, passages_per_hop):
+        self.retrieve = dspy.Retrieve(k=passages_per_hop)
+        self.generate_query = dspy.ChainOfThought("context, question -> search_query")
+        self.generate_answer = dspy.ChainOfThought("context, question -> answer")
+
+    def forward(self, question):
+        context = []
+        
+        for hop in range(2):
+            query = self.generate_query(context=context, question=question).search_query
+            context += self.retrieve(query).passages
+            
+        return self.generate_answer(context=context, question=question)
+
+multihop = BasicMultiHop(passages_per_hop=3)
+\end{lstlisting}
+\end{samepage}
+
+
+
+
+\paragraph{Compiling}\label{sec:qa-compilers}
+
+For compilers, we continue to use the ones that we used for GSM8K (see Sec~\ref{sec:mw-compilers}). We also consider two compositions of our teleprompters. For ReAct, we consider bootstrapping with \texttt{BootstrapFewShotWithRandomSearch} starting from an earlier bootstrap of the ReAct program. For the simple \texttt{multihop} program, we also consider fine-tuning with \texttt{T5-Large} starting from the earlier bootstrap of that program.
+
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+multihop_t5 = dspy.BootstrapFinetune(metric=answer_exact_match).compile(program, teacher=bootstrap, trainset=trainset, target='t5-large')
+\end{lstlisting}
+\end{samepage}
+
+
+\input{tables/results-hotpotqa}
+
+\paragraph{Results}\label{sec:qa-results}
+Table~\ref{tab:hotpotqa-results} summarizes our results. Compared with the \texttt{vanilla} few-shot prompting, a chain-of-thought and retrieval-augmented generation (\texttt{CoT\_RAG}) program can self-bootstrap in DSPy to increase answer EM substantially. However, this relies entirely on the ColBERTv2 retriever to find relevant passages directly from the original questions, limiting its passage recall. This is tackled in the \texttt{react} and \texttt{multihop} programs, which will generate queries for the retriever in multiple iterative ``hops''. Indeed, overall, a simple \texttt{multihop} program performs the best, and in general \texttt{bootstrap} again proves to be very effective at raising its quality relative to its \texttt{fewshot} variant for both LMs.
+
+In particular, we can see that \texttt{bootstrap} (and/or \texttt{bootstrap$\times2$}) can outperform both \texttt{fewshot} prompting (for \texttt{multihop}) and expert human reasoning (for \texttt{react}; adapted slightly from \citet{yao2022react} to our retrieval setting). Perhaps most importantly, we can make \llamaThirteenChat{} competitive with GPT-3.5 by simply compiling our programs. %
+
+To assess the finetuning capacity of DSPy, we also evaluated the compiler \texttt{multihop\_t5} defined above which produces a \texttt{T5-Large} (770M parameter) model. This program scores 39.3\% answer EM and 46.0\% passage accuracy on the dev set, using only 200 labeled inputs and 800 unlabeled questions. For compiling, we use a teacher program consisting of an ensemble (union) of two \texttt{multihop} with \llamaThirteenChat{}. Considering its extremely small size and local availability, this compiled program with \texttt{T5-Large} would impose orders of magnitude lower costs for inference than a proprietary LM like GPT-3.5.
+
+
+
+Our results may be pegged against the evaluation on HotPotQA in a number of recent papers, though there is significant variation in evaluation methodology and test set samples across studies in this space. Using CoT prompting, \citet{si2022prompting} achieve 25.2\% EM. With a ``recite-and-answer'' technique that uses PaLM-62B~\citep{chowdhery2022palm} to recite evidence passages, \citet{sun2022recitation} achieve 26.5\% EM. \citet{wang2022rationale} achieve 33.8\% EM and 44.6\% F1 when applying self-consistency for PaLM-540B. \citet{yao2022react} achieve 27.4\% EM using ReAct with PaLM-540B and 30.8 with \texttt{text-davinci-002}, with a tool giving it the ability for search using a Wikipedia API. They push their PaLM results to 35.1\% EM by applying an additional CoT step with self-consistency, which may resemble our \texttt{ensemble} approach in the sense of aggregating multiple answers. \citet{trivedi2022interleaving} reports 49\% using a pipeline with \texttt{code-davinci-002} LM on a sample of 500 HotPotQA questions.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,78 @@
+%\newpage
+
+\section{\envb{}-10K}
+\label{sec:analysis}
+
+\begin{figure}[t]
+     \centering
+     \begin{subfigure}[h]{0.325\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/objects_per_room.pdf}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[h]{0.325\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/house_area_distribution.pdf}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[h]{0.325\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/num_rooms.pdf}
+     \end{subfigure}
+    \caption{\textbf{\envb{}-10K statistics.} \emph{Left:} distribution of the number of objects in each room; \emph{Middle:} distribution of the area of each house, bucketed into small, medium, and large houses; \emph{Right:} bar plot showing the distribution over the number of rooms that make up each house.}
+    \label{fig:dists}
+    \vspace{-0.2in}
+\end{figure}
+
+\begin{figure}[b]
+    \centering
+    \vspace{-0.2in}
+    \includegraphics[width=\textwidth]{figures/sec4-4.jpg}
+    \caption{\textbf{Example scenes} in \env{}-10K with top-down and an egocentric view.}
+    \label{fig:10k}
+\end{figure}
+
+We demonstrate the power and potential of \env using a sampled set of 10,000 fully interactive houses obtained by the procedural generation process described in Section~\ref{sec:generation} -- which we label \env-10K. An additional set of 1,000 validation and 1,000 testing houses are available for evaluation. Asset splits across train/val/test are detailed in the Appendix. All houses are fully navigable, allowing an agent to traverse through each room without any interaction. In terms of scale, \env-10K is one of the largest sets of interactive home environments for Embodied AI -- as a comparison, AI2-iTHOR~\cite{kolve2017ai2} includes 120 scenes, RoboTHOR~\cite{Deitke2020RoboTHORAO} has 89 scenes, iGibson~\cite{Shen2020iGibsonAS} has 15 scenes, Habitat Matterport 3D~\cite{Ramakrishnan2021HabitatMatterport3D} has 1,000 static (non-interactive) scenes, and Habitat 2.0~\cite{szot2021habitat} has 105 scene layouts. Scaling beyond 10K houses is straightforward and inexpensive. This set of 10K houses was generated in 1 hour on a local workstation with 4 NVIDIA RTX A5000 GPUs. Fig.~\ref{fig:10k} shows examples of ego-centric and top-down views of houses present in \env{}-10K.
+
+\noindent \textbf{Scene statistics.} Houses in \env-10K are generated using 16 different room specifications. An example room spec is: \emph{A house with 1 bedroom connected to 1 bathroom, 1 kitchen, and 1 living room} and is visualized in Fig.~\ref{fig:genOverview}. Houses in this dataset have as few as 1 room and as many as 10. 
+% Rooms can be one of \textsc{Bedroom}, \textsc{Bathroom}, \textsc{Kitchen}, and \textsc{Living Room}. 
+Fig.~\ref{fig:dists} shows the distribution of areas (middle) and the number of rooms (right) of these generated houses. Our use of room specifications enables us to change the distribution of the size and complexity of houses fairly easily. \env-10K encompasses a wider spectrum of scenes than AI2-iTHOR~\cite{kolve2017ai2} and \textsc{RoboTHOR}~\cite{Deitke2020RoboTHORAO} (biased towards room-sized scenes) and Gibson \cite{xia2018gibson} and HM3D \cite{Ramakrishnan2021HabitatMatterport3D} (biased towards large houses).
+
+Rooms in each of these houses contain objects from 95 different categories including common household objects such as fridges, countertops, beds, toilets, and house plants, and structure objects such as doorways and windows. Fig.~\ref{fig:dists} (left) shows the distribution of the number of objects per room per house, which shows that houses in \env-10K are well populated. They also contain objects sampled via 18 different Semantic Asset groups. Examples of Semantic asset groups (SAG) are a \emph{Dining Table with 4 Chairs} or \emph{Bed with 2 Pillows}. Given our large asset library and SAGs, we can create 19.3 million combinations of group instantiations. 
+
+
+
+\begin{table}
+    \centering
+    % \scriptsize
+    \small
+    % \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l cc c cc c cc}
+        \toprule
+        %  \quad & \multicolumn{2}{c}{\shortstack{Prior SoTA /\\Baseline} } & \quad & \multicolumn{2}{c}{\shortstack{ProcTHOR\\Zero-Shot}} & \quad & \multicolumn{2}{c}{\shortstack{ProcTHOR\\Fine-Tuned}} \\
+        % \cmidrule{3-4} \cmidrule{6-7} \cmidrule{9-10}
+        & \multicolumn{2}{c}{Navigation FPS} && \multicolumn{2}{c}{Isolated Interaction FPS} && \multicolumn{2}{c}{Environment Query FPS} \\
+        \cmidrule{2-3}\cmidrule{5-6}\cmidrule{8-9}
+        Compute & Small & Large && Small & Large && Small & Large \\
+        \midrule
+        % \midrule
+        % 1-3 Room Houses &  \\
+        % 4-6 Room Houses &  \\
+        % 7-10 Room Houses &  \\
+        8 GPUs & 8,599{\scriptsize$\pm$359} & 3,208{\scriptsize$\pm$127} && 6,488{\scriptsize$\pm$250} & 2,861{\scriptsize$\pm$107} && 480,205{\scriptsize$\pm$19,684} & 433,587{\scriptsize$\pm$18,729} \\
+        1 GPU & 1,427{\scriptsize$\pm$74} & 6,280{\scriptsize$\pm$40} && 1,265{\scriptsize$\pm$71}  & 597{\scriptsize$\pm$37} && 160,622{\scriptsize$\pm$2,846} & 157,567{\scriptsize$\pm$2,689}\\
+        1 Process & 240{\scriptsize$\pm$69} & 115{\scriptsize$\pm$19} && 180{\scriptsize$\pm$42} & 93{\scriptsize$\pm$15} &&
+        14,825{\scriptsize$\pm$199} & 14,916{\scriptsize$\pm$186}\\
+        \bottomrule
+    \end{tabular}%
+    % }
+    \vspace{0.05in}
+    \caption{\textbf{Rendering speed.} Benchmarking FPS for navigation (\eg moving/rotating), interaction (\eg pushing an object), and querying the environment for data (\eg checking the dimensions of the agent). We report FPS for Small and Large houses. See Appendix for details.}
+    \label{tab:fps}
+    \vspace{-0.2in}
+\end{table}
+
+\noindent \textbf{Rendering speed.} A crucial requirement for large-scale training is high rendering speed since the training algorithms require millions of iterations to converge. Table~\ref{tab:fps} shows these statistics. Experiments were run on a server with 8 NVIDIA Quadro RTX 8000 GPUs. For the 1 GPU experiments, we use 15 processes and for the 8 GPU experiments, we use 120 processes, evenly distributed across the GPUs. \env provides framerates comparable to iTHOR and RoboTHOR environments in spite of having larger houses (See Appendix for details), rendering it fast enough for training large models for hundreds of millions of steps in a reasonable amount of time. 
+
+
+

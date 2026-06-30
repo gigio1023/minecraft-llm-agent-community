@@ -1,0 +1,460 @@
+\newpage
+\appendix
+{
+\bf\LARGE
+\begin{center}
+    Appendix
+\end{center}
+
+}
+\iffalse
+\section{LLM's world model v.s. policy}
+
+The question arises as to whether the knowledge of LLMs regarding states of the world is more complete than their knowledge of policies for accomplishing daily tasks. However, within certain real-world domains, we assert that LLM models are likely to possess more extensive knowledge than LLM policies. We make the following hypotheses:
+\begin{itemize}
+    \item H1: The description length, determining the complexity of describing a prediction rule (i.e., a predictor) of a problem, reflects LLM's prediction accuracy for that problem.
+    \item H2: When the description length of the model is substantially smaller than the policy, using LLM as a model in a model-based method is better than using LLM solely as a policy when solving multi-hop planning problems. 
+\end{itemize}
+In the following sections, we provide analytical and empirical evidence to support our hypothesis. 
+
+\subsection{Analytical evidence}
+
+\subsubsection{Evidence to H1}
+
+To support H1, we refer to the theorem of Occam's Razor in machine learning \cite{shalev2014understanding}. Before we reach the theorem, we have to introduce the notation of True Error. 
+
+\begin{definition}[True Error]
+    Let $h\in\mathcal{H}$ be a prediction rule $h: X\rightarrow Y$. For a probability distribution, $D$, one can measure how likely $h$ is to make an error when labeled points are randomly drawn according to $D$. We define the true error (or risk) of a prediction rule $h$ to be
+    \begin{equation}
+        err_D(h)\overset{\mathrm{def}}{=}\underset{x\in D}{\mathbb{P}}[h(x)\neq c(x)],
+    \end{equation}
+    where $c(x)$ means the label of the data point $x$ in the distribution $D$.
+\end{definition}
+With the definition of the true error, we introduce the theorem that helps us bound the error given the size of the dataset. 
+% \begin{theorem}[Occam's Razor, Cardinality Version]
+% Let $\mathcal{C}$ be a concept
+% class and $\mathcal{H}$ a representation class. Let ${L}$ be a learning algorithm such that for
+% any $n$ and any $c\in \mathcal{C}_n$, if ${L}$ is given as input a sample $S$ of $m$ labeled
+% examples of $c$, then ${L}$ runs in time polynomial in $n$, $m$ and $\mathrm{size}(c)$, and
+% outputs an $h\in\mathcal{H}_{n,m}$ that is consistent with $S$. Then there is a constant
+% $b > 0$ such that for any $n$, any distribution $D$ over $X_n$, and any target
+% concept $c \in \mathcal{C}_n$, if ${L}$ is given as input a random sample from $EX (c, D)$ of
+% $m$ examples, where $\epsilon$ satisfies
+% \begin{equation}
+%     \epsilon\geq \frac{1}{bm}(\log |\mathcal{H}_{n,m}| + \log\frac{1}{\delta}),
+% \end{equation}
+% then $L$ is guaranteed to find a hypothesis $h\in\mathcal{H}_n$ that with probability at
+% least $1-\delta$ obeys $err(h)\leq \epsilon$.
+% \end{theorem}
+\begin{theorem}[Occam's Razor]
+    Let $\mathcal{H}$ be a prediction rule class and let $d:\mathcal{H} \rightarrow \{0, 1\}^*$ be a prefix-free description language for $\mathcal{H}$. Then, for every sample size $m$, every confidence parameter, $\delta > 0$, and every probability distribution, $D$, with probability greater than $1-\delta$ over the choice of $S\sim D^m$ we have that,
+    \begin{equation}
+        \forall h\in\mathcal{H}, err_D(h)\leq err_S(h)+\sqrt{\frac{|h|+\ln{(2/\delta)}}{2m}},
+    \end{equation}
+    where $|h|$ is the length of $d(h)$, i.e., the description length of $h$.
+\label{theorem:or}
+\end{theorem}
+
+Thus, according to Occam's Razor in machine learning \cite{shalev2014understanding}, we can bound the error of a solution $h$ by the description length $|h|$ and the empirical error $err_S(h)$. In the learning procedure, $h$ minimizes the empirical error (ideally, the learning algorithm aims to achieve $err_S(h)\rightarrow 0$). Thus, with a fixed size of data $m$, if the description length for model prediction is smaller than policy prediction, LLM would make fewer mistakes when building the world model than being used as a policy directly. 
+
+\subsubsection{Evidence to H2}\label{sec:comp-error}
+
+Then, we analyze how the error is propagated when solving multi-step planning problems. Assume the error rate of LLM in predicting a world model is $\epsilon$ and acting as a policy is $\zeta$. If the description length of the world model is substantially smaller than the policy, then there should be $\epsilon \ll \zeta$. Generally, planning is a hard combinatorial search problem \cite{kautz1996pushing}. A complex planning problem often contains multiple element tasks (e.g., $k$ tasks), and the description length of the solution grows exponentially $O(2^k)$ \cite{kautz1996pushing, weld1999recent}. As shown in Theorem \ref{theorem:or}, it makes the error rate bound to blow up, indicating the LLM policy could make exponentially more errors. To do the multi-step planning, the model-based approach accumulates errors made by LLM's world model. Assuming solving elementary tasks requires a constant step $\phi$ on average, the mistakes made by the LLM models for each step are independent with mostly the same probability, then the accuracy of the model-based approach should be $(1-\epsilon)^{\phi k}$ after $\phi k$ steps of planning if analyzed naively. 
+ Thus, we have the following analysis. 
+ \begin{proposition}[informal]
+If $\forall k, \epsilon \ll \zeta(k)$ and $\zeta(k)$ grows exponentially, there should exist a moderate value for $\hat{k}>0$ and $\hat{\phi}>0$ such that when $\phi k < \hat{\phi} \hat{k}$
+\begin{equation}
+    (1-\epsilon)^{\phi k}> 1-\zeta(k),\label{eq:inq}
+\end{equation}
+indicating that for a planning question with $k$ and $\phi$ satisfying the above condition, the LLM model-based method works better than the LLM policy. Otherwise, both methods should work equally well due to the over-simple planning task, or equally poorly due to the exponentially grown error.  
+ \end{proposition}\label{prop:lpolicyvsmodel}
+
+\begin{proof}
+We use Taylor series to expand $(1-\epsilon)^{\phi k}$ such that\begin{equation}
+    (1-\epsilon)^{\phi k} = \sum_{n=0}^\infty \frac{k^n(\phi\log(1-\epsilon))^n}{n!}\approx 1 + \phi k \log (1-\epsilon) + o(k^2)\geq 1 - \phi k \log \frac{1}{1-\epsilon} .
+\end{equation}
+
+This inequality can be reflected in Figure \ref{fig:geq_exp}. To show this, assume \begin{gather}
+    f = (1-\epsilon)^{x} -  1 + x \log \frac{1}{1-\epsilon}\\
+    \frac{df}{dx}=\log(1-\epsilon)(1-\epsilon)^{x} + \log\frac{1}{1-\epsilon}=0\implies (1-\epsilon)^{x}=1\implies x=0\\
+    f_\mathrm{min}=f(x=0)=0 \implies f\geq0\implies (1-\epsilon)^{x}\geq 1-x\log\frac{1}{1-\epsilon}\\\implies (1-\epsilon)^{\phi k}\geq 1 - \phi k \log \frac{1}{1-\epsilon}
+\end{gather}
+\begin{figure}
+    \centering
+    \begin{tikzpicture}
+\begin{axis}[
+    ticks=none,
+    xmin=-0.2, xmax=0.9,
+    ymin=-0.1, ymax=1.2,
+    axis lines=center,
+    axis on top=true,
+    domain=-1:1.5,
+    xlabel={$x$},
+    ylabel={$y$},
+    ]
+
+    \addplot [mark=none,draw=red, thick] {1-x} coordinate[pos=0.7] (lin);
+    \addplot [mark=none,draw=blue, thick] {e^-x} coordinate[pos=0.8] (exp_node);
+    \node[anchor=south west, text=black] (b) at (axis cs:0.5,1) {$y=(1-\epsilon)^{x}$};
+    \node[anchor=south west, text=black] (a) at (axis cs:0.0,0.1) {$y=1-x \log \frac{1}{1-\epsilon}$};
+    \draw[draw=red, ->, thick, dashed] (lin)--(a);
+    \draw[draw=blue, ->, thick, dashed] (exp_node)--(b);
+\end{axis}
+% \node [below] at (0.5,0.75) {$1-\phi k \log \frac{1}{1-\epsilon}$};
+\end{tikzpicture}
+    \caption{This figure demonstrate the relationships between $y=1-x\log \frac{1}{1-\epsilon}$ and $y=(1-\epsilon)^{x}$. It appears that $(1-\epsilon)^{x}\geq 1-x \log \frac{1}{1-\epsilon}$.}
+    \label{fig:geq_exp}
+\end{figure}
+
+    Since 
+    \begin{equation}
+        \log\frac{1}{1-\epsilon}\leq \frac{1}{1-\epsilon}-1=\frac{\epsilon}{1-\epsilon},
+    \end{equation} thus we have
+    \begin{align}
+        1-\phi k \log\frac{1}{1-\epsilon}&\geq 1-\phi k \frac{\epsilon}{1-\epsilon}\\&=1-\phi'k'
+        \epsilon,
+    \end{align} where $\phi'k'=\frac{\phi k}{1-\epsilon}$. Thus, as \begin{equation}
+        1-\zeta(k)<1-\zeta(1),
+    \end{equation}to make (\ref{eq:inq}) true, we should have\begin{gather}
+        (1-\epsilon)^{\phi k}\geq 1-\phi k \log\frac{1}{1-\epsilon}\geq 1-\phi'k'\epsilon > 1-\zeta(1)>1-\zeta(k)\\
+        \phi'k'\epsilon<\zeta(1)\implies
+        \phi'k'<\frac{\zeta(1)}{\epsilon}\implies
+        \phi k < \frac{\zeta(1)(1-\epsilon)}{\epsilon}.\label{eq:final_condition}
+    \end{gather}
+    As $\forall k, \epsilon\ll\zeta(k)$, thus $\frac{\zeta(1)(1-\epsilon)}{\epsilon}\gg 1-\epsilon \approx 1$. There must exists a moderate value for $\hat{\phi}$ and $\hat{k}$ such that $\forall k>0 , \phi>0$, if $\phi k < \hat{\phi}\hat{k}< \frac{\zeta(1)(1-\epsilon)}{\epsilon}$, there should be $(1-\epsilon)^{\phi k}> 1-\zeta(k)$. 
+
+    We analyze the conditions where it is not obvious that $(1-\epsilon)^{\phi k}> 1-\zeta(k)$ is true. It could be because $k$ is not large and $\epsilon \centernot\ll \zeta(k)$, i.e., the planning is not complex. Thus, both methods should work equally well. Otherwise, $k$ should be very large, resulting in the poor performance of both methods, as both methods suffer from exponentially decayed accuracy. 
+\end{proof}
+
+
+\subsection{Air travel planning}
+
+
+To further verify our hypothesis H2, we conduct experiments to provide empirical evidence. Here, we describe a simple problem where learning about the world would likely require less training data than learning policies to do all tasks in the domain. Consider the task of planning for air travel from a starting city to a destination city. A state is represented as a set of variables for each city of the world whose values are cities they connect by direct flight together with the city that the AI agent is currently at. The AI agent can choose to fly to a city if the city has a direct flight connected to the current city. The AI agent can only observe which city it is currently in. The goal is to transform the AI agent to the destination city. 
+
+To solve the problem through a planning process, we only need to know the direct flights out of each city. This can be modelled as a graph, which is likely to be sparse in the real world. Assuming that the total number of edges grows proportionally to the number of cities, $O(n\log n)$ bits would be sufficient to describe a graph with $n$ cities, with approximately $2\log n$ bits used to describe the two cities involved in each edge. Conversely, considering all potential starting and destination cities results in approximately $n^2$ tasks. Assuming each task necessitates a constant number of flights, specifying around $n^2$ trajectories would require roughly $n^2\log n$ bits. When predicting $k$-stop flight routes, $O(n^k\log n)$ bits is required to describe the full knowledge if analyzed naively. 
+
+The amount of data required for learning to solve a problem typically depends on the complexity of a problem, which the description length of the solution can roughly estimate. In this example, the description length of policies is far larger than the model, indicating that doing a search with the help of the LLM as a model may be better than using the LLM directly as a policy. 
+
+\subsubsection{Experimental Setup}We conducted experiments about planning for air travel from a starting city to a destination city, which we analyzed above. We utilized GPT-3.5 to generate flight paths between cities. We compare it to the GPT-3.5 model-based approach: we use GPT-3.5 to predict neighbouring cities connected by a direct flight, which feeds into the uniform-cost search (i.e., replace node expansion by GPT-3.5 as the world model). 
+
+We use the data from the Kaggle World cities database, select 68 cities with populations exceeding 5 million in different countries, as well as 62 middle-size cities with populations between 500 thousand and 2 million, and use the Virtual Radar Server to get the flight routes dataset as ground truth. In our tests, we sampled 400 city pairs among large cities and 400 pairs among middle-size cities, evaluating path accuracy by verifying each direct flight exists. Paths were accepted if all flights were valid, even if they extended beyond our selected source and target cities. 
+
+We evaluate the methods in three settings: predicting the flight route given two large cities and two middle-size cities, as well as predicting multi-city flight routes. There will be more direct flights among large cities, and the LLM's knowledge will be more extensive regarding those major international cities. Predicting flight routes among the middle-size cities would be more challenging, as there might not be enough direct flights between the cities, thus requiring the flights to pass through the major flight hubs, resulting in more multi-stop flight routes. We also conduct a more challenging task: planning for multi-city flight routes. We select one starting city with two, three, and four destination cities among the large cities and let both methods predict the flight routes to travel among those cities in the given order. This task requires better compositional generalizability to achieve good performance. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{img/plot_flight.pdf}
+    \caption{Air Travel Planning Results. The left figure reveals the overall average correct rate of predicting single-city routes given two large cities, as well as multi-city routes given three, four, and five large cities to travel through. The middle figure shows the correct rate of predicting routes given two large cities, while the right figure shows the result for predicting routes given two middle-size cities. The length of a flight route is the resulting output by a search algorithm using the ground-truth map of the world, indicating the actual minimum length of the flight route. }
+    \label{fig:air-plan}
+\end{figure}
+
+\subsubsection{Results}We present the result in Figure \ref{fig:air-plan}. The figure presents the correct rate of flight prediction by both methods: using LLM as a model with a uniform-cost search algorithm and using LLM as a policy directly. 
+
+In Figure \ref{fig:air-plan}, the left figure shows that using LLM as a model with a search algorithm works well overall in predicting both the single-city flight and multi-city flight. The middle figure shows that LLM as model + search algorithm works better than LLM as policy when predicting the flight route of two cities that actually have direct flights. This evidence supports our hypothesis H1 that using LLM as a world model has a higher accuracy than using LLM as a policy. The results in all figures show that the LLM model + search algorithm consistently outperforms the LLM policy, supporting our hypothesis H2. 
+
+However, using LLM as a world model or policy does not work well for complex planning tasks. As analyzed in Section \ref{sec:comp-error}, using LLM as a world model will suffer from compounding errors when there are too many planning steps. On the other hand, there is also a data scarcity issue when the number of stops in a flight route increases, as a flight route with more than 4 stops is very rare worldwide, causing low correctness for LLM policy in this regard. Regarding the compositional tasks, the error rate of LLM policy grows more rapidly as well due to the increase of the required description length, exactly as what we predicted in Section \ref{sec:comp-error}. 
+
+As suggested in Figure \ref{fig:air-plan}, when the flight route contains more stops, the performance gap between the model-based and model-free approaches gets smaller as the error rate of both methods grows exponentially. It indicates that the model-based approach might suffer from the compounding error of the imperfect world model. When the number of stops increases, the probability that LLM predicts the model wrongly will grow exponentially and thus compromise the performance. 
+Thus, the probability that the searched route is wrong also grows exponentially. As the stops of the route increase, the performance of the LLM model-based approach gets closer to LLM as policy. However, since the lower error rate of LLM's model, the model-based approach appeared to perform better in all situations when the $k$ is not too large, suggested in Figure \ref{fig:air-plan} as well as our analysis in Section \ref{sec:comp-error}. 
+
+
+
+In our experiments, we only show a case when the description length of the model is shorter than the policy. There might also be a case where the description length of the policy is shorter than the model, and using LLM as a model in a model-based method might be worse than using LLM solely as a policy. One example could be the Monty Hall problem. In this problem, contestants pick one of three doors: one hides a car, two hide goats, and they will win if they pick the one with a car. The contestant can stick or switch after a goat is revealed behind another door. While a detailed model proves switching has a 2/3 win chance compared to 1/3 for sticking, the policy is succinct: "Always switch doors." Explaining the strategy is complex, but following it is simple, making a direct policy approach more efficient than modelling.
+
+\subsection{Multi-digit multiplication}\label{app-sec:multiplication}
+
+
+Multiplication is a case of a general compositional reasoning problem rather than a typical planning problem. Assume we are interested in the multi-digit multiplication with two input integers that have no more than $n$ digits. The L-Policy uses large language models to predict the result of the multi-digit multiplication directly given two numbers. As a comparison, the L-Model uses LLM to get the rule of 1-digit math operations and uses an algorithm to assemble those rules and get the result accordingly. 
+
+To describe the policy, there should be $O(10^{2n})$ bits at least to cover all possible combinations of two numbers. 
+Assume the L-Model is to use the $O(k_1k_2)$ long-form multiplication algorithm and a large language model to conduct the 1-digit multiplication, carry-over, mod 10, and summation. 1-digit multiplication rule requires $O(10^2)$ to describe. Carry-over rule requires $O(10^2)$ bits to describe. 2-digit number's Mod 10 rule requires $O(10^2)$ bits to describe. The rule of summing two 1-digit numbers requires $O(10^2)$ to describe. Describing those operations is sufficiently less complex than describing the entire combination of two multi-digit numbers. 
+
+We compare the L-Model and L-Policy's error rate regarding multi-digit multiplication. Assume the error rate of L-Policy is $\zeta$, and L-Model is $\epsilon$. According to Theorem \ref{theorem:or}, since the description length of L-Policy is substantially smaller than L-Model, we should have $\epsilon\ll \zeta$. $n$-digit multiplication requires $5n^2$ operations at most, and the upper bound of the error rate for L-Model is $(1-\epsilon)^{5n^2}$. To show $(1-\epsilon)^{5n^2} > 1-\zeta$, according to the proof of Proposition \ref{prop:lpolicyvsmodel}, we need to have $n <\sqrt{\frac{\zeta(1-\epsilon)}{5\epsilon}}$ to guarantee that L-Model is better than L-Policy. Since there is a big gap between the description length of the L-Model and L-Policy when $n$ is large, we have $\epsilon \ll \zeta$, making the value of $\sqrt{\frac{\zeta(1-\epsilon)}{5\epsilon}}$ large. 
+
+The empirical evidence in \cite{dziri2023faith} also shows that L-policy has more than 40\% error rate when $n\geq 3$, more than 95\% when $n\geq 4$, and almost 100\% when $n\geq 5$. However, the L-model has almost 0\% error rate (equivalent to the case $n=1$), indicating that the value of $\sqrt{\frac{\zeta(1-\epsilon)}{5\epsilon}}$ is very large, at least for $n\geq 3$. Thus, for most scenarios, the L-model is guaranteed to work better than the L-policy. 
+
+\subsection{Conclusion}
+
+Our analysis and experiments suggest that description length analysis is useful in deciding how to use a large language model in the solution. If, for a certain problem, the description length of the world model is shorter than the policy, using LLM as a model in a model-based approach is a better option than using LLM solely as a policy. However, this rule only applies when the planning problem is not too complex, or we can use other information to rectify the LLM's error. If the question is too complex and requires massive planning steps, neither using LLM as a model nor a policy is sufficient. 
+\fi
+
+% \subsubsection{Policy}
+
+\section{Virtualhome experimental environments}
+
+We use the VirtualHome simulator \cite{puig2018virtualhome} to evaluate our approach as well as the baseline methods. VirtualHome is a 3D household environment with partial observation, large action space, and a long planning horizon. It contains hundreds of interactive objects and containers, allowing it to perform various household object rearrangement tasks. This section introduces details of the tasks, the goal specifications, the actions, and the observations in our experimental settings. 
+
+\subsection{List of objects, containers, surfaces, and rooms in the apartment}
+
+We list all the objects that are included in our experimental environment. Here, we can put \textit{moveable objects} into the \textit{Containers} or on the \textit{Surfaces}. The \textit{Containers} and \textit{Surfaces} are located at a \textit{Room} in the apartment. 
+\begin{itemize}
+    \item \textit{Containers}: {bathroom cabinet, kitchen cabinet, bathroom counter, fridge, oven, dishwasher, microwave, stove, bathroom cabinet}
+    \item \textit{Surfaces}:~{bed,
+                         bookshelf,
+                         cabinet,
+                         coffee table,
+                         cutting board,
+                         floor,
+                         fryingpan,
+                         kitchen counter,
+                         kitchen table,
+                         nightstand,
+                         sofa,
+                         stove}
+    \item \textit{moveable~objects}:~{alcohol,
+                     apple,
+                     banana,
+                     bar soap,
+                     bell pepper,
+                     boardgame,
+                     book,
+                     box,
+                     bread slice,
+                     bucket,
+                     candle,
+                     candy bar,
+                     carrot,
+                     cellphone,
+                     cereal,
+                     chicken,
+                     Chinese food,
+                     chips,
+                     chocolate syrup,
+                     clock,
+                     clothes pants,
+                     clothes pile,
+                     clothes shirt,
+                     coatrack,
+                     coffeepot,
+                     condiment bottle,
+                     condiment shaker,
+                     cooking pot,
+                     crackers,
+                     crayons,
+                     creamy buns,
+                     cupcake,
+                     cutlery fork,
+                     cutlery knife,
+                     cutlets,
+                     cutting board,
+                     dish bowl,
+                     dishwashing liquid,
+                     face cream,
+                     folder,
+                     fryingpan,
+                     glasses,
+                     globe,
+                     hair product,
+                     hanger,
+                     juice,
+                     keyboard,
+                     lime,
+                     lotion bottle,
+                     magazine,
+                     milk,
+                     milkshake,
+                     minced meat,
+                     mouse,
+                     mug,
+                     notes,
+                     oven tray,
+                     pancake,
+                     paper,
+                     pear,
+                     pie,
+                     pillow,
+                     plate,
+                     plum,
+                     poundcake,
+                     pudding,
+                     radio,
+                     remote control,
+                     salad,
+                     salmon,
+                     slippers,
+                     sports ball,
+                     sundae,
+                     teddybear,
+                     toilet paper,
+                     toothbrush,
+                     toothpaste,
+                     towel,
+                     towel rack,
+                     toy,
+                     washing sponge,
+                     water glass,
+                     whipped cream,
+                     wine,
+                     wineglass}
+    \item \textit{Rooms}: bedroom, bathroom, living room, kitchen.
+\end{itemize}
+
+% \subsection{Apartment maps}
+
+
+
+\subsection{Tasks}
+We use the object rearrangement tasks for evaluation. The task is to search for one or more objects in the house and move them to the desired positions. We use natural language as the interface to specify the tasks. Thus, the agent should take as input the natural language instruction and observations, and then output actions. 
+
+
+The tasks are randomly sampled from different distributions. We define various types of object rearrangement tasks for evaluation: 
+\begin{itemize}
+    \item \textit{Simple}: this task is to move one object in the house to the desired location. The combination of the object and desired location has appeared in the training dataset. 
+    \item \textit{Novel Simple}: this task is to move one object in the house to the desired location. The combination of the object and desired location has\textbf{not} appeared in the training dataset. 
+    \item \textit{Comp.}: this task is composed of 2 \textit{Simple} tasks, moving more than one object in the house to their desired location. This kind of task has a longer planning horizon as it requires moving multiple objects to complete. The combinations of \textit{Simple} tasks have appeared in the training dataset. 
+    \item \textit{Novel Comp. (2)}: this task is composed of 2 \textit{Simple} tasks, moving more than one object in the house to their desired location. The combinations of \textit{Simple} tasks have not appeared in the training dataset. 
+    \item \textit{Novel Comp. (3)}: this task is composed of 3 \textit{Simple} tasks, moving more than one object in the house to their desired location. This kind of task has the longest planning horizon. The combinations of \textit{Simple} tasks have not appeared in the training dataset. 
+\end{itemize}
+We also have different household environments:
+\begin{itemize}
+    \item \textit{Seen Apartment}: the map of the apartment is shown in Figure \ref{fig:apartmentmap1}. These household environments are the same as the ones in the training set, while the object positions are randomly initialized according to a pre-defined commonsense distribution in VirtualHome \cite{puig2018virtualhome}.
+    \item \textit{Unseen Apartment}: the map of the apartment is shown in Figure \ref{fig:apartmentmap2}. These household environments are not the same as the ones in the training set. The object positions are also sampled from a different pre-defined commonsense distribution in VirtualHome \cite{puig2018virtualhome}. 
+\end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{img/apartment_seen.pdf}
+    \caption{The map of the \textit{seen apartments} in our setting. These household environments are the same as the ones in the training set, while the object positions are randomly initialized according to a commonsense distribution.}
+    \label{fig:apartmentmap1}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{img/apartment_unseen.pdf}
+    \caption{The map of the \textit{unseen apartments} in our setting.  These household environments are not the same as the ones in the training set. The object positions are also sampled from a different commonsense distribution.}
+    \label{fig:apartmentmap2}
+\end{figure}
+
+\subsection{Goal specification}
+Similar to prior works \cite{li2022pre}, we define the goal in the VirtualHome system by a set of predicates. For instance, a goal can be defined by \textit{Inside(apple, fridge):2; Inside(plate, dishwasher):1}, meaning ``put two apples inside the fridge and put one plate inside the dishwasher.'' For \textit{Simple} and \textit{Novel Simple} tasks, it only requires moving one object, while \textit{Comp.} and \textit{Novel Comp.} have more than one object to move. 
+
+\subsection{Actions}
+
+In VirtualHome, the agent is able to navigate in the environment, grab an object, put an object inside the containers (e.g., fridge) or on the surfaces (e.g., table), open and close the container, etc. The actions in VirtualHome are grounded to moveable objects, containers, or rooms in the environment. For example, \texttt{Open(5)} is to open an object with index (5). The list of available actions in our setting are listed below:
+\begin{itemize}
+    \item \texttt{Walk(<item>)}: walk to the \texttt{<item>}. The \texttt{<item>} can be a moveable object, a container, or a room. The precondition of this action is that the \texttt{<item>} is visible. The effect of this action is that the agent is close to the \texttt{<item>} if the \texttt{<item>} is an object or inside the \texttt{<item>} if the \texttt{<item>} is a room. The action is translated into the sentence ``walk to the \texttt{<name of item>}'' when feeding into LLMs. 
+    \item \texttt{Open(<item>)}: open the \texttt{<item>}. The \texttt{<item>} can be a moveable object or a container. The precondition of this action is that the agent should be close to \texttt{<item>}. The effect of this action is that the \texttt{<item>} is opened. The action is translated into the sentence ``open the \texttt{<name of item>}'' when feeding into LLMs.
+    \item \texttt{Close(<item>)}: close the \texttt{<item>}. The \texttt{<item>} can be a moveable object or a container. The precondition of this action is that the agent should be close to \texttt{<item>}. The effect of this action is that the \texttt{<item>} is closed. The action is translated into the sentence ``close the \texttt{<name of item>}'' when feeding into LLMs.
+    \item \texttt{Grab(<item>)}: grab the \texttt{<item>}. The \texttt{<item>} should be a moveable object. The precondition of this action is that the agent should be close to the \texttt{<item>}, and the agent is not holding any objects. The effect of this action is that the agent will hold the \texttt{<item>}. The action is translated into the sentence ``grab the \texttt{<name of item>}'' when feeding into LLMs.
+    \item \texttt{PutIn(<item1>, <item2>)}: put the moveable object \texttt{<item1>} inside the container \texttt{<item2>}. The precondition of this action is that the agent should be close to the \texttt{<item2>} and holding \texttt{<item1>}. The effect of this action is that the agent is not holding any objects, and the \texttt{<item1>} is inside the \texttt{<item2>}. The action is translated into the sentence ``put the \texttt{<name of item1>} inside the \texttt{<name of item2>}'' when feeding into LLMs.
+    \item \texttt{PutBack(<item1>, <item2>)}: put the moveable object \texttt{<item1>} on the surface \texttt{<item2>}. The precondition of this action is that the agent should be close to the \texttt{<item2>} and holding \texttt{<item1>}. The effect of this action is that the agent is not holding any objects, and the \texttt{<item1>} is on the \texttt{<item2>}. The action is translated into the sentence ``put the \texttt{<name of item1>} on the \texttt{<name of item2>}'' when feeding into LLMs.
+\end{itemize}
+
+\subsection{Observations} We use the same representation as \cite{li2022pre} for partial observation. The observation is a list of visible objects and relationships between those objects. Each object or container has a state: \textit{open} or \textit{close}. The fine-tuned GPT2 policy \cite{li2022pre} also uses the 3d coordinates of the object. We also use relationships to connect different objects, such as \texttt{Inside(apple, fridge)}. Those relationships are translated to natural language descriptions when feeding into LLMs, such as ``an apple is inside the fridge.''
+
+
+\section{Data gathering}
+
+Similar to prior works \cite{puig2020watch, li2022pre}, we collect expert trajectories in VirtualHome using regression planning with handcrafted heuristics\footnote{Their implementation is available at: \href{https://github.com/xavierpuigf/watch_and_help.git}{\texttt{https://github.com/xavierpuigf/watch\_and\_help.git}}}. 
+The expert has full observation of the environment. Given the goal predicates and full observation, the agent will use the handcrafted heuristics for each task to effectively search for the solutions. The expert also has a handcrafted mechanism for compositional tasks to decompose one task into subtasks and finish them progressively. For each trajectory, we include the goal predicates (used by the VirtualHome system and the expert agent), the goal instruction (used by the agent), the partial observation for each time step (not used by the expert agent, the expert agent uses full observation), and the expert actions. 
+
+\section{Implementation details of belief in LLM-MCTS}
+This section introduces our implementation details for the belief of states in GPT3.5-MCTS. 
+The source code will be released at \href{https://llm-mcts.github.io}{\texttt{https://llm-mcts.github.io}} before the publication. 
+
+\subsection{State representation}
+
+We represent the states by a list of objects and their relationships. Each object has a unique name and id in the simulator, as well as the state of the object. We use the same unique name and id in our state representation. The relationships connect different objects, containers, surfaces, and rooms. The VirtualHome contains 59 different types of relationships, including \texttt{Inside, On, Close, Facing}, etc. We use the same type of relationships in our state representation. 
+
+\subsection{Belief}\label{app-sec:belief}
+
+The belief of the state also contains a list of objects and their relationships. However, we parameterize the relationships by a vector, representing the probability that the relationship is true. This vector is affiliated with the object representation. For simplicity, we only include the relationships \texttt{Inside, On} in our belief, as we only query LLM about the object positions to build up the commonsense belief of the state. 
+
+When building up a state's belief, we query LLM to predict the position of each moveable object, container, and surface. The position of a moveable object is specified by the relationships (i.e., \texttt{Inside} or \texttt{On}) between itself and a container or surface. The position of a container or a surface is specified by its relationship (i.e., \texttt{Inside}) to the room. We use sampling to approximate the distribution of the position. The moveable objects' belief of position is represented by a vector whose dimension is the same as the total number of containers and surfaces in the house. Each vector entry denotes the probability that whether the object is inside a specific container or on a specific surface is true. When asking LLM to predict the object positions, we asked LLM for $M$ times and received multiple responses from LLM. We then count each entry's total number of predictions and normalize them to become a probability distribution. We initialize the value of other unsampled entries in the vector by a lower bound of the probability $1\times 10^{-3}$ to ensure that the model will not eliminate other possibilities when the commonsense model is wrong.
+
+The agent will receive new observations to update their belief when interacting with the environment. We will first predict the next state of the agent by the transition function and then update the belief of the object positions by new observations. Suppose the object is inside the current observation. In that case, the other entry of the relations between objects will be masked out by zero, and the entry of the relationships in observation will be replaced by the value of one. However, if a relationship is not inside the observation, the value of the corresponding entry will be replaced by zero, and the vector will be normalized again. 
+
+% \subsection{Monte Carlo Tree Search}
+
+\section{Visualized examples}
+
+We provide a set of successful (shown in Figure \ref{fig:exp1}) and failed trajectories (shown in Figure \ref{fig:exp2}) to give a better understanding of the tasks and our method. Policy, model, and translation errors are the primary causes of failures. Among these, policy errors are responsible for the majority of the failures. Often time, the policy produces unreasonable behaviors that mislead the search procedure. For example, it usually outputs inadmissible actions, such as ``\textit{walk to the cutlery fork}'' where the ``\textit{cutlery fork}'' is not in the observation (shown in Figure \ref{fig:exp2} (a)). It also produces back-and-forth behaviors, resulting in an unreasonable heuristic and slowing the search procedure. For example, when putting objects inside the microwave, it is sometimes struck by repeatedly opening and closing the microwave. For model error, the predicted positions of objects are not always correct. Since a random rollout policy is employed, incorrect object states can result in higher $Q$-values than correct states, leading to misguided exploration (shown in Figure \ref{fig:exp2} (b)). The wrong translation also compromises the performance as we translate the response from LLM to admissible action or object names to ensure executability. This is caused in part by the VirtualHome environments, as the policy might not understand the underlying logic of the actions in VirtualHome, such as you have to walk close to interact with the object. Thus, if the LLM outputs ``open fridge'' but is not close enough to the fridge, the action will be translated to other admissible actions (``open fridge'' is not inside the admissible actions for this case as it is invalid due to the setting of VirtualHome).
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth, page=3]{img/apartment_exp.pdf}
+    \caption{Successful examples}
+    \label{fig:exp1}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{img/apartment_exp_f.pdf}
+    \caption{Failed examples. (a) Policy error and translation error. LLM outputs walk to the cutlery fork, but the cutlery fork is not in observation. We use embeddings to evaluate the most similar valid actions. Therefore it translates the action to one similar action ``walk to cutlery knife.'' The action has an incorrect semantic meaning and causes failure. (b) model error. The LLM predicts the apple is on the nightstand in the bedroom and on the coffee table in the living room. As we are using random rollout to get the estimation of the reward, there will be situations when the incorrect actions result in a higher estimated $Q$ value, thereby misleading the exploration. }
+    \label{fig:exp2}
+\end{figure}
+
+\section{Runtime performance}\label{app-sec:runtime}
+
+The runtime performance to make one-step decisions for simple object-rearrangement tasks is reported in Fig \ref{app-tab:runtime}. The experimental setup is the same as our main experiments in VirtualHome. The simple tasks are the tasks that only require the rearrangement of one item generated from the same distribution as the training dataset. We used 100 times simulation during the tree search for GPT3.5-MCTS in our experiments. For UCT, we bound the runtime by 120 seconds. The details of our hardware for experiments are enclosed below:
+\begin{itemize}
+    \item CPU: Intel(R) Xeon(R) Gold 6240 CPU @ 2.60GHz (72 cores)
+    \item GPU: NVIDIA GeForce RTX 2080 Ti
+\end{itemize}
+
+\begin{table}[]\label{app-tab:runtime}
+\centering
+\caption{Runtime performance (second $\pm$ standard error)}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+        & GPT3.5-MCTS & GPT3.5 Policy & UCT    & GPT2 Policy \\ \midrule
+Runtime & 67.83 $\pm$ 18.92      & 1.19 $\pm$ 0.81         & 120.0 $\pm$ 0.0 & 0.33 $\pm$ 0.07       \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Prompts}
+\label{app-sec:prompts}
+
+One example prompt for the LLM policy and the exact prompt we used for building up the commonsense belief is shown below. 
+
+% \begin{listing}[h]
+\begin{lstlisting}[caption=Example prompt for the heuristic policy]
+You need to generate a high-level plan for completing a household task using the allowed actions and visible objects.
+Allowed actions: walk to <object>, walk to <room>, walk to <container>, walk to <surface>, grab <object>, open <container>, close <container>, put <object> on <surface>, put <object> inside <container>.
+Rooms in the house: bedroom, bathroom, living room, kitchen
+You need to strictly follow the format in the following examples:
+Goal: Put one apple inside the fridge
+Completed actions: walk to the kitchen, walk to the apple
+Current Observation: a kitchen table is inside the kitchen, a kitchen counter is inside the kitchen, an apple is on the kitchen counter, a plate is on the kitchen table, a banana is on the kitchen counter, a fridge is inside the kitchen and fridge is closed, a kitchen cabinet is inside the kitchen and kitchen cabinet is closed, a cutlery knife is on the kitchen table, a microwave is inside the kitchen and microwave is closed, a dishwasher is inside the kitchen and dishwasher is closed.
+Next actions: grab the apple, walk to the fridge, open the fridge, put the apple inside the fridge, close the fridge, done.
+Now, finish the next following task.
+
+Goal: Put one apple on the kitchen table
+Completed actions: walk to the kitchen
+Current observation: a kitchen table is inside the kitchen, an apple is on the kitchen table, a kitchen counter is inside the kitchen, an apple is on the kitchen counter, a cutlery knife is on the kitchen counter, a fridge is inside the kitchen and fridge is closed, a kitchen cabinet is inside the kitchen and kitchen cabinet is closed, a kitchen table is inside the kitchen, a plate is on the kitchen table, a pounding cake is on the kitchen table, a microwave is inside the kitchen and microwave is closed, a dishwasher is inside the kitchen and dishwasher is closed.
+Next actions:
+\end{lstlisting}
+
+\begin{lstlisting}[caption=Example prompt for the commonsense world model]
+You need to predict the positions of the moveable objects, containers, and surfaces in the apartment according to the commonsense.
+Rooms in the apartment: bedroom, bathroom, living room, kitchen.
+Containers in the apartment: bathroom cabinet, kitchen cabinet, bathroom counter, fridge, oven, dishwasher, microwave, stove, bathroom cabinet.
+Surfaces in the apartment: bed, bookshelf, cabinet, coffee table, cutting board, floor, fryingpan, kitchen counter, kitchen table, nightstand, sofa, stove.
+You need to strictly follow the format in the following examples:
+Question: what are the possible positions of strawberry?
+Answer: Inside fridge, On kitchen table.
+Question: what are the possible positions of soap?
+Answer: On bathroom counter.
+Question: what are the possible positions of water cup?
+Answer: On kitchen table, Inside dishwasher.
+Now, answer the next following question.
+Question: what are the possible positions of apple?
+Answer:
+\end{lstlisting}
+
+\begin{lstlisting}[caption=Example prompt for the natural language instruction interpretation]
+You need to interpret the natural language goal into a formal goal representation
+For example,
+Goal: put 1 toothbrush inside the bathroomcabinet.
+Formal goal: (INSIDE, toothbrush, bathroomcabinet, 1)
+Goal: put 1 toothbrush inside the bathroomcabinet, put 1 apple on the kitchentable.
+Formal goal: (INSIDE, toothbrush, bathroomcabinet, 1)-(ON, apple, kitchentable, 1)
+Goal: put 1 toothbrush inside the bathroomcabinet, put 1 apple on the kitchentable, put 1 chicken inside the fridge.
+Formal goal: (INSIDE, toothbrush, bathroomcabinet, 1)-(ON, apple, kitchentable, 1)-(INSIDE, chicken, fridge, 1)
+Now, interpret the next following goals:
+\end{lstlisting}
+
+%%% Local Variables:
+%%% TeX-master: "./main"
+%%% End:

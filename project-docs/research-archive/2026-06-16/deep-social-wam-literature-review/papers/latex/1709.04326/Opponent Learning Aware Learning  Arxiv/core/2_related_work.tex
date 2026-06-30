@@ -1,0 +1,51 @@
+\section{Related Work}
+\label{sec:related_work}
+The study of general-sum games has a long history in game theory and evolution. Many papers address the iterated prisoners' dilemma (IPD) in particular, including the seminal work on the topic by ~\citet{axelrod2006evolution}. This work popularised tit-for-tat (TFT), a strategy in which an agent cooperates on the first move and then copies the opponent's most recent move, as an effective and simple strategy. 
+
+% Best response algorithms and convergence focussed.
+A  number of methods in  multi-agent RL aim to achieve convergence in self-play and rationality in sequential, general sum games. Seminal work includes the family of WoLF algorithms~\citep{bowling2002multiagent}, which uses different learning rates depending on whether an agent is winning or losing, joint-action-learners (JAL), and AWESOME~\citep{conitzer2007awesome}. 
+Unlike LOLA, these algorithms typically have well understood convergence behaviour given an appropriate set of constraints.
+However, none  of these algorithm have the ability to shape the learning behaviour of the opponents in order to obtain higher payouts at convergence. AWESOME aims to learn the equilibria of the one-shot game, a subset of the equilibria of the iterated game.
+
+
+Detailed studies have analysed the dynamics of JALs in general sum settings: This includes work by~\citet{uther1997adversarial} in zero-sum settings and 
+by~\citet{claus1998dynamics} in cooperative settings.
+\citet{sandholm1996multiagent} study the dynamics of independent Q-learning in the IPD under a range of different exploration schedules and function approximators.
+\citet{wunder2010classes} and \citet{zinkevich2006cyclic}  explicitly study the convergence dynamics and equilibria of learning in iterated games. Unlike LOLA, these papers do not propose novel learning rules.
+
+\citet{littman2001friend} propose a method that assumes each opponent either to be a friend, i.e., fully cooperative, or foe, i.e., fully adversarial. Instead, LOLA considers general sum games.
+
+%, banerjee2007reaching} and friend-or-foe learning ~. 
+
+ By comparing a set of models with different history lengths, \citet{chakraborty2014multiagent} propose a method to learn a best response to memory bounded agents with fixed policies. In contrast, LOLA assumes learning agents, which effectively correspond to unbounded memory policies.
+
+\citet{brafman03} introduce the solution concept of an efficient learning equilibrium (ELE), in which neither side is encouraged to deviate from the learning rule. The algorithm they propose applies to settings where all Nash equilibria can be computed and enumerated; LOLA does not require either of these assumptions. 
+
+By contrast, most work in deep multi-agent RL focuses on fully cooperative or zero-sum settings, in which learning progress is easier to evaluate, ~\citep{omidshafiei2017deep,foerster2017counterfactual,foerster2017stabilising} and emergent communication in particular ~\citep{das2017learning,mordatch2017emergence,lazaridou2016multi,foerster2016learning,sukhbaatar2016learning}. 
+As an exception, ~\citet{leibo2017multi} analyse the outcomes of independent learning in general sum settings using feedforward neural networks as policies.
+ ~\citet{lowe2017multi} propose a centralised actor-critic architecture for efficient training in these general sum environments. However, none of these methods explicitly reasons about the learning behaviour of other agents.
+ ~\citet{Lanctot17PSRO} generalise the ideas of game-theoretic best-response-style algorithms, such as NFSP~\citep{heinrich2016deep}. In contrast to LOLA, these best-response algorithms assume a given set of opponent policies, rather than attempting to shape the learning of the other agents.
+
+
+% Things that aim to change the Nash equilibrium
+The problem setting and approach of \citet{lerer2017maintaining} is closest to ours.  They directly generalise tit-for-tat to complex environments using deep RL. The authors explicitly train a fully cooperative and a defecting policy for both agents and then construct a tit-for-tat policy that switches between these two in order to encourage the opponent to cooperate. Similar in spirit to this work, \citet{munoz08} propose a Nash equilibrium algorithm for repeated stochastic games that attempts to find the egalitarian equilibrium by switching between competitive and cooperative strategies. A similar idea underlies M-Qubed, \citep{crandall2011learning}, which balances best-response, cautious and optimistic learning biases. 
+
+Reciprocity and cooperation are not emergent properties of the learning rules in these algorithms but rather directly coded into the algorithm via heuristics, limiting their generality. 
+
+
+ Our work also relates to opponent modelling, such as fictitious play ~\citep{brown1951iterative} and action-sequence prediction~\citep{ mealing2015opponent, rabinowitz2018machine}. \citet{mealing2013opponent} also %and  
+ propose a method that finds a policy based on predicting the future action of a memory bounded opponent. Furthermore, \citet{hernandez2017learning} directly model the distribution over opponents. While these methods model the opponent strategy, or distribution thereof, and use look-ahead to find optimal response policies, they do not address the learning dynamics of opponents.
+For further details we refer the reader to excellent reviews on the subject~\citep{hernandez2017survey, busoniu2008comprehensive}.
+
+By contrast, \citet{zhang2010multi} carry out policy prediction under one-step learning dynamics. However, the opponents' policy updates are assumed to be given and only used to learn a best response to the anticipated updated parameters. By contrast,  a LOLA agent directly shapes the policy updates of all opponents in order to maximise its own reward. Differentiating through the opponent's learning step, which is unique to LOLA, is crucial for the emergence of tit-for-tat and reciprocity. To the best of our knowledge, LOLA is the first method that aims to shape the learning of other agents in a multi-agent RL setting.
+
+With LOLA, each agent differentiates through the opponents' policy update. Similar ideas were proposed by \citet{metz2016unrolled}, whose training method for generative adversarial networks  differentiates through multiple update steps of the opponent. Their method relies on an end-to-end differentiable loss function, and thus does not work in the general RL setting. However, the overall results are similar: differentiating through the opponent's learning process stabilises the training outcome in a zero sum setting.
+
+Outside of purely computational studies the emergence of cooperation and defection in RL settings has also been studied and compared to human data ~\cite{kleiman2016coordinate}.
+
+\begin{figure*}[t]
+  \includegraphics[width=0.95\textwidth]{figures/figure_1_complete}
+  \vspace{-3ex}
+\caption{ a) shows the probability of cooperation in the iterated prisoners dilemma (IPD) at the end of 50 training runs for both agents as a function of state under naive learning (NL-Ex) and b) displays the results for LOLA-Ex when using the exact gradients of the value function. c) shows the normalised discounted return for both agents in NL-Ex vs. NL-Ex and LOLA-Ex vs. LOLA-Ex, with the exact gradient. d) plots the normalised discounted return for both agents in NL-PG vs. NL-PG and LOLA-PG vs. LOLA-PG, with policy gradient approximation. We see that NL-Ex leads to DD, resulting in an average reward of ca. $-2$. In contrast, the LOLA-Ex agents play tit-for-tat in b): When in the last move agent 1 defected and agent 2 cooperated (DC, green points), most likely in the next move agent 1 will cooperate and agent 2 will defect, indicated by a concentration of the green points in the bottom right corner. Similarly, the yellow points (CD), are concentrated in the top left corner. While the results for the NL-PG and LOLA-PG with policy gradient approximation are more noisy, they are qualitatively similar. Best viewed in colour.}
+\label{fig:fig_IPD}
+\end{figure*}

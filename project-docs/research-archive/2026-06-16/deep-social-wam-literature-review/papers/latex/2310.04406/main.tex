@@ -1,0 +1,443 @@
+%%%%%%%% ICML 2024 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+\usepackage{svg}
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2024} with \usepackage[nohyperref]{icml2024} above.
+\usepackage{hyperref}
+\usepackage{algpseudocode}
+\usepackage{url}
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{wrapfig}
+\usepackage{listings}
+\usepackage{algpseudocode}
+\newcommand{\greencheck}{{\color{green}\checkmark}} 
+\newcommand{\redcross}{{\color{red}$\times$}} 
+
+\newcommand{\yxw}[1]{\textcolor{blue}{[{\bf yxw:} #1]}}
+\newcommand{\kai}[1]{\textcolor{purple}{[{\bf kai:} #1]}}
+\newcommand{\az}[1]{\textcolor{orange}{[{\bf andy:} #1]}}
+
+\expandafter\def\expandafter\normalsize\expandafter{%
+    \normalsize%
+    \setlength\abovedisplayskip{4pt}%
+    \setlength\belowdisplayskip{4pt}%
+    \setlength\abovedisplayshortskip{-4pt}%
+    \setlength\belowdisplayshortskip{4pt}%
+}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+%\usepackage{icml2024}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2024}
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+\usepackage[textsize=tiny]{todonotes}
+
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{Language Agent Tree Search Unifies Reasoning, Acting, and Planning in Language Models}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Language Agent Tree Search Unifies Reasoning, Acting, and Planning in Language Models}
+%~\yxw{I think unify is better than improve - unify suggests more important contrition}\kai{modified}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2024
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Andy Zhou}{uiuc,lapis}
+\icmlauthor{Kai Yan}{uiuc}
+\icmlauthor{Michal Shlapentokh-Rothman}{uiuc}
+\icmlauthor{Haohan Wang}{uiuc}
+\icmlauthor{Yu-Xiong Wang}{uiuc}
+%\icmlauthor{}{sch}
+%\icmlauthor{}{sch}
+\end{icmlauthorlist}
+
+\icmlaffiliation{uiuc}{University of Illinois Urbana-Champaign.}
+\icmlaffiliation{lapis}{Lapis Labs}
+
+\icmlcorrespondingauthor{Andy Zhou}{andyz3@illinois.edu}
+
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF but will not be shown in the document
+\icmlkeywords{Machine Learning, Large Language Models, LM Agents, LM Planning}
+
+\vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \icmlEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
+
+%\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+\printAffiliationsAndNotice{} % otherwise use the standard text.
+\begin{abstract}
+While language models (LMs) have shown potential across a range of decision-making tasks, their reliance on simple acting processes limits their broad deployment as autonomous agents. In this paper, we introduce Language Agent Tree Search (LATS) -- \emph{the first general} framework that \emph{synergizes} the capabilities of LMs in reasoning, acting, and planning. By leveraging the in-context learning ability of LMs, we integrate Monte Carlo Tree Search into LATS to enable LMs as agents, along with LM-powered value functions and self-reflections for proficient exploration and enhanced decision-making. A key feature of our approach is the incorporation of an environment for external feedback, which offers a more deliberate and adaptive problem-solving mechanism that surpasses the constraints of existing techniques. Our experimental evaluation across diverse domains, including programming, interactive question-answering (QA), web navigation, and math, validates the effectiveness and generality of LATS in decision-making while maintaining competitive or improved reasoning performance. Notably, LATS achieves state-of-the-art pass@1 accuracy (92.7\%) for programming on HumanEval with GPT-4 and demonstrates gradient-free performance (average score of 75.9) comparable to gradient-based fine-tuning for web navigation on WebShop with GPT-3.5. Code can be found at \url{https://github.com/lapisrocks/LanguageAgentTreeSearch}.
+\end{abstract}
+% While language models (LMs) have demonstrated impressive performance on a range of decision-making tasks, they rely on simple acting processes and fall short of broad deployment as autonomous agents. We introduce LATS (Language Agent Tree Search), a general framework that \emph{synergizes} the capabilities of LMs in planning, acting, and reasoning. By leveraging the in-context learning ability of LMs, we integrate Monte Carlo tree search into LATS, which enables LMs as agents with LM-powered value functions and self-reflections for cleverer exploration, repurposing their strengths for enhanced decision-making. What is crucial in this method is the use of an environment for external feedback, which offers a more deliberate and adaptive problem-solving mechanism that moves beyond the limitations of existing techniques. Our experimental evaluation across diverse domains, such as programming, interactive QA, web navigation, and math, illustrates the applicability of LATS for decision-making while maintaining competitive reasoning performance. In particular, LATS achieving state-of-the-art pass@1 accuracy (94.4\%) for programming on HumanEval with GPT-4 and gradient-free performance (an average score of 75.9) comparable to gradient-based fine-tuning for web browsing on WebShop with GPT-3.5, demonstrating the effectiveness and generality of our method.
+% both reasoning and acting
+%~\yxw{This was misleading; suggest revising and removing model-based RL.}\kai{Rephrased} ~\yxw{suggest revising; Kai, recall your revised text before}\kai{Rephrased} programming, HotPotQA, WebShop and Game of 24~\yxw{Do we want to mention game 24 in the abstract?}\kai{Mentioned},
+% LATS achieves 94.4\% for programming on HumanEval with GPT-4 and an average score of 75.9 for web browsing on WebShop with GPT-3.5~\yxw{suggest revising; Kai, recall your revised text before}\kai{What was that text for? I forgot}, demonstrating the effectiveness and generality of our method.\kai{The abstract seems a bit long}
+
+
+\section{Introduction}
+
+General autonomous agents capable of reasoning and decision-making in a variety of environments \citep{wooldridge1995intelligent} have been of longstanding interest in the field of artificial intelligence. While this has traditionally been studied in reinforcement learning, the recent rise of language models (LMs) \citep{GPT3, chowdhery2022palm, touvron2023llama, openai2023gpt4} with strong reasoning and general adaptability offers an alternative paradigm. Not only have LMs excelled in standard natural language processing (NLP) tasks such as summarization \citep{nallapati2016abstractive} and language inference \citep{bowman2015large}, but they have also been adapted to an increasingly diverse set of tasks that often require advanced common-sense reasoning or quantitative skills \citep{cobbe2021training, saparov2022language}. In addition, LMs are capable of performing in complex environments that involve knowledge and reasoning, such as web navigation \citep{yao2022webshop, deng2023mind2web}, tool-use \citep{schick2023toolformer}, and open-ended games \citep{fan2022minedojo}. 
+
+% \begin{wrapfigure}{r}{0.5\textwidth}
+%   \centering
+%   \vspace{-0.2in}
+%   \includegraphics[width=0.4\textwidth]{figures/teaser2.pdf}
+%   \caption{An overview of LATS. LATS uses an external environment and self-reflection to improve	reasoning and decision-making.}
+%   \vspace{-0.2in}
+%   \label{fig:teaser}
+% \end{wrapfigure}
+\begin{figure}
+    \centering
+    % \includesvg[width=0.36\textwidth]{figures/lats_teaser.svg}
+    \includegraphics[width=0.38\textwidth]{figures/lats_teaser.pdf}
+    \vspace{-0.1in}
+    \caption{Overview of LATS. Serving as a unified framework, LATS leverages an external environment and an MCTS-based search algorithm to improve reasoning and decision-making.}
+    \label{fig:teaser}
+    \vspace{-0.2in}
+\end{figure}
+%~\yxw{Fig. 1 is not referred in the main text.}\az{added in paragrph4}
+
+Reasoning and acting abilities have been further improved by prompting techniques that augment LMs with feedback or observations from an external environment, as exemplified by ReAct \citep{yao2023react} and other work \citep{gao2022pal, shinn2023reflexion}. This eliminates the need to rely entirely on the base abilities of LMs, enhancing them through external tools or semantic feedback. Despite such strengths, these methods are reflexive and fall short of humans' deliberate and thoughtful decision-making characteristics to solve problems \citep{Sloman1996TheEC,evans2010intuition}. In particular, they fail to consider multiple reasoning paths or to plan ahead. Recent search-guided LM work \citep{xie2023decomposition, yao2023tree, hao2023reasoning} addresses this issue by searching over multiple reasoning chains. While enabling planning, such methods operate in isolation, lacking the incorporation of external feedback that can improve reasoning. 
+\vspace{0.04in}
+
+To overcome these challenges, we propose Language Agent Tree Search (LATS) -- a \emph{unified} framework for decision-making and reasoning with language models. As illustrated in Fig.~\ref{fig:teaser}, LATS \emph{synergizes LM reasoning, acting, and planning} strategies by expanding ReAct \citep{yao2023react} into a search over a combinatorial space of possible reasoning and acting steps. This effort is nontrivial -- adapting search algorithms to language agents and shifting from non-interactive tasks to interactive ones requires a substantial novel design on nodes, prompts, and search algorithms. In particular, nodes and prompts must effectively store and retrieve external feedback, with the search algorithm incorporating this information into useful heuristics for value assignment. Indeed, our empirical evaluation, as demonstrated on HotPotQA \citep{yang2018hotpotqa} in Sec.~\ref{sec:HotPotQA}, reveals that a simple combination of existing methods is inadequate, even failing to surpass internal reasoning performance, despite having access to the ground truth answer from the environment.
+\vspace{0.04in}
+
+Our \emph{key insight} underpinning LATS is adapting Monte Carlo Tree Search (MCTS), inspired by its success in model-based reinforcement learning \citep{silver2017mastering} and \textit{the observation that many LM tasks allow reverting to earlier steps}, to language agents, repurposing pretrained LMs as agents with LM-powered value functions and self-reflections for cleverer exploration. Leveraging the general capabilities and in-context learning abilities of modern LMs, we use language as an interface between each component, allowing LATS to adapt planning to environmental conditions \emph{without additional training}. To the best of our knowledge, LATS is \emph{the first framework} that incorporates reasoning, acting, and planning to enhance LM performance. Notably, LATS doubles the performance of ReAct \citep{yao2023react} on HotPotQA \citep{yang2018hotpotqa} and raises the average score by $22.1$ on WebShop \citep{yao2022webshop} with GPT-3.5. When used with GPT-4, LATS achieves a $92.7$ Pass@1 rate on HumanEval \citep{chen2021evaluating}, setting the state of the art. 
+
+% {\color{red}Adapting search algorithms to LM agents and shifting from non-interactive tasks to interactive ones requires a new node, prompt, and search algorithm design. Nodes and prompts must store and retrieve external feedback, and the search algorithm must incorporate this into useful heuristics for value assignment. Overall, we find this design to be nontrivial. Indeed, our experiments show a naive combination of existing methods is insufficient, even failing to surpass internal reasoning performance on HotPotQA despite having access to the ground truth from the environment. \az{added, did not directly reference the result or method combined however}}
+
+% \yxw{As suggested in slack, I would decouple this paragraph into two paragraphs, and emphasize the technical contributions - the current text sounds like a simple integration; we need to make it clear at the beginning it is not..}To help address these issues, we propose LATS (Language Agent Tree Search), a general framework for decision-making and reasoning with language models. Summarized in Fig.~\ref{fig:teaser}, LATS unifies LM planning, acting, and reasoning strategies by expanding ReAct \citep{yao2023react} into a search over a combinatorial space of possible reasoning and acting steps. We adapt Monte Carlo tree search (MCTS) from model-based reinforcement learning \citep{Silver2017MasteringTG, anthony2017thinking, jiang2018feedback} to language agents, repurposing a pretrained LM as an agent, value function, and optimizer. Utilizing the strong natural language understanding and in-context learning ability of modern LMs, we use text as an interface between each component, allowing LATS to adapt planning to environmental conditions without additional training. To the best of our knowledge, \emph{LATS is the first framework that incorporates each of  reasoning, acting, and planning to enhance LM performance}. Notably, LATS doubles the performance of GPT-3.5 on HotPotQA \citep{yang2018hotpotqa} over ReAct \citep{yao2023react} and raises the average score by $22.1$ on WebShop \citep{yao2022webshop}. When used with GPT-4, LATS achieves a $94.4$ Pass@1 rate for programming on HumanEval \citep{chen2021evaluating}, setting the state of the art. 
+\vspace{0.04in}
+
+Our \textbf{contributions} are the following: 1) We introduce LATS, a framework based on Monte Carlo Tree Search to construct the best trajectory from sampled actions, enabling more flexible and adaptive problem-solving compared with reflexive prompting methods. 2) We propose a novel value function that guides the search process and incorporates successful heuristics such as self-refinement and self-consistency. 3) By integrating external feedback and self-reflection, LATS enhances model sensibility and enables agents to learn from experience, surpassing reasoning-based search methods. Through experiments across diverse domains, including programming, interactive question-answering (QA), web navigation, and math, we demonstrate the versatility of LATS for enhancing autonomous reasoning and decision-making.
+%To summarize, 
+\section{Related Work}
+\vspace{-0.06in}
+\input{tables/related_work}
+%~\yxw{use this to update abstract}\kai{The abstract is already too long}
+
+
+% \vspace{-0.1in}
+% \begin{itemize}
+%     \item We introduce an LM-based Monte Carlo tree search variant to deliberately construct the best trajectory from sampled actions, enabling more flexible and adaptive problem-solving compared to reflexive prompting methods. {\color{red}Our proposed value function guides the search process and incorporates successful heuristics such as self-refinement and self-consistency.}
+%     \item By integrating external feedback and self-reflection, LATS enhances model sensibility and enables agents to learn from experience, surpassing reasoning-based search methods.
+%     \item Through experiments across diverse domains like math, programming, interactive QA, and web navigation, we demonstrate the versatility of LATS in harnessing LMs for autonomous reasoning and decision-making.
+% \end{itemize}
+% \vspace{-0.07in}
+
+
+
+% \begin{figure}[!htbp]
+%     \centering
+%     \begin{minipage}{0.32\textwidth}
+%         \centering
+%         \includegraphics[width=\linewidth]{figures/tot.pdf}
+%         \vspace{-0.05in}
+%         \\\textbf{a) Tree-of-Thoughts}
+%         \label{fig:tot}
+%     \end{minipage}%
+%     \hfill
+%     \hspace{-0.04\textwidth}
+%     \begin{minipage}{0.32\textwidth}
+%         \centering
+%         \includegraphics[width=\linewidth]{figures/rap.pdf}
+%         \vspace{-0.05in}
+%         \\\textbf{b) Reasoning via Planning}
+%         \label{fig:rap}
+%     \end{minipage}%
+%     \hfill
+%     \begin{minipage}{0.34\textwidth}
+%         \centering
+%         \includegraphics[width=\linewidth]{figures/lats.pdf}
+%         \vspace{-0.05in}
+%         \\\textbf{c) Language Agent Tree Search}
+%         \label{fig:lats}
+%     \end{minipage}
+%     \vspace{-0.15in}
+%     \caption{An overview of the differences between LATS and recently proposed LM search algorithms ToT \citep{yao2023tree} and RAP \citep{hao2023reasoning}. LATS leverages environmental feedback and self-reflection to further adapt search and improve performance.}
+%     \vspace{-0.13in}
+%     \label{fig:comparison}
+% \end{figure}
+
+\textbf{LMs for reasoning.} For LMs, reasoning involves decomposing complex inputs into sequential intermediate steps towards a final answer \citep{cobbe2021training}, demonstrated with chain-of-thought (CoT) prompting \citep{wei2022chain} and its variants~\citep{wei2022chain, kojima2022large, wang2022self}. However, these methods, which create chains autoregressively in a single step, often suffer from error propagation as the number of steps increases \citep{guo2018long,chen2022program}, due to compound errors. Various advancements aim to mitigate this issue; some approaches, such as self-consistency~\citep{wang2022self}, employ majority voting over sampled chains, while others focus on multi-step decomposition, such as least-to-most prompting~\citep{zhou2022least}. Recently, CoT has been improved with search algorithms \citep{yao2023tree,hao2023reasoning,besta2023graph} that can sample trajectories more effectively. Tree-of-thought (ToT) prompting \citep{yao2023tree} uses DFS or BFS-based (depth/breadth-first) search guided by an LM-generated heuristic, while reasoning via planning (RAP) \citep{hao2023reasoning} uses MCTS with rollouts simulated by LMs. However, they rely solely on LM internal knowledge and cannot adapt to useful external feedback.
+%typically
+
+\textbf{LMs for acting.} The strong reasoning and common-sense abilities of LMs have been further adapted for decision-making or acting tasks as a policy model in interactive environments. In robotics, LMs have been employed as high-level controllers of control policies \citep{ahn2022do, huang2022inner, driess2023palme}. Similar work \citep{openai2022vpt, wang2023voyager} has also adapted LM agents to complex multimodal games such as Minecraft \citep{guss2019minerl, fan2022minedojo}. LMs are particularly useful in text-based environments \citep{liu2018reinforcement,shridhar2020alfworld,liu2023agentbench}, where acting-based prompting techniques such as ReAct \citep{yao2023react} have seen success. Similar to CoT, ReAct is limited by its simplicity and cannot effectively adapt to environment conditions. Many extensions have been proposed to address this issue, including self-refine \citep{madaan2023selfrefine} and Reflexion \citep{shinn2023reflexion}, which use self-improvement to enhance reasoning and decision-making, and AdaPlanner \citep{sun2023adaplanner}, which incorporates both positive and negative feedback. However, these methods focus on refining an individual trajectory and do not consider alternative choices at each step. In addition, recent work \citep{huang2023large} has suggested that LMs cannot self-correct their internal reasoning, making it critical to use external feedback. Alternatively, to pure decision-making environments, the reasoning and practical abilities of LMs have been enhanced by providing access to external tools, such as APIs, search engines, calculators, and other models \citep{schick2023toolformer, shen2023hugginggpt, surís2023vipergpt}. We summarize prior work in Tab.~\ref{table:related_work}.
+
+\textbf{Tree-based search.} Tree-based search, where multiple branches of outcomes are explored during search, is widely used in many planning algorithms~\citep{swiechowski2023monte, lavalle2001rapidly} and reinforcement learning (RL)~\citep{hafner2019learning, du2023learning, wu2023daydreamer} algorithms for its good exploration-exploitation trade-off. Note that though tree-based search necessitates an environment model that can expand from an arbitrary state~\citep{vodopivec2017monte}, often requiring extra training in RL~\citep{hafner2023mastering}, such a problem \emph{does not} exist for most LM tasks. This is because we can conveniently revert to any state by setting the input to be the context and the corresponding previous output from the LM for many tasks. Thus, we operate on the tree-based framework and use MCTS~\citep{swiechowski2023monte} to fully unlock the potential of LMs. In addition, we avoid the cost of training a value function over language descriptions by leveraging the in-context learning \citep{GPT3} abilities of LMs. Concurrent work \cite{liu2023reason} also explores combining search algorithms with LM agents but uses an off-the-shelf search algorithm, which may not be optimal for LMs. Finally, following \citet{yao2023tree} and \citet{hao2023reasoning}, we note that we use \textit{planning} and \textit{search algorithms} interchangeably in this paper.%{\color{red}Concurrent work \cite{liu2023reason} also explores combining search algorithms with LM agents but uses an off-the-shelf search algorithm. Finally, we note that we do not distinguish between \textit{planning} and the use of a \textit{search algorithm} in this paper, following \citet{yao2023tree} and \citet{hao2023reasoning}.}
+%~\yxw{consider changing the title to include LMs for planning?} \kai{But this paragraph is about tree-based search, e.g., MCTS in general and does not focus on NLP task}~\yxw{The red text here needs revising, hard to parse.}\kai{revised}
+
+\section{Preliminaries}
+
+\subsection{Problem Setting and Prompting}
+
+We first define our problem and outline a few established methods that leverage language models for reasoning \emph{or} decision-making. In LM reasoning or decision making, we are given an input $x$ in natural language and a pretrained language model $p_\theta(x)$ parameterized by $\theta$; our goal is to generate a final output $y\sim p_\theta(x)$ that corresponds to the answer (reasoning) or completes the task (decision-making). Both $x$ and $y$ are language \textit{sequences}, which are comprised of a list of \textit{tokens} (the basic elements of natural language, often words), denoted as \( x = (x[1], \dots, x[l_x]) \) and \( y = (y[1], \dots, y[l_y]) \) where $l_x$ and $l_y$ are the length. The LM decodes text autoregressively, i.e., without other inputs, the probability for an LM to generate a sequence $y$ is given by \(p_\theta(x) = \prod_{i=1}^{l_x} p_\theta(x[i] | x[1 \dots i-1]) \). Usually, to improve reasoning, \textit{prompts} are provided along with the input $x$, which are specific instructions or few-shot input-output examples. We denote the generic process where an input \( \texttt{prompt}_{\mathrm{IO}}(x) \) is transformed into an output \( y \) by LM: \( y \sim p_\theta(\texttt{prompt}_{\mathrm{IO}}(x)) \).
+%, where \( \texttt{prompt}_{IO}(x) \) denotes the input \( x \).
+%large ~\yxw{this is not consistent with the following usage, should it be $y\sim p_\theta(y|x)$?}\kai{modified} ~\yxw{what is n? - not defined; also do x and y have to be of the same length?}\kai{Andy - please address}\az{done} ~\yxw{why LLM generates x? x is input.}\az{mistake, changed to y} ~\yxw{what does it mean by `improve LM'?}\kai{explained}
+%Before describing LATS, w
+
+\textbf{Chain-of-thought (CoT) prompting}~\citep{wei2022chain} caters to scenarios where the direct mapping from \( x \) to \( y \) is intricate, e.g., when \( x \) is from a mathematical query or challenging question. It hinges on creating \textit{thoughts} \( z_1, \dots, z_l \) that act as stepping stones between \( x \) and \( y \); each thought $z_i$ is a language sequence. To employ CoT prompting, thoughts are extracted sequentially as \( z_i \sim p_\theta^{\mathrm{CoT}}(x, z_{1\cdots i-1}) \), with the final output being \( y \sim p_\theta^{\mathrm{CoT}}(x, z_{1 \cdots l}) \).
+%~\yxw{$p_\theta^\mathrm{CoT}$ - use mathrm for text-based sub-script/superscript}\kai{Addressed} is introduced to such as This method
+
+\textbf{Tree-of-thought (ToT) prompting}~\citep{yao2023tree} extends CoT prompting by exploring multiple reasoning paths over thoughts. It frames problems as a search over a tree, where each node $s=[x, z_{1\cdot i}]$ represents a partial solution state comprising the original input $x$ and the thought sequence $z_{1\cdots i}$. Thoughts $z_{i}$ are generated by proposal or sampling with CoT \( z_i \sim p_\theta^\mathrm{CoT}(x, z_{1\cdots i-1}) \). Search algorithms like depth-first (DFS) or breadth-first (BFS) search are used to systematically explore the tree, guided by heuristics based on LM evaluations $V(s)$ of each state.
+%{ \yxw{I think this sentence can be made stronger - need to first mention this assumption is widely existing in ...; and then say we follow.}\az{moved to react section}
+
+\textbf{ReAct}~\citep{yao2023react} extends language models to tasks where the mapping from \( x \) to \( y \) is enhanced by or requires interactions with an external environment, such as a game or API. This technique constructs an action space $\hat{A} = A \cup Z$ that adds permissible actions $a \in A$ to the reasoning traces $z \in Z$ from CoT. Observations $o$ from the environment are used to improve both reasoning and acting. To solve problems with ReAct, after each observation, actions are generated from $p_\theta$ sequentially as \( a_i \sim p_\theta^\mathrm{ReAct}(x, o_{1\cdots i-1}, a_{1\cdots i-1}) \), with the final output being \( y \sim p_\theta^\mathrm{ReAct}(x, o_{1\cdots l}, a_{1\cdots l}) \). In this paper, consistent with other LM agent methods such as ReAct and Reflexion \cite{shinn2023reflexion}, we focus on decision-making tasks \emph{where reverting between iterations is feasible}.
+
+While the previously described prompting techniques improve LM performance on reasoning tasks, they falter on difficult tasks that involve multifaceted decision-making due to several shortcomings: 1) \textit{Flexibility}: Base prompting designs (CoT or ReAct) autoregressively sample from the LM, neglecting potential alternative continuations from specific states. 2) \textit{Sensibility}: Reasoning-based methods (CoT, RAP \cite{hao2023reasoning}, or ToT) rely solely on the internal representations of the LM and cannot consider external observations. This dependency risks fact hallucination and error propagation while setting a performance ceiling. 3) \textit{Adaptability}: Current planning strategies (RAP or ToT) use simple search algorithms such as BFS or cannot leverage environmental feedback to improve planning. Additionally, the agent is static and cannot reuse previous experience or learn from trial and error. While RAP also adopts MCTS, it is constrained to tasks where the LM can become a world model and accurately predict states. These shortcomings limit the ability of LMs to be deployed as general problem-solving agents and form the motivation for LATS.
+
+
+\subsection{Monte Carlo Tree Search (MCTS)}
+Monte Carlo Tree Search (MCTS) is a heuristic search algorithm that is proved successful on many decision-making environments, such as Atari~\citep{ye2021mastering} and Go~\citep{silver2016mastering}. MCTS builds a decision tree where every node in the tree is a state and edge is an action. MCTS runs for $k$ episodes; for each episode, it starts from the root (i.e., initial state) and iteratively conducts two steps to expand the tree: 1) \textit{Expansion}, where multiple children states $s$ are explored from the current parent state $p$ by sampling $n$ actions, and 2) \textit{Selection}, where the children with the highest UCT \textit{(Upper Confidence bounds applied to Trees)}~\citep{kocsis2006bandit} value is selected for expansion by the next iteration. The UCT of a child state $s$ is calculated as follows:
+\begin{equation}
+\small
+UCT(s)=V(s)+w\sqrt{\frac{\ln N(p)}{N(s)}},
+\label{eq:uct}
+\end{equation}
+where $N(s)$ is the number of visits to a node $s$, $V(s)$ is the value function (expected return) from the subtree of $s$, $w$ is the exploration weight, and $p$ is the parent node of $s$. When the end of an episode is reached, a \textit{backpropagation} is carried out: the return $r$ is used for updating every $V(s)$ along the path 
+% see Sec.~\ref{sec:LATS} for formulas). 
+with the formula $V(s)=\frac{V_{\text{old}}(s)(N(s)-1)+r}{N(s)}$, where $V_{\text{old}}(s)$ is the old value function. Normally, the major shortcoming of MCTS is that it requires an environment model to undo previous steps and form a searching tree, which could be a strong assumption. However, this limitation \emph{does not} exist for many LM tasks, as we can conveniently reset to any step by simply copy-pasting historical text input. Such a special property is the key motivation of our work. 
+%~\yxw{is this sentence a bit redundant with the sentence above eq. 1?}~\kai{Removed}.often
+% ------------------------------------------------
+
+
+\section{Unifying Reasoning, Acting, and Planning}
+\subsection{LM Agent} 
+%~\yxw{why not follow the same order as the title?}\kai{Addressed}
+
+Depending on the base prompting framework design, LATS supports sequential reasoning or decision-making tasks. At time step $t$, an agent receives an observation $o_t \in O$ from the environment and takes an action $a_t \in A$ following some policy $\pi(a_t | x, o_{1\cdots t-1}, a_{1\cdots t-1})$. We initialize the agent with $p_\theta$ to leverage the useful language representations of an LM as a base decision-maker. We follow the ReAct instantiation, in which the action space $\hat{A} = A \cup Z$ consists of both the space of permissible actions $A$ and the language space of reasoning traces $Z$. Actions directly affect the environment and result in observation, while thoughts are used to formalize decisions by organizing information, planning future actions, or injecting internal knowledge. The exact instantiation of the action space depends on the particular environment -- for decision-making tasks actions might consist of commands on a website, while for reasoning tasks the action space might be limited to a few external tools or APIs. In environments without feedback, such as reasoning tasks, we use CoT as the base prompting framework.
+%~\yxw{would there be any confusion between t and i?}\kai{modified}
+
+Instead of greedily decoding one trajectory or solution, we sample $n$ actions from $p_\theta$ using the current state. This is based on the intuition that for complex decision-making tasks, there is likely to be a range of potential trajectories or reasoning paths that are correct \citep{evans2010intuition}. Sampling a diverse set of candidates at each step mitigates the stochastic nature of LM text generation and enables greater exploration in both the decision-making and reasoning space. We wrap $p_\theta$ within our proposed search algorithm to deliberately construct the best trajectory from sampled actions.
+
+\subsection{LATS}
+\label{sec:LATS}
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/phases.pdf}
+    \vspace{-1.2in}
+    \caption{Overview of the six operations in LATS. A node is \textit{selected}, \textit{expanded}, \textit{evaluated}, then \textit{simulated} until a terminal node is reached, and then the resulting value is \textit{backpropagated}. If the trajectory fails, a \textit{reflection} is generated and used as additional context for future trials. These operations are performed in succession until the budget is reached or the task is successful.}
+    \vspace{-0.1in}
+    \label{fig:phases}
+\end{figure*}
+
+The main component of LATS is a search algorithm that controls the problem-solving process with planning. To find the most promising trajectory and systemically balance exploration with exploitation, we adopt a variant of MCTS that frames decision-making as a tree search, in which each node $s=[x, a_{1\cdots i}, o_{1\cdots i}]$ represents a state comprising the original input $x$, action sequence $a_{1\cdot i}$, and observation sequence $o_{1\cdot i}$, where $i$ is a token in the text sequence. 
+
+Our main technical contribution is \textit{adapting MCTS to language agents}. LATS repurposes $p_\theta$ as an agent, state evaluator, and feedback generator, leveraging the useful language representations of modern LMs to facilitate planning. While standard MCTS and RAP \cite{hao2023reasoning} rely on internal dynamics models to facilitate simulation, LATS uses environment interaction and does not require a world model. As depicted in Fig.~\ref{fig:phases}, LATS consists of a series of operations -- \textit{selection, expansion, evaluation, simulation, backpropagation, and reflection} -- performed in succession until the task is successfully completed or a computational limit is reached after sampling $k$ trajectories. The full pseudocode of LATS can be found in Sec.~\ref{sec:pseudocode} in the Appendix.
+
+\textbf{Selection.}
+In the first operation, the algorithm identifies a segment of the current tree most suitable for subsequent expansion. Starting from the root node, denoted as the initial state \(s_0\), a child node is selected at each tree level until a leaf node is reached. To balance exploration and exploitation, we use the UCT algorithm as shown in Eq.~\ref{eq:uct}. 
+
+\vspace{0.5mm}
+\textbf{Expansion.} 
+After selecting a node, the second operation expands the tree by sampling $n$ actions from $p_\theta$, as described in the prior section. The environment receives each action and returns corresponding feedback as an observation. This results in $n$ new child nodes added to the tree. This tree is stored in an external long-term memory structure.
+
+\vspace{0.5mm}
+\textbf{Evaluation.} 
+The third operation assigns a scalar value to each new child node for selection and backpropagation. This value effectively quantifies the agent's progress in task completion, serving as a heuristic to steer the search algorithm towards the most promising regions of the tree. As LATS does not involve training, we propose a novel value function for this setting based on two components: (1) a \emph{self-generated} LM score and (2) a \emph{self-consistency} score.
+
+Inspired by ToT, we repurpose $p_\theta$ into a value function by prompting it to reason about a given state. To obtain a scalar value, we instruct $p_\theta$ to end its reasoning trace with a score indicating the correctness of the trajectory. Our key distinction from ToT is that we obtain this value after obtaining the environmental feedback, improving value assignment. This also enables scaling to more challenging environments, as it is difficult for LMs to improve their responses without external feedback \cite{huang2023large}. Additionally, to further improve value assignment, we introduce an additional heuristic based on self-consistency \cite{wang2022self}, in which actions sampled multiple times at the same state tend to be more accurate. This results in the overall value function:
+\begin{equation}
+\small
+    V(s) = \lambda * \text{LM}(s) + (1-\lambda) * \text{SC}(s),
+\end{equation}
+where $\lambda$ is a hyperparameter. Notably, our method offers enhanced flexibility over programmed heuristics \citep{campbell2002deep} and greater efficiency than learned heuristics \citep{silver2017mastering}.
+
+
+\textbf{Simulation.} The fourth operation expands the currently selected node until a terminal state is reached. At each depth level, we sample and evaluate nodes with the same operations but prioritize nodes of the highest value. Reaching a terminal state provides objective feedback on the correctness of a trajectory. If the task is completed successfully, then LATS terminates the search. If the solution is partially successful or unsuccessful, then we perform two additional operations as described below. The success of a trajectory is determined by the design of the specific environment, such as finalizing a purchase in web navigation environments.
+
+\textbf{Backpropagation.} 
+This operation updates the values of the tree based on the outcome of a trajectory. For each node $s_0,s_1,\dots, s_l$ in the trajectory from root (initial state $s_0$) of the searching tree to leaf (terminal state $s_l$), its value is updated to reflect the outcome of the simulation by $N(s_i)=N(s_{i-1})+1$ and $V(s_i)=\frac{V(s_{i-1})N(s_{i-1})+r}{N(s_i)}$, where $r$ is the reward. These updated values are used in the UCT formula (Eq.~\ref{eq:uct}) to guide the selection of the next node.
+
+\textbf{Reflection.}
+In addition to the environmental feedback, we leverage \textit{self-reflection} to further refine the decision-making process \citep{shinn2023reflexion, madaan2023selfrefine}. Upon encountering an unsuccessful terminal node, $p_\theta$ is prompted with the trajectory and final reward to provide a verbal self-reflection that summarizes the errors in the reasoning or acting process and proposes superior alternatives. We store both failed trajectories and corresponding reflections in the memory. In subsequent iterations, these are integrated as additional context to the agent and value function, refining both through in-context learning. This imparts a semantic gradient signal more useful than a scalar value, enabling the agent to learn from trial and error without the cost of expensive optimization such as reinforcement learning.
+
+\textbf{Discussion.} Conceptually, LATS has several notable advantages as a general framework for reasoning and decision-making with LM agents.
+(1) \textit{Generality}: LATS supports both reasoning and decision-making tasks by defining a shared space of thoughts and actions. (2) \textit{Deliberation}:  Leveraging MCTS and LM value function in LATS ensures a principled search that selects options with high value while exploring promising alternatives. (3) \textit{Adaptability}: Incorporating external feedback through observations and self-reflection in LATS enables greater adaptation during problem-solving. (4) \textit{Flexibility}: LATS can accommodate different scenarios, environments, and resource stipulations by modifying state design and tree dimensions. (5) \textit{Modularity}: The base LM agent, reflection generator, and value function can be independently altered and adapted to individual LM properties.
+
+%around the use of the following The use of LATS is designed to
+
+\input{tables/hotpot_cot}
+
+\section{Experiments}
+\label{sec:exp}
+
+To demonstrate the general applicability of LATS, we evaluate our method on a variety of domains that require reasoning and acting: programming \citep{chen2021evaluating, austin2021program}, HotPotQA \citep{yang2018hotpotqa}, WebShop \citep{yao2022webshop}, and Game of 24~\cite{yao2023tree}.
+%~\yxw{did not mention game 24?}\kai{added}
+
+\subsection{HotPotQA}
+\label{sec:HotPotQA}
+
+\input{tables/hotpot_act}
+
+For a task that can be approached with both reasoning-based and acting-based strategies, we consider HotPotQA \citep{yang2018hotpotqa}, a multi-hop question-answering benchmark that requires retrieval over two or more Wikipedia passages. For the action space, in addition to LM thoughts, we follow the setup from \citet{yao2023react}, which provides the agent with API calls to search and retrieve information. The output of these API calls and self-generated reflections form the observation space. Note that consistent with previous work \cite{yao2023react, shinn2023reflexion}, we use an oracle setup for HotPotQA, in which the environment provides feedback about the answer's correctness upon receiving an answer. This enables a fair comparison between our method and baselines in scenarios where the quality of feedback is high, allowing us to focus our evaluation on how well the agent incorporates external feedback. We use a subset of 100 questions and three few-shot examples for each method. For ToT, we use DFS as the base search algorithm. For all methods that involve sampling, including LATS, we sample $k=50$ trajectories. More details are in Appendix Sec.~\ref{sec:envdetail}.
+%~\yxw{this sentence is written in a confusing way - it sounds like we have two settings, with an oracle one and another one, but it should be only the oracle one? I guess the confusion lies in using `additionally' to start the sentence, maybe change to `Note that'? also, need to emphasize this is for all the methods including baselines.}\kai{Andy - please deal with this}\az{added}}
+
+We evaluate internal reasoning strategies by removing actions and observations from the context, corresponding to CoT \citep{wei2022chain} and its variants, CoT-SC \citep{wang2022self}, ToT \citep{yao2023tree}, and RAP \citep{hao2023reasoning}. These methods rely solely on the agent's existing knowledge to answer the question. We further consider acting-based methods ReAct, Reflexion, and LATS, which augment the agent with the interactive API environment and primarily evaluate its information retrieval abilities. We also design a simple integration of search algorithms with LM agents, extending ToT and RAP with ReAct prompting to handle external observations. In addition, while LATS is designed for scenarios where external feedback can enhance reasoning, we also implement a reasoning-only version with CoT as the base prompting framework. Moreover, we combine internal and external reasoning in LATS by first prompting with a CoT-based prompt and then switching to a ReAct-based prompt upon failure. This is closer to how humans might approach this task by using tools to retrieve additional information only when the answer is not already known. 
+
+\textbf{Results.} We observe in Tab.~\ref{table:hotpot-cot} and Tab.~\ref{tab:hotpot-react} that both internal reasoning and external retrieval strategies perform well on HotPotQA. Due to their large-scale training corpus, modern LMs already encode factual knowledge and can often directly answer the question correctly. While CoT can slightly enhance performance on questions requiring reasoning, larger gains are observed with search methods ToT and RAP (Tab.~\ref{table:hotpot-cot}, Row 4, 5), which can sample and explore more outputs. We observe similar results for acting-based methods. LATS surpasses ReAct, even when sampling the same number of trajectories, by expanding more nodes with principled search. This is demonstrated when modifying $n$, the number of nodes expanded during each iteration. Increasing $n$ can consistently improve performance, although at greater computational and inference costs. LATS also outperforms RAP on internal reasoning, but has higher performance on the decision-making setting of HotPotQA than the reasoning setting. Contrary to LATS, the ReAct versions of ToT and RAP (Tab.~\ref{tab:hotpot-react}, Row 4, 5) \textit{perform even worse than the reasoning-only setting} of HotPotQA, which indicates that the acting-based setting is more challenging and \emph{adaptation of search algorithms to decision-making scenarios is non-trivial}. Combining internal and external reasoning in LATS results in the highest performance, indicating the importance of external feedback in augmenting reasoning even in tasks where the base LM can already perform.
+%~\yxw{worse than?- this sentence is confusing}\kai{Andy - please clarify this}\az{added}.
+
+\subsection{Programming}
+
+\input{tables/humaneval}
+
+To demonstrate the importance of external observations for complex reasoning tasks, we evaluate the baselines and LATS on programming with HumanEval~\citep{chen2021evaluating}\footnote{Some baselines use 161 questions from HumanEval. We use all 164 questions for LATS and find minimal performance differences, so we report baselines for both settings.} and MBPP~\citep{austin2021program}. Both datasets measure the correctness of synthesized programs in Python from natural language docstrings. We use individual solutions as the action space and test suite and compiler feedback as the external observation. We follow \citet{bei2022codet} and use an LM to generate a synthetic test suite of syntactically valid ``assert'' statements for each question. For each step, the solution is evaluated on this test suite, and the results, including successful and failed tests and compiler output, are added to the context as an observation. 
+
+For this task, the reasoning and acting baselines share an action space, but acting methods are able to incorporate observations as additional context. For LATS, since each action corresponds to a complete solution, we skip the simulation step of LATS and directly use the percentage of passed tests as the backpropagated reward. We use $k = 8$ iterations, set the number of generated tests at $4$, and sample $n = 5$ solutions during expansion. After the search is completed, we select the solution with the highest value and evaluate it on the real test suite for the pass@1 accuracy evaluation. More details can be found in Appendix Sec.~\ref{sec:envdetail}.
+
+\textbf{Results.} Tab.~\ref{tab:humaneval} and Tab.~\ref{table:mbpp} show that both search and semantic feedback are crucial for better performance. Despite not using observations, ToT and RAP are competitive with Reflexion. LATS has the highest performance on both datasets. RAP uses a search algorithm similar to LATS, which reveals the importance of external feedback for difficult reasoning tasks such as programming. With GPT-4, using LATS sets the state of the art for HumanEval, validating that LATS can be used with more advanced LMs for higher performance.
+
+\input{tables/mbpp}
+
+\subsection{WebShop}
+
+For a complex decision-making environment with practical applications, we consider WebShop \citep{yao2022webshop}, an online shopping environment composed of a website with 1.18M real-world products and 12k human instructions. Agents must navigate a website through a variety of commands to purchase an item matching a user specification. We use the preconstructed action space of search and click commands and browser feedback and reflections for the observation. The performance is gauged using two metrics: an average score, reflecting the percentage of user-specified attributes met by the selected product, and a success rate, indicating the frequency with which the chosen product fulfills all given conditions. We compare against acting-based prompting methods and RL-based approaches. We evaluate on 50 instructions, expand $n=5$ children for LATS, and set $k=30$ for LATS, ReAct (best of $k$), and Reflexion. More details and prompts are in Appendix Sec.~\ref{sec:envdetail} and Sec.~\ref{sec:webshop_prompt}.
+
+\textbf{Results.} We find in Tab.~\ref{table:webshop} that GPT-3.5 with ReAct is competitive to imitation learning (IL) and can exceed reinforcement learning techniques with stronger prompting strategies. Sampling $k=30$ trajectories with ReAct and Reflexion results in a similar performance, suggesting the semantic feedback is not as helpful in complex environments like WebShop. Similar to \citet{shinn2023reflexion}, we find that generated reflections are often generic and do not provide useful feedback, resulting in a tendency for the agent to become stuck in local minima. However, using LATS indeed results in a noticeable improvement, indicating a more effective exploration for the same number of iterations.
+
+\input{tables/webshop}
+
+\input{tables/game24}
+
+
+\subsection{Ablation Study and Additional Analysis}%Additional Observations}
+
+We further test the reasoning ability of LATS on Game of 24, and also conduct additional experiments on HotPotQA to demonstrate the effect of each component of LATS (results shown in Tab.~\ref{table:abl}). % We use HotPotQA as our setup incorporates both reasoning (through thoughts) and acting (through API calls);  
+More ablations for token consumption on HotPotQA are in Tab.~\ref{tab:cost} in Appendix Sec.~\ref{sec:abl}. 
+%In this section, w
+
+\textbf{Reasoning on Game of 24.} To show how LATS can be applied to purely internal reasoning tasks, we additionally evaluate on Game of 24 \cite{yao2023tree}, a mathematical reasoning task where the agent must construct 24 out of a set of numbers and basic operations. We use CoT as the base prompting design and employ the same operations as in other settings. We find in Tab.~\ref{table:game24} that LATS outperforms previous methods proposed specifically for reasoning. This is due to our proposed value function, which incorporates self-consistency as an additional heuristic. 
+
+\input{tables/ablation}
+
+\textbf{Self-reflection.} LATS uses self-reflection to provide additional semantic signals for the agent. In Tab.~\ref{table:abl} (Row 5, 6), we observe a $0.05$ performance drop when self-reflection is removed from LATS, validating its usefulness. This is a smaller gain than the $0.19$ gain that Reflexion has over ReAct as shown in Tab.~\ref{tab:hotpot-react}, suggesting overlap between the questions where an answer can be improved by self-reflection and search. This variant outperforms RAP (ReAct), reflecting our improvements to MCTS.
+
+\input{tables/cost}
+
+\input{tables/cost_k}
+
+\textbf{Search algorithm.} MCTS is a more principled search algorithm than variants like A* \cite{zhuang2023toolchain} or DFS and is the basis for observed performance gains. We observe the effects of using DFS, and incorporate the LM-based heuristic used in ToT in which branches with low values are pruned. This removes the selection and backpropagation operations, and we observe a $0.21$ drop in performance in Tab.~\ref{table:abl} (Row 4) when sampling the same number of nodes but outperforms ToT (ReAct). {Despite also benefiting from ground-truth feedback, LATS uses it better than ToT and RAP and can outperform these methods.} We also find in Tab.~\ref{table:abl} (Row 3) that LM scoring, the main component of our value function, is crucial for leveraging external feedback and strong performance.
+
+{\textbf{Sample complexity and token consumption.} One possible concern of LATS is that the tree-structured search might consume much more tokens than existing methods. To further study the computational cost of LATS compared to prior methods, we examine the sample complexity (i.e., asymptotic token cost) of all methods considered in this paper and count the average number of nodes expanded by our method and other tree-structured methods (ToT and RAP) upon successful search on HotPotQA. We present the results in Tab.~\ref{tab:cost} and Tab.~\ref{table:costk}, which show that our method has the same sample complexity as other tree-based search methods and requires fewer overall tokens and states. The token cost gap will be even larger when taking failed trajectories into account, since our method has a higher success rate and reaches the computational budget limit less often. This is also true when sampling a smaller number of trajectories; on average, LATS requires 3.55 fewer nodes than RAP and 12.12 fewer nodes than ToT. These findings underscore our improvements to MCTS and adaptation to LM agents, resulting in a more principled and efficient search mechanism.}
+
+\vspace{0.2mm}
+\section{Conclusion}
+\label{sec:conclusion}
+\vspace{1.2mm}
+
+This work introduces Language Agent Tree Search (LATS), the first framework to unify reasoning, acting, and planning for enhanced LM problem-solving. LATS addresses key limitations of prior prompting techniques by deliberately constructing trajectories with search algorithms, incorporating external feedback, and enabling agents to learn from experience. Our evaluation demonstrates the ability of LATS to harness LM capabilities for various decision-making tasks while maintaining its reasoning ability \emph{without additional training}. The proposed synergies between search, interaction, and reflection offer a versatile approach to autonomous decision-making, highlighting the potential of LMs as generalist agents. 
+
+\vspace{1.2mm}
+{\textbf{Limitations and future directions.} LATS has two main limitations that should be considered before its application. First, it has a higher computational cost compared to simpler prompting methods like ReAct or Reflexion, which may limit its practicality in certain situations. Second, LATS assumes the ability to revert to earlier states in decision-making environments, which may not be universally applicable in all possible environments. Despite these limitations, it is worth noting that LATS still achieves better performance and efficiency compared to similar methods, and the number of nodes expanded at each step provides a trade-off between performance and efficiency. Additionally, we expect inference-time compute costs to decrease over time, thereby increasing the usefulness of LATS and other ``System-2'' LM approaches. Finally, the reversion property is feasible in many real-world applications, opening up new opportunities in the LM decision-making community. Future directions include scaling LATS to more complex environments or multi-agent frameworks and improving efficiency to reduce costs. A more detailed discussion about the limitations of LATS can be found in Appendix Sec.~\ref{sec:discussion}.}
+
+% {\color{red}\textbf{Limitations.} Despite its impressive reasoning and decision-making ability on many tasks of different types, LATS has two limitations: 1) relative higher computational cost to simpler prompting methods like ReAct, and 2) the assumption that the environment could back up for decision-making tasks. See detailed discussion in Appendix~\ref{sec:discussion}.}
+% Although LATS can improve reasoning and decision-making, this arrives at a higher computational cost relative to simpler prompting methods like ReAct or Reflexion. A full analysis of the cost can be found in Tab.~\ref{tab:cost} in Appendix~\ref{sec:abl}. While such an issue is mitigated by the fact that the number of nodes $n$ expanded at every step provides a natural trade-off between performance and efficiency (setting $n=1$ makes the method as efficient as ReAct with multiple trials or CoT-SC), in practice, we recommend using LATS for difficult tasks like programming or for situations where performance is prioritized over efficiency. We hope that continued advancements in LLMs will reduce costs and increase the practicality of LATS.
+
+% harness LM capabilities for a variety of reasoning and decision-making tasks without additional training.
+\newpage
+\section*{Impact Statement}
+
+LATS is a framework that enhances LM performance through interactions with an environment. This improvement in autonomous decision-making may facilitate harmful uses of LMs. On the other hand, LATS enhances interpretability and the potential for greater alignment, as it involves high-level linguistic reasoning and actions through several rounds of decision-making and reflection rather than relying on autoregressive generation. Finally, enhancing the capabilities of LM agents may raise security risks, such as executing malware. We encourage further research to fully understand and mitigate the risks of LMs.
+
+\section*{Acknowledgements}
+
+We thank Daniel Campos for useful feedback on earlier versions of this paper. This work was supported in part by NSF Grant 2106825, NIFA Award 2020-67021-32799, the Jump ARCHES endowment through the Health Care Engineering Systems Center at Illinois and the OSF Foundation, and the IBM-Illinois Discovery Accelerator Institute. This work used NVIDIA GPUs at NCSA Delta through allocations CIS220014, CIS230012, and CIS230218 from the ACCESS program.
+
+\bibliography{main}
+\bibliographystyle{plainnat}
+
+\clearpage
+
+\section*{Appendix of LATS}
+\appendix
+
+The appendix is organized as follows. First in Sec.~\ref{sec:pseudocode}, we show the pseudocode of our proposed algorithm, LATS. In Sec.~\ref{sec:discussion}, we provide further discussion of {the limitations of our method}. In Sec.~\ref{sec:abl}, we present additional experimental results. In Sec.~\ref{sec:envdetail}, we specify the environment details in our experiments. Finally, we list our prompts used for the three environments in Sec.~\ref{sec:hotpotqa_prompt} (HotPotQA), Sec.~\ref{sec:programming_prompt} (Programming), and Sec.~\ref{sec:webshop_prompt} (WebShop), respectively.
+
+\input{appendix}
+
+\end{document}
+
+
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018, and modified by Alexandre Bouchard in
+% 2019 and 2021 and by Csaba Szepesvari, Gang Niu and Sivan Sabato in 2022.
+% Modified again in 2023 and 2024 by Sivan Sabato and Jonathan Scarlett.
+% Previous contributors include Dan Roy, Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.

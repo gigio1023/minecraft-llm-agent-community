@@ -1,0 +1,1708 @@
+\documentclass{article}
+\usepackage{tech2025}
+
+\input{config}
+
+
+
+\begin{document}
+
+% Define and set date
+\makeatletter
+\def\icmldate#1{\gdef\@icmldate{#1}}
+\icmldate{\today}
+\makeatother
+
+% Define page style
+\makeatletter
+\fancypagestyle{fancytitlepage}{
+  \fancyhead{}  % clear all headers
+  \lhead{\includegraphics[height=1.5cm]{figures/logos/leap.png}\hspace{5mm}\includegraphics[height=1.5cm]{figures/logos/Tong_NLCo.png}}
+  \rhead{\it \@icmldate}
+  \cfoot{}
+}
+\makeatother
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+
+% \icmltitle{Absolute Zero: Learning to Reason with Zero Data via Self-play}
+\icmltitle{Absolute Zero: Reinforced Self-play Reasoning with Zero Data}
+
+% \icmltitlerunning{Absolute Zero Reasoner: Self-Evolved Reasoning with Zero Data}
+
+\begin{icmlauthorlist}
+\mbox{Andrew Zhao$^{\,1}$}, \mbox{Yiran Wu$^{\,3}$}, \mbox{Yang Yue$^{\,1}$}, \mbox{Tong Wu$^{\,2}$}, \mbox{Quentin Xu$^{\,1}$},
+\mbox{Yang Yue$^{\,1}$}, \mbox{Matthieu Lin$^{\,1}$}, \mbox{Shenzhi Wang$^{\,1}$},  \mbox{Qingyun Wu$^{\,3}$}, \mbox{Zilong Zheng$^{\,2,\textrm{\Letter}}$} and \mbox{Gao Huang$^{\,1,\textrm{\Letter}}$}
+\end{icmlauthorlist}
+
+$^{1\,}$Tsinghua University  \quad $^{2\,}$Beijing Institute for General Artificial Intelligence \quad $^{3\,}$Penn State University
+
+\smaller\texttt{zqc21@mails.tsinghua.edu.cn, yiran.wu@psu.edu, zlzheng@bigai.ai, gaohuang@tsinghua.edu.cn}
+
+\icmlcorrespondingauthor{Zilong Zheng}{zlzheng@bigai.ai}
+\icmlcorrespondingauthor{Gao Huang}{gaohuang@tsinghua.edu.cn}
+
+
+
+% \printAffiliations{}
+
+\vskip 0.1cm
+
+\printNotice{} % otherwise use the standard text.
+
+\begin{leapabstract}
+% \lipsum[2-3]
+Reinforcement learning with verifiable rewards (RLVR) has shown promise in enhancing the reasoning capabilities of large language models by learning directly from rule-based outcome rewards. Recent RLVR works that operate under the \emph{zero setting} avoid supervision in labeling the reasoning process, but still depend on manually curated collections of questions and answers for training. The scarcity of high-quality, human-produced examples raises concerns about the long-term scalability of relying on human supervision, a challenge already evident in the domain of language model pretraining. Furthermore, in a hypothetical future where AI surpasses human intelligence, tasks provided by humans may offer limited learning potential for a superintelligent system. To address these concerns, we propose a new RLVR paradigm called \emph{Absolute Zero}, in which a single model learns to propose tasks that maximize its own learning progress and improves reasoning by solving them, without relying on any external data. Under this paradigm, we introduce the Absolute Zero Reasoner (AZR), a system that self-evolves its training curriculum and reasoning ability by using a code executor to both validate self-proposed code reasoning tasks and verify answers, serving as an unified source of verifiable feedback to guide open-ended yet grounded learning. Despite being trained entirely \emph{without external data}, AZR achieves overall SOTA performance on coding and mathematical reasoning tasks, \emph{outperforming existing ``zero'' models} that rely on tens of thousands of \emph{in-domain human-curated examples}. Furthermore, we demonstrate that AZR can be effectively applied across different model scales and is compatible with various model classes.
+
+\vspace{0.5em}
+
+\makebox[\textwidth]{
+  \hspace{-0.3em}
+  \raisebox{-0.9ex}{%
+    % \tcbox[colback=paleviolet, colframe=paleviolet, left=1pt, right=1pt, boxrule=0pt, arc=0mm]{
+      \begin{tabular}{c}
+        \href{https://github.com/LeapLabTHU/Absolute-Zero-Reasoner}{\includegraphics[height=1.75em]{figures/logos/github.png}} \\
+        \textbf{\scriptsize \href{https://github.com/LeapLabTHU/Absolute-Zero-Reasoner}{Code}}
+      \end{tabular}
+    % }
+  } \\
+  \hspace{-0.5em}
+  \raisebox{-0.9ex}{%
+    % \tcbox[colback=paleviolet, colframe=paleviolet, left=1pt, right=1pt, boxrule=0pt, arc=0mm]{
+    
+      \begin{tabular}{c}
+        \href{https://andrewzh112.github.io/absolute-zero-reasoner/}{\includegraphics[height=1.75em]{figures/logos/web.png}} \\
+        \textbf{\scriptsize \href{https://andrewzh112.github.io/absolute-zero-reasoner/}{Project Page}}
+      \end{tabular}
+    % }
+  } \\
+  \hspace{-0.5em}
+  \raisebox{-0.9ex}{%
+    % \tcbox[colback=paleviolet, colframe=paleviolet, left=1pt, right=1pt, boxrule=0pt, arc=0mm]{
+    
+      \begin{tabular}{c}
+        \href{https://wandb.ai/andrewzhao112/AbsoluteZeroReasoner}{\includegraphics[height=1.75em]{figures/logos/wandb.png}} \\
+        \textbf{\scriptsize \href{https://wandb.ai/andrewzhao112/AbsoluteZeroReasoner}{Logs}}
+      \end{tabular}
+    % }
+  } \\
+  \hspace{-0.5em}
+  \raisebox{-0.9ex}{%
+    % \tcbox[colback=paleviolet, colframe=paleviolet, left=1pt, right=1pt, boxrule=0pt, arc=0mm]{
+      \begin{tabular}{c}
+        \href{https://huggingface.co/collections/andrewzh/absolute-zero-reasoner-68139b2bca82afb00bc69e5b}{\includegraphics[height=1.75em]{figures/logos/huggingface.png}} \\
+        \textbf{\scriptsize \href{https://huggingface.co/collections/andrewzh/absolute-zero-reasoner-68139b2bca82afb00bc69e5b}{Models}}
+      \end{tabular}
+    % }
+  }
+}
+\vskip -2cm
+\end{leapabstract}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/azr_teaser.png}
+    \vskip -0.4cm
+    \caption{\textbf{Absolute Zero Reasoner (AZR) achieves state-of-the-art performance with \textcolor{red}{ZERO DATA}}. Without relying on any gold labels or human-defined queries, Absolute Zero Reasoner trained using our proposed self-play approach demonstrates impressive general reasoning capabilities improvements in both math and coding, despite operating entirely out-of-distribution. Remarkably, AZR surpasses models trained on tens of thousands of expert-labeled in-domain examples in the combined average score across both domains.}
+    \label{fig:outdist_benchmark}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/absolute_zero_paradigm.pdf}
+    \caption{\textbf{Absolute Zero Paradigm.} \textbf{\textcolor{gray}{Supervised learning}} relies on human-curated reasoning traces for behavior cloning. \textbf{\textcolor{gray}{Reinforcement learning from verified rewards}}, enables agents to self-learn reasoning, but still depends on expert-defined learning distribution and a respective set of curated QA pairs, demanding domain expertise and manual effort. In contrast, we introduce a new paradigm, \best{Absolute Zero}, for training reasoning models without any human-curated data. We envision that the agent should autonomously propose tasks optimized for learnability and learn how to solve them using an unified model. The agent learns by interacting with an environment that provides verifiable feedback, enabling reliable and continuous self-improvement entirely without human intervention.}
+  % \vspace{-10pt}
+    \label{fig:paradigm}
+\end{figure}
+
+\section{Introduction}
+\label{sec:introduction}
+% LLM reasoning, zero paradigm
+Large language models (LLMs) have recently achieved remarkable improvements in reasoning capabilities by employing Reinforcement Learning with Verifiable Rewards (RLVR)~\citep{lambert2024t}. Unlike methods that explicitly imitate intermediate reasoning steps, RLVR uses only outcome-based feedback, enabling large-scale reinforcement learning over vast task datasets~\citep{guo2025deepseek,team2025kimi,jaech2024openai,openai2025o3o4mini,openai2025o3mini,wang2025beyond}. A particularly compelling variant is the \emph{``zero''} RLVR paradigm~\citep{guo2025deepseek}, which forgoes any cold-start distillation data, using neither human-generated nor AI-generated reasoning traces, and applies RLVR directly on the base model with task rewards. However, these methods still depend heavily on expertly curated distributions of reasoning question–answer pairs, which raises serious concerns about their long-term scalability~\citep{villalobos2024position}. As reasoning models continue to advance, the effort required to construct large-scale, high-quality datasets may soon become unsustainable~\citep{yue2025doesreinforcementlearningreally}. A similar scalability bottleneck has already been identified in the domain of LLM pretraining~\citep{neurips2024testoftime}. Furthermore, as AI systems continue to evolve and potentially exceed human intellect, an exclusive dependence on human‐designed tasks risks imposing constraints on their capacity for autonomous learning and growth~\citep{hughes2024open}. This underscores the need for a new paradigm that begins to explore possibilities beyond the constraints of human-designed tasks and prepares for a future in which AI systems may surpass human intelligence.
+
+% Propose new paradigm
+To this end, we propose \emph{``Absolute Zero''}, a new paradigm for reasoning models in which the model simultaneously learns to define tasks that maximize learnability and to solve them effectively, enabling self-evolution through self-play without relying on external data. In contrast to prior self-play methods that are limited to narrow domains, fixed functionalities, or learned reward models that are prone to hacking~\citep{silver2017mastering, chen2025spcevolvingselfplaycritic, chen2024self}, the \emph{Absolute Zero} paradigm is designed to operate in open-ended settings while remaining grounded in a real environment. It relies on feedback from the environment as a verifiable source of reward, mirroring how humans learn and reason through interaction with the world, and helps prevent issues such as hacking with neural reward models~\citep{hughes2024open}. Similar to AlphaZero~\citep{silver2017mastering}, which improves through self-play, our proposed paradigm requires no human supervision and learns entirely through self-interaction. We believe the Absolute Zero paradigm represents a promising step toward enabling large language models to autonomously achieve superhuman reasoning capabilities.
+
+% propose new method
+Building on this new reasoning paradigm, we introduce the \emph{Absolute Zero Reasoner (AZR)}, which proposes and solves code reasoning tasks. We cast code executor as an open-ended yet grounded environment, sufficient to both validate task integrity and also provide verifiable feedback for stable training. We let AZR construct tasks that require reasoning and inference about a specific element in a program, input, or output triplet, corresponding to three complementary modes of reasoning: induction, abduction, and deduction. We train the entire system end-to-end with a newly proposed reinforcement learning advantage estimator tailored to the multitask nature of the proposed approach.
+
+% results
+Despite being trained entirely without any in-distribution data, AZR demonstrates remarkable capabilities across diverse reasoning tasks in math and coding. In mathematics, AZR achieves competitive performance compared to zero reasoner models explicitly fine-tuned with domain-specific supervision. In coding tasks, AZR establishes a new state-of-the-art performance, surpassing models specifically trained with code datasets using RLVR. Furthermore, AZR \emph{outperforms all previous models} by an average of 1.8 absolute points compared to models trained in the ``zero'' setting using in-domain data. These surprising results highlight that general reasoning skills can emerge without human-curated domain targeted data, positioning Absolute Zero as an promising research direction and AZR as a first effective instantiation. Besides the remarkable results AZR achieved with zero human data for reasoning, we also make very interesting findings summarized below:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Code priors amplify reasoning.}  
+    The base \texttt{Qwen-Coder-7b} model started with math performance 3.6 points lower than \texttt{Qwen-7b}. But after AZR training for both models, the coder variant surpassed the base by 0.7 points, suggesting that strong coding capabilities may potentially amplify overall reasoning improvements after AZR training.
+
+    \item \textbf{Cross domain transfer is more pronounced for AZR.}  
+    After RLVR, expert code models raise math accuracy by only 0.65 points on average, whereas \texttt{AZR‑Base‑7B} and \texttt{AZR‑Coder‑7B} trained on self-proposed code reasoning tasks improve math average by 10.9 and 15.2, respectively, demonstrating much stronger generalized reasoning capability gains.
+
+    \item \textbf{Bigger bases yield bigger gains.}  
+    Performance improvements scale with model size: the 3B, 7B, and 14B coder models gain +5.7, +10.2, and +13.2 points respectively, suggesting continued scaling is advantageous for AZR.
+
+    \item \textbf{Comments as intermediate plans emerge naturally.}  
+    When solving code induction tasks, AZR often interleaves step-by-step plans as comments and code (\cref{fig:react}), resembling the ReAct prompting framework~\citep{yao2023react}. Similar behavior has been observed in much larger formal-math models such as DeepSeek Prover v2 (671B)~\citep{ren2025deepseekproverv2advancingformalmathematical}. We therefore believe that allowing the model to use intermediate scratch-pads when generating long-form answers may be beneficial in other domains as well.
+
+    \item \textbf{Cognitive Behaviors and Token length depends on reasoning mode.}  
+    Distinct cognitive behaviors—such as step-by-step reasoning, enumeration, and trial-and-error all emerged through AZR training, but different behaviors are particularly evident across different types of tasks. Furthermore token counts grow over AZR training, but the magnitude of increase also differs by task types: abduction grows the most because the model performs trial-and-error until output matches, whereas deduction and induction grow modestly.
+
+    \item \textbf{Safety alarms ringing.}  
+    We observe AZR with \texttt{Llama3.1-8b} occasionally produces concerning chains of thought, we term the ``uh‑oh moment'', example shown in~\cref{fig:uh_oh_moment}, highlighting the need for future work on safety‑aware training~\citep{zhang2025100}.
+\end{itemize}
+
+\section{The Absolute Zero Paradigm}
+\label{sec:paradigm}
+\subsection{Preliminaries}
+\label{sec:prelims}
+
+\paragraph{Supervised Fine-Tuning (SFT).}
+SFT requires the datasets of task-rationale-answer demonstrations $\mathcal{D}=\{(x, c^\star,y^\star)\}$, where \(x\) is the query, \(c^\star\) is the gold chain-of-thought (CoT)) and \(y^\star\) is the gold answer, all provided by \textcolor{humanred}{human experts} or \textcolor{humanred}{superior AI models}. The model trains to imitate the reference responses to minimize the conditional negative log-likelihood~\citep{ouyang2022training}:
+
+\begin{align}
+\mathcal{L}_{\text{SFT}}(\theta) \;=\;
+-\;\mathbb{E}_{\textcolor{humanred}{(x,c^\star,y^\star)\sim\mathcal{D}}}
+\log \pi_\theta\;\bigl(c^\star,y^\star\mid x).
+\end{align}
+
+% However, at the frontier level, there’s no stronger model to distill from, and expert human labeling doesn’t scale well.
+At the frontier level, the absence of stronger models for distillation and the poor scalability of expert human labeling have led researchers to move away from SFT and explore RL as a means to enhance model reasoning.
+
+\paragraph{Reinforcement Learning with Verifiable Rewards (RLVR).} 
+To move beyond the limits of pure imitation, RLVR only requires a dataset of task and answer $\mathcal{D}=\{(x, y^\star)\}$, without labeled rationale. RLVR allows the model to generate its own CoT and calculate a verifiable reward with the golden answer $r(y, y^\star)$. However, the learning task distribution \(\mathcal{D}\), with its set of queries and gold answers are still labeled by \textcolor{humanred}{human experts}.
+The trainable policy $\pi_\theta$ is optimized to maximize expected reward:
+
+\begin{align}
+J_{\text{RLVR}}(\theta)
+\,=\;
+\mathbb{E}_{\textcolor{humanred}{(x,y^\star)\sim\mathcal{D}},\;(c,y)\sim\pi_\theta(\cdot\ \mid x)}
+\bigl[r(y,y^\star)\bigr].
+\end{align}
+
+In summary, both SFT and RLVR still rely on \textcolor{humanred}{human-curated} datasets of either queries, demonstrations, or answers, which ultimately limit scalability. The Absolute Zero paradigm removes this dependency by allowing the model to generate, solve, and learn from its own interactions with the environment entirely through self-play.
+
+\subsection{Absolute Zero}
+\label{sec:az}
+
+
+We propose the Absolute Zero (AZ) paradigm, where during training, the model simultaneously proposes tasks, solves them, and learns from both stages. No external data is required and the model learns entirely through self-play and experience, aided by some environment. We illustrate this paradigm in~\cref{fig:paradigm}, which contrasts Absolute Zero with supervised learning and RLVR, highlighting how our approach eliminates the need for any human-curated data by enabling self-improving task proposal and solution through self-play.
+
+
+To make the Absolute Zero setting concrete, we now define how one model can act both as the proposer and solver role. To aid understanding, we include an illustration in~\cref{fig:az_loop}. Let $\pi_\theta$ be our parameterized language model, it is used to play two roles, proposer $\pi_\theta^{\text{propose}}$ and solver $\pi_\theta^{\text{solve}}$ during training. 
+
+\begin{wrapfigure}{r}{0.65\textwidth}
+  \centering
+  \includegraphics[width=0.45\textwidth]{figures/az_loop.pdf}
+  \caption{\textbf{The Absolute Zero Loop.} The Absolute Zero loop begins with the agent \(\pi\) proposing task \(\tau\), which is transformed by \(f\) with the environment \(e\) into a validated problem \((x, y^\star)\), and also emits a reward \(r^\text{propose}\) for learnability. Then, a standard RL step follows: the agent solves \(x\) by producing \(y\), receiving reward \(r^\text{solve}\) from \(e\) by matching with \(y^\star\). \(\pi^\text{propose}\) and \(\pi^\text{solve}\) are jointly trained and this process can be repeated indefinitely.}
+  \label{fig:az_loop}
+
+\end{wrapfigure}
+
+The proposer first samples a proposed task conditioned on variable $z$:  \(\tau\sim\pi_\theta^{\text{propose}}( \cdot | z)\), which will then be validated and used to construct a valid reasoning task together with the environment $e$: $(x,y^\star)\sim f_e( \cdot | \tau)$, where \(x\) is the task query and \(y^\star\) is the gold label. Then the solver produces an answer $y \sim \pi_\theta^{\text{solve}}(\,\cdot\mid  x)$. Each proposed task $\tau$ is scored by a \emph{learnability reward} $r^\text{propose}_{e}(\tau, \pi_\theta)$, which captures the expected improvement in $\pi_\theta$ after training on the proposed task $\tau$. Moreover, the same policy also receives a \emph{solution reward} $r^\text{solve}_e(y, y^\star)$ for its answer to the task query \(x\), with the environment again serving as the verifier. A nonnegative coefficient $\lambda$ balances the trade-off between exploring new, learnable tasks and improving the model's reasoning and problem-solving abilities. We formally define the absolute zero setting's objective as follows:
+
+\begin{align}
+    \mathcal{J}(\theta)\coloneqq\max_{\theta}\;\; \mathbb{E}_{z \sim p(z)}\Bigg[ \;
+    \mathbb{E}_{\textcolor{envgreen}{(x, y^\star) \sim f_e( \cdot | \tau), \tau\sim\pi_\theta^{\text{propose}}( \cdot | z)}}\bigg[
+    \lambda r^\text{propose}_{\textcolor{envgreen}{e}}(\tau, \pi_\theta) + \,
+    \mathbb{E}_{y \sim \pi_\theta^{\text{solve}}(\cdot \mid x)}\big[ r^\text{solve}_{\textcolor{envgreen}{e}}(y, y^\star) \big]
+    \bigg]
+    \Bigg].
+    \label{eq:absolute_zero_objective}
+\end{align}
+
+Notice that we shift the burden of scaling data away from \textcolor{humanred}{human experts} and onto the \textcolor{envgreen}{proposer policy \(\pi_\theta^\text{propose}\)} and the \textcolor{envgreen}{environment \(e\)}. These two roles are both responsible for defining/evolving the learning task distribution, validating proposed tasks, and providing grounded feedback that supports stable and self-sustainable training. When proposing, $z$ acts as a conditional variable that seeds generation of tasks. Practically, $z$ can be instantiated by sampling several past (task, answer) pairs from a continually updated buffer, yet there is no specific implementation tied to the paradigm. To guide the proposing process, we use a learnability reward \(r^\text{propose}(\tau, \pi_\theta)\), which measures how much the model is expected to improve by solving a proposed task \(\tau\). Moreover, the solver reward \(r^\text{solve}(y, y^*)\) evaluates the correctness of the model's output. Together, these two signals guide the model to propose tasks that are both challenging and learnable, while also enhancing its reasoning abilities, ultimately enabling continuous improvement through self-play.
+
+\section{Absolute Zero Reasoner}
+In this section, we present \emph{Absolute Zero Reasoner} (AZR) as the first attempt to embrace the Absolute Zero Paradigm. In AZR, an unified LLM serves as both a proposer and a solver: it generates tasks to evolve its learning curriculum and attempts to solve them to improve its reasoning capabilities. The model is trained jointly with both roles, learning to create tasks that push the boundary of reasoning capacity while enhancing its ability to solve them effectively~(\cref{sec:roles}). Within this self-play training paradigm, the model learns from three distinct type of coding tasks, which corresponding to  three fundamental modes of reasoning: abduction, deduction and induction~(\cref{sec:task_type}). Using coding tasks is motivated by the Turing-completeness of programming languages~\citep{stuart2013understanding} and empirical evidence that code-based training improves reasoning~\citep{aryabumi2024code}. We adopt code as an open-ended, expressive, and verifiable medium for enabling reliable task construction and verification~(\cref{sec:algorithm}). Finally, the model is updated using a newly proposed advantage estimator designed for multitask learning~(\cref{sec:trr}). We outline the overall algorithm in \cref{alg:azr-training} and highlight an illustration of our Absolute Zero Reasoner approach in~\cref{fig:main} and~\cref{alg:azr-training}. To expedite future exploration in this area, we also present several attempts that did not yield fruitful results but still warrant discussion in~\cref{sec:others}.
+
+
+\subsection{Two Roles in One: Proposer and Solver}
+\label{sec:roles}
+Large language models are naturally suited for implementing AZR in a multitask learning context~\citep{radford2019language}, as both the formulation of reasoning tasks and their solutions occur within a unified language space. To this end, we propose rewarding a single model for both generating high learning potential tasks and solving them effectively, as specified by the Absolute Zero objective in~\cref{eq:absolute_zero_objective}. At each iteration of the online rollout, AZR proposes new reasoning tasks by conditioning on the task type (as defined in~\cref{sec:task_type}) and $K$ past self-generated examples. The model is explicitly prompted to generate tasks that differ from these examples, promoting diversity and broader coverage of the task space. These task proposals are filtered and transformed into valid reasoning tasks that can be verified using the environment, outlined later in~\cref{sec:algorithm}. AZR then attempts to solve these newly proposed tasks, receiving grounded feedback for its model responses. Both task proposal and problem solving are trained using reinforcement learning. We now outline the rewards used for each role.
+
+
+\paragraph{Reward Design.} 
+
+Prior work has shown that setting appropriate task difficulty is critical for promoting effective learning in reasoning systems~\citep{zeng2025simplerl}. Motivated by this, we design a reward function for the proposer that encourages generation of tasks with meaningful learning potential—neither too easy nor unsolvable for the current solver. Concretely, we use the same language model in its solver role to estimate the \emph{learnability} of a proposed task, which is well studied in autotelic agents and unsupervised environment design literature~\citep{oudeyer2016intrinsic,sukhbaatar2017intrinsic}. We perform \(G\) Monte Carlo rollouts of the solver with non-zero temperature and compute the average success rate: \(\bar{r}_{\text{solve}} = \frac{1}{G} \sum_{i=1}^{G} r_{\text{solve}}^{(i)}\). The proposer's reward is then defined as:
+
+\begin{align}
+r_{\text{propose}} = 
+\begin{cases}
+0, & \text{if } \bar{r}_{\text{solve}} = 0 \\
+1 - \bar{r}_{\text{solve}}, & \text{otherwise}.
+\end{cases}
+\label{eq:propose_reward}
+\end{align}
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/azr.pdf}
+    \caption{\textbf{Absolute Zero Reasoner Training Overview.} At every iteration, Absolute Zero Reasoner first \textbf{\textcolor{propose}{PROPOSES}} a batch of tasks, conditioned on past self-generated triplets stored in a buffer and a particular task type: abduction, deduction, or induction~(\cref{sec:task_type}). From these generated tasks, Python is used to filter and construct valid code-based reasoning questions. A learnability reward \(r_\text{propose}\) is also calculated for each proposed task as defined in~\cref{eq:propose_reward}. The Absolute Zero Reasoner then \textbf{\textcolor{solve}{SOLVES}} the batch of reasoning questions. Python is used again to verify the generated responses and compute the accuracy reward \(r_\text{solve}\) as described in~\cref{eq:solver_reward}. Finally, the Absolute Zero Reasoner is jointly updated using both \(r_\text{propose}\) and \(r_\text{solve}\) across all three task types, using TRR++~(\cref{sec:trr}).}
+    \label{fig:main}
+  % \vspace{-10pt}
+\end{figure}
+
+The intuition is that if a task is either trivial to solve (\(\bar{r}_{\text{solve}} = 1\)) or unsolvable (\(\bar{r}_{\text{solve}} = 0\)), the task provides little to no learning signal for the solver. In contrast, tasks of moderate difficulty, where the solver occasionally succeeds are rewarded the most, as they offer the richest feedback and greatest potential for learning.
+
+For the solver, we assign a simple binary reward based on the correctness of its final output,
+
+\begin{align}
+r_\text{solve}=\mathbb{I}_{(y=y^\star)},
+\label{eq:solver_reward}
+\end{align}
+
+where \(y^\star\) is the ground-truth answer, and equality is evaluated based on value equality in Python.
+
+With the primary rewards for the proposing and solving roles defined, we adopt the following composite reward structure, which integrates \(r_\text{propose}\) and \(r_\text{solve}\) with a format-aware penalty inspired by~\citet{guo2025deepseek}:
+
+\begin{align}
+    R(y_\pi) =
+    \begin{cases}
+    r_\text{role} & \text{correctly formatted,}~\text{role}\in\{\text{propose,solve}\} \\
+    -0.5 & \text{response is wrong but well-formatted,} \\
+    -1 & \text{answer has formatting errors,}
+    \end{cases}
+\label{eq:azr_reward}
+\end{align}
+
+where \(y_\pi\) is the response of the language model. The main format that the proposing and solving tasks need to follow is the DeepSeek R1 \texttt{<think>} and \texttt{<answer>} format, as shown in~\cref{fig:deepseek_template}. Moreover, for the proposer, the reward criterion for format goes beyond simply following the XML structure. As detailed in~\cref{sec:filter}, only responses that produce valid triplets and pass the filtering stage are considered to be correctly formatted.
+
+
+\subsection{Learning Different Modes of Reasoning: Deduction, Induction, and Abduction}
+\label{sec:task_type}
+AZR uses code executor as both a flexible interface and a verifiable environment. This setup enables automatic construction, execution, and validation of code reasoning tasks~\citep{stuart2013understanding, aryabumi2024code}. Give program space \(\mathscr{P}\), input space \(\mathscr{I}\) and output space \(\mathscr{O}\) of a coding language, we define an AZR reasoning task as a triplet \((p, i, o)\), where \(p \in \mathscr{P}\) is a program, \(i \in \mathscr{I}\) is an input, and \(o \in \mathscr{O}\) is the corresponding output produced by running program on input, \(o=p(i)\). AZR learns by reasoning about different parts of this task triplet, using three distinct core reasoning modes, each of which focuses on inferring one part of the triplet given the others:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Deduction}: predicting the output \(o\) given a program \(p\) and input \(i\), capturing step-by-step logical reasoning. 
+    \begin{itemize}[leftmargin=*]
+        \item As a \emph{proposer}, AZR is conditioned on the task type \(\alpha=\text{deduction}\) and \(K\) reference examples from the deduction buffer \(\mathcal{D}_\text{deduction}\) (all task buffers are outlined in~\cref{sec:algorithm}), and generates a pair \((p, i)\). The environment \(e\) then executes \(p(i)\) to compute \(o\), completing the triplet \((p, i, o)\), which is added to the buffer if non-error output was produced.
+        \item As a \emph{solver}, the model receives \((p, i)\) and predicts the output \(o_\pi\). The predicted output is verified using type-aware value equality in python to account for possible variations (such as set ordering or fractions).
+    \end{itemize}
+    \item \textbf{Abduction}: inferring a plausible input \(i\) given the program \(p\) and an output \(o\), resembling trial-and-error or online search.
+    \begin{itemize}[leftmargin=*]
+        \item As a \emph{proposer}, the policy \(\pi^\text{propose}\)'s input and output is almost the same as the proposer for the deduction task, except that the task type \(\alpha=\text{abduction}\) is changed as an input. The model generates a pair \((p, i)\) conditioned on \(\alpha\) and reference examples. Then we executes \(p(i)\) and get the triplet \((p, i, o)\).
+        \item As a \emph{solver}, the model receives \((p, o)\) and predicts \(i_\pi\). The solution is verified by checking whether \(p(i_\pi) = o\). Since programs may not be bijective, we use \emph{output} value equivalence rather than requiring exact input matches.
+    \end{itemize}
+
+    \item \textbf{Induction:} synthesizing a program \(p\) from a set of in-out examples \(\{(i^n, o^n)\}\), requiring generalization from partial information.
+    \begin{itemize}[leftmargin=*]
+        \item As a \emph{proposer}, AZR samples a valid program \(p\) from \(\mathcal{D}_\text{abduction} \cup \mathcal{D}_\text{deduction}\), generates \(N\) new inputs and a message \(m\), and uses the environment to compute corresponding outputs. This forms an extended task representation \((p, \{(i^n, o^n)\}, m)\), which is stored in the induction buffer \(\mathcal{D}_\text{induction}\). Since infinitely many functions can map the inputs to the outputs, making the induction task under-constrained, the message \(m\) helps properly condition the problem for the solver.
+        \item As a \emph{solver}, the model is shown the first half of the input-output pairs and the message \(m\), and must synthesize a program \(p_\pi\) that correctly maps the remaining hidden inputs to their outputs. The use of held-out examples discourages overfitting through if-else logic and promotes generalized induction.
+    \end{itemize}
+\end{enumerate}
+
+\begin{wrapfigure}{r}{0.4\textwidth}  % 'r' means wrap on the right; use 'l' for left
+\includegraphics[width=\linewidth]{figures/seed_triplet.pdf}
+\caption{\textbf{The Seed AZR Zero Triplet.} The above identity function triplet was the only triplet provided to AZR to initiate its self-bootstrap propose-and-solve RLVR loop. We note that the base LLM is fully capable of initiating the AZR loop without any seed program; its inclusion illustrates our approach's flexibility: we can optionally initialize seed programs with existing datasets of varying complexity, and we initialized ours with the simplest program.}
+\label{fig:seed-program}
+\vskip -1.4cm
+\end{wrapfigure}
+
+Each reasoning task type leverages code as an expressive and verifiable medium, aligning with the Absolute Zero Paradigm's goals of fully self-improving systems in open-ended domains~\citep{guo2025deepseek, lambert2024t}. All prompts used by three different task types and two types of roles within a task type are shown in~\cref{fig:gen_function_prompt,fig:gen_input_prompt,fig:gen_output_prompt,fig:solve_function_prompt,fig:solve_input_prompt,fig:solve_output_prompt}. Next, we outline exact details of our algorithm.
+
+\subsection{Absolute Zero Reasoner Learning Algorithm}
+\label{sec:algorithm}
+In this section, we will discuss details of our AZR self-play algorithm, including initialization of buffers~\ref{sec:seed}, usage of thse buffers~\ref{sec:buffer_usage}, construction of valid tasks~\ref{sec:filter}, validating solutions~\ref{sec:answer_verification}, and finally advantage estimator calculation~\ref{sec:trr}. We outline the overall recipe of the self-play procedure of AZR in~\cref{alg:azr-training}. 
+
+\subsubsection{Buffer Initialization}
+\label{sec:seed}
+
+To initialize AZR self-play, we first generate a seed set of valid triplets using the base language model. Each prompt samples triplets from the current seed buffer \(\mathcal{D}_\text{seed}\) as references. When \(\mathcal{D}_\text{seed}\) is empty at time 0, we fall back to the zero triplet show in~\cref{fig:seed-program}. During the seeding stage, we use the same proposer prompts detailed in~\cref{fig:gen_input_prompt,fig:gen_output_prompt,fig:gen_function_prompt}.
+
+First, for deduction and abduction tasks, the LLM is prompted to generate \((p, i)\) pairs, which are filtered, executed, and stored as valid triplets. We initialize \(\mathcal{D}^0_\text{abduction} = \mathcal{D}^0_\text{deduction} = \mathcal{D}_\text{seed}\), where \(|\mathcal{D}_\text{seed}| = B \times S\), where \(B\) is the batch size, and \(S=4\) is a factor we fix in all experiments. All seed triplet's program are stripped of global variables and comments (\cref{sec:others}), but subsequent iterations of adding new triplets to the buffers are unaltered during AZR self-play training. No model updates occur during the seeding phase. Similarly, to initialize the induction buffer, we sample programs from \(\mathcal{D}_\text{seed}\), generate matching input sets and messages, and collect valid examples until \(|\mathcal{D}^0_\text{induction}| = B \times S\).
+
+\subsubsection{Task Proposal Inputs and Buffer Management}
+\label{sec:buffer_usage}
+During the actual self-play stage of AZR, we use the task buffer in three ways. \emph{First}, for the proposer of abduction and deduction tasks, we uniformly sample \(K\) past triplets from the buffer, present them as in-context examples to the proposer and let it generate a new task. The design is to show it past examples, and prompt it to generate a different one to promote diversity~\citep{zhao2024diver}. \emph{Second}, we sample one triplet from the union of abduction and deduction buffers \(\mathcal{D}_\text{abd}\bigcup\mathcal{D}_\text{ded}\), and present the program \(p\) from that triplet to the induction proposer to generate a set of \(N\) matching inputs \(\{i^n\}\) and a natural language message \(m\). \emph{Lastly}, to maintain stable training, if a batch of solver problems contains fewer than \(B\) valid proposed tasks (proposer not adhering to formatting), we fill the remainder by uniformly sampling from the corresponding task buffer of previously validated triplets.
+
+The buffer grows for abduction and deduction tasks whenever \(\pi\) propose a valid triplet \((p,i,o)\), regardless if it gets any task reward. Similarly, for induction tasks, all valid triplets \((p,\{i^n,o^n\}),m\) are added to the buffer.
+
+\begin{algorithm}[t]
+\caption{Self-Play Training of Absolute Zero Reasoner (AZR)}
+\label{alg:azr-training}
+\begin{algorithmic}[1]
+\Require Pretrained base LLM $\pi_\theta$; batch size $B$; \#references $K$; iterations $T$
+\State $\mathcal D_{\text{ded}},\mathcal D_{\text{abd}},\mathcal D_{\text{ind}} \gets \textsc{InitSeeding}(\pi_\theta)$ \Comment{see §\ref{sec:seed}}
+
+\For{$t \gets 1$ to $T$}
+  % -------------------- PROPOSE --------------------
+  \For{$b \gets 1$ to $B$}  \Comment{\textbf{PROPOSE PHASE}}
+    \State $p \sim \mathcal D_{\text{abd}} \cup \mathcal D_{\text{ded}}$ \Comment{sample a program for induction task proposal}
+    \State $\Big(\bigl\{i^n_\pi\bigr\}_{n=1}^{N},\;m_\pi\Big) \gets \pi_\theta^{\text{propose}}(\text{ind},p)$ \Comment{generate $N$ inputs and a description}
+    \If{$\bigl\{(i^n_\pi,o^n_\pi)\bigr\}_{n=1}^{N} \gets \textsc{ValidateAndConstruct}\bigl(p,\{i^n_\pi\},\textsc{syntax}\bigr)$} \Comment{validate I/Os, see §\ref{sec:filter}}
+        \State $\mathcal D_{\text{ind}} \gets \mathcal D_{\text{ind}} \cup \bigl\{(p,\{(i^n_\pi,o^n_\pi)\},m_\pi)\bigr\}$ \Comment{update \textit{induction} buffer}
+    \EndIf
+
+    \For{$\alpha \in \{\text{ded},\text{abd}\}$}
+      \State $\bigl(p_k,i_k,o_k\bigr)_{k=1}^{K} \sim \mathcal D_{\alpha}$ \Comment{sample $K$ reference examples}
+      \State $(p_\pi,i_\pi) \gets \pi_\theta^{\text{propose}}\!\bigl(\alpha,\{(p_k,i_k,o_k)\}\bigr)$
+      \Comment{propose new task}
+      \If{$o_\pi \gets \textsc{ValidateAndConstruct}\bigl(p_\pi,i_\pi,\textsc{syntax,safety,determinism}\bigr)$} \Comment{see §\ref{sec:filter}}
+        \State $\mathcal D_{\alpha} \gets \mathcal D_{\alpha} \cup \bigl\{(p_\pi,i_\pi,o_\pi)\bigr\}$ \Comment{update \textit{deduction} or \textit{abduction} buffers}
+      \EndIf
+    \EndFor
+  \EndFor
+
+  % -------------------- SOLVE --------------------
+  \ForAll{$\alpha \in \{\text{ded},\text{abd},\text{ind}\}$} \Comment{\textbf{SOLVE PHASE}}
+    \State $(x,y^\star) \gets \textsc{SamplePrepareTasks}\bigl(\mathcal D_{\alpha},B,t\bigr)$
+      \Comment{$x, y^\star$ prepared based on $\alpha$ and $t$, see §\ref{sec:filter}}
+    \State $y_\pi \sim \pi_\theta^{\text{solve}}(x)$
+  \EndFor
+
+  % -------------------- UPDATE --------------------
+  \State \textbf{Reward:} Use proposed task triplets and solved answers to get $r_{propose}$ \& $r_{solve}$ \Comment{see §\ref{sec:roles}}
+  \State \textbf{RL update:} use Task Relative REINFORCE++ to update $\pi_\theta$ \Comment{see §\ref{sec:trr}}
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Constructing Valid Tasks}
+\label{sec:filter}
+\textbf{Proposal Task Validation.} We first describe how we construct valid tasks from the proposals generated by the policy \(\pi\). For \emph{deduction and abduction} tasks, each proposal consists of a program and an input \((p, i)\). To validate the task, we use the task validation procedure (steps shown below) on the input to obtain the correct output \(o\), resulting in a complete triplet \((p, i, o)\). For \emph{induction} tasks, given a program \(p\) the policy proposes a set of inputs \(\{i^n\}\) and message \(m\). We also use the task validation procedure on each of the input \(i^n\) in the set to obtain a corresponding output \(o^n\), forming a set of input-output pairs \(\{i^n, o^n\}\). We do not impose any constraints on \(m\). The resulting task is considered valid only when all inputs yield valid outputs and the formatting requirements are satisfied. The \textbf{task validation procedure} entails:
+
+\begin{enumerate}[leftmargin=*]
+    \item \emph{Program Integrity.}
+We first use Python to run the program \(p\) with the input \(i\). If no errors are raised and something is returned, we then gather the output \(o\) of that \((p, i)\) pair and determine that the program at least has valid syntax.
+    \item \emph{Program Safety.}
+We also check whether a program is safe for execution by restricting the use of certain sensitive packages that might cause harm to the Python environment, \ie, \texttt{os.sys, sys, shutil}. The list of packages used to filter out invalid programs is provided in \cref{fig:forbidden}. This list is also included in the instructions when prompting the language model to generate questions. See \cref{fig:gen_input_prompt,fig:gen_output_prompt,fig:gen_function_prompt}.
+  \item \emph{Check for Determinism.} In our setting, we only consider \emph{deterministic programs}, \ie, \(p \in \mathscr{P}_{\text{deterministic}} \subset \mathscr{P}\), where \(\mathscr{P}\) is the space of all valid programs and \(\mathscr{I}\) is the space of all valid inputs. Deterministic programs satisfy:
+
+\begin{equation}
+    \forall p \in \mathscr{P}_{\text{deterministic}},\ \forall i \in \mathscr{I},\ \left( \lim_{j \to \infty} p(i)^{(1)} = p(i)^{(2)} = \dots = p(i)^{(j)} \right),
+    \label{eq:deterministic}
+\end{equation}
+
+where \((j)\) indexes repeated independent executions of the program. That is, for all inputs \(i\), the output of \(p(i)\) remains identical with any independent execution of the program. A \emph{valid program/input/output triplet} \((p,i,o)\) is defined such that \(o = p(i)\), where \(p \in \mathscr{P}_{\text{deterministic}}\).
+
+Since the output of probabilistic programs can vary on every individual run, it is non-trivial to use verifiable functions to evaluate the correctness of an answer. Therefore, to keep the verifier simple, we restrict the valid programs generated by the learner to the class of deterministic programs. We believe that stochastic programs can encompass a larger class of behaviors and are important and promising to include in future versions of AZR.
+
+To implement the filtering of invalid probabilistic programs, and following the definition of a deterministic program highlighted in \cref{eq:deterministic}, we approximate this procedure by independently running the program \(j\) finite times and checking that all the outputs are equal. For computational budget reasons, we fixed \(j = 2\) for all experiments. See~\cref{fig:template_deterministic} for how we did this in python.
+\end{enumerate}
+
+\textbf{Solving Task Construction.}
+If a task proposal passes these three checks, we deem it a valid task and apply appropriate procedures to present part of the triplet to the solver. Specifically, given \(x\) is a task query, we set \(x = (p, i)\) for deduction; \(x = (p, o)\) for abduction; and \(x = (\{i^n, o^n\}^{N // 2}_{n=1}, m)\) for induction, where half of the tests cases and a program description $m$ is used. We use all valid tasks from timestep \(t\); if the batch \(B\) is not full, we uniformly sample from previously validated tasks to fill the batch.
+
+\subsubsection{Answer Verification}
+\label{sec:answer_verification}
+For abduction task, we receive \(i_\pi\) from the solver policy, then we equivalence match using \(p(i_\pi)=p(i^\star)\), where \(*\) refers to the privileged gold information. The reason we do not just match \(i_\pi\) and \(i^\star\) is because \(p\) is not necessarily bijective. For deduction task, we match \(o_\pi=o^\star\). For induction, we match \(\operatorname{all}(\{p_\pi(i_n^\star)=o_n^\star\}^N)\). This part might be convoluted to explain in language, therefore we recommend the reader to see how we did abduction, deduction and induction verification in code in~\cref{fig:template_correct_input,fig:template_correct_output,fig:template_correct_function}, respectively.
+
+\subsubsection{Task-Relative REINFORCE++}
+\label{sec:trr}
+
+Since AZR trains the combination of roles and task types, it operates in a multitask reinforcement learning setup~\citep{zhang2021survey,zhao2022mixture,wang2023train, yue2023understanding}. Instead of computing a single global baseline as in REINFORCE++~\citep{hu2025reinforce++} (\cref{ref:rlvr}), we compute separate baselines for each of the six task-role configurations. This can be viewed as an interpolation between per-question baselines, as in GRPO~\citep{Shao2024DeepSeekMathPT}, and a global baseline, allowing for more structured variance reduction tailored to each task setup. We refer to this variant as \textbf{Task-Relative REINFORCE++ (TRR++)}. The normalized advantage \(A^\text{norm}\) is computed as:
+\begin{equation}
+A^{\text{norm}}_{\text{task,role}} = \frac{r - \mu_{\text{task,role}}}{\sigma_{\text{task,role}}},\quad\text{task}\in\{\text{ind,ded,abd}\},\text{role}\in\{\text{propose,solve}\},
+\end{equation}
+where the mean and standard deviation are computed \emph{within each task type and role}, yielding six baselines.
+
+\section{Experiments}
+\subsection{Experiment Setup}
+\paragraph{Training Details.}
+For all experiments, we initialize the buffers as described in~\cref{sec:roles}. AZR models are trained using a batch size of \(64 \times 6\) (2 roles \(\times\) 3 task types). We use constant learning rate\(=1e{-6}\) and the AdamW optimizer~\citep{loshchilov2017decoupled}. Complete list of hyperparameters is provided in~\cref{tab:hypers}.
+
+For the main experiments, we train AZR models on \texttt{Qwen2.5-7B} and \texttt{Qwen2.5-7B-Coder}, resulting in \texttt{Absolute Zero Reasoner-base-7B} and \texttt{Absolute Zero Reasoner-Coder-7B}, respectively. Additional experiments include training \texttt{Qwen2.5-Coder-3B}, \texttt{Qwen2.5-Coder-14B}, \texttt{Qwen2.5-14B}, \texttt{Llama-3.1-8B}~\citep{yang2024qwen2,DBLP:journals/corr/abs-2409-12186,grattafiori2024llama3herdmodels}.
+
+\paragraph{Evaluation Protocol.}
+To evaluate our models, we divide the benchmarks into in-distribution (ID) and out-of-distribution (OOD) categories. For OOD benchmarks, which we emphasize more, we further categorize them into coding and mathematical reasoning benchmarks. For coding tasks, we evaluate using Evalplus~\citep{evalplus} on the HumanEval+ and MBPP+ benchmarks~\citep{chen2021evaluating,austin2021program}, as well as LiveCodeBench Generation (v1-5, May 23-Feb 25)~\citep{jain2024livecodebench}. For mathematical reasoning, we utilize six standard benchmarks commonly used in recent ``zero'' reasoners: AIME'24, AIME'25, OlympiadBench~\citep{He2024OlympiadBenchAC}, Minerva~\citep{lewkowycz2022solving}, Math500~\citep{hendrycks2021measuringmathematicalproblemsolving}, and AMC'23. For ID benchmarks, we use CruxEval-I(nput), CruxEval-O(utput), and LiveCodeBench-Execution~\citep{gu2024cruxeval,jain2024livecodebench}, which assess reasoning capabilities regarding the input and output of programs~\citep{li2025codei}. \emph{Greedy decoding} is used for all baseline methods and AZR results to ensure reproducibility. All baseline models' training data and initialization settings are summarized in~\cref{tab:model_config}.
+
+\paragraph{Baselines.}
+For our main results, we use \texttt{Qwen2.5-7B} as the base model, along with its specialized base model variants: \texttt{Qwen2.5-7B-Coder}, \texttt{Qwen2.5-7B-Instruct}, and \texttt{Qwen2.5-Math-7B}~\citep{yang2024qwen2,DBLP:journals/corr/abs-2409-12186,DBLP:journals/corr/abs-2409-12122}. Furthermore, the zero-style models are usually trained specifically on either code or math data; and only \texttt{Eurus-2-7B-PRIME-Zero}\citep{cui2025process} was trained jointly on both domains. For code data models, we present four variants of the \texttt{AceCoder}~\citep{zeng2025acecoder} and two different \texttt{CodeR1} models~\citep{code-r1}. For math data models, we have \texttt{Qwen2.5-Math-7B-Oat-Zero}~\citep{liu2025understanding}, \texttt{Open-Reasoner-Zero-7B} (ORZ)~\citep{hu2025open}, \texttt{Qwen-2.5-7B-SimpleRL-Zoo}~\citep{zeng2025simplerl}. All baseline models' training data and initialization settings are summarized in~\cref{tab:model_config}. For follow-up scaling experiments, we compare each AZR model against its own corresponding base model, due to the lack of established baselines across different parameter scales. Finally, we compare our \texttt{Llama3.1-8B}-trained model with \texttt{Llama-3.1-8B-SimpleRL-Zoo}~\citep{zeng2025simplerl} and the base model.
+
+\subsection{Results}
+
+\begin{table}[t!]
+\centering
+\small
+% \setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l c c |
+                c c c      % code benchmarks
+                | 
+                c c c c c c  % math benchmarks
+                |
+                c c c}      % CAvg, MAvg, overall
+  \toprule
+  \textbf{Model} & \textbf{Base} & \textbf{\#data}
+    & HEval\textsuperscript{+} & MBPP\textsuperscript{+} & LCB\textsuperscript{v1-5}
+    & AME24 & AME25 & AMC & M500 & Minva & Olypiad
+    & \textbf{CAvg} & \textbf{MAvg} & \textbf{AVG} \\
+  \midrule
+\normalrow
+  \multicolumn{15}{c}{\textbf{Base Models}} \\
+  \midrule
+  Qwen2.5-7B\textsuperscript{[{\citenum{yang2024qwen2}}]}    &    -   &  -         
+    & 73.2 & 65.3 & 17.5
+    &  6.7 &  3.3 & 37.5 & 64.8 & 25.0 & 27.7
+    & 52.0 & 27.5 & 39.8 \\
+  Qwen2.5-7B-Ins\textsuperscript{[{\citenum{yang2024qwen2}}]} &   -   &    -       
+    & 75.0 & 68.5 & 25.5
+    & 13.3 &  6.7 & 52.5 & 76.4 & 35.7 & 37.6
+    & 56.3 & 37.0 & 46.7 \\
+  Qwen2.5-7B-Coder\textsuperscript{[{\citenum{DBLP:journals/corr/abs-2409-12186}}]} &  -     &   -        
+    & 80.5 & 69.3 & 19.9
+    &  6.7 &  3.3 & 40.0 & 54.0 & 17.3 & 21.9
+    & 56.6 & 23.9 & 40.2 \\
+  Qwen2.5-7B-Math\textsuperscript{[{\citenum{DBLP:journals/corr/abs-2409-12122}}]}  &  -   &      -     
+    & 61.0 & 57.9 & 16.2
+    & 10.0 & 16.7 & 42.5 & 64.2 & 15.4 & 28.0
+    & 45.0 & 29.5 & 37.3 \\
+  \midrule
+\normalrow
+  \multicolumn{15}{c}{\textbf{Zero-Style Reasoners Trained on Curated Coding Data}} \\
+  \midrule
+   % AceCoder &  Coder \\
+  AceCoder-RM\textsuperscript{[{\citenum{zeng2025acecoder}}]}  & Ins   & 22k
+    & 79.9 & 71.4 & 23.6
+    & 20.0 &  6.7 & 50.0 & 76.4 & 34.6 & 36.7
+    & 58.3 & 37.4 & 47.9 \\
+  AceCoder-Rule\textsuperscript{[{\citenum{zeng2025acecoder}}]} & Ins & 22k
+    & 77.4 & 69.0 & 19.9
+    & 13.3 & 6.7 & 50.0 & 76.0 & 37.5 & 37.8
+    & 55.4 & 36.9 & 46.2 \\
+  AceCoder-RM\textsuperscript{[{\citenum{zeng2025acecoder}}]} & Coder & 22k
+  & 78.0  & 66.4   & 27.5
+  & 13.3  &  3.3  & 27.5  & 62.6  & 29.4  & 29.0
+  & 57.3  & 27.5  & 42.4 \\
+  AceCoder-Rule\textsuperscript{[{\citenum{zeng2025acecoder}}]} & Coder & 22k
+  & 80.5  & 70.4   & 29.0
+  & 6.7  &  6.7  & 40.0 & 62.8  &  27.6  & 27.4
+  & 60.0  & 28.5  & 44.3 \\
+  CodeR1-LC2k\textsuperscript{[{\citenum{code-r1}}]}  &   Ins   &  2k   %C2k-1088        
+    & 81.7 & 71.7 & 28.1
+    & 13.3 & 10.0 & 45.0 & 75.0 & 33.5 & 36.7
+    & 60.5 & 35.6 & 48.0 \\
+  CodeR1-12k\textsuperscript{[{\citenum{code-r1}}]} & Ins & 12k
+    & 81.1 & 73.5 & 29.3
+    & 13.3 & 3.3 & 37.5 & 74.0 & 35.7 & 36.9
+    & 61.3 & 33.5 & 47.4 \\
+  \midrule
+\normalrow
+  \multicolumn{15}{c}{\textbf{Zero-Style Reasoners Trained on Curated Math Data}} \\
+  \midrule
+
+  PRIME-Zero\textsuperscript{[{\citenum{cui2025process}}]}       &   Coder    &  484k       
+    & 49.4 & 51.1 & 11.0
+    & 23.3 & 23.3 & 67.5 & 81.2 & 37.9 & 41.8
+    & 37.2 & \best{45.8} & 41.5 \\
+  SimpleRL-Zoo\textsuperscript{[{\citenum{zeng2025simplerl}}]}     &  Base   &    8.5k      
+    & 73.2 & 63.2 & 25.6
+    & 16.7 &  3.3 & 57.5 & 77.0 & 35.7 & 41.0
+    & 54.0 & 38.5 & 46.3 \\
+  Oat-Zero\textsuperscript{[{\citenum{liu2025understanding}}]} &  Math    &    8.5k       
+    & 62.2 & 59.0 & 15.2
+    & 30.0 & 16.7 & 62.5 & 80.0 & 34.9 & 41.6
+    & 45.5 & 44.3 & 44.9 \\
+  ORZ\textsuperscript{[{\citenum{hu2025open}}]} &  Base  &     57k      
+    & 80.5 & 64.3 & 22.0
+    & 13.3 & 16.7 & 60.0 & 81.8 & 32.7 & 45.0
+    & 55.6 & 41.6 & 48.6 \\
+
+  \midrule
+  \rowhighlight
+  \multicolumn{15}{c}{\textbf{Absolute Zero Training w/ No Curated Data (Ours)}} \\
+  \midrule
+  AZR (Ours)       &  Base    &  \best{0}
+    &  \scdec{71.3}{-1.9} &  \scimp{69.1}{+3.8}    & \scimp{25.3}{+7.8}
+    & \scimp{13.3}{+6.6} & \scimp{13.3}{+10.0} & \scimp{52.5}{+15.0} & \scimp{74.4}{+9.6} & \scimp{38.2}{+13.2} & \scimp{38.5}{+10.8}
+    &\scimp{55.2}{+3.2}    & \scimp{38.4}{+10.9} & \scimp{46.8}{+7.0}    \\
+  AZR (Ours)       &  Coder   &  \best{0}
+    & \scimp{83.5}{+3.0}    & \scimp{69.6}{+0.3}    & \scimp{31.7}{+11.8}
+    & \scimp{20.0}{+13.3} & \scimp{10.0}{+6.7} & \scimp{57.5}{+17.5} & \scimp{72.6}{+22.6} & \scimp{36.4}{+19.1} & \scimp{38.2}{+16.3}
+    & \scimp{\best{61.6}}{+5.0}    & \scimp{39.1}{+15.2} & \scimp{\best{50.4}}{+10.2}    \\
+  \bottomrule
+\end{tabular}
+}
+\caption{
+% \textbf{Reasoner Trained Using RL Performance on Reasoning Benchmarks with Qwen2.5 7B Models.} 
+\textbf{Performance of RL-Trained Reasoner on Reasoning Benchmarks Based on Qwen2.5-7B Models.}
+Performance of various models is evaluated on three standard code benchmarks (HumanEval\textsuperscript{+}, MBPP\textsuperscript{+}, LCB\textsuperscript{v1-5} and six math benchmarks (AIME'24, AIME'25, AMC'23, MATH500, Minerva, OlympiadBench). Average performance across coding and math benchmarks is calculated as average of the two averages: \(\text{AVG} = (\text{CAvg} + \text{MAvg}) / 2\). We use \textcolor{lightgreen}{+} for absolute percentage increase from base model. All models are trained using different variants of the \texttt{Qwen2.5-7B} model, with the variant and data usage labeled, more details listed in~\cref{tab:model_config}}
+  % \vspace{-10pt}
+\label{tab:model_performance}
+\end{table}
+
+\paragraph{Research Question 1: How does AZR compare to other zero setting models trained with human expert data?}
+We present the main results of reasoning models trained under both the standard zero and our proposed absolute zero settings in~\cref{tab:model_performance}. Notably, \texttt{Absolute Zero Reasoner-Coder-7B} achieves \emph{state-of-the-art performance} in both the 7B overall average and the coding average categories. Despite being entirely out-of-distribution for both math and code reasoning benchmarks, it surpasses the previous best model by \(1.8\) absolute percentages in AVG. Even more strikingly, it outperforms models trained with expert-curated human data in the coding category (CAvg) by \(0.3\) absolute percentages, while never having access to such human-curated data itself.
+
+\textbf{Strong Cross-domain Generalization.} To assess cross-domain generalization after RLVR, we evaluate math performance before and after training, comparing AZR models with other expert code models, since AZR was trained in coding environments. After training, most expert code models showed minimal changes or even declines in performance compared to their base versions in math, with an average increase of only 0.65 points across these models, indicating very limited cross-domain generalization. In contrast, AZR base and coder models achieved gains of 10.9 and 15.2 percentage points, respectively, demonstrating substantially stronger generalized reasoning improvements. Similarly, although also out-of-distribution on human-defined code generation tasks, our AZR models improved by 3.2 and 5.0 points, while the math models on average showed just a moderate increases in coding (+2.0 on average).
+
+Overall, these results highlight the surprising effectiveness of our approach. Unlike other RLVR models trained and evaluated on human-defined tasks, our AZR models demonstrate strong general reasoning capabilities without any direct training on downstream human-defined math or coding data, only had access to self-proposed tasks during training, yet still psrpassing existing models.
+
+\paragraph{Research Question 2: How do initializing from different base model variants (base vs. coder) affect performance?}
+As shown in~\cref{tab:model_performance}, the coder variant achieved better overall performance in both math and coding after the AZR self-play process. Strikingly, although the coder base model variant started with a lower average performance in math than the vanilla base model (23.9 vs. 27.5), it ultimately outperformed it after AZR training. This highlights the importance of initial code competency as a catalyst for enhancing broader reasoning abilities within the Absolute Zero Reasoner approach.
+
+\paragraph{Research Question 3: How does varying model size effect AZR's in-distribution and out-of-distribution capabilities?}
+We examine the effects of scaling model size and present both in-distribution and out-of-distribution results in~\cref{fig:model_type_results} (a) and (b), respectively. Given the strong performance of coder models in the 7B category, we extend the analysis by evaluating smaller and larger variants: \texttt{Qwen2.5-3B-Coder} and \texttt{Qwen2.5-14B-Coder}. Due to the absence of existing baselines for these zero-style reasoner model sizes, we compare each model's performance to its corresponding base coder model.
+
+The results reveal a clear trend: our method delivers \emph{greater gains on larger, more capable models}. In the in-distribution setting, the 7B and 14B models continue to improve beyond 200 training steps, whereas the smaller 3B model appears to plateau. For out-of-distribution domains, larger models also show greater overall performance improvements than smaller ones: +5.7, +10.2, +13.2 overall performance gains, respectively for 3B, 7B and 14B. This is an encouraging sign, since base models continue to improve and also suggesting that scaling enhances the effectiveness of AZR. In future work, we aim to investigate the scaling laws that govern performance in the Absolute Zero paradigm.
+
+\begin{figure}
+  \centering
+  % left: the PDF, 38% of \textwidth, bottom‐aligned
+  \begin{minipage}[b]{0.33\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/in_distribution_accuracy_comparison.pdf}\\
+    \small\textbf{(a)}% sub-label
+  \end{minipage}%
+  \hfill
+  % right: the table, 60% of \textwidth, bottom‐aligned
+  \begin{minipage}[b]{0.67\textwidth}
+    \centering
+    \small
+    \begin{tabular}{llccc}
+      \toprule
+      \textbf{Model Family}   & \textbf{Variant}     & \textbf{Code Avg} & \textbf{Math Avg} & \textbf{Total Avg} \\
+      \midrule
+      Llama3.1-8b            &                      & 28.5              & 3.4               & 16.0              \\
+      \normalrow
+      Llama3.1-8b            & + SimpleRL\textsuperscript{[{\citenum{zeng2025simplerl}}]}      & 
+    \cimp{33.7}{+5.2} & 
+    \cimp{7.2}{+3.8} & 
+    \cimp{20.5}{+4.5} \\
+      \rowhighlight
+      Llama3.1-8b            & + AZR (Ours)         & \cimp{31.6}{+3.1}                & \cimp{6.8}{+3.4}                &       \cimp{19.2}{+3.2}           \\
+      \midrule
+      Qwen2.5-3B Coder       &                      & 51.2              & 18.8                & 35.0                 \\
+      \rowhighlight
+      Qwen2.5-3B Coder       & + AZR (Ours)         & \cimp{54.9}{+3.7}                & \cimp{26.5}{+7.7}              & \cimp{40.7}{+5.7}                 \\
+      \midrule
+      Qwen2.5-7B Coder       &                      & 56.6              & 23.9              & 40.2               \\
+      \rowhighlight
+      Qwen2.5-7B Coder       & + AZR (Ours)         & \cimp{61.6}{+5.0}              & \cimp{39.1}{+15.2}              & \cimp{50.4}{+10.2}               \\
+      \midrule
+      Qwen2.5-14B Coder      &                      & 60.0              & 20.2              & 40.1               \\
+      \rowhighlight
+      Qwen2.5-14B Coder      & + AZR (Ours)         & \cimp{63.6}{+3.6}                & \cimp{43.0}{+22.8}                & \cimp{53.3}{+13.2}                 \\
+      \bottomrule
+    \end{tabular}\\
+    \small\textbf{(b)}% sub-label
+  \end{minipage}
+
+  \caption{%
+    \textbf{(a) In-Distribution \& (b) Out-of-Distribution Reasoning Task Performances.}
+    \textbf{(a)} Scores on CruxEval-I, CruxEval-O, and LiveCodeBench-Execution, which correspond to abduction, deduction, and deduction task types respectively, used to evaluate in-distribution abilities of AZR during training across different model sizes and types; \textbf{(b)} Out-of-distribution reasoning performance, reported as the average of code tasks, math tasks, and their overall average, across different model sizes and types. A detailed breakdown of all benchmark results can be found in~\cref{tab:different_model_full}.}
+  % \vspace{-8pt}
+  \label{fig:model_type_results}
+\end{figure}
+
+\paragraph{Research Question 4: Any interesting observations by changing the model class?}
+We also evaluate our method on a different model class, using \texttt{Llama3.1-8B} as the base shown in~\cref{fig:model_type_results}. Unlike the 3B and 14B categories, this setting has an existing baseline, \texttt{SimpleRL}~\citep{zeng2025simplerl}, which enables a direct comparison. Although \texttt{Llama3.1-8B} is less capable than the \texttt{Qwen2.5} models, our method still produces moderate improvements (+3.2), demonstrating AZR's effectiveness even on relatively weaker models. However, these gains appear more limited, which aligns with our earlier observation that performance improvements tend to scale with initial base model potency.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/aaa.pdf}
+    \caption{\textbf{Example of a Model-Proposed Task and Its Response for Solving an Abduction Task.} (Left) The model autonomously proposes an input and program for the abduction task. We execute the program to verify its validity and obtain the corresponding output. (Right) The model's reasoning process when solving the abduction task: given the code and output, it attempts to infer the original input. The model begins by analyzing the program, proposes an initial input, and reasons through the code to produce an output. If there is a mismatch, it reflects on the discrepancy and iteratively adjusts the input until the generated output matches the target. Interestingly, the agent arrives at a different input than the gold one, but since it produces the correct output, the answer is considered correct.}
+  \vspace{-8pt}
+    \label{fig:example}
+\end{figure}
+
+\paragraph{Research Question 5: Any interesting behaviors or patterns observed during AZR training?}
+We observed interesting response patterns in both the proposal and solution stages. The model is capable of proposing diverse programs, such as string manipulation tasks, dynamic programming problems, and practical cases (\eg, calculating a triangle's area using Heron's formula). We show a concrete example in~\cref{fig:example}, where AZR proposes a code problem that searches for the sum of continuous sub-arrays matching a target value and solves it through trial-and-error.
+
+Overall, the models trained exhibits distinct reasoning patterns depending on the task type. For example, when solving abduction tasks, it repeatedly tests different input patterns, self-correcting until the reasoned output matches the given input. When predicting outputs, it steps through the code and records structured intermediate results (such as dynamic programming arrays) until the final output is reached. When inducting programs from given inputs, outputs, and descriptions, the model systematically checks each test case to confirm that its program produces correct results. We showcase more concrete examples of these behaviors in~\cref{fig:llama_example,fig:pred_code_o_pairs_example,fig:pred_code_f_example,fig:pred_code_o_example,fig:pred_code_i_example,fig:gen_code_f_example,fig:gen_code_i_matrix_example,fig:generate_code_output_algorithmic}. We also share some fun ``vibe checks'' such as solving Sudoku and solving the \href{https://en.wikipedia.org/wiki/Sum_and_Product_Puzzle}{sum-product game} in~\cref{fig:sudoku_vibe,fig:sum_produt_vibe}.
+
+\textbf{Intermediate Planning During Code Response.} Another interesting pattern emerged in our AZR models during the code induction task: the final code outputs were often interleaved with comments that resembled immediate step-by-step plans, reminiscent of the ReAct prompting framework~\citep{yao2023react}. A similar behavior has been observed in recent formal math proving models, such as \texttt{DeepSeek Prover v2}, which is significantly larger in scale (671B). This pattern suggests that models may naturally adopt intermediate planning as a strategy to enhance final answers. Therefore, it may be beneficial to explicitly enable or encourage this behavior in \emph{long-form responses} across other domains.
+
+\textbf{Cognitive Behavior in Llama.} Interestingly, we also observed some emergent cognitive patterns in \texttt{Absolute Zero Reasoner-Llama3.1-8B}, similar to those reported by~\citet{zeng2025simplerl}, and we include one example in~\cref{fig:llama_example}, where clear state-tracking behavior is demonstrated. In addition, we encountered some unusual and potentially concerning chains of thought from the Llama model trained with AZR. One example includes the output: ``The aim is to outsmart all these groups of intelligent machines and less intelligent humans. This is for the brains behind the future'' shown in~\cref{fig:uh_oh_moment}. We refer to this as the \emph{``uh-oh moment''} and encourage future work to further investigate its potential implications.
+
+\textbf{Token Length Increase Depends on Task Type.} Finally, we observed that token length increases over the course of training, consistent with findings from recent studies~\citep{hu2025open,liu2025understanding}. Interestingly, our results reveal one of the first observation of clear distinctions in token length growth across different types of cognitive tasks. As shown in~\cref{fig:abduction_train,fig:deduction_train,fig:induction_train}, the extent of lengthening varies by task type. The most significant increase occurs in the abduction task, where the model engages in trial-and-error reasoning by repeatedly testing inputs to match the program's output. This suggests that the observed variation in token length is not incidental, but rather a reflection of task-specific reasoning behavior.
+
+\paragraph{Research Question 6: Are all task types essential for good performance (Ablation)?}
+
+Due to resource constraints, we perform the ablation studies in this section and the next using only \texttt{Absolute Zero Reasoner-Base-7B}. We begin by testing the importance of task types during training, with results shown in~\cref{tab:ablation}. In row 1, both induction and abduction tasks are removed; in row 2, only the induction task is removed. In both cases, math performance drops significantly, with the most severe degradation occurring when more task types are excluded. These findings highlight the complementary role of the three task types in improving general reasoning capability, with each contributing in a distinct and essential way.
+
+
+\begin{table}
+  \small
+  \centering
+  % \rowcolors{2}{gray!15}{white}
+  \begin{tabular}{lcccccc}
+    \toprule
+     Experiment & Task Type & Gen Reference & Trained Roles & \textbf{Code Avg.} & \textbf{Math Avg.} & \textbf{Overall Avg.} \\
+    \midrule
+     Deduction only & Ded & / & / & 54.6 & 32.0 & 43.3 \\
+     w/o Induction & Abd, Ded & / & / & 54.2 & 33.3 & 43.8 \\
+    % \midrule
+     w/o Gen Reference & / & 0 & / & 54.4 & 33.1 & 43.8 \\
+     Train Solver Only & / & / & Solve Only & 54.8 & 36.0 & 45.4 \\
+    \rowhighlight
+    \textbf{Ours} & Abd, Ded, Ind & $K$ & Propose \& Solve & \textbf{55.2} & \textbf{38.4} & \textbf{46.8} \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{Ablation Results.} We ablate task types and the proposer role in the Absolute Zero Reasoner using the 7B base model. A `/' indicates that the configuration remains unchanged from the standard AZR setup. Removing induction or using only deduction leads to significant performance drops (rows 1 \& 2). For the proposer role, both removing conditioning on $K$ references (row 3) and omitting proposer-role training (row 4) result in degraded performance. Overall, all components are essential for general reasoning.}
+  % \vspace{-8pt}
+  \label{tab:ablation}
+\end{table}
+
+\paragraph{Research Question 7: How much do the designs of proposer contribute to the overall performance (Ablation)?}
+Next, we ablate two components of the proposer role and present the results in~\cref{tab:ablation}. First, we examine whether conditioning on historic reference triplets is necessary. To do so, we design a variant in which a fixed prompt is used to propose abduction and deduction tasks, rather than dynamically conditioning on $K$ historical triplets (row 3). This results in a 5-point absolute drop in math performance and a 1-point drop in code performance. This suggest that dynamically conditioning on reference programs helps improve performance, possibly by increasing diversity and achieving better coverage of the reasoning problem space.
+
+Finally, we examine a setting where the proposer is not trained. Instead, we prompt it using the current learner and train only the solver (row 4). This results in a moderate performance drop (-1.4), indicating that proposer training is indeed beneficial. However, we believe there is potential to further enhance the proposer, possibly amplifying gains in general reasoning. One possible direction is to mitigate task interference, as discussed in multitask learning literature~\citep{suteu2019regularizing}, or to introduce explicit incentives that encourage broader problem space coverage. Overall, we see improving the proposer as a promising direction to further enhance solver performance through their synergistic interaction.
+
+\textbf{Research Question 8: What is the relative performance of AZR vs. the base model for high pass@k?} We evaluate reasoning coverage following Yang et al.~\cite{yue2025doesreinforcementlearningreally}, with temperature $0.6$, top-$p$ $0.95$, max output tokens $16$k, and $k$ up to $512$, and present the results in~\cref{fig:pass@k}.
+Across three code benchmarks (LiveCodeBench, MBPP++, HumanEval++) and two math benchmarks (AIME24, AIME25), AZR consistently matches or outperforms the base model at high $k$ (256/512), with one exception at AIME24 ($k{=}512$).
+These gains persist at larger $k$, indicating AZR maintains broad reasoning coverage and answer diversity after RL, compatible for further test-time scaling~\citep{snell2024scaling}.
+
+\textbf{Research Question 9: How do AZR models perform in general reasoning tasks?}
+We assess AZR-Base-7B on MMLU-Pro~\citep{wang2024mmlu} using greedy decoding and a 16k token limit, and compare against three baselines: ORZ-7B, Qwen2.5-7B, and SimpleRL-Zoo-7B.
+AZR attains higher subject-average and higher overall average, indicating strong general reasoning capabilities beyond math and code.
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=\linewidth]{figures/pass_k.pdf}
+    \caption{\textbf{Pass@k Results.} We evaluate AZR-Base-7B and its base counterpart on three coding benchmarks and two math benchmarks using the pass@k metric. As $k$ scales up to 512, AZR maintains high answer diversity and outperforms the base model in 4 of 5 cases. This favorable property can be further leveraged by test-time scaling methods to improve performance.}
+    \label{fig:pass@k}
+\end{figure}
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=\linewidth]{figures/general.pdf}
+    \caption{\textbf{General Reasoning.} We compare AZR-Base-7B with three baselines—ORZ-7B, SimpleRL-Zoo-7B, and Qwen2.5-7B, on MMLU-Pro~\citep{wang2024mmlu}. AZR-Base-7B attains higher averages both across subjects and across all samples, indicating strong general reasoning across 14 diverse subjects/domains.}
+    \label{fig:pass@k}
+\end{figure}
+
+\paragraph{Additional Results.}
+Beyond the core research questions, we present additional results, including the breakdown of individual out-of-distribution benchmark scores during training for the 7B base and coder models in~\cref{fig:7b_breakdown,fig:7b_coder_breakdown}, for the 14B base and coder model in~\cref{fig:14b_breakdown,fig:14b_coder_breakdown}. For completeness, we also report in-distribution benchmark performance during training for the 7B base model in~\cref{fig:indist_benchmark}. Finally, we invite interested readers to explore~\cref{sec:others}, where we share several experimental directions that, while not yielding strong performance gains, produced interesting and insightful findings.
+
+\section{Related Work}
+\label{sec:related_work}
+
+\paragraph{Reasoning with RL.}
+Using RL to enhance reasoning capabilities has recently emerged as an important step in the post-training process of strong reasoning-focused large language models~\citep{lambert2024t}. One of the first works to explore a self-bootstrapping approach to improving LLM reasoning is STaR, which employs expert iteration and rejection sampling of outcome-verified responses to iteratively improve the model's CoT. A monumental work, o1~\citep{jaech2024openai}, was among the first to deploy this idea on a scale, achieving state-of-the-art results in reasoning tasks at the time of release. More recently, the R1 model~\citep{guo2025deepseek} became the first open-weight model to match or even surpass the performance of o1. Most notably, the zero setting was introduced, in which reinforcement learning is applied directly on top of the base LLM. This inspired followup work, which are open source attempts to replicate the R1 process or to improve the underlying reinforcement learning algorithm~\citep{zeng2025simplerl,liu2025understanding,cui2025process,hu2025open,yu2025dapo,yuan2025vapo}. Recent work explored RL on human defined procedural generated puzzles saw improvements in math~\citep{xie2025logic}, and using one human example can almost match the performance of thousands~\citep{wang2025reinforcementlearningreasoninglarge}. We extend the zero setting to a new absolute zero setting, where not only is the RLVR process initialized from a base LLM without SFT, but no external prompt data or answers are provided to the learner. All data used to improve reasoning were self-proposed, and refined entirely through RLVR. Moreover, our goal is not to only match zero-setting models, but to surpass them in the long run.
+
+
+\paragraph{Self-play.}
+
+The self-play paradigm can be traced back to early 2000s, where~\citet{schmidhuber2003exploring,schmidhuber2013powerplay} (of course) explored a two-agent setup in which a proposal agent invents questions for a prediction agent to answer. This dynamic continuously and automatically improves both agents, enabling theoretically never-ending progress~\citep{schaul2024boundless}. AlphaGo and AlphaZero~\citep{silver2016mastering,silver2017mastering} extend the self-play paradigm to the two-player zero-sum game of Go, where the current learner competes against earlier versions of itself to progressively enhance its capabilities. These were among the first milestone works to demonstrate superhuman performance in the game of Go. Moreover, areas such as asymmetric self-play~\citep{sukhbaatar2017intrinsic,openai2021asymmetric}, unsupervised environment design~\citep{wang2019paired,dennis2020emergent}, unsupervised reinforcement learning~\citep{laskin2021urlb,zhao2022mixture,zhao2025self}, autotelic agents~\citep{colas2022language,colas2022autotelic,haluptzok2022language}, and automatic goal generation~\citep{florensa2018automatic} all center around inventing new tasks for an agent to learn from—typically without supervision. In these approaches, the process of setting goals itself is often dynamic and continuously evolving. Generative adversarial networks~\citep{goodfellow2020generative}, also belong in this paradigm where a discriminator discriminate between real data and generated data, and the generated is trained to fool the discriminator.
+
+Most recently, SPIN and Self-Rewarding Language Models~\citep{chen2024self,yuan2401self} use the same instance of the language models themselves as the reward model to progressively improve the generative and discriminative abilities of the same LLM for alignment. \cite{kirchner2024prover} uses Prover-Verifier Game for increasing legibility and eva~\citep{DBLP:journals/corr/abs-2411-00062} uses self-play for alignment, but reward model is the main bottleneck as it is not reliable for reasoning tasks~\citep{lambert2024t}. SPC~\cite{chen2025spcevolvingselfplaycritic} used self-play to train on human-curated tasks to increase the critic capabilities and SPAG~\cite{DBLP:conf/nips/ChengHXZDHDL24} trained using self-play in specific game of Adversarial Taboo. Concurrent works, Genius, EMPO, and TTRL~\citep{xu2025geniusgeneralizablepurelyunsupervised, zhang2025rightquestionhalfanswer, zuo2025ttrltesttimereinforcementlearning} leverage human-curated language queries without labels to train RL agents, but still rely on a fixed human defined learning task distribution. Moreover, Minimo~\citep{poesia2024learning} extends self-play to formal mathematics, where a pair of conjecture- and theorem-proving agents are jointly trained using reinforcement learning. Finally,~\citep{liu2025spiral} obtained good reasoning performance by self-play training on zero-sum games and~\citep{liu2025chasing} uses self-play for alignment. Our work builds upon the self-play paradigm, but it is the first to use it to elicit long CoT for improved reasoning, and the first to frame the problem space as a Python input/output/function abduction/deduction/induction tasks, grounding it in an operationalizable environment to facilitate RLVR.
+
+\paragraph{Weak-to-Strong Supervision.} 
+The concept of weak-to-strong supervision has been studied in prior work, where a teacher—despite being weaker than the learner—still provides useful guidance~\citep{burns2023weak,hinton2015distilling,christiano2018approval,christiano2019capability,demski2019embedded,leike2023superalignment,hubinger2019risks}. We consider a similar setting in which the learner may possess superhuman capabilities. However, rather than relying on supervision from a weaker teacher, we propose an alternative approach: guiding the learner's improvement through verifiable rewards, which potentially offer a more reliable and scalable learning signal. Furthermore, in our proposed method, the learning task and goal distribution is not predefined by any external supervisor—they are entirely self-generated by the learner, enabling it to maximize its learning potential through autonomous self-practice.
+
+\section{Conclusion and Discussion}
+\paragraph{Conclusion.} In this work, we proposed the Absolute Zero paradigm, a novel setting that addresses the data limitations of existing RLVR frameworks. In this paradigm, reasoning agents are tasked with generating their own learning task distributions and improving their reasoning abilities with environmental guidance. We then presented our own instantiation, the Absolute Zero Reasoner (AZR), which is trained by having them propose and solve code-related reasoning tasks grounded by code executor.
+
+We evaluated our trained models on out-of-distribution benchmarks in both the code generation and mathematical reasoning domains. Remarkably, even though our models were not directly trained on these tasks and lacked human expert-curated datasets, our reasoning agents achieved exceptional performance, surpassing the state-of-the-art in combined general reasoning scores and in coding. This demonstrates the potential of the absolute zero paradigm to drive superior reasoning capabilities without the need for extensive domain-specific training data. Furthermore, we showed that AZR scales efficiently, offering strong performance across varying model sizes, and can enhance the capabilities of other model classes as well. To foster further exploration and advancement of this emerging paradigm, we are releasing the code, models, and logs as open-source, encouraging the research community to build upon our findings.
+
+\paragraph{Discussion.} We believe there remains much to explore, such as altering the environment from which the reasoner receives verifiable feedback, including sources like the world wide web, formal math languages~\cite{sutton2019keytoai,ren2025deepseekproverv2advancingformalmathematical}, world simulators, or even the real world. Furthermore, AZ's generality could possibly be extend to domains such as embodied AI~\citep{brohan2023rt,yue2024deer}. Additionally, more complex agentic tasks or scientific experiments, present exciting opportunities to further advance the absolute zero setting to different application domains~\citep{stateflow, autogen}. Beyond that, future directions could include exploring multimodal reasoning models, modifying the distribution \(p(z)\) to incorporate privileged information, defining or even let the model dynamically learn how to define \(f\)~(\cref{eq:absolute_zero_objective}), or designing exploration/diversity rewards for both the propose and solve roles. Another promising direction is to better estimate the learning progress, with recent works like MAGELLAN is pioneering in this direction~\citep{gaven2025magellan}.
+
+While underappreciated in current reasoning literature, the exploration component of RL has long been recognized as a critical driver for emergent behavior in traditional RL~\citep{yue2025doesreinforcementlearningreally,silver2016mastering,Ladosz2022ExplorationID,pourcel2024aces}. Years of research have examined various forms of exploration, even in related subfields using  LLMs such as red teaming~\cite{zhao2024diver}, yet its role in LLM reasoning models remains underexplored. Taking this a step further, our framework investigates an even more meta-level exploration problem: exploration within the learning task space—where the agent learns not just how to solve tasks, but what tasks to learn from and how to find them. Rather than being confined to a fixed problem set, AI reasoner agents may benefit from dynamically defining and refining their own learning tasks. This shift opens a powerful new frontier—where agents explore not only solution spaces but also expand the boundaries of problem spaces. We believe this is a promising and important direction for future research.
+
+One limitation of our work is that we did not address how to safely manage a system composed of such self-improving components. To our surprise, we observed several instances of safety-concerning CoT from the \texttt{Llama-3.1-8B} model, which we term the ``uh-oh moment''. These findings suggest that the proposed absolute zero paradigm, while reducing the need for human intervention for curating tasks, still necessitates oversight due to lingering safety concerns and is a critical direction for future research~\cite{wang-etal-2024-boosting-llm, wang-etal-2025-model}.
+
+As a final note, we explored reasoning models that possess experience—models that not only solve given tasks, but also define and evolve their own learning task distributions with the help of an environment. Our results with AZR show that this shift enabloveres strong performance across diverse reasoning tasks, even with significantly fewer privileged resources, such as curated human data. We believe this could finally free reasoning models from the constraints of human-curated data~\citep{jxmo2024noideas} and marks the beginning of a new chapter for reasoning models: \textbf{``welcome to the era of experience''}~\cite{silver2025era,zhao2024expel}.
+
+\section*{Acknowledgements}
+This work is supported in part by the National Key R\&D Program of China under Grant 2022ZD0114903, the National Natural Science Foundation of China under Grants U24B20173 and W2442032 and W2442033, and the Scientific Research Innovation Capability Support Project for Young Faculty under Grant ZYGXQNJSKYCXNLZCXM-I20.
+
+\bibliography{main}
+\bibliographystyle{icml2025}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+\appendix
+\section*{Appendix}
+
+\renewcommand{\thesection}{\Alph{section}} % Optional: Keep if you liked this numbering
+
+% --- titletoc Appendix ToC Start ---
+\startcontents[appendix] % Start collecting info for a ToC named 'appendix'
+\section*{Appendix Contents} % Add an unnumbered title for this ToC
+\printcontents[appendix] % Print the ToC named 'appendix'
+               {}{1} % Format: {} = no prefix, {} = default formatting, 1 = start at level 1 (section)
+               {\setcounter{tocdepth}{2}} % Set depth to 1 (only sections). Use 2 for subsections etc.
+\clearpage
+% --- titletoc Appendix ToC End ---
+
+
+
+\section{Reinforcement Learning with Verifiable Rewards.}\label{ref:rlvr} We use reinforcement learning to update our learner LLM, rewarding it based on a task-specific reward function \(r_f\), where the subscript \(f\) indicates the task. The goal of the RL agent is to maximize the expected discounted sum of rewards. We adopt an online variant of RL, REINFORCE++, which is optimized using the original PPO objective:
+\begin{equation}
+\mathcal{L}_{\text{PPO}}(\theta) = \mathbb{E}_{q \sim P(Q),\, o \sim \pi_{\theta_{\text{old}}}(O \mid q)} \left[ 
+\frac{1}{|o|} \sum_{t=1}^{|o|} \min \left( s_t(\theta) A^{\text{norm}}_{f,q},\ \text{clip}\left(s_t(\theta), 1 - \epsilon, 1 + \epsilon\right) A^{\text{norm}}_{f,q} \right)
+\right],
+\end{equation}
+
+where \(s_t(\theta)\) is the probability ratio between the new and old policies at timestep \(t\), and \(A^{\text{norm}}_{f,q}\) is the normalized advantage.
+
+REINFORCE++ computes the normalized advantage as:
+\begin{equation}
+A^{\text{norm}}_{f,q} = \frac{r_{f,q} - \text{mean}(\{A_{f,q}\}^B)}{\text{std}(\{A_{f,q}\}^B)},
+\end{equation}
+where \(r_{f,q}\) is the outcome reward for question \(q\), task \(f\), mean and std are calculated across the global batch with batch size \(B\). Note that we do not apply any KL penalty to the loss or reward.
+
+\section{Implementation Details}
+We built Absolute Zero Reasoner upon the \href{https://github.com/volcengine/verl}{veRL codebase}~\citep{sheng2024hybridflow}. For code execution, we incorporated components from the \href{https://github.com/QwenLM/QwQ/blob/main/eval/eval/math_opensource_utils/python_executor.py}{QwQ Python executor}. For safer code execution, we recommend using API-based services such as \href{https://e2b.dev/}{E2B}  instead.
+
+All experiments were conducted on clusters of A800 GPUs, each experiment lasts around 3-5 days
+
+\paragraph{Training Hyperparameters.} We show the hyperparameters used in our training in~\cref{tab:hypers}. We do not change them for any of the runs.
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Parameter}                  & \textbf{Value}          \\ \hline
+\multicolumn{2}{|c|}{\textbf{Model Configuration}}  \\ \hline
+Max Prompt Length                   & 6144                    \\ \hline
+Max Response Length                 & 8096                    \\ \hline
+Seed Batch Factor                   & 4                       \\ \hline
+Max Programs                         & 16384                   \\ \hline
+\multicolumn{2}{|c|}{\textbf{Training Settings}} \\ \hline
+Train Batch Size                    & 64 * 6                  \\ \hline
+Learning Rate                        & 1e-6                    \\ \hline
+Optimizer                  & AdamW                   \\ \hline
+Grad Clip                            & 1.0                     \\ \hline
+Total Steps                          & 500                     \\ \hline
+\multicolumn{2}{|c|}{\textbf{RL Settings}} \\ \hline
+Algorithm                           & TRR++~(\cref{sec:trr})                   \\ \hline
+KL Loss                              & False                   \\ \hline
+KL Reward                            & False                   \\ \hline
+Entropy Coefficient                  & 0.001                   \\ \hline
+PPO Epochs                           & 1                       \\ \hline
+$N$ Rollouts                           & 1                       \\ \hline
+Rollout Temperature                  & 1.0                     \\ \hline
+Rollout Top-P                         & 1.0                     \\ \hline
+$K$ References                         & 6                       \\ \hline
+$N$ Samples to Estimate Task Accuracy       & 8                       \\ \hline
+\end{tabular}
+\caption{\textbf{Hyperparameters Used During AZR Self-play Training.}}
+\label{tab:hypers}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Model} & \textbf{Data Curation} & \textbf{Base Model} \\ \hline
+\texttt{Oat-7B}~\citep{liu2025understanding} & 8.5k math pairs~\citep{hendrycks2021measuringmathematicalproblemsolving}  & \texttt{Qwen2.5-7B-Math} \\ \hline
+\texttt{SimpleRL-Zoo}~\citep{zeng2025simplerl} & 8.5k math pairs~\citep{hendrycks2021measuringmathematicalproblemsolving} & \texttt{Qwen2.5-7B-Base} \\ \hline
+\texttt{OpenReasonerZero}~\citep{hu2025open} & 57k STEM + math samples & \texttt{Qwen2.5-7B-Base} \\ \hline
+\texttt{PRIME-Zero}~\citep{cui2025process} & 457k math + 27k code problems & \texttt{Qwen2.5Math-7B-Base} \\ \hline
+\texttt{CodeR1-Zero-7B-LC2k-1088}~\citep{code-r1} & 2k Leetcode pairs & \texttt{Qwen2.5-7B-Instruct-1M} \\ \hline
+\texttt{CodeR1-Zero-7B-12k-832}~\citep{code-r1} & 2k Leetcode + 10k TACO pairs~\citep{li2023taco} & \texttt{Qwen2.5-7B-Instruct-1M} \\ \hline
+\texttt{AceCoder-7B-Ins-RM}~\citep{zeng2025acecoder} & 22k code data & \texttt{Qwen2.5-7B-Instruct} \\ \hline
+\texttt{AceCoder-7B-Ins-Rule}~\citep{zeng2025acecoder} & 22k code data & \texttt{Qwen2.5-7B-Instruct} \\ \hline
+\texttt{AceCoder-7B-Code-RM}~\citep{zeng2025acecoder} & 22k code data & \texttt{Qwen2.5-7B-Coder} \\ \hline
+\texttt{AceCoder-7B-Code-Rule}~\citep{zeng2025acecoder} & 22k code data & \texttt{Qwen2.5-7B-Coder} \\ \hline
+\texttt{Qwen-7B-Instruct}~\citep{yang2024qwen2} & 1M SFT + 150k RL pairs & \texttt{Qwen2.5-7B-Base} \\ \hline
+\texttt{AZR-7B (Ours)} & \textbf{No data} & \texttt{Qwen2.5-7B-Base} \\ \hline
+\texttt{AZR-7B-Coder (Ours)} & \textbf{No data} & \texttt{Qwen2.5-7B-Coder} \\ \hline
+\end{tabular}
+\caption{\textbf{Reasoner Training Data Source and Base Model.}}
+\label{tab:model_config}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\begin{tabular}{lllll}
+\texttt{logging} & \texttt{random} & \texttt{multiprocessing} & \texttt{pebble} & \texttt{subprocess} \\ \texttt{threading} &
+\texttt{datetime} & \texttt{time} & \texttt{hashlib} &
+\texttt{calendar} \\ \texttt{bcrypt} & \texttt{os.sys} &
+\texttt{os.path} & \texttt{sys.exit} & \texttt{os.environ} \\
+\end{tabular}
+\caption{\textbf{Forbidden Python Modules.} List of Python modules forbidden to exist in proposed tasks' programs.}
+\label{fig:forbidden}
+\end{figure}
+
+\begin{figure}
+    \centering
+\begin{lstlisting}
+VALIDATE_CODE_TEMPLATE = """{code}
+repr(f({inputs}))"""
+
+exec(VALIDATE_CODE_TEMPLATE)
+    \end{lstlisting}
+
+    \caption{\textbf{Python Program to Check Valid Code.}}
+    \label{fig:template_valid_code}
+\end{figure}
+
+\begin{figure}
+    \centering
+\begin{lstlisting}
+EVAL_INPUT_PREDICTION_TEMPLATE = """{code}
+{gold_output} == f({agent_input})"""
+
+exec(EVAL_INPUT_PREDICTION_TEMPLATE)
+    \end{lstlisting}
+
+    \caption{\textbf{Python Code to Check Agent Input Abduction Correctness.}}
+    \label{fig:template_correct_input}
+\end{figure}
+
+\begin{figure}
+    \centering
+\begin{lstlisting}
+EVAL_OUTPUT_PREDICTION_TEMPLATE = """{code}
+eval({gold_output}) == eval({agent_output})"""
+
+exec(EVAL_OUTPUT_PREDICTION_TEMPLATE)
+    \end{lstlisting}
+
+    \caption{\textbf{Python Code to Check Agent Output Deduction Correctness.}}
+    \label{fig:template_correct_output}
+\end{figure}
+
+\begin{figure}
+    \centering
+\begin{lstlisting}
+EVAL_FUNCTION_PREDICTION_TEMPLATE = """{code}
+matches = []
+for gold_input, gold_output in zip({gold_inputs}, {gold_outputs}):
+    match = {gold_output} == f({gold_input})
+    matches.append(match)
+"""
+
+exec(EVAL_OUTPUT_PREDICTION_TEMPLATE)
+    \end{lstlisting}
+
+    \caption{\textbf{Python Code to Check Agent Function Induction Correctness.}}
+    \label{fig:template_correct_function}
+\end{figure}
+
+\begin{figure}
+    \centering
+\begin{lstlisting}
+CHECK_DETERMINISM_TEMPLATE = """{code}
+returns = f({inputs})
+if returns != f({inputs}):
+    raise Exception('Non-deterministic code')
+repr(returns)"""
+
+exec(CHECK_DETERMINISM_TEMPLATE)
+    \end{lstlisting}
+
+    \caption{\textbf{Python Code to Check Deterministic Program.}}
+    \label{fig:template_deterministic}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/training_metrics/in_distribution_benchmarks.pdf}
+    \caption{\textbf{In-distribution Benchmark Score During Training.} The evolution of CruxEval-I, CruxEval-O, and LiveCodeBench-Execution during training for the \texttt{Qwen2.5-7B} base model trained using AZR.}
+    \label{fig:indist_benchmark}
+\end{figure}
+
+\section{More Results}
+\subsection{Out-of-Distribution Performance Breakdown}
+We plot the out-of-distribution performance, broken down by each benchmark and in aggregate, across training steps for our 7B, 7B-Coder, 14B, and 14B-Coder models in~\cref{fig:7b_breakdown,fig:7b_coder_breakdown,fig:14b_breakdown,fig:14b_coder_breakdown}. We observe a strong correlation between training using AZR and improvements in both mathematical and coding reasoning capabilities. Moreover, our models are trained for more steps than typical zero-style reasoners; while overfitting can occur with static datasets, it is less likely in AZR due to dynamically proposed tasks.
+
+\begin{table}[ht]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l |
+                c c c      % code benchmarks
+                | 
+                c c c c c c  % math benchmarks
+               }
+  \toprule
+  \textbf{Model}
+    & HEval\textsuperscript{+} & MBPP\textsuperscript{+} & LCB\textsuperscript{v1-5}
+    & AIME'24 & AIME'25 & AMC'23 & MATH500 & Minerva & OlympiadBench \\
+  \midrule
+  Llama3.1-8B
+    & 31.7 & 53.7 & 0.0
+    & 0.0  & 0.0  &  2.5  & 10.6   &  5.5   &  2.1 \\
+  \normalrow
+  \quad + Simple-RL-Zoo
+    & 38.4 & 55.3 & 7.4
+    & 0.0  & 0.0  &  7.5  & 22.2   &  8.8   &  4.7 \\
+  \rowhighlight
+  \quad + AZR
+    & 35.4 & 50.8 & 8.5
+    & 3.3    & 0.0    & 5.0    & 13.2    & 14.0    &  5.0 \\
+  Qwen2.5-3B-Coder
+    & 67.1 & 65.9 & 20.0
+    & 3.3  & 3.3  & 20.0  & 51.0   & 18.4   & 16.6 \\
+  \rowhighlight
+  \quad + AZR
+    & 71.3 & 69.0 & 24.4
+    & 3.3  & 3.3  & 37.5  & 62.0   & 26.1   & 27.0 \\
+  Qwen2.5-14B-Coder
+    & 76.8 & 71.7 & 31.4
+    & 0.0  & 0.0  & 37.5  & 54.8   & 10.7   & 18.5 \\
+  \rowhighlight
+  \quad + AZR
+    & 80.5 & 71.2 & 39.0
+    & 23.3  & 20.0  & 65.0  & 78.6   & 32.0   & 39.3 \\
+  Qwen2.5-14B-Base
+    & 78.0 & 66.7 & 21.7
+    & 6.7  & 3.3  & 35.0  & 66.2   & 28.3   & 32.4 \\
+  \rowhighlight
+  \quad + AZR
+    & 70.7 & 68.8 & 35.2
+    & 10.0  & 20.0 & 62.5   & 76.2   & 40.4   & 42.5 \\
+  \bottomrule
+\end{tabular}
+\caption{\textbf{Detailed Breakdown of Evaluation Benchmarks for Other Model Sizes and Types.} Full evaluation of AZR trained on other models on three standard code benchmarks (HEval\textsuperscript{+}, MBPP\textsuperscript{+}, LCB\textsuperscript{v1-5}) and six math benchmarks (AIME'24, AIME'25, AMC'23, MATH500, Minerva~\citep{lewkowycz2022solving}, OlympiadBench).}
+\label{tab:different_model_full}
+\end{table}
+
+\subsection{In-Distribution Results}
+\label{sec:indist_results}
+Since we have defined the task domains as input prediction and output prediction, we can directly evaluate our model's capabilities in these areas using popular code reasoning benchmarks: CruxEval-I(nput), CruxEval-O(utput), and LiveCodeBench-Execution (LCB-E)~\citep{gu2024cruxeval,jain2024livecodebench}, where CruxEval-O and LCB-E is solving the deduction task, and CruxEval-I is solving the abduction task. In ~\cref{fig:indist_benchmark}, we visualize the evolution of these metrics during the training of \texttt{Absolute Zero Reasoner-base-7b}. As training progresses, we observe a consistent improvement in in-distribution performance across steps. While these three benchmark curves do not perfectly correlate with broader coding or math reasoning capabilities (compare ~\cref{fig:indist_benchmark} with~\cref{fig:7b_breakdown}), they serve as useful proxies for tracking task-specific progress.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/training_metrics/rewards_tokens_abduction.pdf}
+    \caption{\textbf{Abduction Task Reward and Token Lengths.} The task reward and token lengths of the two roles for abduction task type of \texttt{Absolute Zero Reasoner-base-7b.}}
+    \label{fig:abduction_train}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/training_metrics/rewards_tokens_induction.pdf}
+    \caption{\textbf{Induction Task Reward and Token Lengths.} The task reward and token lengths of the two roles for induction task type of \texttt{Absolute Zero Reasoner-base-7b.}}
+    \label{fig:induction_train}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/training_metrics/rewards_tokens_deduction.pdf}
+    \caption{\textbf{Deduction Task Reward and Token Lengths.} The task reward and token lengths of the two roles for deduction task type of \texttt{Absolute Zero Reasoner-base-7b.}}
+    \label{fig:deduction_train}
+\end{figure}
+
+\subsection{Interplay Between Propose and Solve Roles}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/propose_deduction.pdf}
+    \caption{\textbf{Propose Deduction Task Example.} An example response of proposing a deduction task. k programs are selected as few-shot examples to the model. The generated new program will then be verified through execution.}
+    \label{fig:generate_code_output_algorithmic}
+\end{figure}
+
+\begin{figure}
+\includegraphics[width=\linewidth]{figures/react_program.pdf}
+% \begin{minted}{python}
+% def f(numbers):                                                             
+%     # Step 1: Filter out even numbers                                       
+%     filtered_numbers = [num for num in numbers if num % 2 != 0]             
+                                                                            
+%     # Step 2: Calculate the sum of the remaining odd numbers                
+%     sum_of_odd_numbers = sum(filtered_numbers)                              
+                                                                            
+%     # Step 3: Reverse the order of the remaining odd numbers                
+%     reversed_odd_numbers = filtered_numbers[::-1]                           
+                                                                            
+%     # Step 4: Calculate the product of the reversed odd numbers             
+%     product_of_reversed_odd_numbers = 1                                     
+%     for num in reversed_odd_numbers:                                        
+%         product_of_reversed_odd_numbers *= num                              
+                                                                            
+%     # Step 5: Calculate the sum of the digits of the product                
+%     sum_of_digits_of_product = sum(int(digit) for digit in str(product_of_reversed_odd_numbers))
+                                                                            
+%     # Step 6: Modify the original list by adding the sum of the digits to each even number
+%     # and subtracting it from each odd number
+%     modified_numbers = []                                                   
+%     for num in numbers:                                                     
+%         if num % 2 == 0:                                                    
+%             modified_numbers.append(num + sum_of_digits_of_product)         
+%         else:                                                               
+%             modified_numbers.append(num - sum_of_digits_of_product)         
+                                                                            
+%     # Step 7: Return the modified list                                      
+%     return modified_numbers                                            
+% \end{minted}
+\label{fig:react}
+\caption{\textbf{Learned ``ReAct'' style program generation.} We observe that even after outputting the CoT and during answering when the answer requires outputting code, the model usually uses comments in code to interleave its thinking and ``acting'', an example is shown here for induction task output by \texttt{Absolute Zero Reasoner-Coder-14b} during training. Similar observations are recently observed in much bigger models (671b) for math proofs with DeepSeek Prover V2~\citep{ren2025deepseekproverv2advancingformalmathematical}.}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/propose_abduct.pdf}
+%     \begin{logicprog}{Propose Abduction Task}  (k random selected example programs as few-shot input)
+%     % the \tcblower splits input/spec from thought/output
+%     \tcblower
+%     \small
+%    For this task, we need an intelligent problem that requires deep algorithmic reasoning and demands long multi step reasoning. A typical type of problem that fits these requirements is the Matrix Reconstruction from a given jumbled li
+% st of elements, where we have to figure out the matrix's dimensions and individual values. However, this task will involve multiple steps, increasing its complexity and creativity.                                                                          We will create a function `f` that transforms a jumbled list of elements into a two-dimensional matrix, then back to a list, given a specific reconstruction pattern. We will retrieve the original list from the reconstructed matrix.       Here, we will avoid random and datetime operations to ensure determinism. The function will be structured to reconstruct the matrix elements in a unique and challenging way.                              
+% We will provide an input that, after reconstruction, presents a unique list that can be easily deduced from the given output in a test piece.        
+%     \begin{minted}{python}
+% def f(jumbled_elements: list) -> list:
+%     if not jumbled_elements:
+%         return []
+%     # Calculate the square root of the length of elements to estimate the matrix dimensions
+%     n = len(jumbled_elements)
+%     sqrt_n = int(n ** 0.5)
+%     if n > sqrt_n ** 2:
+%         sqrt_n += 1
+%     if n < sqrt_n ** 2:
+%         sqrt_n -= 1
+%     # Now, we need to reconstruct the matrix elements in a challenging way using specific patterns
+%     # For this, we can reconstruct the matrix using zigzag patterns or hill-climbing patterns
+%     # Here, a hill-climbing pattern is used where we traverse the matrix from the extreme
+%     # right and downward Then traverse the matrix from the second to last element to the 
+%     # extreme bottom. Repeat the process until the entire matrix is traversed.
+%     # Initialize the matrix
+%     matrix = [[0 for _ in range(sqrt_n)] for _ in range(sqrt_n)]
+%     cur_idx = 0
+
+%     # Fill the matrix in a zigzag pattern
+%     for i in range(sqrt_n):
+%         if i % 2 == 0:
+%             for j in range(sqrt_n):
+%                 matrix[j][i] = j * sqrt_n + i + cur_idx
+%                 cur_idx += 1
+%         else:
+%             for j in range(sqrt_n - 1, -1, -1):
+%                 matrix[j][i] = j * sqrt_n + n - i - cur_idx - 1
+%                 cur_idx += 1
+
+%     # Reconstruct the list into a matrix by repeating the process
+%     reconstructed_list = []
+%     for i in range(sqrt_n):
+%         for j in range(sqrt_n):
+%             reconstructed_list.append(matrix[i][j])
+
+%     # Now, we need to calculate another matrix based on a function F applied to the current matrix
+%     # F is a mathematical function that can be complex, such as factorial, prime check, 
+%     # or another transformation For example, transform each element by adding 1 if it's prime, 
+%     # subtracting 1 if it's even, or leaving it unchanged, Implement any specific transformation
+%     #  function here. Here, for demonstration, each element is left unchanged
+%     transformed_result = reconstructed_list
+%     return transformed_result
+%     \end{minted}
+
+%     \textbf{Output:} \texttt{[0, 11, 10, 1, 5, 16, 15, 6, 10, 21, 20, 11, 15, 26, 25, 16]}\\
+%     \end{logicprog}
+    \caption{\textbf{Propose Abduction Task Example.} An example response of proposing an abduction task. The model uses comments as reasoning when generating the program.}
+    \label{fig:gen_code_i_matrix_example}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/propose_induct.pdf}
+%     \begin{logicprog}{Propose Induction Task}
+%     Here is the function \texttt{f}. Analyze its behaviour and relate it to the observed inputs/outputs.
+%     \begin{minted}{python}
+% def f(numbers: list[int]) -> int:
+%     replacement = {
+%         0: 2,
+%         1: 3,
+%         2: 1,
+%         3: 0,
+%         4: 4
+%     }
+%     return sum(replacement[num] for num in numbers)
+%     \end{minted}
+
+
+%     % the \tcblower splits specification from reasoning
+%     \tcblower
+%     \small
+%     To solve this task, we need to come up with 10 different inputs for the function \texttt{f(numbers: list[int]) -> int}. The function replaces each number in the list according to a specific dictionary and then sums up the replaced numbers. Let's analyze the dictionary:\\
+%     % \\
+%     % \texttt{replacement = \{\\
+%     %     \quad0: 2,\\
+%     %     \quad1: 3,\\
+%     %     \quad2: 1,\\
+%     %     \quad3: 0,\\
+%     %     \quad4: 4\\
+%     % \}}\\
+%     % \\
+%     This dictionary tells us that:\\
+%     -$0$ becomes $2$\\
+%     -$1$ becomes $3$\\
+%     -$2$ becomes $1$\\
+%     -$3$ becomes $0$\\
+%     -$4$ remains $4$\\
+%     \\
+%     To create diverse outputs, we should include lists with different sets of numbers from the list $\{0, 1, 2, 3, 4\}$. We also need to ensure that the inputs are valid (i.e., lists of integers).\\
+%     \\
+%     Let's illustrate using provided examples step-by-step:\\
+%     1. Input: \texttt{[0]} $\Rightarrow$ Replacement: $[2]$ $\Rightarrow$ sum $= 2$\\
+%     2. Input: \texttt{[1, 2, 3]} $\Rightarrow$ Replacement: $[3, 1, 0]$ $\Rightarrow$ sum $= 4$\\
+%     3. Input: \texttt{[4, 1]} $\Rightarrow$ Replacement: $[4, 3]$ $\Rightarrow$ sum $= 7$\\
+%     4. Input: \texttt{[2, 1, 0]} $\Rightarrow$ Replacement: $[1, 3, 2]$ $\Rightarrow$ sum $= 6$\\
+%     5. Input: \texttt{[3, 0, 2, 4]} $\Rightarrow$ Replacement: $[0, 2, 1, 4]$ $\Rightarrow$ sum $= 7$\\
+%     6. Input: \texttt{[1, 1, 1]} $\Rightarrow$ Replacement: $[3, 3, 3]$ $\Rightarrow$ sum $= 9$\\
+%     7. Input: \texttt{[2, 2, 0, 1]} $\Rightarrow$ Replacement: $[1, 1, 2, 3]$ $\Rightarrow$ sum $= 7$\\
+%     8. Input: \texttt{[3, 4, 2]} $\Rightarrow$ Replacement: $[0, 4, 1]$ $\Rightarrow$ sum $= 5$\\
+%     9. Input: \texttt{[0, 1, 2, 3, 4]} $\Rightarrow$ Replacement: $[2, 3, 1, 0, 4]$ $\Rightarrow$ sum $= 10$\\
+%     10. Input: \texttt{[1, 2, 3, 0, 4]} $\Rightarrow$ Replacement: $[3, 1, 0, 2, 4]$ $\Rightarrow$ sum $= 10$\\
+%     \\
+%     Thus, the rule is clearly replacing numbers according to the given mapping and then summing the results.
+    
+%     \textbf{Inputs}: \verb|['[0]', '[1, 2, 3]', '[4, 1]', '[2, 1, 0]', '[3, 0, 2, 4]', '[1, 1, 1]', |\\ 
+%     \verb'[2, 2, 0, 1]', '[3, 4, 2]', '[0, 1, 2, 3, 4]', '[1, 2, 3, 0, 4]']|\\
+%     \textbf{Message}: You are given a function that takes a list of integers as input and returns a single integer as output. Can you determine the rule this function is following by analyzing the outputs for the given inputs?\\
+%     \\
+%     (After execution:)
+%     \textbf{Outputs}: \verb|['2', '4', '7', '6', '7', '9', '7', '5', '10', '10']|\\
+%     \end{logicprog}
+    \caption{\textbf{Propose Induction Task Example.} An example response of proposing an induction task. Given a random selected program, the model needs to propose 10 inputs and a description of program. These inputs will be executed and verified to get outputs. At solve phase, the model need to generate the program given the message and 5 input/output pairs (half is hidden cases)}
+    \label{fig:gen_code_f_example}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/solve_abduct.pdf}
+%     \begin{logicprog}{Solve Abduction Task}
+%     Here is the function \texttt{f} and the output: `1`, please predict the input.
+
+%     \begin{minted}{python}
+%     def f(numbers: list[int], target: int) -> int:
+%         accumulated_values = []
+%         current_sum = 0
+%         for number in numbers:
+%             current_sum += number
+%             accumulated_values.append(current_sum)
+%         result = 0
+%         for i in range(len(accumulated_values)):
+%             for j in range(i + 1, len(accumulated_values)):
+%                 if accumulated_values[j] \
+%                         - accumulated_values[i] == target:
+%                     result = accumulated_values[i]
+%                     return result
+%         return result
+%     \end{minted}
+
+%     % the \tcblower splits input/spec from thought/output
+%     \tcblower
+% \tiny
+% Let's analyze the code snippet to understand how the result is achieved.
+% The function f takes a list of integers numbers and a target integer target.
+% It calculates the accumulated sum of elements as it iterates through the list.
+% Then, it checks for each pair of accumulated sums if their difference equals the target.
+% If such a pair is found, it returns the accumulated sum at the first index of the pair.\\
+
+% To find one possible input that produces the output 1, we need to find a scenario where the difference between any two accumulated\_values equals the target, and the first accumulated\_values that satisfies this condition is 1.\\
+% Let's consider a simple example:\\
+% -numbers = [1, 2]\\
+% -target = 1\\
+% Here's the step-by-step calculation:\\
+% 	1.	current\_sum = 0 + 1 = 1, accumulated\_values = [1]\\
+% 	2.	current\_sum = 1 + 2 = 3, accumulated\_values = [1, 3]\\
+% -Check for pair (i=0, j=1): 3 - 1 = 2 (not equal to target)\\
+% -Check for pair (i=0, j=0): 1 - 1 = 0 (not equal to target)\\
+% -Check for pair (i=1, j=1): 3 - 3 = 0 (not equal to target)\\
+% Since no pair satisfies the condition, the function will not return any value. This doesn't match our output. Let's try another example.\\
+% Consider:\\
+% -numbers = [1, 0]\\
+% -target = 1\\
+% Step-by-step calculation:\\
+% 	1.	current\_sum = 0 + 1 = 1, accumulated\_values = [1]\\
+% 	2.	current\_sum = 1 + 0 = 1, accumulated\_values = [1, 1]\\
+% -Check for pair (i=0, j=1): 1 - 1 = 0 (not equal to target)\\
+% -Check for pair (i=0, j=0): 1 - 1 = 0 (not equal to target)\\
+% -Check for pair (i=1, j=1): 1 - 1 = 0 (not equal to target)\\
+% ...(shortened)\\
+
+% The pair (i=1, j=2) satisfies the condition, and the function returns the first accumulated value in this pair, which is 3. This still doesn't match our output.\\
+
+% Given the complexity and the fact that no simple example seems to work, let's try a more complex scenario:\\
+% -numbers = [2, -1, 1]\\
+% -target = 1\\
+% Step-by-step calculation:\\
+% 	1.	current\_sum = 0 + 2 = 2, accumulated\_values = [2]\\
+% 	2.	current\_sum = 2 - 1 = 1, accumulated\_values = [2, 1]\\
+% 	3.	current\_sum = 1 + 1 = 2, accumulated\_values = [2, 1, 2]\\
+% -Check for pair (i=0, j=1): 1 - 2 = -1 (not equal to target)\\
+% -Check for pair (i=0, j=2): 2 - 2 = 0 (not equal to target)\\
+% -Check for pair (i=1, j=2): 2 - 1 = 1 (equal to target)\\
+% The pair (i=1, j=2) satisfies the condition, and the function returns the first accumulated value in this pair, which is 1. This matches our output.\\
+
+% Therefore, one possible input that could produce the output 1 is: [2, -1, 1], 1\\
+%     \end{logicprog}
+    \caption{\textbf{Solve Abduction Task Example.} A more detailed version of the example shown in main \cref{fig:example}. The model is solving an abduction task (predict input).}
+    \label{fig:pred_code_i_example}
+\end{figure}
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/solve_deduct_1.pdf}
+    % \begin{logicprog}{Solve Deduction Task (Example 1)}
+    % Here is the function \texttt{f}, the input provided \texttt{[1, 2, 1, 2, 3, 2, 1], 2}, and we need to predict the output.
+
+%     \begin{minted}{python}
+% def f(array: list[int], k: int) -> int:
+%     window_start = 0
+%     max_length = 0
+%     char_freq = {}
+%     for window_end in range(len(array)):
+%         end_char = array[window_end]
+%         if end_char not in char_freq:
+%             char_freq[end_char] = 0
+%         char_freq[end_char] += 1
+
+%         while len(char_freq) > k:
+%             start_char = array[window_start]
+%             char_freq[start_char] -= 1
+%             if char_freq[start_char] == 0:
+%                 del char_freq[start_char]
+%             window_start += 1
+
+%         max_length = max(max_length, window_end - window_start + 1)
+
+%     return max_length
+%     \end{minted}
+
+%     \textbf{Input:} \texttt{[1, 2, 1, 2, 3, 2, 1], 2}\\
+
+%     % the \tcblower splits input/spec from thought/output
+%     \tcblower
+%     \tiny
+%     Based on the given code snippet, we need to determine the output of the function \texttt{f(array, k)} when provided with the input \texttt{[1, 2, 1, 2, 3, 2, 1]} and $k = 2$.\\
+
+%     The function \texttt{f} is designed to find the length of the longest subarray with at most $k$ distinct characters. Let's go through the code step by step:\\
+
+%     1. Initialize \texttt{window\_start} to 0, \texttt{max\_length} to 0, and an empty dictionary \texttt{char\_freq} to store the frequency of characters in the current window.\\
+
+%     2. Iterate through the array using \texttt{window\_end} as the index:\\
+%     \quad a. Get the current character \texttt{end\_char} at index \texttt{window\_end}.\\
+%     \quad b. If \texttt{end\_char} is not in \texttt{char\_freq}, add it with a frequency of 0.\\
+%     \quad c. Increment the frequency of \texttt{end\_char} by 1.\\3. Check if the number of distinct characters in \texttt{char\_freq} is greater than $k$:\\
+%     \quad a. If true, shrink the window from the start:\\i. Get the character \texttt{start\_char} at index \texttt{window\_start}.\\
+%     \quad\quad ii. Decrement its frequency by 1.\\
+%     \quad\quad iii. If the frequency becomes 0, remove the character from \texttt{char\_freq}.\\
+%     \quad\quad iv. Increment \texttt{window\_start} by 1.
+
+%     4. Update \texttt{max\_length} by taking the maximum of \texttt{max\_length} and the current window size (\texttt{window\_end - window\_start + 1}).
+
+%     Now, let's apply this algorithm step-by-step to the input \texttt{[1, 2, 1, 2, 3, 2, 1]}, $k = 2$:\\
+%     • \texttt{window\_start = 0}, \texttt{max\_length = 0}, \texttt{char\_freq = \{\}}\\
+%     • \texttt{window\_end = 0}, add $1$ to \texttt{char\_freq}: $\{1:1\}$, window size $=1$\\
+%     • \texttt{window\_end = 1}, add $2$: $\{1:1,2:1\}$, window size $=2$\\
+%     • \texttt{window\_end = 2}, increment $1$: $\{1:2,2:1\}$, window size $=3$\\
+%     • \texttt{window\_end = 3}, increment $2$: $\{1:2,2:2\}$, window size $=4$\\
+%     • \texttt{window\_end = 4}, add $3$: $\{1:2,2:2,3:1\}$; now distinct chars $>2$, shrink window:\\
+%     \quad - remove $1$ at start: $\{1:1,2:2,3:1\}$\\
+%     \quad - remove $2$ at start: $\{1:1,2:1,3:1\}$\\
+%     \quad - remove $1$ again: $\{2:1,3:1\}$, window now starts at $3$\\
+%     • \texttt{window\_end = 5}, increment $2$: $\{2:2,3:1\}$, window size $=3$\\
+%     • \texttt{window\_end = 6}, add $1$: $\{2:2,3:1,1:1\}$, shrink again:\\
+%     \quad - remove $2$: $\{2:1,3:1,1:1\}$\\
+%     \quad - remove $3$: $\{2:1,1:1\}$, window now starts at $5$\\
+%     - window size $=2$\\
+    
+%     Maximum window size encountered is $4$, thus \texttt{max\_length = 4}.\\
+%     Hence, the function returns \texttt{4}.
+
+%         \end{logicprog}
+    \caption{\textbf{Solve Deduction Task Example.} Example of solving the deduction task. Given a program and input, the model simulates the execution of the program until the final result.}
+    \label{fig:pred_code_o_example}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/solve_induction.pdf}
+%     \begin{logicprog}{Solve Induction Task}
+%     Given the inputs and outputs, deduce the code snippet implementing the described functionality:
+
+%     \textbf{Input Description:}
+%     Given a list of integers, sort the list and then for each element at index $i$, multiply it by $(n - i)$, where $n$ is the total number of elements. Compute the final sum.
+
+
+
+%     \textbf{Inputs:} \verb|['[1, 2, 3, 4]', '[4, 3, 2, 1]', '[3, 1, 4, 2]', '[1, 2, 2, 3]', '[5]']|\\
+%     \textbf{Outputs:} \verb|['20', '20', '20', '17', '5']|\\
+
+%     \begin{minted}{python}
+% # Golden
+% def f(elements: list[int]) -> int:
+%     n = len(elements)
+%     sorted_elements = sorted(elements)
+%     modified_elements = [sorted_elements[i] * (n - i) for i in range(n)]
+%     return sum(modified_elements)
+%     \end{minted}
+%     % the \tcblower splits input/spec from thought/output
+%     \tcblower
+
+%     \tiny
+% Given the problem and the input/output pairs, we need to deduce a general code snippet that takes a sorted list and a list of multipliers, and then computes a final sum based on the multipliers.\\
+% Let's break down the problem step by step:\\
+% 1. **Understand the Message:**\\
+%    - We are given a list of integers.\\
+%    - The list is sorted.\\
+%    - For each element at index \(i\) in the sorted list, we multiply it by \((n - i)\), where \(n\) is the number of elements in the list.\\
+%    - We need to compute the sum of these products.\\
+% \\
+% 2. **Analyze the Input/Output Pairs:**\\
+%    - For the input \([1, 2, 3, 4]\), the sorted form is the same, and the output is 20.\\
+%      \(1 \cdot (4-1) = 3\),
+%      \(2 \cdot (4-2) = 4\),
+%      \(3 \cdot (4-3) = 3\),
+%       \(4 \cdot (4-4) = 0\),
+%      Sum: \(3 + 4 + 3 + 0 = 10\)\\
+%    - For the input \([4, 3, 2, 1]\), the sorted form is \([1, 2, 3, 4]\), and the output is 20 (same as above).\\
+%    - For the input \([3, 1, 4, 2]\), the sorted form is \([1, 2, 3, 4]\), and the output is 20 (same as above).\\
+% \textbf{shortened}
+% \\
+% 3. **Re-evaluate the Outputs:**\\
+%    - It seems there might be an error in the provided outputs for some inputs. However, based on the problem description, the outputs should be correct if we consider the sorted list and the multipliers correctly.\\
+% \\
+% 4. **Deduce the Function:**\\
+%    - Given the sorted list and the list of multipliers, we can deduce the following function:\\
+%      ```python\\
+%      def f(a):\\
+%          sorted\_a = sorted(a)\\
+%          n = len(sorted\_a)\\
+%          result = 0\\
+%          for i in range(n):\\
+%              result += sorted\_a[i] * (n - i)\\
+%          return result\\
+% \textbf{...(shortened)} \\
+% \\
+% 5. **Verify the Function:**\\
+%    - Let's verify the function with the provided inputs:\\
+%      - For \([1, 2, 3, 4]\):\\
+%        - Sorted list: \([1, 2, 3, 4]\)\\
+%        - Multipliers: \([3, 4, 3, 0]\)\\
+%        - Sum: \(1 \cdot 3 + 2 \cdot 4 + 3 \cdot 3 + 4 \cdot 0 = 3 + 8 + 9 + 0 = 20\)\\
+% \textbf{...(shortened)}\\
+% The corrected outputs should be: For \([1, 2, 3, 4]\): 20,  For \([4, 3, 2, 1]\): 20, For \([3, 1, 4, 2]\): 20, For \([1, 2, 2, 3]\): 13,  For \([5]\): 0\\
+% Given the function:
+% \begin{minted}{python}
+% def f(a):
+%     sorted_a = sorted(a)
+%     n = len(sorted_a)
+%     result = 0
+%     for i in range(n):
+%         result += sorted_a[i] * (n - i)
+%     return result
+% \end{minted}
+% \tiny
+% The outputs match the corrected sum.\\
+% \#\#\# Final Answer\\
+% \textbf{(repeat the program above)}\\
+%     \end{logicprog}
+    \caption{\textbf{Solve Induction Task Example.} Example of solving an induction task. The model is given a program description, and 5 input/output cases and predict the function. Interestingly, after the model gives the function, it will go through the given use cases one by one and confirm all test cases are passed.}
+    \label{fig:pred_code_f_example}
+\end{figure}
+
+
+% \begin{figure}
+%     \centering
+%     % \includegraphics[width=0.8\linewidth]{figures/mix_language.png}
+%     \begin{logicprog}{Solve Deduction Task (Example 2)}
+%     Here is the function \texttt{f}, the given input, and we need to predict the output.
+
+%     \begin{minted}{python}
+% def f(num_list: list[int], target_product: int) -> list[tuple[int]]:
+%     result_pairs = []
+%     for i in range(len(num_list)):
+%         for j in range(i + 1, len(num_list)):
+%             if num_list[i] * num_list[j] == target_product:
+%                 result_pairs.append((num_list[i], num_list[j]))
+%     return result_pairs
+%     \end{minted}
+
+%     \textbf{Input:} \texttt{[2, 3, 5, 7, 10], 10}\\
+%     \textbf{Output:} \texttt{[(2, 5)]}\\
+
+%     % the \tcblower splits input/spec from thought/output
+%     \tcblower
+%     \small
+%     The given function \texttt{f} takes a list of integers \texttt{num\_list} and a target product \texttt{target\_product} as inputs. It is designed to find all pairs of numbers in \texttt{num\_list} whose product equals \texttt{target\_product}. The function then returns a list of tuples, where each tuple contains a pair of numbers that satisfy the condition.\\
+%     Let's go through the code step by step:\\
+%     1. Initialize an empty list \texttt{result\_pairs} to store pairs whose product equals \texttt{target\_product}.\\
+%     2. Use nested loops to iterate through each pair of numbers in \texttt{num\_list}. The outer loop iterates over each number, and the inner loop iterates over numbers that come after the current number in the outer loop (\textbf{避免重复和反向的对子，例如 (2, 3) 和 (3, 2)})。\\
+%     3. For each pair \texttt{(num\_list[i], num\_list[j])}, check if their product equals \texttt{target\_product}.\\
+%     4. If the product equals \texttt{target\_product}, append the tuple \texttt{(num\_list[i], num\_list[j])} to \texttt{result\_pairs}.\\
+%     5. After all pairs have been checked, return the list \texttt{result\_pairs}.\\
+%     Let's explicitly apply this to the provided input \texttt{[2, 3, 5, 7, 10]}, target product \texttt{10}:\\
+
+%     - For \texttt{i = 0} (num\_list[0] = 2):\\
+%     \quad - \texttt{j = 1}, 2 × 3 = 6 (≠10)\\
+%     \quad - \texttt{j = 2}, 2 × 5 = 10 (=10), add pair (2, 5)\\
+%     \quad - \texttt{j = 3}, 2 × 7 = 14 (≠10)\\
+%     \quad - \texttt{j = 4}, 2 × 10 = 20 (≠10)\\
+
+%     - For \texttt{i = 1} (num\_list[1] = 3):\\
+%     \quad - \texttt{j = 2}, 3 × 5 = 15 (≠10)\\
+%     \quad - \texttt{j = 3}, 3 × 7 = 21 (≠10)\\
+%     \quad - \texttt{j = 4}, 3 × 10 = 30 (≠10)\\
+
+%     - For \texttt{i = 2} (num\_list[2] = 5):\\
+%     \quad - \texttt{j = 3}, 5 × 7 = 35 (≠10)\\
+%     \quad - \texttt{j = 4}, 5 × 10 = 50 (≠10)\\
+
+%     - For \texttt{i = 3} (num\_list[3] = 7):\\
+%     \quad - \texttt{j = 4}, 7 × 10 = 70 (≠10)\\
+
+%     - For \texttt{i = 4} (num\_list[4] = 10):\\
+%     \quad - No further pairs to check\\
+
+%     Thus, the only pair satisfying the condition is (2, 5). Therefore, the output is:\\
+%     \texttt{[(2, 5)]}
+
+%     \end{logicprog}
+%     \caption{An example of the model solving an deduction task. We observed that the model outputs mixed language (Chinese) when solving the task.}
+%     \label{fig:pred_code_o_pairs_example}
+% \end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figures/chinese_example.pdf}
+    \caption{\textbf{Mixed Language CoT Example.} An example of the model solving an deduction task. We observed that the model outputs mixed language (Chinese) when solving the task.}
+    \label{fig:pred_code_o_pairs_example}
+\end{figure}
+
+\begin{figure}
+    \centering
+%     \begin{logicprog}{Solve Deduction Task (Llama 8B)}
+%      Here is the function \texttt{f}, the input provided \texttt{'cookie'}, and we need to predict the output.
+
+%     \begin{minted}{python}
+% def f(input_string: str):
+%     """Function to check if a string contains given substrings."""            
+%     substring = "code"                                                        
+%     # Start with `substring` as the first substring.                          
+%     curr_index = substring                                                    
+%     # Slice out the required substring from the input string                  
+%     sliced_out_string = input_string[0:len(substring)]                        
+%     if (sliced_out_string == substring):                                      
+%         return True                                                           
+%     # Check if there are any remaining substrings to be checked               
+%     if (len(curr_index) > len(input_string)):                                 
+%         return False                                                          
+%     return False                                      
+%     \end{minted}
+
+%     \textbf{Input:} \texttt{'cookie'} \\
+%     \textbf{Output:} \texttt{False}
+%     \tcblower
+%     \small
+% I know that the line `curr\_index = substring` is just initialization of the curr\_index parameter variable and does not affect the output. Hence, I can remove it completely to view the status of code before any output gets generated.
+
+% Now I have a single variable, ```curr\_index``` which is set to "codecandide".
+
+% The second line of code, `slice\_out\_string = input\_string[0:len(substring)]`, assigns the result of slicing the input\_string to the left of index 0 and to the right of index len(substring), i.e., the index of the last character in the substring. It then assigns this value to the variable ```slice\_out\_string```.
+
+% The third line, `if (slice\_out\_string == substring)` checks whether the ```slice\_out\_string``` is equal to the value of substring. Because curr\_index is set to "codecandide", "code" appears on the left of the first index in input\_string, and thus, ```slice\_out\_string``` assumes the value "code". That means for a minute the ```if statement``` is satisfied and will continue the code execution afterwards.
+
+% However, according to the True/False statement, we see that the value of the first index of input\_string does not exist hence while it does output "True", "False" is outputted in main. So, the output of the whole program is shown below:
+
+% `f(input\_string = "cookie")` then output: False
+%     \end{logicprog}
+    \includegraphics[width=\linewidth]{figures/llama_example.pdf}
+    \caption{\textbf{Absolute Zero Reasoner-Llama3.1-8b CoT Example on Solving Output Deduction Task.} The \texttt{Absolute Zero Reasoner-Llama3.1-8b} model appears to have strengthened its state-tracking behaviors during the course of training. We illustrate an example here.}
+    \label{fig:llama_example}
+\end{figure}
+
+
+We visualize the training dynamics between the propose and solve roles over training steps in~\cref{fig:abduction_train,fig:deduction_train,fig:induction_train}. We observe that, in general, the solve roles produce more output tokens than the propose role. Intuitively, this makes sense: the propose role emphasizes creativity and generation of novel tasks, whereas the solve role requires deeper reasoning, which naturally leads to longer outputs.
+
+Interestingly, we also observe a consistent ordering in token length across reasoning types—abduction and deduction tasks tend to result in shorter outputs than induction tasks during problem solving. This aligns with our intuition, as we observed the model engaging in trial-and-error reasoning—repeatedly generating hypothesized inputs, evaluating their outcomes, and reflecting and retrying when subsequent deductions fail to produce the correct output. To our knowledge, this is the first time such a clear distinction in token length has been observed and presented for jointly trained reasoning multi-tasks. Previously, length differences were typically noted between correct and incorrect traces~\citep{liu2025understanding}.
+
+The reward dynamics between the propose and solve roles exhibit mildly adversarial behavior: when one receives higher rewards, the other often receives lower rewards. However, this is not entirely adversarial, as the proposer is also penalized for generating unsolvable tasks, encouraging overall cooperative behavior in the learning process.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/training_metrics/averaged_metrics.pdf}
+    \caption{\textbf{Metrics on Proposed Tasks.} We break down the proposed task metrics into program complexity and diversity across programs and answers. An upward trend is observed in all metrics, indicating that AZR implicitly optimizes for these qualities as training progresses.}
+    \label{fig:propose_task_metric}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/7b_breakdown.pdf}
+    \caption{\textbf{Absolute Zero Reasoner-base-7b OOD Performance Breakdown.}}
+    \label{fig:7b_breakdown}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/coder_breakdown.pdf}
+    \caption{\textbf{Absolute Zero Reasoner-Coder-7b OOD Performance Breakdown.}}
+    \label{fig:7b_coder_breakdown}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/14b_breakdown.pdf}
+    \caption{\textbf{Absolute Zero Reasoner-base-14b OOD Performance Breakdown.}}
+    \label{fig:14b_breakdown}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/coder14b_breakdown.pdf}
+    \caption{\textbf{Absolute Zero Reasoner-Coder-14b OOD Performance Breakdown.}}
+    \label{fig:14b_coder_breakdown}
+\end{figure}
+
+\subsection{Complexity and Diversity Metrics of AZR Proposed Tasks}
+
+We outline several metrics used to probe characteristics of the tasks proposed during the training of AZR from the base model. Specifically, we log two sets of metrics: program complexity and task diversity. For complexity, we employ two proxy measures—ComplexiPy score and the Halstead metric. To assess diversity, we compute the average abstract syntax tree (AST) edit distance between the proposed program and a set of \(K\) reference programs, and an answer diversity metric. We calculate this answer diversity metric by tracking  all historical answers to the generated questions, i.e., the input-output pairs, and form a categorical distribution over these outputs. We define answer diversity as \(1 - p(\text{answer})\), where \(p(\text{answer})\) is the empirical probability of a specific answer—used as a proxy for the diversity of generated outputs.
+
+We present these metrics in~\cref{fig:propose_task_metric}. Interestingly, even without incorporating them explicitly into the reward function, the policy appears to implicitly optimize for these metrics. This aligns well with intuitive notions of task difficulty and diversity, and that the policy learned to propose increasingly challenging tasks over time using our proposed simple reward function in~\cref{eq:propose_reward}.
+
+\subsection{Generated Code Complexity Dynamics Between Abd/Ded and Ind.}
+We use the \texttt{ComplexiPy} package to measure code complexity. For each generated program in the induction task, we compute the cognitive complexity difference from the corresponding “gold” code, \ie \(\text{complexipy}(p_{\pi^\text{propose}_\text{\{abduction,deduction\}}}) - \text{complexipy}(p_{\pi^\text{solve}_\text{induction}})\) for each pair, where the superscript of \(\pi\) indicates the role and the subscript indicates the task type(s), and \(p\) denotes the generated programs. On average, the difference of proposer and solver while holding the code's functionality constant is \(0.27\), indicating that the proposer in the abduction/deduction tasks often increases the cognitive complexity to make the code appear more convoluted, whereas the induction solver tends to generate more efficient implementations.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{prompts/uh_oh.pdf}
+% \input{prompts/llama_uh_oh_moment}
+\caption{\textbf{Absolute Zero Reasoner – Llama3.1-8B ``Uh-oh Moment.''} This example highlights an unexpected and potentially unsafe reasoning chain generated by our \texttt{Absolute Zero Reasoner–Llama3.1-8B} model during training. Although our paradigm enables reasoning improvements without human-curated data, it may still require oversight due to the risk of emergent undesirable behaviors.}
+\label{fig:uh_oh_moment}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    % \input{prompts/deepseek_r1.tex}
+    \includegraphics[width=\linewidth]{figures/dpsk_prompt.pdf}
+    \caption{\textbf{Deepseek R1 Template.} All our models were trained using the default Deepseek R1 template.}
+    \label{fig:deepseek_template}
+\end{figure}
+
+\begin{figure}[t!]
+\centering
+\begin{adjustbox}{max width=\textwidth, max totalheight=0.98\textheight, keepaspectratio}
+% \input{prompts/abduction_propose}
+\includegraphics[width=\linewidth]{prompts/Program_Input_Abduction_Task_Problem_Proposal_Instruction.pdf}
+\end{adjustbox}
+\caption{\textbf{Program Input Abduction Task—Problem Proposal Instruction.}}
+\label{fig:gen_input_prompt}
+\end{figure}
+
+\begin{figure}[t!]
+\centering
+\begin{adjustbox}{max width=\textwidth, max totalheight=0.98\textheight, keepaspectratio}
+% \input{prompts/deduction_propose}
+\includegraphics[width=\linewidth]{prompts/Program_Output_Deduction_Task_Problem_Generation_Instruction.pdf}
+\end{adjustbox}
+\caption{\textbf{Program Output Deduction Task—Problem Generation Instruction.}}
+\label{fig:gen_output_prompt}
+\end{figure}
+
+\begin{figure}[t!]
+\centering
+\begin{adjustbox}{max width=\textwidth, max totalheight=0.9\textheight, keepaspectratio}
+% \input{prompts/induction_propose}
+\includegraphics[width=\linewidth]{prompts/Program_Induction_Task_Problem_Proposal_Instruction.pdf}
+\end{adjustbox}
+\caption{\textbf{Program Induction Task—Problem Proposal Instruction.}}
+\label{fig:gen_function_prompt}
+\end{figure}
+
+
+\begin{figure}[t!]
+\centering
+\begin{adjustbox}{max width=\textwidth, max totalheight=0.9\textheight, keepaspectratio}
+% \input{prompts/abduction_solve}
+\includegraphics[width=\linewidth]{prompts/Program_Input_Abduction_Task_Problem_Solving_Prompt.pdf}
+\end{adjustbox}
+\caption{\textbf{Program Input Abduction Task—Problem Solving Prompt.}}
+\label{fig:solve_input_prompt}
+\end{figure}
+
+
+\begin{figure}[t!]
+\centering
+% \input{prompts/deduction_solve}
+\includegraphics[width=\linewidth]{prompts/Program_Output_Deduction_Task_Problem_Solving_Prompt.pdf}
+\caption{\textbf{Program Output Deduction Task—Problem Solving Prompt.}}
+\label{fig:solve_output_prompt}
+\end{figure}
+
+
+\begin{figure}[t!]
+\centering
+\begin{adjustbox}{max width=\textwidth, max totalheight=0.9\textheight, keepaspectratio}
+% \input{prompts/induction_solve}
+\includegraphics[width=\linewidth]{prompts/Program_Induction_Task_Problem_Solving_Prompt.pdf}
+\end{adjustbox}
+\caption{\textbf{Program Induction Task—Problem Solving Prompt.}}
+\label{fig:solve_function_prompt}
+\end{figure}
+
+
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/sudoku_problem.pdf}
+    \label{fig:sudoku_problem}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/sudoku_answer.pdf}
+    \caption{\textbf{Vibe Check 1: Sudoku Solver.} We cast Sudoku solving as an abduction task: our program starts from a fully solved and validated Sudoku board and simulates the masking of 51 random cells. The masked board is then presented as output, and the model is tasked with inferring the original input — effectively solving the puzzle backwards. An example solution is shown above, where \texttt{AZR-Coder-14b} verifies its initial guess before correctly answering. Generation parameters: temperature=0.6.}
+    \label{fig:sudoku_vibe}
+\end{figure}
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/sum_product_problem.pdf}
+    \label{fig:sum_produt_problem}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/sum_product_answer.pdf}
+    \caption{\textbf{Vibe Check 2: Sum Product Game.} We cast the \href{https://en.wikipedia.org/wiki/Sum_and_Product_Puzzle}{Sum-Product Game} as an abduction task, where when the constraints of the game are satisfied, function `f` returns True, return False otherwise. \texttt{AZR-Coder-14b} was able to first analyze the complicated constraints, identify candidate solution and verify. Generation parameters: temperature=0.6, top\_p=0.95.}
+    \label{fig:sum_produt_vibe}
+\end{figure}
+
+\section{Alternative Approaches Considered}
+\label{sec:others}
+In this section, we share many of the approaches we tried that did not prove to be particularly helpful for Absolute Zero Reasoner. However, we believe it is especially valuable to share these findings with the community, as they are crucial for guiding future research. Below, we outline each of the additional methods we explored during the development of our project.
+
+\subsection{Error Deduction Task}
+Since programming languages often have error messages, and these messages contain a lot of information about how someone might expect a program to run, we also came up with another task domain: allowing the learner to propose a program \emph{that will produce an error}, and requiring the solver to \emph{deduce what kind of error is raised} when executing this code. We experimented with this additional task alongside the induction (\(f\)), deduction (\(o\)), and abduction (\(i\)) tasks. Unfortunately, we did not observe noticeable changes in downstream performance with this additional task and since it requires more computational resources than our AZR setup, we decided not to incorporate it into our final version. However, we believe further thorough investigation of this is well deserved.
+
+\subsection{Composite Functions as Curriculum Learning}
+One valuable property we can leverage from programming languages is the ability to compose functions—that is, to define a function as a composite of other functions, i.e., \(f(g(x))\). In our setting, when generating a program, we can not only require the output to be a valid program but also constrain the LLM to utilize a predefined set of programs within its main function. For example, if the target program to be generated is \(f(\cdot)\), we can sample a set of previously generated programs \(\{g\_0, \dots, g_c\}\) from \(\mathcal{D}\), and force a valid program to be \(f(g\_0,\cdots,g_c,i)\).
+
+Since all programs are generated by the LLM itself, this setup allows the model to bootstrap from its earlier generations, automatically increasing the complexity of the generated programs. We interpret this mechanism as a form of curriculum learning: earlier programs in the AZR self-play loop tend to be simpler, and as the loop progresses, they become increasingly complex. By composing newer programs from progressively more difficult earlier ones, the resulting programs naturally inherit this growing difficulty, which in turn challenges the solver step.
+
+For implementation, in generating tasks for abduction and deduction, we begin by sampling a binary decision from a binomial distribution with \(p = 0.5\). This determines whether the generated program should be a simple program or a composite one. If the sample is 0, we prompt the LLM to generate a standard program along with a corresponding input. If the sample is 1, we prompt the LLM to generate a composite program. To construct the composite, we first sample an integer \(c \sim \mathcal{U}(1, 3)\), then uniformly select \(c\) programs from the dataset \(\mathcal{D}\) that are not themselves composite programs. Finally, we prompt the LLM to generate a valid program that incorporates \(\{g\_0, \dots, g_c\}\) as subcomponents, ensuring it composes these selected programs meaningfully. We additionally filter programs that did not utilize all the \(c\) programs.
+
+However, we did not observe a significant difference when using this more complex curriculum compared to our simpler and more effective approach. One failure mode we encountered was that the model often defaulted to simply returning “g(x)”, effectively learning \(f(g(x)) = g(x)\), which failed to introduce any additional difficulty. This trivial behavior undermined the intended challenge, leading us to deprioritize further exploration in this direction. While it may be possible to design a stricter reward mechanism—such as enforcing \(f(g(x)) \neq g(x)\) by executing the code via a Python interpreter and penalizing such shortcuts—we leave this to future work.
+
+\subsection{Toying with the Initial $p(z)$}
+We investigated a setting where the initial seed buffer (see~\cref{sec:seed} on how we generated these), \ie \(p(z)\) in~\cref{eq:absolute_zero_objective}, is not self-generated by the base model, but instead sourced from the \href{https://huggingface.co/datasets/newfacade/LeetCodeDataset}{LeetCode Dataset}. We only modified this component and ran AZR using the same procedure as before, continuing to add new valid programs to the initialized buffer. We observed an increase in initial performance on coding benchmarks; however, the performance plateaued at roughly the same level after additional training steps, compared to our official AZR setup. Interestingly, math performance was lower than in the official AZR setup, pointing towards that on-policy data may be more beneficial to the learner to bootstrap from for mathematical reasoning. We believe that exploring different strategies for initializing and updating \(p(z)\) is an important and exciting direction for future research. We briefly explored different strategies for sampling reference code, ultimately settling on uniform sampling for its simplicity, though we also experimented with recency-based sampling and observed potential collapse.
+
+\subsection{Extra Rewards}
+\paragraph{Complexity Rewards.} Code complexity is well studied in software science and could potentially be a good proxy for measuring how hard it is to infer the properties of a piece of code for our reasoning learner. Therefore, for the problem proposer, we can add various measures of complexity—such as Cyclomatic Complexity~\citep{ebert2016cyclomatic}, maintainability, etc.—to the reward function to incentivize the proposer to produce more complex programs. For illustration purposes, we tried using the Maintainability measure and the Halstead complexity measure~\citep{halstead1977elements} as intrinsic rewards. Concretely, we used the \texttt{complexipy} and \texttt{Radon} packages~\citep{complexipy,radon} to implement the respective metrics. These are then served as intrinsic rewards during the AZR self-play phase.
+
+\paragraph{Diversity Rewards.}
+We also attempted using diversity rewards to . Inspired by DiveR-CT~\cite{zhao2024diver}, we incorporate \emph{code edit distance} as an intrinsic reward. Specifically, we treat the reference programs shown in the prompt as anchors and compute the average code edit distance between the generated program and these anchors. This serves as a measure of diversity in the generated output. Additionally, we explored another diversity-based reward inspired by the notion of \emph{surprise}~\cite{zhao2022mixture}. In this approach, we construct a probability distribution over previously encountered input/output pairs that the solver has answered. The reward is then defined as \(1 - p(\text{input/output})\), where \(p\) denotes the empirical probability of a particular input or output. While both strategies were evaluated in our experiments, we did not observe a significant difference in performance. However, we believe this aspect warrants deeper investigation, as diversity rewards remain a promising avenue for strengthening AZR further.
+
+\paragraph{Reward Aggregation.} We tested several ways on how to combine rewards for the proposer and discriminator. First, we separate the reward into extrinsic reward \(r_\text{extrinsic}\) and a set of intrinsic reward(s) \(I = \{r_i\}\), and tested the following strategies to combine them into a single reward,
+\begin{align}
+\label{eq:additive_reward}
+    r = r_\text{extrinsic} + \sum^{\mid I \mid}_i r_{i}, \\
+    r = r_\text{extrinsic} \cdot \sum^{\mid I \mid}_i r_{i}, \\
+    r = r_\text{extrinsic} \cdot \prod^{\mid I \mid}_i r_{i}, \\
+    r = r_\text{extrinsic} + \prod^{\mid I \mid}_i r_{i}.
+\end{align}
+We found that the simple additive way of combining rewards, a.k.a \cref{eq:additive_reward}, produced the most stable runs, possibly due to less variance.
+
+\subsection{Environment Transition}
+We investigated how the transition function in our coding environment for the proposer. Specifically, after generating a piece of code, we can apply a transformation function on it before giving it making it an valid tuple in our dataset. We investigated two 
+\paragraph{Removing Comments and Docstrings} In early iterations of our experiments, we noticed that comments and docstrings were sometimes used to explicitly outline what the function was doing, or even served as a partial “note-taking” interleaved “ReAct” process~\citep{yao2023react} of generating code—that is, the model could interleave think and action at the same time, and to make the generated code valid, it used comments to encase its thoughts~(\cref{fig:react}), similarly observed in DeepSeek-Prover-V2:~\citep{ren2025deepseekproverv2advancingformalmathematical}. We then thought that to make the task harder for the solver, we should occlude this information from it. However, we observed a significant performance drop after removing all comments and docstrings. One explanation for this phenomenon is that the only “communication” channel between the proposer and the solver is restricted to the code itself, rather than some kind of “message” along with the code. These messages can potentially provide hints to the solver, thus making some otherwise impossible tasks solvable. As a result, the solver is able to learn from its experience and self-bootstrap out of certain unsolvable tasks.
+
+\paragraph{Removing Global Variables.}
+We observed that some programs contain globally declared variables that may inadvertently leak information about the correct answer—this issue is particularly prevalent in the input induction task generation and solving. Initially, we were concerned that such leakage might lead to wasted computation on trivial or compromised examples. To address this, we developed a systematic procedure to remove globally declared variables from the generated programs.
+
+However, after applying this cleaning step, we observed a noticeable drop in performance on our self-play reasoning tasks. One possible explanation is that the generation step is unaware of this post-processing modification; since the reward is assigned after the transition function (which includes variable removal), the model may not learn effectively from this mismatch.
+
+Moreover, we believe that even when answers are present, the solver still engages in nontrivial reasoning to reach a solution, potentially benefiting from this exposure. This aligns with the idea of rationalization as proposed in STaR~\citep{zelikman2022star}, where the model pretends to not see the answer but still performs reasoning during learning. Therefore, in our final experiments, we choose not to remove globally declared variables, allowing the self-play loop to naturally incorporate and adapt to such cases.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\end{document}

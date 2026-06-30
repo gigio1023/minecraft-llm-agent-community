@@ -1,0 +1,29 @@
+\section{A DSL for Causal Trajectories}
+\label{sec:dsl}
+
+Final-answer accuracy cannot distinguish guessing from transferable mechanism discovery. We therefore introduce a domain-specific language (DSL) that records per-step causal commitments and converts hypotheses into SCM artifacts for trajectory-level scoring.
+
+At each interaction step \(t\), the agent emits a compact DSL record with five
+fields: \emph{Memory} \(M_t\), the persistent episode notes; \emph{Thought}
+\(T_t\), a short interpretation of the current evidence; \emph{Past data}
+\(\mathcal{D}_{\le t}\), the accumulated observations and intervention
+outcomes; \emph{Hypothesis} \(H_t\), the current causal claim; and
+\emph{Experiment} \(E_t\), the next planned intervention and its rationale.
+Only \(H_t\) is used as a scored causal artifact: it states hypothesized edges,
+the structural equation for \texttt{frequency}, and the associated
+coefficients. Appendix Figure~\ref{fig:causal_visualization} shows how parsed
+hypotheses are rendered as candidate graphs and recovery metrics over time.
+Prompting and repair details appear in Appendix~\ref{app:dsl_implementation}.
+
+\paragraph{Making the hypothesis parsable.}
+We make \(H_t\) a scored object by requiring a fixed schema rather than
+free-form prose. The schema contains three typed parts: directed edges as
+\texttt{(parent, child)} pairs over episode variables, a \texttt{frequency}
+structural equation in the declared functional family, and numeric coefficients
+for the equation terms. A deterministic parser converts each valid hypothesis
+into a candidate graph \(G_t\) and target mechanism \(\hat f_t\), producing a
+trajectory \(\{(G_t,\hat f_t)\}_{t=1}^{T}\). This lets the benchmark score the
+mechanism the agent commits to at each step using the same graph, root, and
+coefficient metrics used for final evaluation, rather than relying only on the
+final numeric answer.
+

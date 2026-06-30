@@ -1,0 +1,103 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Task: Navigate a dynamic platform to touch a target
+
+    Description:
+    - The environment consists of a start platform (3 m x 3 m x 0.5 m) and an end platform (3 m x 3 m x 0.5 m) placed 20 meters apart.
+    - The two platforms are connected by a dynamic bridge (2 m wide) divided into 5 segments of equal length (3 m each).
+    - Each segment moves up and down independently with a sinusoidal motion. The amplitude is 1 meter and the period is 2 seconds, with each segment offset in phase by 0.4 seconds from the previous one.
+    - A target object (a cylinder with a radius of 0.2 meters and a height of 0.5 meters) is placed on the end platform.
+    - The robot is initialized on the start platform, facing the dynamic bridge and the target object.
+    - The task of the robot is to navigate the dynamic bridge and touch the target object on the end platform.
+
+    Success:
+    The task is successfully completed when the robot touches the target object on the end platform.
+
+    Rewards:
+    - The robot receives a reward for each time step it remains on the bridge or platforms, encouraging steady progress.
+    - The robot is rewarded based on how much it reduces the distance to the target object, incentivizing swift movement towards the goal.
+    - The robot receives a large reward for touching the target object.
+
+    Termination:
+    The task terminates immediately if the robot falls off the start platform, any segment of the bridge, or the end platform, or if the robot touches the target object.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.platform_size = [3.0, 3.0, 0.5]
+        self.platform_start_position = [0.0, 0.0, 0.0]
+        self.platform_end_position = [self.platform_start_position[0] + 20.0, self.platform_start_position[1], self.platform_start_position[2]]
+        self.platform_start_id = self.create_box(mass=0.0, half_extents=[self.platform_size[0] / 2, self.platform_size[1] / 2, self.platform_size[2] / 2], position=self.platform_start_position, color=[0.8, 0.8, 0.8, 1.0])
+        self.platform_end_id = self.create_box(mass=0.0, half_extents=[self.platform_size[0] / 2, self.platform_size[1] / 2, self.platform_size[2] / 2], position=self.platform_end_position, color=[0.8, 0.8, 0.8, 1.0])
+        self.bridge_length = self.platform_end_position[0] - self.platform_start_position[0] - self.platform_size[0]
+        self.bridge_width = 2.0
+        self.num_segments = 5
+        self.segment_length = self.bridge_length / self.num_segments
+        self.segment_amplitude = 1.0
+        self.segment_period = 2.0
+        self.segment_phase_offset = 0.4
+        segment_colors = [[1.0, 0.0, 0.0, 1.0], [1.0, 0.5, 0.0, 1.0], [1.0, 1.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0]]
+        self.segment_ids = []
+        for i in range(self.num_segments):
+            segment_id = self.create_box(mass=0.0, half_extents=[self.segment_length / 2, self.bridge_width / 2, self.platform_size[2] / 2], position=[self.platform_start_position[0] + self.platform_size[0] / 2 + self.segment_length / 2 + i * self.segment_length, self.platform_start_position[1], self.platform_start_position[2]], color=segment_colors[i])
+            self._p.changeDynamics(bodyUniqueId=segment_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+            self.segment_ids.append(segment_id)
+        self.target_radius = 0.2
+        self.target_height = 0.5
+        self.target_position = [self.platform_end_position[0], self.platform_end_position[1], self.platform_end_position[2] + self.platform_size[2] / 2 + self.target_height / 2]
+        self.target_id = self.create_cylinder(mass=0.0, radius=self.target_radius, height=self.target_height, position=self.target_position, color=[0.0, 1.0, 0.0, 1.0])
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_cylinder(self, mass, radius, height, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, height=height)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self.time = 0.0
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, [self.platform_start_position[0], self.platform_start_position[1], self.platform_start_position[2] + self.platform_size[2] / 2 + self.robot.links['base'].position_init[2]], self.robot.links['base'].orientation_init)
+        return observation
+
+    def step(self, action):
+        self.distance_to_target = self.get_distance_to_object(self.target_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.time += self.dt
+        for i, segment_id in enumerate(self.segment_ids):
+            segment_position = self.get_object_position(segment_id)
+            new_segment_position = [segment_position[0], segment_position[1], self.platform_start_position[2] + self.segment_amplitude * np.sin(2 * np.pi * (self.time + i * self.segment_phase_offset) / self.segment_period)]
+            self._p.resetBasePositionAndOrientation(segment_id, new_segment_position, [0.0, 0.0, 0.0, 1.0])
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_target = self.get_distance_to_object(self.target_id)
+        on_bridge_or_platforms = 1.0 if self.robot.links['base'].position[2] > self.platform_start_position[2] + self.platform_size[2] / 2 else -1.0
+        reach_target = (self.distance_to_target - new_distance_to_target) / self.dt
+        touch_target = 10.0 if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.target_id)) > 0 else 0.0
+        return {'on_bridge_or_platforms': on_bridge_or_platforms, 'reach_target': reach_target, 'touch_target': touch_target}
+
+    def get_terminated(self, action):
+        is_off_bridge_or_platforms = self.robot.links['base'].position[2] < self.platform_start_position[2]
+        is_touching_target = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.target_id)) > 0
+        return is_off_bridge_or_platforms or is_touching_target
+
+    def get_success(self):
+        is_touching_target = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.target_id)) > 0
+        return is_touching_target
+\end{lstlisting}

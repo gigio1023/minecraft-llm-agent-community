@@ -1,0 +1,49 @@
+
+\begin{figure}
+    \centering
+    \includegraphics[scale=0.4]{./Figures/FuN_architecture.pdf}
+    \caption{The schematic illustration of FuN (section~\ref{sec:model}) \figskiny }
+    \label{fig:architecture}
+\end{figure}
+
+\section{The model}
+\label{sec:model}
+
+\paragraph{What is FuN?} 
+FuN is a modular neural-network consisting of two modules -- the Worker and the Manager. The Manager internally computes a latent state representation $s_t$ and outputs a goal vector $g_t$. The Worker produces actions conditioned on external observation, it’s own state, and the Manager’s goal. The Manager and the Worker share a perceptual module which takes an observation from the environment $x_t$ and computes a shared intermediate representation $z_t$. 
+The Manager's goals $g_t$ are trained using an approximate \textit{transition policy gradient}. This is a particularly efficient form of policy gradient training that exploits the knowledge that the Worker's behaviour will ultimately align with the goal directions it has been set. The Worker is then trained via intrinsic reward to produce actions that cause these goal directions to be achieved. Figure~\ref{fig:architecture}a illustrates the overall design and the following equations describe the forward dynamics of our network:
+
+\begin{equation}
+z_t = f^\textnormal{percept}(x_t)
+\end{equation}
+\begin{equation}
+s_t = f^\textit{Mspace}(z_t)
+\end{equation}
+\begin{equation}
+h^M_t, \hat{g}_t = f^\textit{Mrnn}(s_t, h^M_{t-1}); g_t=\hat{g}_t/||\hat{g}_t||; 
+\end{equation}
+\begin{equation}
+w_t = \phi(\sum_{i=t-c}^t {g_i}) 
+\label{eqn:FuN:pool_embed}
+\end{equation}
+\begin{equation}
+h^W, U_t = f^\textit{Wrnn}(z_t, h^W_{t-1}) 
+\label{eqn:FuN:psi}
+\end{equation}
+\begin{equation}
+\pi_t = \textit{SoftMax}(U_t w_t)
+\label{eqn:FuN:pi}
+\end{equation}
+
+
+where both the Manager and the Worker are recurrent. Here $h^M$ and $h^W$ correspond to the internal states of the Manager and the Worker respectively. A linear transform $\phi$ maps a goal $g_t$ into an embedding vector $w_t \in R^k$, which is then combined via product with matrix $U_t$ (Workers output) to produce policy $\pi$ -- vector of probabilities over primitive actions. 
+The next section provides the details on goal embedding and the following sections~\ref{sec:Learning},\ref{subsec:tpg} describes how FuN is trained. 
+
+ 
+\subseckiny
+\subsection{Goal embedding}
+\subseckiny
+\label{subsec:goal_embedding}
+The goal $g$ modulates the policy via a multiplicative interaction in a low dimensional goal-embedding space $R^k, k<<d$. The Worker first produces an embedding vector for every action, represented by rows of matrix $U \in R^{|a| \times k}$ (eq.~\ref{eqn:FuN:psi}). 
+To incorporate goals from the Manager, the last $c$ goals are first pooled by summation and then embedded into a vector $w \in R^k$ using a linear projection $\phi$ (eq.~\ref{eqn:FuN:pool_embed}). The projection $\phi$ is linear, with no biases, and is learnt with gradients coming from the Worker's actions. The embedding matrix $U$ is then combined with the goal embedding $w$ via a matrix-vector product (eq.~\ref{eqn:FuN:pi}).
+Since $\phi$ has no biases it can never produce a constant non-zero vector  -- which is the only way the setup could ignore the Manager's input. This makes sure that the goal output by the Manager always influences the final policy. Notice how, due to pooling of goals over several time-steps, the conditioning from the Manager varies smoothly. 

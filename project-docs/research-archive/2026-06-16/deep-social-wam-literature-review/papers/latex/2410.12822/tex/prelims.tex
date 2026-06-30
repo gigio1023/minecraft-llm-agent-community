@@ -1,0 +1,57 @@
+\section{Preliminaries}
+
+\paragraph{Denoising Diffusion Probabilistic Models (DDPM)} 
+Diffusion models~\citep{ho2020denoising, sohl2015deep} are a class of generative models.
+%
+Consider a sequence of positive noise scales, $0 < \beta_1, \beta_2, \ldots, \beta_N < 1$.
+%
+In the forward process, for each training data point $\mathbf{x}_0 \sim p_{\mathrm{data}}(\mathbf{x})$, a Markov chain $\mathbf{x}_0, \mathbf{x}_1,\ldots,\mathbf{x}_N$ is constructed such that $p(\mathbf{x}_i \ |\ \mathbf{x}_{i-1}) = \mathcal{N}(\mathbf{x}_i; \sqrt{1 - \beta_i}\mathbf{x}_{i-1}, \beta_i\mathbf{I})$.
+%
+Therefore, $p_{\alpha_i}(\mathbf{x}_i\ |\ \mathbf{x}_0) = {\mathcal{N}(\mathbf{x}_i; \sqrt{\alpha_i}\mathbf{x}_0, (1-\alpha_i)\mathbf{I})}$, where $\alpha_i := \Pi_{j=1}^i (1 - \beta_j)$.
+%
+We denote the perturbed data distribution as $p_{\alpha_i}(\mathbf{x}_i) := \int p_{\mathrm{data}}(\mathbf{x}) p_{\alpha_i}(\mathbf{x}_i \ |\ \mathbf{x}) \mathrm{d}\mathbf{x}$.
+%
+The noise scales are chosen such that $\mathbf{x}_N$ is distributed according to $\mathcal{N}(\mathbf{0}, \mathbf{I})$.
+%
+% A Markov chain in the reverse direction is parameterised with $p_\theta(\mathbf{x}_{i-1}\ |\ \mathbf{x}_{i}) = \mathcal{N}(\mathbf{x}_{i-1}; \frac{1}{\sqrt{1 - \beta_i}}(\mathbf{x}_i + \beta_i \mathbf{s_\theta}(\mathbf{x}_i, i)), \beta_i \mathbf{I})$, and trained to optimize the objective:
+%
+Define $s(\mathbf{x}_i, i)$ to be the score function of the perturbed data distribution: $s(\mathbf{x}_i, i) := \nabla_{\mathbf{x}_i} \log p_{\alpha_i}(\mathbf{x}_i)$, for all $i$.
+%
+% \begin{equation}
+%     \mathbf{\theta}^* = \argmin_{\mathbf{\theta}} \sum_{i=1}^N(1-\alpha_i) \mathbb{E}_{\mathbf{x}_0 \sim p_\mathrm{data}(\mathbf{x})} \mathbb{E}_{p_{{\alpha_i}(\mathbf{x}_i|\mathbf{x}_0)}} \big[ ||\mathbf{s_\theta}(\mathbf{x}_i, i) - \nabla_{\mathbf{x}_i} \log p_{\alpha_i} (\mathbf{x}_i |\mathbf{x}_0) ||_2^2  \big] \label{eq:diffusion_score_obj}
+% \end{equation}
+%
+Samples can be generated from a diffusion model via Langevin dynamics by starting from $\mathbf{x}_N \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and following the recursion:
+\begin{equation}
+    \mathbf{x}_{i-1} = \frac{1}{\sqrt{1 - \beta_i}}(\mathbf{x}_i + \beta_i s_{\mathbf{\theta}}(\mathbf{x}_i, i) ) + \sqrt{\beta}_i \mathbf{z}, \label{eq:diffusion_sample}
+\end{equation}
+where $s_\theta$ is a learned approximation to the true score function $s$, and $\mathbf{z}$ is a sample from the standard normal distribution.
+%
+If we reparameterize the sampling of the noisy data points according to: $\mathbf{x}_i = \sqrt{\alpha_i}\mathbf{x}_0 + \sqrt{1 - \alpha_i}\boldsymbol\epsilon$, where $\boldsymbol\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$, we observe that
+$
+\nabla_{\mathbf{x}_i} \log p_{\alpha_i}(\mathbf{x}_i |\ \mathbf{x}_0) = - \frac{\boldsymbol\epsilon}{\sqrt{1 - \alpha_i}}.$
+% Thus, estimating the score function is equivalent to estimating the noise added. 
+%
+Therefore, we can define the estimated score function 
+in terms of a function $\mathbf{\epsilon_\theta}$ that predicts the noise $\boldsymbol\epsilon$ used to generate each sample
+\begin{equation}
+    s_\theta(\mathbf{x}_i, i) := -\frac{\mathbf{\epsilon}_\theta (\mathbf{x}_i, i)}{\sqrt{1 - \alpha_i}}.
+\end{equation}
+The noise prediction model $\mathbf{\epsilon}_\theta$ is trained to optimize the objective
+\begin{equation}
+    \mathbf{\theta}^* = \argmin_{\mathbf{\theta}} \mathbb{E}_{\mathbf{x}_0 \sim p_\mathrm{data}(\mathbf{x}),{\boldsymbol\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})}, i \sim \mathcal{U}(\{1, 2, \dots, N\})} \big[ ||\boldsymbol\epsilon -  \epsilon_\theta (\sqrt{\alpha_i}\mathbf{x}_0 + \sqrt{1 - \alpha_i}\boldsymbol\epsilon, i)||^2  \big] \label{eq:diffusion_noise_obj}.
+\end{equation}
+To add a conditioning signal to the diffusion model, the denoising can be trained with an additional conditioning signal $\mathbf{\epsilon}_\theta (\mathbf{x}_i, i, c)$, where $c$ is the desired conditioning signal.
+
+
+\paragraph{Probabilistic Adaptation of Diffusion Models} \cite{yang2024probabilistic} proposes to model the problem of diffusion model adaptation via a product of experts. Given a pretrained model $p_{\text{pre}}(\mathbf{x})$ and a small domain specific video model $p_{\text{adapt}}(\mathbf{x})$, the final adapted model is defined as the following product of expert (PoE) distribution:
+$$p_\textnormal{PoE} := \frac{p_{\text{pre}}(\mathbf{x})p_{\text{adapt}}(\mathbf{x})}{Z},$$
+ which generates samples that are likely under both of the original models, with the aim of maintaining strong video quality from $p_{\text{pre}}(\mathbf{x})$ and the desired domain-specific quality from $p_{\text{adapt}}(\mathbf{x})$.
+ %
+In practice, $p_\textnormal{PoE}$ is intractable. To sample from the PoE, the authors propose to compose their scores:
+$$ \mathbf{\epsilon}_{\text{PoE}} (\mathbf{x}_i, i, c) := 
+\mathbf{\epsilon}_{\text{pre}} (\mathbf{x}_i, i, c) + \mathbf{\epsilon}_{\text{adapt}} (\mathbf{x}_i, i, c), $$
+and pass the combined score to a  DDPM sampler.
+
+
+% \textbf{Include an overview of this.}

@@ -4,9 +4,15 @@ sidebar_position: 4
 
 # Evidence And Artifacts
 
-The project treats artifacts as the main proof that a run did what it claimed.
-This matters because LLM text can sound successful even when Minecraft state did
-not change.
+The project treats artifacts as audit hygiene. They are the way to check what a
+run did, not the research contribution by themselves. This matters because LLM
+text can sound successful even when Minecraft state did not change.
+
+For the active WAM direction, artifacts should support transition rows:
+
+```text
+state_before + candidate_action + predicted_delta + observed_delta
+```
 
 ## What Counts As Evidence
 
@@ -20,6 +26,7 @@ Useful evidence includes:
 - actor workspace evidence references;
 - provider input/output snapshots;
 - provider usage records when live models are used.
+- predicted-vs-observed transition rows when a WAM is evaluated.
 
 ## What Does Not Count Alone
 
@@ -37,11 +44,13 @@ These are context, not proof of Minecraft progress:
 Blocked, failed, and environment-blocked runs are useful when they explain the
 reason clearly. A good report should say whether the actor was blocked by
 missing parameters, unavailable world state, repeated target failure, provider
-budget, auth, server lifecycle, or verifier evidence.
+budget, auth, server lifecycle, or runtime checks.
 
 ## Why This Helps Social Simulation
 
-Social behavior needs consequences. If an actor promises help, fails to gather
-resources, places an item in a shared chest, or repeats an impossible action,
-the next cycle should see artifact-backed consequences instead of relying on a
-fresh prompt summary.
+Social-material WAM research needs consequences. If an actor promises help,
+fails to gather resources, lends a tool, refuses a request, places a public
+affordance, or repeats an impossible action, the next cycle should see
+artifact-backed consequences instead of relying on a fresh prompt summary. The
+model's predicted consequences should be compared with what the runtime
+observed.

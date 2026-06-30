@@ -1,0 +1,81 @@
+\section{Problem Formulation} \label{sec:problem_formulation}
+Let $x^*$ denote a physical scene and $h^*_{1:K}$ denote the objects in the scene.
+Let $X$ and $A$ be random variables for the image observation of the scene $x^*$ and the agent's actions respectively.
+In contrast to prior works~\citep{hafner2018learning} that use a single latent variable to represent the state of the scene, we use a set of latent random variables $H_{1:K}$ to represent the state of the objects $h^*_{1:K}$.
+We use the term \textit{object} to refer to $h^*_k$, which is part of the physical world, and the term \textit{entity} to refer to $H_k$, which is part of our model of the physical world.
+The generative distribution of observations $X^{(0:T)}$ and latent entities $H^{(0:T)}_{1:K}$ from taking $T$ actions $a^{(0:T-1)}$ is modeled as:
+\footnotesize
+\begin{equation} \label{eqn:generative}
+    p\left(X^{(0:T)}, H^{(0:T)}_{1:K} \;\middle|\; a^{(0:T-1)}\right) = p\left(H^{(0)}_{1:K}\right) \prod_{t=1}^{T} p\left(H^{(t)}_{1:K} \;\middle|\; H^{(t-1)}_{1:K}, a^{(t-1)}\right) \prod_{t=0}^{T} p\left(X^{(t)} \;\middle|\; H^{(t)}_{1:K}\right)
+\end{equation}
+\normalsize
+where $p(X^{(t)} \sgiven H^{(t)}_{1:K})$ and $p(H^{(t)}_{1:K} \sgiven H^{(t-1)}_{1:K}, A^{(t-1)})$ are the observation and dynamics distribution respectively shared across all timesteps $t$.
+Our goal is to build a model that, from simply observing raw observations of random interactions, can generalize to solve novel compositional object manipulation problems that the learner was never trained to do, such as building various block towers during test time from only training to predict how blocks fall during training time.
+
+When all tasks follow the same dynamics we can achieve such generalization with a planning algorithm if given a sequence of actions we could compute $p(X^{(T+1:T+d)} \sgiven X^{(0:T)}, A^{(0:T+d-1)})$, the posterior predictive distribution of observations $d$ steps into the future.
+Approximating this predictive distribution can be cast as a variational inference problem (Appdx.~\ref{appdx:problem_formulation}) for learning the parameters of an approximate observation distribution $\mathdutchcal{G}(X^{(t)} \sgiven H^{(t)}_{1:K})$, dynamics distribution $\mathdutchcal{D}(H^{(t)}_{1:K} \sgiven H^{(t-1)}_{1:K}, A^{(t-1)})$, and a time-factorized recognition distribution $\mathdutchcal{Q}(H^{(t)}_{1:K} \sgiven H^{(t-1)}_{1:K}, X^{(t)}, A^{(t-1)})$ that maximize the evidence lower bound (ELBO), given by
+$\mathcal{L} = \sum_{t=0}^{T} \mathcal{L}^{(t)}_{\text{r}} - \mathcal{L}^{(t)}_{\text{c}}$, where
+\footnotesize
+\begin{align*}
+    \mathcal{L}^{t}_{\text{r}} &= \mathbb{E}_{h^t_{1:K} \sim q\left(H^{t}_{1:K} \sgiven h^{0:t-1}_{1:K}, x^{1:t}, a^{0:t-1} \right)}\left[\log \mathdutchcal{G}\left(x^t \sgiven h^t_{1:K}\right)\right]\\ 
+    \mathcal{L}^{t}_{\text{c}} &= \mathbb{E}_{h^{t-1}_{1:K} \sim q\left(H^{t-1}_{1:K} \sgiven h^{1:t-2}_{1:K}, x^{1:t-1}, a^{0:t-2} \right)}\left[D_{KL}\left(\mathdutchcal{Q}\left(H^{t}_{1:K} \sgiven h^{t-1}_{1:K}, x^{t}, a^{t-1}\right) \kld \mathdutchcal{D}\left(H^{t}_{1:K} \sgiven h^{t-1}_{1:K}, a^{t-1} \right)\right)\right].
+\end{align*}
+\normalsize
+The ELBO pushes $\mathdutchcal{Q}$ to produce states of the entities $H_{1:K}$ that contain information useful for not only reconstructing the observations via $\mathdutchcal{G}$ in $\mathcal{L}^{(t)}_{\text{r}}$ but also for predicting the entities' future states via $\mathdutchcal{D}$ in $\mathcal{L}^{(t)}_{\text{c}}$.
+Sec.~\ref{sec:op3} will next offer our method for incorporating entity abstraction into modeling the generative distribution and optimizing the ELBO.
+
+\section{Object-Centric Perception, Prediction, and Planning (OP3)} \label{sec:op3}
+The \textit{entity abstraction} is derived from an assumption about symmetry: that the problem of modeling a dynamic scene of multiple entities can be reduced to the problem of (1) modeling a single entity and its interactions with an \textit{entity-centric} function and (2) applying this function to every entity in the scene.
+Our choice to represent a scene as a set of entities exposes an avenue for directly encoding such a prior about symmetry that would otherwise not be straightforward with a global state representation.
+
+As shown in Fig.~\ref{fig:combined_overview}, a function $F$ that respects the entity abstraction requires two ingredients.
+The first ingredient (Sec.~\ref{sec:op3_model}) is that $F(H_{1:K})$ is expressed in part as the higher-order operation $\texttt{map}(f, H_{1:K})$ that broadcasts the same entity-centric function $f(H_k)$ to every entity variable $H_k$.
+This yields the benefit of automatically transferring learned knowledge for modeling an individual entity to all entities in the scene rather than learn such symmetry from data.
+As $f$ is a function that takes in a single generic entity variable $H_k$ as argument, the second ingredient (Sec.~\ref{sec:op3_inference}) should be a mechanism that binds information from the raw observation $X$ about a particular object $h^*_k$ to the variable $H_k$.
+
+\subsection{Entity Abstraction in the Observation and Dynamics Models} \label{sec:op3_model}
+The functions of interest in model-based RL are the observation and dynamics models $\mathdutchcal{G}$ and $\mathdutchcal{D}$ with which we seek to approximate the data-generating distribution in equation~\ref{eqn:generative}.
+
+\begin{wrapfigure}{R}{0.45\textwidth}
+\centering
+\includegraphics[width=0.45\textwidth]{figs/method/obs_model.png}
+\caption{\small{
+\textbf{(a)} The observation model $\mathdutchcal{G}$ models an observation image as a composition of sub-images weighted by segmentation masks. The shades of gray in the masks indicate the depth $\delta$ from the camera of the object that the sub-image depicts.
+\textbf{(b)} The graphical model of the generative model of observations, where $k$ indexes the entity, and $i,j$ indexes the pixel.
+$Z$ is the indicator variable that signifies whether an object's depth at a pixel is the closest to the camera.
+}}
+\label{fig:observation_model}
+\end{wrapfigure}
+
+\textbf{Observation Model:} 
+The observation model $\mathdutchcal{G}(X \sgiven H_{1:K})$ approximates the distribution $p(X \sgiven H_{1:K})$, which models how the observation $X$ is caused by the combination of entities $H_{1:K}$.
+We enforce the entity abstraction in $\mathdutchcal{G}$ (in Fig.~\ref{fig:combined_overview}g) by applying the same entity-centric function $\mathdutchcal{g}(X \sgiven H_k)$ to each entity $H_k$, which we can implement using a mixture model at each pixel $(i,j)$:
+\footnotesize
+\begin{equation} \label{eqn:log_likelihood}
+    \mathdutchcal{G}\left(X_{(ij)} \given H_{1:K}\right) = \sum_{k=1}^K m_{(ij)}\left(H_k\right) \cdot \mathdutchcal{g}\left(X_{(ij)} \sgiven H_k\right),
+\end{equation}
+\normalsize
+where $\mathdutchcal{g}$ computes the mixture components that model how each individual entity $H_k$ is independently generated, combined via mixture weights $m$ that model the entities' relative depth from the camera, the derivation of which is in Appdx.~\ref{appdx:obs_model}.
+
+\textbf{Dynamics Model:} The dynamics model $\mathdutchcal{D}(H'_{1:K} \sgiven H_{1:K}, A)$ approximates the distribution $p(H'_{1:K} \sgiven H_{1:K}, A)$, which models how an action $A$ intervenes on the entities $H_{1:K}$ to produce their future values $H'_{1:K}$.
+We enforce the entity abstraction in $\mathdutchcal{D}$ (in Fig.~\ref{fig:combined_overview}f) by applying the same entity-centric function $\mathdutchcal{d}(H'_k \sgiven H_k, H_{[\neq k]}, A)$ to each entity $H_k$, which reduces the problem of modeling how an action affects a scene with a combinatorially large space of object configurations to the problem of simply modeling how an action affects a single \textit{generic} entity $H_k$ and its interactions with the list of other entities $H_{[\neq k]}$.
+Modeling the action as an finer-grained intervention on a \textit{single} entity rather than the entire scene is a benefit of using local representations of entities rather than global representations of scenes.
+
+However, at this point we still have to model the combinatorially large space of \textit{interactions} that a single entity could participate in.
+Therefore, we can further enforce a \textit{pairwise} entity abstraction on $\mathdutchcal{d}$ by applying the same \textit{pairwise} function $\mathdutchcal{d}_{oo}(H_k, H_i)$ to each entity pair $(H_k, H_i)$, for $i \in [\neq k]$.
+Omitting the action to reduce clutter (the full form is written in Appdx.~\ref{appdx:dyn_model}), the structure of the $\mathdutchcal{D}$ therefore follows this form:
+\footnotesize
+\begin{align}
+    \mathdutchcal{D}\left(H'_{1:K} \given H_{1:K}\right) = \prod_{k=1}^K \mathdutchcal{d}\left(H'_k \given H_k, H^{\text{interact}}_{k}\right), \;\text{where}\; H_k^{\text{interact}} = \sum_{i \neq k}^K d_{oo}\left(H_i, H_k\right).
+\end{align}
+\normalsize
+The entity abstraction therefore provides the flexibility to scale to modeling a variable number of objects by solely learning a function $\mathdutchcal{d}$ that operates on a single generic entity and a function $\mathdutchcal{d}_{oo}$ that operates on a single generic entity pair, both of which can be re-used for across all entity instances.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.95\textwidth]{figs/method/dynamics_labeled.png}
+\caption{\small{The \textbf{dynamics model} $\mathdutchcal{D}$ models the time evolution of every object by symmetrically applying the function $\mathdutchcal{d}$ to each object.
+For a given object, $d$ models the individual dynamics of that object $\left(d_o\right)$, embeds the action vector $\left(d_a\right)$, computes the action's effect on that object $\left(d_{ao}\right)$, computes each of the other objects' effect on that object $\left(d_{oo}\right)$, and aggregates these effects together $\left(d_{\text{comb}}\right)$.
+}}
+\label{fig:dynamics}
+\end{figure}

@@ -1,0 +1,196 @@
+
+\section{Experiments}
+
+\subsection{Setup}
+We select \texttt{o4-mini}, a strong but cost-efficient LLM as our research agent and run AlphaResearch on each problem to get the best algorithm. We perform supervised finetuning on \texttt{Qwen-2.5-7B-Instruct} \citep{yang2025qwen3} with the collected ICLR records, yielding AlphaResearch-RM-7B. We do not compute loss on paper information, only on the average rating scores within \texttt{\textbackslash boxed\{\}}. For fine-tuning hyperparameters, we train our model with a learning rate of 1e-5 warmed up linearly for 100 steps. We train all the models in bfloat16 precision with Pytorch
+Fully Shard Data Parallel (FSDP) and set a global batch size to 128 for 2 epochs.
+All other settings not mentioned in this paper follow the default values
+of Huggingface Trainer \footnote{\url{https://huggingface.co/docs/transformers/main_classes/trainer}}. Due to the unavailability of the AlphaEvolve codebase, we adopted OpenEvolve and ShinkaEvolve as our baseline approaches.
+
+\subsection{Evaluation}
+\begin{table}[t]
+% \resizebox{\linewidth}{!}{%
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l|cc|cc|c}
+\toprule
+\multirow{2}{*}{\textbf{Problem}}                        & \multicolumn{2}{c|}{\textbf{Human Researcher}} & \multicolumn{2}{c|}{\textbf{AlphaResearch}} & \multirow{2}{*}{\textbf{$\Delta$(\%)}} \\
+                                                & \textit{research record}  &  \textit{baseline}   & \textit{init}            & \textit{best}            &            \\
+\midrule
+packing circles (n=26) $\uparrow$   &  D. Cantrell (2011)  & 2.634    &  0   & 2.636  & 0.002   \\
+packing circles (n=32) $\uparrow$   & E. Specht (2012)    & 2.936     &  0  & 2.939  &  0.003  \\
+minimizing max-min distance ratio $\downarrow$ & D. Cantrell (2009) & 12.89 & 15.55 & 12.92 & - 0.03\\
+third autocorrelation inequality   $\downarrow$  & C. Vinuesa  (2009)  & 1.458  & 35.746 & 1.546 & -0.088   \\
+% kissing number                                  & 592           &                  \\
+spherical code  (d=3, n=30)      $\uparrow$      &   Hardin \& Sloane (2002)     &    0.6736  & 0.5130 & 0.6735 & -0.0001\\
+autoconvolution peak minimization $\downarrow$  &  Matolcsi \& Vinuesa (2010)  & 0.755   & 1.512 &      0.756     & -0.001   \\
+littlewood polynomials (n=512) $\downarrow$  & Rudin \& Shapiro (1959)  & 32     &32& 32  &  0 \\
+MSTD        (n=30) $\uparrow$ & Hegarty (2007)    & 1.04   &1.04    &  1.04 & 0   \\
+
+
+\bottomrule
+\end{tabular}
+}
+\caption{Results on AlphaResearchComp. $\uparrow$ indicates that higher score is better and $\downarrow$  for lower. $\Delta$ indicates the performance gap between best of AlphaResearch and human baseline.}
+\label{tab:res}
+\end{table}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.40\linewidth]{doc/figures/little3.pdf}
+    \includegraphics[width=0.40\linewidth]{doc/figures/mstd3.pdf}
+    \caption{Performance comparison of AlphaResearch, OpenEvolve, and ShinkaEvolve in terms of failure modes of AlphaResearchComp.}
+    \label{app:comp2}
+\end{figure}
+
+\paragraph{Problem collection.}
+We curate AlphaResearchComp,  a set of frontier program-based research tasks including geometry, number theory, harmonic analysis, and combinatorial optimization. These problems were selected based on the following principles: (1)  Each task has a precise mathematical formulation with an objective function that admits rigorous automatic evaluation. 
+(2) For every problem, we provide the best-known human result from the literature. These represent conjectured best-known values rather than proven optima, ensuring ample room for further improvement. 
+The curated problems are either inherited from prior work (e.g., AlphaEvolve) or collected from online repositories and domain experts. Each problem is supported by verifiable resources in the corresponding field. 
+This design enables AlphaResearch to demonstrate both the \emph{reproducibility} of established mathematical results and the \emph{potential for discovery} beyond current human-best achievements. 
+
+% Detailed definitions, baseline values, and references for each problem are provided in the \autoref{Problems_details}.
+
+% To facilitate the evaluation process, we firstly warm up the initial program for each problems in AlphaResearch-Bench to achieve near human best performance if no human best solution provided.
+% After obtaining the research problems of AlphaResearchComp, we construct different discovery difficulty for each problem with the following strategies: 
+
+% (1) \textbf{Discover from scratch.} To simulate a research setting that starts from scratch, we initialize the programs with null programs ($r_0 = 0$) for \emph{``Packing Circles'' (n=26)} and \emph{``Packing Circles'' (n=32)} instances. 
+
+% (2) \textbf{Discover from moderate solution.} For the \emph{``Littlewood Polynomials''} and \emph{``MSTD (n=30)''} problems, we directly adopt the best-known solutions ($r_0=r_{human}$) from human researchers to emulate improvements upon established methods. 
+
+% (3) \textbf{Discover from the best solution.} For remaining problems, we employ a moderate initialization strategy ($0<r_0<r_{human}$) to ensure sufficient room for the research agent to explore.
+% This initialization strategy simulates a variety of real-world scenarios for the research agent, thereby facilitating a thorough evaluation process.
+
+
+
+% \subsection{Evaluation Protocol}
+% \paragraph{Excel@best metric.} 
+% \paragraph{Metrics.}
+% For benchmarks like code generation with good verification techniques (e.g., unit tests), pass@k~\citep{chen2021evaluating} is a metric denoting that at least one out of $k$ i.i.d. task trials is successful, which captures the ability of LLMs to solve easy-to-verified problems.
+% For open-ended real-world algorithm discovery tasks, we propose a new metric - excel@best (excel at best), defined as the percentage excess on baseline (best of human level) results: 
+% \begin{equation}
+%     \mathrm{excel@}best=\underset{\mathrm{Problems}}{\operatorname*{\operatorname*{\mathbb{E}}}}\left[\frac{(r_{best} - r_{human}) \cdot \mathbb{I}_{d}}{r_{human}}\right]  
+% \end{equation}
+% where $r_{human}$ indicates the results of human's best level. $\mathbb{I}_{d}$ indicates the optimization direction where $\mathbb{I}_{d}=1$ represents that higher score is better and $\mathbb{I}_{d} = -1$ represents lower. 
+
+
+
+
+
+
+
+
+% \begin{table*}[h]
+% \small
+% \centering
+% \caption{Problem overview in AlphaResearchComp. More information are shown at \autoref{Problems_details}.}
+% \vspace{3pt}
+% \begin{tabular}{l|r|c}
+% \toprule
+% \textbf{Problem}                                         & \textbf{Human Best} &  \textbf{Human Researcher} \\
+% \midrule
+% packing circles (n=26)                          & 2.634         & David Cantrell (2011) \\
+% packing circles (n=32)                          & 2.936         & Eckard Specht (2012)  \\
+% minimizing max-min distance raio (d=2, n=16)      & 12.89         & David Cantrell (2009)   \\
+% third autocorrelation inequality                & 1.4581        & Carlos Vinuesa  (2009)\\
+% % kissing number                                  & 592           &                  \\
+% spherical code (n=30)                                    &   0.67365    &   Hardin \& Sloane (1996, 2002)         \\
+% autoconvolution peak minimization (upper bound) & 0.755       &  Matolcsi–Vinuesa (2010) \\
+% littlewood polynomials (n=512)                         & 32       & Rudin–Shapiro (1959/1952)                \\
+% MSTD (n=30)                           & 1.04       &  Hegarty (2006/2007)                \\
+
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+
+\subsection{Main Results}
+\paragraph{Successful Cases.}
+
+% \textcolor{blue}{\textbf{LLMs could sometimes discover new algorithms themselves.} }
+% \textbf{The discovery of superhuman algorithms remains challenging for LLMs.}
+\autoref{tab:res}
+% \kaiyue{probably want to check the autorefs in this section, I guess you mean Table 4 here?}
+presents the results of AlphaResearchComp on 8 algorithms discovery problems. AlphaResearch achieves a 2/8 win rate ($\Delta$ $>$ 0) against human researchers, with one notable success: the algorithm discovered by AlphaResearch for \emph{``Packing Circles''} problem reaches the best-of-known performance (2.636 for n=26, 2.939 for n=32), outperforming human researchers (2.634 for n=26, 2.936 for n=32) and AlphaEvolve (2.635 for n=26, 2.937 for n=32), where the case (n = 32) is shown in \autoref{fig:comp-alpha}.
+
+
+
+\paragraph{Failure Cases.}
+
+% Despite exhibiting continuous growth, AlphaResearch’s performance still underperforms human researchers in \emph{``Littlewood polynomials``} and \emph{``MSTD(n=30)``} problems, where AlphaResearch have not shown an increase in execution-based rewards. This indicates that current LLMs still struggle to consistently find better algorithms than human researchers.
+
+
+Although AlphaResearch has exhibited continuous growth, it still underperforms human researchers on the \emph{``Littlewood polynomials``} and \emph{``MSTD(n=30)``} tasks, with no observable improvement in program score throughout the discovery process. 
+To further analyze this limitation, we compare the performance of AlphaResearch with that of OpenEvolve and ShinkaEvolve on the failure modes.
+As shown in \autoref{app:comp2}, All of AlphaResearch, OpenEvolve, and ShinkaEvolve fail to improve on the Littlewood polynomials and MSTD (n=30) problems, which indicates that current large language models still face significant challenges in reliably discovering superior algorithms.
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.42\linewidth]{doc/figures/minimize3.pdf}
+    \includegraphics[width=0.42\linewidth]{doc/figures/apm3.pdf}
+    \includegraphics[width=0.42\linewidth]{doc/figures/third3.pdf}
+    \includegraphics[width=0.42\linewidth]{doc/figures/spherical3.pdf}
+    \caption{Comparison of AlphaResearch, OpenEvolve, and ShinkaEvolve throughput the 1000 step discovery process. }
+    \label{app:comp}
+\end{figure}
+\subsection{Comparison with OpenEvolve and ShinkaEvolve}
+
+\autoref{app:comp} presents the comparison of AlphaResearch with OpenEvolve and ShinkaEvolve, highlghting the following observations:
+(1) With interleaved idea generation and program generation, AlphaResearch consistently surpasses OpenEvolve across the first four open-ended problems, which demonstrates the effectiveness of incorporating peer-review environments into autonomous discovery process.
+(2) Compared to ShinkaEvolve, which employs code novelty-based rejection sampling to reduce the number of attempts, AlphaResearch surpasses it on three out of four tasks within the first 1,000 iterations. Although the initial performance gains are modest, these advantages tend to accumulate into more substantial improvements as the number of iterations increases. This highlights the superiority of the peer-review environment over approaches that rely solely on code novelty-based rejection sampling.
+
+
+\subsection{Ablations and Analysis}
+
+% \begin{wrapfigure}{r}{0.47\linewidth}
+%     \centering
+%     \includegraphics[width=\linewidth]{figures/dis.pdf}
+%     \caption{The idea comparison between the execution-only research agent and AlphaResearch, where AlphaResearch-RM-7B is used. \textcolor{blue}{This is done between the full distribution of all 1000 generated ideas from both agents without filtering.}}
+%     \label{fig:dis}
+%     \vspace{-8pt}
+% \end{wrapfigure}
+
+\begin{wrapfigure}{r}[0pt]{0.4\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{doc/figures/fig_gpt5.pdf}
+    \caption{Comparison between different frontier LLMs in AlphaResearch.}
+    \label{fig:gpt5}
+    \vspace{-6pt} 
+\end{wrapfigure}
+
+\textbf{Impact of different LLM backbone.}
+To compare the impact of different LLM backbones on AlphaResearch, we used GPT-5 and o4-mini to run AlphaResearch for 200 steps on the "The Autocorrelation Inequality" problem, respectively.
+As illustrated in \autoref{fig:gpt5}, AlphaResearch (GPT-5) achieves strong performance much more rapidly than o4-mini during the early stages of discovery. However, in later stages, the two models exhibit comparable performance, suggesting that their underlying capabilities on the algorithm discovery task are similar.
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\linewidth]{doc/figures/res_new.pdf}
+    \caption{The impact of real-world peer review environment on execution results. AlphaResearch-RM-7B filters 151 bad ideas, where 108 ideas fail to execute and 43 are successful.}
+    \label{fig:abl}
+\end{figure*}
+
+\textbf{Ablations on real-world peer-review environment.} To assess the effectiveness of reward from a simulated real-world peer-view environment, we ablate AlphaResearch-RM-7B at the first 400 iterations on \emph{``Packing Circles''} problem. 
+\autoref{fig:abl} presents the execution results of w/ and w/o AlphaReasearch-RM-7B during the discovery process.
+Compared to the baseline without RM, AlphaResearch-RM-7B successfully filtered 151 ideas below the threshold. This process yielded 108 correct rejections of execution failures while making 43 erroneous rejections of viable ideas.
+AlphaResearch attained an accuracy of 71.5\% (108/151), a result that aligns closely with its  performance on the AlphaResearch-RM test set, as shown in \autoref{tab:rm-res}
+This outcome effectively demonstrates the model's generalization capabilities and the efficacy of incorporating feedback from a simulated real-world peer-review environment.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.85\linewidth]{doc/figures/process_reward.pdf}
+    \caption{Reward overview during the discovery process. Each action in AlphaResearch will obtain 3 kinds of reward: (1) idea scrapping due to a lower RM score than the threshold (2) idea execution successes (3) idea execution fails.  }
+    \vspace{-5pt}
+    \label{fig:pr}
+\end{figure}
+
+\textbf{Analysis of the discovery process.} We analyze the rejection distribution in AlphaResearch discovery process. As shown in \autoref{fig:pr}, approximately 30\%$\sim$40\% of newly proposed ideas fall below the RM threshold and are thus discarded. The remaining ideas are executed, with the success rate of execution largely depending on the inherent characteristics of the problems. For example, the execution success rate on \emph{``Packing Circles''} problem is 28.9\%, whereas it reaches 51.7\% on the \emph{``Third Autocorrelation Inequality''} problem. \autoref{fig:reward} illustrates the execution-based rewards for these two examples in AlphaResearch. Despite the substantial variations in execution success rates, the execution-based rewards in both cases exhibit a consistent increasing trend. These findings demonstrate the interactions between LLM-based autonomous research agents and real-world environments.
+
+\subsection{Case Study}
+We select the successful example from AlphaResearch to better understand the discovery process. We’ll consider the problem \emph{``Packing Circles''} where the goal is to pack $n$ disjoint circles inside a unit square so as to maximize the sum of their radii, shown in \autoref{fig:example}. We first initialize AlphaResearch with an original research proposal and a related program that returns a list of circles $(x,y,r)$ as output. 
+The verification program first employs \texttt{verify\_circles} function to check if the outputs of the initial program meet the problem constraints (e.g., all circles are inside a unit square) and \texttt{evaluate} function to output the sum of their radii.
+The metadata, including: (1) research ideas, (2) programs, (3) execution results, are subsequently preserved as candidates which represent the end of one step.
+At the next step, AlphaResearch will sample from the candidate pool and generate a new idea  to improve the research proposals from the sampled metadata.
+After generating the new research ideas, AlphaResearch will further generate a patch to modify the existing program if the idea obtains a positive score from AlphaResearch-RM. The new program is then evaluated by the same verification program, thereby generating new metadata. We select the best program and idea as the final solution of AlphaResearch in this iterative process.
+
+% \vspace{-0.3cm}
+% \newpage
+

@@ -1,0 +1,71 @@
+%##################################################################################################
+\definecolor{codeblue}{rgb}{0.25,0.5,0.5}
+\definecolor{codekw}{rgb}{0.85, 0.18, 0.50}
+\definecolor{keywordgreen}{rgb}{0,0.6,0}
+\lstset{
+  backgroundcolor=\color{gray!10},
+  basicstyle=\fontsize{8pt}{9pt}\ttfamily\selectfont,
+  columns=fullflexible,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\fontsize{7.5pt}{7.5pt}\color{codeblue},
+  keywords = {User, Planner, RePlanner, Descriptor, Explainer}, 
+  keywordstyle = {\textbf},
+  caption={Prompt for DEPS in Minecraft tasks},
+  label={lst:minecraft_deps_prompt}
+}
+\begin{lstlisting} % [language=python]  
+
+User: You are a helper agent in Minecraft. You need to generate the sequences of goals for a certain task in Minecraft.
+Planner: OK.
+
+==========
+User: How to obtain 1 wooden_button in Minecraft step-by-step?
+Planner: The code for obtaining 1 wooden_button is as follows:
+def obtain_1_wooden_button(inventory={}):
+    mine({'log':1}, null); # step 1: mine 1 log without tool
+    craft({'planks':4}, {'log':1}, null); # step 2: craft 4 planks from 1 log
+    craft({'wooden_button':1}, {'planks':1}, null); # step 3: craft 1 wooden_button from 1 planks
+    return "wooden_button"
+Descriptor: I succeed in step 1, 2, 3. 
+User: Good. I finish all steps and I obtain 1 stone_pickaxe successfully.
+Planner: OK.
+
+==========
+User: How to obtain 1 stone_sword in Minecraft step-by-step?
+Planner: The code for obtaining stone_sword is as follows:
+def obtain_1_stone_sword(inventory = {}):
+    mine({'log':3}, null); # step 1: mine 3 log without tool
+    craft({'planks':12}, {'log':3}, null); # step 2: craft 12 planks from 3 log
+    craft({'stick':4}, {'planks':2}, null); # step 3: craft 4 stick from 2 planks
+    mine({'cobblestone':2}, null); # step 4: mine 2 cobblestone without tool
+    craft({'stone_sword':1}, {'cobblestone':2, 'stick':1}, 'crafting_table'); # step 5: craft 1 stone_sword from 2 cobblestone and 1 stick, on crafting_table
+    return 'stone_sword'
+
+Descriptor: I succeed on step 1, 2, 3, but I fail on step 4 "mine({'cobblestone':2}, null);".  My inventory now has 10 planks, 4 stick.
+Explainer: Because mining cobblestone needs to use the tool wooden_pickaxe.
+User: Please fix the above errors and replan the task "obtain 1 stone_sword".
+RePlanner: The code for crafting stone_sword is as bellows:
+def obtain_1_stone_sword(inventory = {'planks':10, 'stick':4}):
+    craft({'wooden_pickaxe':1}, {'planks':3, 'stick':2}, 'crafting_table');  # step 1: craft 1 wooden_pickaxe from 3 planks and 2 stick, on crafting_table
+    mine({'cobblestone':2}, 'wooden_pickaxe'); # step 2: mine 2 cobblestone with wooden_pickaxe
+    craft({'stone_sword':1}, {'cobblestone':2, 'stick':1}, 'crafting_table'); # step 3:  craft 1 stone_sword from 2 cobblestone and 1 stick, on crafting_table
+    return 'stone_sword'
+    
+Descriptor: I fail on step 1 "craft({'wooden_pickaxe':1}, {'planks':3, 'stick':2}, 'crafting_table');". My inventory now has 10 planks, 4 stick.
+Explainer: Because the action needs to use the tool crafting_table, but I do not have it.
+User: Please fix the above errors and replan the task "obtain 1 stone_sword".
+RePlanner: The code for crafting stone_sword is as bellows:
+def obtain_1_stone_sword(inventory = {'planks':10, 'stick':4}):
+    craft({'crafting_table':1}, {'planks':4}, null); # step 1: craft 1 crafting_table from 4 planks 
+    craft({'wooden_pickaxe':1}, {'planks':3, 'stick':2}, 'crafting_table'); # step 2: craft 1 wooden_pickaxe from 3 planks and 2 stick, on crafting_table
+    mine({'cobblestone':2}, 'wooden_pickaxe'); # step 3: mine 2 cobblestone with wooden_pickaxe
+    craft({'stone_sword':1}, {'cobblestone':2, 'stick':2}, 'crafting_table'); # step 4: craft 1 stone_sword from 2 cobblestone and 1 stick, on crafting_table
+    return 'stone_sword'
+Descriptor: I succeed in step 1, 2, 3, 4. 
+User: Good. I finish all steps and I obtain 1 stone_pickaxe successfully.
+Planner: OK.
+
+\end{lstlisting}
+
+

@@ -1,0 +1,99 @@
+\section{Methods}
+\label{sec:method}
+In this section, we review the naive learner's strategy and introduce the LOLA learning rule. We first derive the update rules when agents have access to exact gradients and Hessians of their expected discounted future return in Sections~\ref{sec:nl} and~\ref{sec:lola}. In Section~\ref{sec:pg}, we derive the learning rules purely based on policy gradients, thus removing access to exact gradients and Hessians. This renders LOLA suitable for deep RL. However, we still assume agents have access to opponents' policy parameters in policy gradient-based LOLA. Next, in Section~\ref{sec:om}, we incorporate opponent modeling into the LOLA learning rule, such that each LOLA agent only infers the opponent's policy parameter from experience. Finally, we discuss higher order LOLA in Section~\ref{sec:higher-oder-lola}.
+
+For simplicity, here we assume the number of agents is $n=2$ and display the update rules for agent~1 only. The same derivation holds for arbitrary numbers of agents.
+\subsection{Naive Learner} \label{sec:nl}
+Suppose each agent's policy $\pi^a$ is parameterised by $\vct{\theta}^a$ and $V^{a}(\vct{\theta}^1, \vct{\theta}^2)$ is the expected total discounted return for agent $a$ as a function of both agents' policy parameters $(\vct{\theta}^1, \vct{\theta}^2)$. A Naive Learner (NL) iteratively optimises for its own expected total discounted return, such that at the $i$th iteration, $\vct{\theta}^a_i$ is updated to $\vct{\theta}^a_{i+1}$ according to
+\begin{align*}
+    \vct{\theta}^1_{i+1} & = \argmax\nolimits_{\vct{\theta}^1} V^1(\vct{\theta}^1, \vct{\theta}^2_i)\\
+    \vct{\theta}^{2}_{i+1} & = \argmax\nolimits_{\vct{\theta}^2} V^2(\vct{\theta}^1_i, \vct{\theta}^2).
+\end{align*}
+In the reinforcement learning setting, agents do not have access to $\{V^1, V^2\}$ over all parameter values. Instead, we assume that agents only have access to the function values and gradients at $(\vct{\theta}^1_i, \vct{\theta}^2_i)$. Using this information the naive learners apply the gradient ascent update rule 
+% $\Delta \vct{\theta}^1_{\text{nl}}$:
+$\vct{f}^1_{\text{nl}}$:
+\begin{align}
+\vct{\theta}^1_{i+1} &= \vct{\theta}^1_{i} +   \vct{f}^1_{\text{nl}}(\vct{\theta}^1_{i}, \vct{\theta}^2_{i}), \nonumber \\
+\vct{f}^1_{\text{nl}} &= \nabla_{\vct{\theta}^1_{i}} V^1(\vct{\theta}^1_{i}, \vct{\theta}^2_{i})   \cdot \delta, \label{eqn:f-nl}
+\end{align}
+
+where $\delta$ is the step size.
+
+
+
+
+\subsection{Learning with Opponent Learning Awareness} \label{sec:lola}
+A LOLA learner optimises its return under one step look-ahead of opponent learning: Instead of optimizing the expected return under the current parameters, $V^1(\vct{\theta}^1_{i}, \vct{\theta}^2_{i})$, a LOLA agent optimises $V^1(\vct{\theta}^1_{i}, \vct{\theta}^2_{i}  +\Delta \vct{\theta}^2_{i})$, which is the expected return after the opponent updates its policy with one naive learning step, $\Delta \vct{\theta}^2_{i}$. Going forward  we drop the subscript $i$ for clarity. Assuming small $\Delta \vct{\theta}^2$, a first-order Taylor expansion results in: 
+\begin{equation} \label{eqn:lola-obj}
+    V^1(\vct{\theta}^1, \vct{\theta}^2  +\Delta \vct{\theta}^2) \approx
+    V^1(\vct{\theta}^1, \vct{\theta}^2)+ (\Delta \vct{\theta}^2)^T 
+    \nabla_{\vct{\theta}^2}V^1(\vct{\theta}^1, \vct{\theta}^2).
+\end{equation}
+ 
+The LOLA objective \eqref{eqn:lola-obj} differs from prior work, e.g., \citet{zhang2010multi}, that predicts the opponent's policy parameter update and learns a best response. LOLA learners attempt to actively influence the opponent's future policy update, and explicitly differentiate through the $\Delta \vct{\theta}^2$ with respect to $\vct{\theta}^1$. Since LOLA focuses on this shaping of the learning direction of the opponent, the dependency of $\nabla_{\vct{\theta}^2} V^1(\vct{\theta}^1, \vct{\theta}^2)$ on $\vct{\theta}^1$ is dropped during the backward pass. Investigation of how differentiating through this term would affect the learning outcomes is left for future work. 
+
+By substituting the opponent's naive learning step:
+\begin{equation} \label{eqn:opponent-naive}
+    \Delta \vct{\theta}^2 = \nabla_{\vct{\theta}^2} V^2(\vct{\theta}^1, \vct{\theta}^2) \cdot \eta
+\end{equation}
+into \eqref{eqn:lola-obj} and taking the derivative of \eqref{eqn:lola-obj} with respect to $\vct{\theta}^1$, we obtain our LOLA learning rule:
+\begin{equation*}
+\vct{\theta}^1_{i+1} = \vct{\theta}^1_{i}  + \vct{f}^1_{\text{lola}}(\vct{\theta}^1_{i}, \vct{\theta}^2_{i}),
+\end{equation*}
+ which includes a second order correction term
+\begin{align}
+&\vct{f}^1_{\text{lola}}(\vct{\theta}^1, \vct{\theta}^2) = \nabla_{\vct{\theta}^1} V^1(\vct{\theta}^1, \vct{\theta}^2)  \cdot \delta \nonumber \\
+ & + \left(\nabla_{\vct{\theta}^2} V^1(\vct{\theta}^1, \vct{\theta}^2) \right)^T  
+  \nabla_{\vct{\theta}^1} \nabla_{\vct{\theta}^2} V^2(\vct{\theta}^1, \vct{\theta}^2)  \cdot \delta  \eta, \label{eqn:f-lola}
+\end{align}
+where the step sizes $\delta, \eta$ are for the first and second order updates. 
+Exact LOLA and NL agents (LOLA-Ex and NL-Ex) have access to the gradients and Hessians of $\{V^1, V^2\}$ at the current policy parameters $(\vct{\theta}^1_i, \vct{\theta}^2_i)$ and can evaluate \eqref{eqn:f-nl} and \eqref{eqn:f-lola} exactly.
+
+
+\subsection{Learning via Policy Gradient} \label{sec:pg}
+When agents do not have access to exact gradients or Hessians, we derive the update rules $f_{\text{nl, pg}}$ and $f_{\text{lola, pg}}$ based on approximations of the derivatives in \eqref{eqn:f-nl} and~\eqref{eqn:f-lola}. 
+Denote an episode of horizon $T$ as $\tau = (s_0, u^1_0, u^2_0, r^1_0, r^2_0, ..., r^1_{T}, r^2_{T})$ and its corresponding discounted return for agent $a$ at timestep $t$ as
+$R^a_t(\tau) = \sum\nolimits_{l=t}^{T} \gamma^{l-t} r^a_{l}$. 
+The expected episodic return conditioned on the agents' policies $(\pi^1, \pi^2)$, $\Expect R^1_0(\tau)$ and $\Expect R^2_0(\tau)$, approximate $V^1$ and $V^2$ respectively, as do the gradients and Hessians. 
+
+$\nabla_{\vct{\theta}^1}  \Expect R^1_0(\tau)$ follows from the policy gradient derivation:
+\begin{align*}
+&\nabla_{\vct{\theta}^1}  \Expect R^1_0(\tau) = \Expect\big[R^1_0(\tau) \nabla_{\vct{\theta}^1}\log \pi^1(\tau)\big]  \\
+ &= \Expect\left[\sum\nolimits_{t=0}^{T} \nabla_{\vct{\theta}^1}  \log \pi^1(u^1_t|s_t) \cdot \sum\nolimits_{l=t}^{T} \gamma^l r^1_{l} \right] \\
+ &= \Expect\left[\sum\nolimits_{t=0}^{T} \nabla_{\vct{\theta}^1}  \log \pi^1(u^1_t|s_t)  \gamma^t \big(R^1_t(\tau) - b(s_t)\big)\right],
+\end{align*}
+where $b(s_t)$ is a baseline for variance reduction. Then the update rule $\vct{f}_{\text{nl, pg}}$ for the policy gradient-based naive learner (NL-PG) is
+\begin{equation} \label{eqn:f-nl-pg}
+\vct{f}^1_{\text{nl, pg}} = \nabla_{\vct{\theta}^1}  \Expect R^1_0(\tau) \cdot \delta.
+\end{equation}
+For the LOLA update, we derive the following estimator of the second-order term in \eqref{eqn:f-lola} based on policy gradients. The derivation (omitted) closely resembles the standard proof of the policy gradient theorem, exploiting the fact that agents sample actions independently. We further note that this second order term is exact in expectation:
+\begin{align}
+\nabla_{\vct{\theta}^1}& \nabla_{\vct{\theta}^2} \Expect R^2_0(\tau)  \nonumber \\ &= \Expect\left[R^2_0(\tau)\nabla_{\vct{\theta}^1}\log \pi^1(\tau) \big(\nabla_{\vct{\theta}^2}\log \pi^2(\tau)\big)^T \right] \nonumber  \\
+ & = \Expect \left[\sum\nolimits_{t=0}^{T} \gamma^t r^2_t\cdot  \left(\sum\nolimits_{l=0}^t \nabla_{\vct{\theta}^1} \log \pi^1(u^1_l|s_l) \right)\right. \nonumber  \\
+& \quad \left. \left( \sum\nolimits_{l=0}^t \nabla_{\vct{\theta}^2} \log \pi^2(u^2_l|s_l) \right)^T \right]. \label{eqn:second-order}
+\end{align} 
+The complete LOLA update using policy gradients (LOLA-PG) is
+\begin{align}
+& \vct{f}^1_{\text{lola, pg}}= \nabla_{\vct{\theta}^1}  \Expect R^1_0(\tau) \cdot \delta + \nonumber \\
+& \big(\nabla_{\vct{\theta}^2} \Expect R^1_0(\tau) \big)^T \nabla_{\vct{\theta}^1} \nabla_{\vct{\theta}^2} \Expect R^2_0 (\tau) \cdot \delta \eta.  \label{eqn:f-lola-pg}
+\end{align}
+
+
+\subsection{LOLA with Opponent Modeling} \label{sec:om}
+Both versions \eqref{eqn:f-lola} and \eqref{eqn:f-lola-pg} of LOLA learning assume that each agent has access to the exact parameters of the opponent. However, in adversarial settings the opponent's parameters are typically obscured and have to be inferred from the opponent's state-action trajectories. Our proposed opponent modeling is similar to behavioral cloning~\cite{ross2011no,bojarski2016end}. Instead of accessing agent $2$'s true policy parameters $\vct{\theta}^2$, agent $1$ models the opponent's behavior with $\hat{\vct{\theta}}^2$, where $\hat{\vct{\theta}}^2$ is estimated from agent $2$'s trajectories using maximum likelihood:
+\begin{equation}
+\hat{\vct{\theta}}^2 =\argmax_{\vct{\theta}^2} \sum_t \log{\pi_{\vct{\theta}^2}(u^2_t|s_t)}.
+\end{equation}
+Then, $\hat{\vct{\theta}}^2$ replaces $\vct{\theta}^2$ in the LOLA update rule, both for the exact version \eqref{eqn:f-lola} using the value function and the gradient based approximation \eqref{eqn:f-lola-pg}. We compare the performance of policy-gradient based LOLA agents \eqref{eqn:f-lola-pg} with and without opponent modeling in our experiments. In particular we can obtain $\hat{\vct{\theta}}^2$ using the past action-observation history. In our experiments we incrementally fit to the most recent data in order to address the non-stationarity of the opponent.
+
+
+\begin{figure*}[t]
+  \includegraphics[width=0.95\textwidth]{figures/figure_2_complete}
+  \vspace{-3ex}
+\caption{ a) the probability of playing heads in the iterated matching pennies (IMP) at the end of 50 independent training runs for both agents as a function of state under naive learning NL-Ex. b) the results of LOLA-Ex when using the exact gradients of the value function. c) the normalised discounted return for both agents in NL-Ex vs. NL-Ex and LOLA-Ex vs. LOLA-Ex with exact gradient. d) the normalised discounted return for both agents in NL-PG vs. NL-PG and LOLA-PG vs. LOLA-PG with policy gradient approximation. We can see in a) that NL-Ex results in near deterministic strategies, indicated by the accumulation of points in the corners. These strategies are easily exploitable by other deterministic strategies leading to unstable training and high variance in the reward per step in c). In contrast, LOLA agents learn to play the only Nash strategy, $50\% /  50\%$, leading to low variance in the reward per step. One interpretation is that LOLA agents anticipate that exploiting a deviation from Nash increases their immediate return, but also renders them more exploitable by the opponent's next learning step. Best viewed in colour.}
+\label{fig:fig_IMP}
+\end{figure*}
+
+\subsection{Higher-Order LOLA} \label{sec:higher-oder-lola}
+By substituting the naive learning rule \eqref{eqn:opponent-naive} into the LOLA objective~\eqref{eqn:lola-obj}, the LOLA learning rule so far assumes that the opponent is a naive learner. We call this setting \emph{first-order LOLA}, which corresponds to the first-order learning rule of the opponent agent. However, we can also consider a higher-order LOLA agent that assumes the opponent applies a first-order LOLA learning rule, thus replacing \eqref{eqn:opponent-naive}. This leads to third-order derivatives in the learning rule. While the third-order terms are typically difficult to compute using policy gradient method, due to high variance, when the exact value function is available it is tractable. We examine the benefits of higher-order LOLA in our experiments.
+

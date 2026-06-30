@@ -1,0 +1,22 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{c+c1}{\PYGZsh{} ood is an OOD detector, model is classifier with softmax output}
+\PYG{n}{lambda1s} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{linspace}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{l+m+mi}{1}\PYG{p}{,}\PYG{n}{N}\PYG{p}{)} \PYG{c+c1}{\PYGZsh{} Usually N \PYGZti{}= 1000}
+\PYG{n}{lambda2s} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{linspace}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{l+m+mi}{1}\PYG{p}{,}\PYG{n}{N}\PYG{p}{)}
+\PYG{n}{losses} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{zeros}\PYG{p}{((}\PYG{l+m+mi}{2}\PYG{p}{,}\PYG{n}{n}\PYG{p}{,}\PYG{n}{N}\PYG{p}{,}\PYG{n}{N}\PYG{p}{))} \PYG{c+c1}{\PYGZsh{} 2 losses, n data points, N x N lambdas}
+\PYG{c+c1}{\PYGZsh{} The following loop can be massively parallelized (and GPU accelerated)}
+\PYG{k}{for} \PYG{p}{(}\PYG{n}{i}\PYG{p}{,}\PYG{n}{j}\PYG{p}{,}\PYG{n}{k}\PYG{p}{)} \PYG{o+ow}{in} \PYG{p}{[(}\PYG{n}{i}\PYG{p}{,}\PYG{n}{j}\PYG{p}{,}\PYG{n}{k}\PYG{p}{)} \PYG{k}{for} \PYG{n}{i} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{n}\PYG{p}{)} \PYG{k}{for} \PYG{n}{j} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{N}\PYG{p}{)} \PYG{k}{for} \PYG{n}{k} \PYG{o+ow}{in} \PYG{n+nb}{range}\PYG{p}{(}\PYG{n}{N}\PYG{p}{)]:}
+  \PYG{n}{softmaxes} \PYG{o}{=} \PYG{n}{model}\PYG{p}{(}\PYG{n}{X}\PYG{p}{[}\PYG{n}{i}\PYG{p}{]}\PYG{o}{.}\PYG{n}{unsqueeze}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{))}\PYG{o}{.}\PYG{n}{softmax}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{o}{.}\PYG{n}{squeeze}\PYG{p}{()} \PYG{c+c1}{\PYGZsh{} Care with dims}
+  \PYG{n}{cumsum} \PYG{o}{=} \PYG{n}{softmaxes}\PYG{o}{.}\PYG{n}{sort}\PYG{p}{(}\PYG{n}{descending}\PYG{o}{=}\PYG{k+kc}{True}\PYG{p}{)[}\PYG{l+m+mi}{0}\PYG{p}{]}\PYG{o}{.}\PYG{n}{cumsum}\PYG{p}{(}\PYG{l+m+mi}{0}\PYG{p}{)[}\PYG{n}{Y}\PYG{p}{[}\PYG{n}{i}\PYG{p}{]]}
+  \PYG{k}{if} \PYG{n}{odd}\PYG{p}{(}\PYG{n}{X}\PYG{p}{)} \PYG{o}{\PYGZgt{}} \PYG{n}{lambda1s}\PYG{p}{[}\PYG{n}{j}\PYG{p}{]:}
+    \PYG{n}{losses}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{,}\PYG{n}{i}\PYG{p}{,}\PYG{n}{j}\PYG{p}{,}\PYG{n}{k}\PYG{p}{]} \PYG{o}{=} \PYG{l+m+mi}{1}
+    \PYG{k}{continue}
+  \PYG{n}{losses}\PYG{p}{[}\PYG{l+m+mi}{1}\PYG{p}{,}\PYG{n}{i}\PYG{p}{,}\PYG{n}{j}\PYG{p}{,}\PYG{n}{k}\PYG{p}{]} \PYG{o}{=} \PYG{n+nb}{int}\PYG{p}{(}\PYG{n}{cumsum} \PYG{o}{\PYGZgt{}} \PYG{n}{lambda2s}\PYG{p}{[}\PYG{n}{k}\PYG{p}{])}
+\PYG{n}{risks} \PYG{o}{=} \PYG{n}{losses}\PYG{o}{.}\PYG{n}{mean}\PYG{p}{(}\PYG{n}{dim}\PYG{o}{=}\PYG{l+m+mi}{1}\PYG{p}{)} \PYG{c+c1}{\PYGZsh{} 2 x N x N}
+\PYG{n}{risks}\PYG{p}{[}\PYG{l+m+mi}{1}\PYG{p}{]} \PYG{o}{=} \PYG{n}{risks}\PYG{p}{[}\PYG{l+m+mi}{1}\PYG{p}{]} \PYG{o}{\PYGZhy{}} \PYG{n}{alpha2}\PYG{o}{*}\PYG{n}{risks}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{]}
+\PYG{n}{pval1s} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{exp}\PYG{p}{(}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{2}\PYG{o}{*}\PYG{n}{n}\PYG{o}{*}\PYG{p}{(}\PYG{n}{torch}\PYG{o}{.}\PYG{n}{relu}\PYG{p}{(}\PYG{n}{alpha1}\PYG{o}{\PYGZhy{}}\PYG{n}{risks}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{])}\PYG{o}{**}\PYG{l+m+mi}{2}\PYG{p}{))} \PYG{c+c1}{\PYGZsh{} Or HB p\PYGZhy{}value}
+\PYG{n}{pval2s} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{exp}\PYG{p}{(}\PYG{o}{\PYGZhy{}}\PYG{l+m+mi}{2}\PYG{o}{*}\PYG{n}{n}\PYG{o}{*}\PYG{p}{(}\PYG{n}{torch}\PYG{o}{.}\PYG{n}{relu}\PYG{p}{(}\PYG{n}{alpha2}\PYG{o}{\PYGZhy{}}\PYG{n}{risks}\PYG{p}{[}\PYG{l+m+mi}{1}\PYG{p}{])}\PYG{o}{**}\PYG{l+m+mi}{2}\PYG{p}{))} \PYG{c+c1}{\PYGZsh{} Ditto}
+\PYG{n}{pvals} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{maximum}\PYG{p}{(}\PYG{n}{pval1s}\PYG{p}{,}\PYG{n}{pval2s}\PYG{p}{)}
+\PYG{c+c1}{\PYGZsh{} Bonferroni can be replaced by sequential graphical test as in LTT paper}
+\PYG{n}{valid} \PYG{o}{=} \PYG{n}{torch}\PYG{o}{.}\PYG{n}{where}\PYG{p}{(}\PYG{n}{pvals} \PYG{o}{\PYGZlt{}=} \PYG{n}{delta}\PYG{o}{/}\PYG{p}{(}\PYG{n}{N}\PYG{o}{*}\PYG{n}{N}\PYG{p}{))}
+\PYG{n}{lambda\PYGZus{}hat} \PYG{o}{=} \PYG{p}{[}\PYG{n}{lambda1s}\PYG{p}{[}\PYG{n}{valid}\PYG{p}{[}\PYG{l+m+mi}{0}\PYG{p}{]],} \PYG{n}{lambda2s}\PYG{p}{[}\PYG{n}{valid}\PYG{p}{[}\PYG{l+m+mi}{1}\PYG{p}{]]]}
+\end{Verbatim}

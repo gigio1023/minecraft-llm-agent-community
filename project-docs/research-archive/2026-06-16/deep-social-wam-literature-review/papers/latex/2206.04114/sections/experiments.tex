@@ -1,0 +1,128 @@
+\input{figures/inputs/figure}
+\input{figures/mazes/figure}
+\input{figures/pinpads/figure}
+% \input{figures/standard/figure}
+\input{figures/goals/selection}
+
+\section{Experiments}
+\label{sec:experiments}
+
+We evaluate Director on two challenging benchmark suites with visual inputs and very sparse rewards, which we expect to be challenging to solve using a flat policy without hierarchy (\Cref{sec:sparse}).
+We further evaluate Director on a wide range of standard tasks from the literature to demonstrate its generality and ensure that the hierarchy is not harmful in simple settings (\Cref{sec:standard}). 
+We use a fixed set of hyperparameters not only across tasks but also across domains, detailed in \cref{tab:hparams}. 
+Finally, we offer insights into the learned hierarchical behaviors by visualizing the latent goals selected during environment episodes (\Cref{sec:interp}). 
+Ablations and additional results are included in the appendix.
+
+\paragraph{Implementation}
+
+We implemented Director on top of the public source code of DreamerV2 \citep{hafner2020dreamerv2}, reusing its default hyperparameters. 
+We additionally increased the number of environment instances to 4 and set the training frequency to one gradient step per 16 policy steps, which drastically reduced wall-clock time and decreased sample-efficiency mildly. 
+Implementing Director in the code base amounts to about 250 lines of code. 
+The computation time of Director is 20\% longer than that of DreamerV2. 
+Each training run used a single V100 GPU with XLA and mixed precision enabled and completed in less than 24 hours. 
+All our agents and environments will be open sourced upon publication to facilitate future research in hierarchical reinforcement learning.
+
+\paragraph{Baselines}
+
+To fairly compare Director to the performance of non-hierarchical methods, we compare to the DreamerV2 agent on all tasks. 
+DreamerV2 has demonstrated strong performance on Atari \citep{hafner2020dreamerv2}, Crafter \citep{hafner2021crafter} and continuous control tasks \citep{yarats2021drqv2} and outperforms top model-free methods in these domains. 
+We kept the default hyperparameters that the authors tuned for DreamerV2 and did not change them for Director. 
+In addition to its hierarchical policy, Director employs an exploration bonus at the top-level. 
+To isolate the effects of hierarchy and exploration, we compare to Plan2Explore \citep{sekar2020plan2explore}, which uses ensemble disagreement of forward models as a directed exploration signal. 
+We combined the extrinsic and exploration returns after normalizing by their exponential moving standard deviation with weights $1.0$ and $0.1$, as in Director. 
+We found Plan2Explore to be effective across both continuous and discrete control tasks.
+
+\subsection{Sparse Reward Benchmarks}
+\label{sec:sparse}
+
+\paragraph{Egocentric Ant Mazes}
+
+Learning navigation tasks directly from joint-level control has been a long-standing milestone for reinforcement learning with sparse rewards, commonly studied with quadruped robots in maze environments \citep{florensa2017snn,nachum2018hiro}. 
+However, previous attempts typically required domain-specific inductive biases to solve such tasks, such as providing global XY coordinates to the agent, easier practice goals, and a ground-truth distance reward, as summarized in \cref{fig:inputs}. 
+In this paper, we instead attempt learning directly from first-person camera inputs, without privileged information, and a single sparse reward that the agent receives while in the fixed goal zone. 
+The control frequency is 50Hz and episodes end after a time limit of 3000 steps. 
+There are no early terminations that could leak task-information to the agent \citep{laskin2022cic}. 
+To help the agent localize itself from first-person observations, we assign different colors to different walls of the maze.
+
+As shown in \cref{fig:mazes}, we evaluate the agents in four mazes that span varying levels of difficulty. 
+Because of the sparse reward, the episode returns correspond to the number of time steps for which the agent remains at the goal after reaching it. 
+Curves show the mean and standard deviation across 5 independent seeds. 
+We find that the flat Dreamer agent succeeds at the smallest of the four mazes, and the flat exploration policy Plan2Explore makes some initial learning progress but fails to converge to the optimal solution. 
+Inspecting the trajectories revealed that Plan2Explore chooses too chaotic actions that often result in the robot flipping over. 
+None of the baselines learn successful behaviors in the larger mazes, demonstrating that the benchmark pushes the limits of current approaches. 
+In contrast, Director discovers and learns to reliably reach the goal zone at all four difficulty levels, with the larger maze taking longer to master.
+
+\paragraph{Visual Pin Pads}
+
+The Pin Pad suite of environments is designed to evaluate an agent's ability to explore and assign credit over long horizons, isolated from the complexity of 3D observations or sophisticated joint-level control. 
+As shown in \cref{fig:pinpads}, each environment features a moving black square that the agent can control in all four directions and fixed pads of different colors that the agent can activate by walking over to the pad and stepping on it. 
+The task requires discovering the correct sequence of activating all pads, at which point the agent receives a sparse reward of 10 points and the agent position is randomly reset. 
+Episodes last for 2000 steps and there are no intermediate rewards for activating the pads. 
+To remove the orthogonal challenge of learning long-term memory \citep{gregor2019simcore}, the history of previously activated pads is displayed at the bottom of the image.
+
+The agent performance is shown in \cref{fig:pinpads}, which displays mean and standard deviation across five independent seeds. 
+The easiest environment contains three pads, so the agent only has to decide whether to activate the pads in clockwise or counter-clockwise sequence. 
+The flat Dreamer agent sometimes discovers the correct sequence. 
+The exploration bonus of Plan2Explore offers a significant improvement over Dreamer on this task. 
+Dreamer fails to discover the correct sequence in the harder environments that contain more pads. 
+Plan2Explore still achieves some reward with four pads, struggles with five pads, and completely fails with six pads. 
+In contrast, Director discovers the correct sequence in all four environments, demonstrating the benefit of hierarchy over flat exploration.
+
+\subsection{Standard Benchmarks}
+\label{sec:standard}
+
+To evaluate the robustness of Director, we train on a wide range of standard benchmarks, which typically require no long-term reasoning. 
+We choose Atari games \citep{bellemare2013ale}, the Control Suite from pixels \citep{tassa2018dmcontrol}, Crafter \citep{hafner2021crafter}, and tasks from DMLab \citep{beattie2016dmlab} to cover a spectrum of challenges, including continuous and discrete actions and 2D and 3D environments. 
+We compare two versions of Director. 
+In its standard variant, the worker learns purely from goal rewards. 
+This tests the ability of the manager to propose successful goals and the ability of the worker to achieve them. 
+In the second variant, the worker learns from goal and task returns with weights $1.0$ and $0.5$, allowing the worker to fill in low-level details in a task-specific manner, which the manager may be too coarse-grained to provide. 
+Ideally, we would like to see Director not perform worse than Dreamer on any task when giving task reward to the worker.
+
+The results of this experiment are summarized in \cref{sec:standardfig} due to space constraints, with the full training curves for Atari and the Control Suite included in \cref{sec:atari,sec:dmc}.
+We observe that Director indeed learns successfully across many environments, showing broader applicability than most prior hierarchical reinforcement learning methods. 
+In addition, providing task reward to the worker is not as important as expected --- the hierarchy solves a wide range of tasks purely by following goals at the low level. 
+Additionally providing task reward to the worker completely closes the gap to the state-of-the-art DreamerV2 agent.
+\Cref{fig:atari} in the appendix further shows that Director achieves a higher human-normalized median score than Dreamer on the 55 Atari games.
+
+\vspace*{3ex}
+\pagebreak
+
+% \vspace*{-1ex}
+\subsection{Goal Interpretations}
+\label{sec:interp}
+% \vspace*{-1ex}
+
+To gain insights into the decision making of Director, we visualize the sequences of goals it selects during environment interaction. 
+While the goals are latent vectors, the world model allows us to decode them into images for human inspection. 
+\Cref{fig:first,fig:selection} show episodes with the environment frames (what the agent sees) at the top and the decoded subgoals (what the manager wants the worker to achieve) at the bottom. 
+Visualizations for additional environments are included in \cref{sec:moregoals}.
+
+\begin{itemize}
+
+\itempar{Ant Maze M}
+The manager chooses goals that direct the agent through the different sections of the maze until the reward object is reached. 
+We also observed that initially, the manager chooses more intermediate subgoals whereas later during training, the worker learns to achieve further away goals and thus the manager can select fewer intermediate goals.
+
+\itempar{DMLab Goals Small}
+The manager directs the worker to the teleport animation, which occurs every time the agent collects the reward object and gets teleported to a random location in the 3D maze.
+Time step $T=125$ shows an example of the worker reaching the animation in the environment. 
+Unlike the Ant Maze benchmark, navigating to the goal in DMLab requires no joint-level control and is simple enough for the worker to achieve without fine-grained subgoals.
+
+% \pagebreak
+% \vspace*{-3ex}
+
+\itempar{Crafter}
+The manager requests higher inventory counts of wood and stone materials, as well as wooden tools, via the inventory display at the bottom of the screen. 
+It also directs the worker to a cave to find stone and coal but generally spends less effort on suggesting what the world around the agent should look like.
+As night breaks, the manager tasks the worker with finding a small cave or island to hide from the monsters that are about to spawn.
+
+\itempar{Walker Walk}
+The manager abstracts away the detail of leg movement, steering the worker using a forward leaning pose with both feet off the ground and a shifting floor pattern. 
+While the images cannot show this, the underlying goal vectors are Markovian states that can contain velocities, so it is likely that the manager additionally requests high forward velocity.
+The worker fills in the details of standing up and moving the legs to pass through the sequence of goals.
+
+\end{itemize}
+\vspace*{-.5ex}
+
+Across domains, Director chooses semantically meaningful goals that are appropriate for the task, despite using the same hyperparameters across all tasks and receiving no domain-specific knowledge.

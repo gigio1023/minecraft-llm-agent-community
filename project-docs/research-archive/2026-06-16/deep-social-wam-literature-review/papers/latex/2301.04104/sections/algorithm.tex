@@ -1,0 +1,199 @@
+\input{figures/model/figure}
+
+\section*{Learning algorithm}
+\label{sec:algorithm}
+
+We present the third generation of the Dreamer algorithm\citep{hafner2019dreamer,hafner2020dreamerv2}.
+The algorithm consists of three neural networks: the world model predicts the outcomes of potential actions, the critic judges the value of each outcome, and the actor chooses actions to reach the most valuable outcomes.
+The components are trained concurrently from replayed experience while the agent interacts with the environment.
+To succeed across domains, all three components need to accommodate different signal magnitudes and robustly balance terms in their objectives.
+This is challenging as we are not only targeting similar tasks within the same domain but aim to learn across diverse domains with fixed hyperparameters.
+This section introduces the world model, critic, and actor along with their robust loss functions, as well as tools for robustly predicting quantities of unknown orders of magnitude.
+
+\subsection*{World model learning}
+
+The world model learns compact representations of sensory inputs through autoencoding \citep{kingma2013vae} and enables planning by predicting future representations and rewards for potential actions.
+We implement the world model as a Recurrent State-Space Model (RSSM) \citep{hafner2018planet}, shown in \cref{fig:model}.
+First, an encoder maps sensory inputs $x_t$ to stochastic representations $z_t$.
+Then, a sequence model with recurrent state $h_t$ predicts the sequence of these representations given past actions $a_{t-1}$.
+The concatenation of $h_t$ and $z_t$ forms the model state from which we predict rewards $r_t$ and episode continuation flags $c_t\in\{0,1\}$ and reconstruct the inputs to ensure informative representations:
+
+\eq{
+\begin{alignedat}{4}
+\raisebox{1.95ex}{\llap{\blap{\ensuremath{
+\text{RSSM} \hspace{1ex} \begin{cases} \hphantom{A} \\ \hphantom{A} \\ \hphantom{A} \end{cases} \hspace*{-2.4ex}
+}}}}
+& \text{Sequence model:}        \padspace && h_t            &\ =    &\ f_\phi(h_{t-1},z_{t-1},a_{t-1}) \\
+& \text{Encoder:}   \padspace && z_t            &\ \sim &\ \qp(z_t | h_t,x_t) \\
+& \text{Dynamics predictor:}   \padspace && \hat{z}_t      &\ \sim &\ \pp(\hat{z}_t | h_t) \\
+& \text{Reward predictor:}       \padspace && \hat{r}_t      &\ \sim &\ \pp(\hat{r}_t | h_t,z_t) \\
+& \text{Continue predictor:}     \padspace && \hat{c}_t      &\ \sim &\ \pp(\hat{c}_t | h_t,z_t) \\
+& \text{Decoder:}        \padspace && \hat{x}_t      &\ \sim &\ \pp(\hat{x}_t | h_t,z_t)
+\end{alignedat}}
+
+\Cref{fig:openl} visualizes long-term video predictions of the world world.
+The encoder and decoder use convolutional neural networks (CNN) for image inputs and multi-layer perceptrons (MLPs) for vector inputs.
+The dynamics, reward, and continue predictors are also MLPs.
+The representations are sampled from a vector of softmax distributions and we take straight-through gradients through the sampling step \citep{bengio2013straight,hafner2020dreamerv2}.
+Given a sequence batch of inputs $x_{1:T}$, actions $a_{1:T}$, rewards $r_{1:T}$, and continuation flags $c_{1:T}$, the world model parameters $\phi$ are optimized end-to-end to minimize the prediction loss $\mathcal{L}_{\mathrm{pred}}$, the dynamics loss $\mathcal{L}_{\mathrm{dyn}}$, and the representation loss $\mathcal{L}_{\mathrm{rep}}$ with corresponding loss weights $\beta_{\mathrm{pred}}=1$, $\beta_{\mathrm{dyn}}=1$, and $\beta_{\mathrm{rep}}=0.1$:
+
+\eq{
+\mathcal{L}(\phi)\doteq
+\E_{q_\phi}<\Big>[\textstyle\sum_{t=1}^T(
+    \beta_{\mathrm{pred}}\mathcal{L}_{\mathrm{pred}}(\phi)
+   +\beta_{\mathrm{dyn}}\mathcal{L}_{\mathrm{dyn}}(\phi)
+   +\beta_{\mathrm{rep}}\mathcal{L}_{\mathrm{rep}}(\phi)
+)].
+\label{eq:wm}
+}
+
+\input{figures/openl/figure}
+The prediction loss trains the decoder and reward predictor via the symlog squared loss described later, and the continue predictor via logistic regression.
+The dynamics loss trains the sequence model to predict the next representation by minimizing the KL divergence between the predictor $\pp(z_t|h_t)$ and the next stochastic representation $\qp(z_t|h_t,x_t)$.
+The representation loss, in turn, trains the representations to become more predictable allowing us to use a factorized dynamics predictor for fast sampling during imagination training.
+The two losses differ in the stop-gradient operator $\operatorname{sg}(\cdot)$ and their loss scale.
+To avoid a degenerate solution where the dynamics are trivial to predict but fail to contain enough information about the inputs, we employ free bits\citep{kingma2016freebits} by clipping the dynamics and representation losses below the value of 1 nat $\approx$ 1.44 bits.
+This disables them while they are already minimized well to focus learning on the prediction loss:
+
+\eq{
+\mathcal{L_{\mathrm{pred}}}(\phi) & \doteq
+-\lnpp(x_t|z_t,h_t)
+-\lnpp(r_t|z_t,h_t)
+-\lnpp(c_t|z_t,h_t) \\
+\mathcal{L_{\mathrm{dyn}}}(\phi) & \doteq
+\max\bigl(1,\KL[\sg(\qp(z_t|h_t,x_t)) || \hspace{3.2ex}\pp(z_t|h_t)\hphantom{)}]\bigr) \\
+\mathcal{L_{\mathrm{rep}}}(\phi) & \doteq
+\max\bigl(1,\KL[\hspace{3.2ex}\qp(z_t|h_t,x_t)\hphantom{)} || \sg(\pp(z_t|h_t))]\bigr)
+}
+
+Previous world models require scaling the representation loss differently based on the visual complexity of the environment \citep{hafner2019dreamer}.
+Complex 3D environments contain details unnecessary for control and thus prompt a stronger regularizer to simplify the representations and make them more predictable.
+In games with static backgrounds and where individual pixels may matter for the task, a weak regularizer is required to extract fine details.
+We find that combining free bits with a small representation loss resolves this dilemma, allowing for fixed hyperparameters across domains.
+Moreover, we transform vector observations using the symlog function described later, to prevent large inputs and large reconstruction gradients, further stabilizing the trade-off with the representation loss.
+
+We occasionally observed spikes the in KL losses in earlier experiments, consistent with reports for deep variational autoencoders \citep{child2020vdvae}.
+To prevent this, we parameterize the categorical distributions of the encoder and dynamics predictor as mixtures of 1\% uniform and 99\% neural network output, making it impossible for them to become deterministic and thus ensuring well-behaved KL losses.
+Further model details and hyperparameters are included in the supplementary material.
+
+\subsection*{Critic learning}
+
+The actor and critic neural networks learn behaviors purely from abstract trajectories of representations predicted by the world model \citep{sutton1991dyna}.
+For environment interaction, we select actions by sampling from the actor network without lookahead planning.
+The actor and critic operate on model states $s_t \doteq \{h_t,z_t\}$ and thus benefit from the Markovian representations learned by the recurrent world model.
+The actor aims to maximize the return $R_t \doteq \textstyle\sum_{\tau=0}^\infty \gamma^\tau r_{t+\tau}$ with a discount factor $\gamma=0.997$ for each model state.
+To consider rewards beyond the prediction horizon $T=16$, the critic learns to approximate the distribution of returns \citep{bellemare2017c51} for each state under the current actor behavior:
+
+\eq{
+&\text{Actor:}\quad
+&& a_t \sim \p<\pi_\theta>(a_t|s_t) \qquad
+&\text{Critic:}\quad
+&& \p<v_\psi>(R_t | s_t)
+\label{eq:ac}
+}
+
+Starting from representations of replayed inputs, the world model and actor generate a trajectory of
+imagined model states $s_{1:T}$, actions $a_{1:T}$, rewards $r_{1:T}$, and continuation flags $c_{1:T}$.
+Because the critic predicts a distribution, we read out its predicted values $v_t \doteq \operatorname{E}[\p<v_\psi>(\,\cdot|s_t)]$ as the expectation of the distribution.
+To estimate returns that consider rewards beyond the prediction horizon, we compute bootstrapped $\lambda$-returns \citep{sutton2018rlbook} that integrate the predicted rewards and the values.
+The critic learns to predict the distribution of the return estimates $R^\lambda_t$ using the maximum likelihood loss:
+
+\eq{
+\mathcal{L}(\psi) \doteq -\textstyle\sum_{t=1}^T \p<\ln p_\psi>(R^\lambda_t | s_t)
+\qquad
+R^\lambda_t \doteq r_t + \gamma c_t \Big(
+  (1 - \lambda) v_t +
+  \lambda R^\lambda_{t+1}
+\Big)
+\qquad
+R^\lambda_T \doteq v_T
+\label{eq:lambda}
+}
+
+While a simple choice would be to parameterize the critic as a Normal distribution, the return distribution can have multiple modes and vary by orders of magnitude across environments. To stabilize and accelerate learning under these conditions, we parameterize the critic as categorical distribution with exponentially spaced bins, decoupling the scale of gradients from the prediction targets as described later.
+To improve value prediction in environments where rewards are challenging to predict, we apply the critic loss both to imagined trajectories with loss scale $\beta_{\mathrm{val}}=1$ and to trajectories sampled from the replay buffer with loss scale $\beta_{\mathrm{repval}}=0.3$. The critic replay loss uses the imagination returns $R^\lambda_t$ at the start states of the imagination rollouts as on-policy value annotations for the replay trajectory to then compute $\lambda$-returns over the replay rewards.
+
+Because the critic regresses targets that depend on its own predictions, we stabilize learning by regularizing the critic towards predicting the outputs of an exponentially moving average of its own parameters.
+This is similar to target networks used previously in reinforcement learning \citep{mnih2015dqn} but allows us to compute returns using the current critic network.
+We further noticed that the randomly initialized reward predictor and critic networks at the start of training can result in large predicted rewards that can delay the onset of learning.
+We thus initialize the output weight matrix of the reward predictor and critic to zeros, which alleviates the problem and accelerates early learning.
+
+\subsection*{Actor learning}
+
+The actor learns to choose actions that maximize return while exploring through an entropy regularizer \citep{williams1991maxentreinforce}.
+However, the correct scale for this regularizer depends both on the scale and frequency of rewards in the environment.
+Ideally, we would like the agent to explore more if rewards are sparse and exploit more if rewards are dense or nearby. At the same time, the exploration amount should not be influenced by arbitrary scaling of rewards in the environment.
+This requires normalizing the return scale while preserving information about reward frequency.
+
+To use a fixed entropy scale of $\eta=3\times10^{-4}$ across domains, we normalize returns to be approximately contained in the interval $[0, 1]$. In practice, substracting an offset from the returns does not change the actor gradient and thus dividing by the range $S$ is sufficient. Moreover, to avoid amplifying noise from function approximation under sparse rewards, we only scale down large return magnitudes but leave small returns below the threshold of $L=1$ untouched. We use the Reinforce estimator \citep{williams1992reinforce} for both discrete and continuous actions, resulting in the surrogate loss function:
+
+\eq{
+\mathcal{L}(\theta)\doteq
+-\textstyle\sum_{t=1}^T%\Big(
+\sg\!\Big(\big(R^\lambda_t-v_\psi(s_t)\big)/\max(1,\,S)\Big)
+\log\p<\pi_\theta>(a_t|s_t)
++\,\eta\H[\p<\pi_\theta>(a_t|s_t)]%\Big)
+}
+
+The return distribution can be multi-modal and include outliers, especially for randomized environments where some episodes have higher achievable returns than others. Normalizing by the smallest and largest observed returns would then scale returns down too much and may cause suboptimal convergence. To be robust to these outliers, we compute the range from the 5\textsuperscript{th} to the 95\textsuperscript{th} return percentile over the return batch and smooth out the estimate using an exponential moving average:
+
+\eq{
+S \doteq \EMA\!\big(\Per(R^\lambda_t, 95) - \Per(R^\lambda_t, 5), 0.99\big)
+}
+
+Previous work typically normalizes advantages\citep{schulman2017ppo} rather than returns, which puts a fixed amount of emphasis on maximizing returns over entropy regardless of whether rewards are within reach.
+Scaling up advantages when rewards are sparse can amplify noise that outweighs the entropy regularizer and stagnates exploration.
+Normalizing rewards or returns by standard deviation can fail under sparse rewards where their standard deviation is near zero, drastically amplifying rewards regardless of their size.
+Constrained optimization targets a fixed entropy on average across states \citep{haarnoja2018sac,abdolmaleki2018mpo} regardless of achievable returns, which is robust but explores slowly under sparse rewards and converges lower under dense rewards.
+We did not find stable hyperparameters across domains for these approaches.
+Return normalization with a denominator limit overcomes these challenges, exploring rapidly under sparse rewards and converging to high performance across diverse domains.
+
+\subsection*{Robust predictions}
+\label{sec:symlog}
+
+Reconstructing inputs and predicting rewards and returns can be challenging because the scale of these quantities can vary across domains.
+Predicting large targets using a squared loss can lead to divergence whereas absolute and Huber losses \citep{mnih2015dqn} stagnate learning.
+On the other hand, normalizing targets based on running statistics \citep{schulman2017ppo} introduces non-stationarity into the optimization.
+We suggest the symlog squared error as a simple solution to this dilemma.
+For this, a neural network $f(x,\theta)$ with inputs $x$ and parameters $\theta$ learns to predict a transformed version of its targets $y$.
+To read out predictions $\hat{y}$ of the network, we apply the inverse transformation:
+
+\eq{
+\mathcal{L(\theta)} \doteq \textstyle\frac{1}{2}\big(f(x,\theta)-\symlog(y)\big)^2 \qquad
+\hat{y} \doteq \symexp\!\big(f(x,\theta)\big)
+\label{eq:logpred}}
+
+Using the logarithm as transformation would not allow us to predict targets that take on negative values.
+Therefore, we choose a function from the bi-symmetric logarithmic family \citep{webber2012symlog} that we name symlog as the transformation with the symexp function as its inverse:
+
+\eq{
+\symlog(x) \doteq \sign(x)\ln\!\big(|x|+1\big) \qquad
+\symexp(x) \doteq \sign(x)\big(\!\exp(|x|)-1\big)
+\label{eq:symlog}}
+
+The symlog function compresses the magnitudes of both large positive and negative values.
+Unlike the logarithm, it is symmetric around the origin while preserving the input sign.
+This allows the optimization process to quickly move the network predictions to large values when needed.
+The symlog function approximates the identity around the origin so that it does not affect learning of targets that are already small enough.
+
+For potentially stochastic targets, such as rewards or returns, we introduce the symexp twohot loss. Here, the network outputs the logits for a softmax distribution over exponentially spaced bins $b_i \in B$.
+Predictions are read out as the weighted average of the bin positions weighted by their predicted probabilities. Importantly, the network can output any continuous value in the interval because the weighted average can fall between the buckets:
+
+\eq{
+\hat{y} \doteq \operatorname{softmax}(f(x))^T B \qquad
+B \doteq \symexp(\begin{bmatrix} -20 & ... & +20 \end{bmatrix})
+}
+
+The network is trained on twohot encoded targets \citep{schrittwieser2019muzero,bellemare2017c51}, a generalization of onehot encoding to continuous values. The twohot encoding of a scalar is a vector with $|B|$ entries that are all $0$ except at the indices $k$ and $k+1$ of the two bins closest to the encoded scalar. The two entries sum up to $1$, with linearly higher weight given to the bin that is closer to the encoded continuous number.
+The network is then trained to minimize the categorical cross entropy loss for classification with soft targets. Note that the loss only depends on the probabilities assigned to the bins but not on the continuous values associated with the bin locations, decoupling the size of the gradients from the size of the targets:
+
+\eq{
+\mathcal{L}(\theta) \doteq
+-\twohot(y)^T \operatorname{log\,softmax}(f(x,\theta))
+\label{eq:twohotloss}
+}
+
+Applying these principles, Dreamer transforms vector observations using the symlog functions, both for the encoder inputs and the decoder targets and employs the synexp twohot loss for the reward predictor and critic.
+We find that these techniques enable robust and fast learning across many diverse domains.
+For critic learning, an alternative asymmetric transformation has previously been proposed \citep{kapturowski2018r2d2}, which we found less effective on average across domains.
+Unlike alternatives, symlog transformations avoid truncating large targets \citep{mnih2015dqn}, introducing non-stationary from normalization \citep{schulman2017ppo}, or adjusting network weights when new extreme values are detected \citep{hessel2019popart}.

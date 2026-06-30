@@ -1,0 +1,446 @@
+\section{Introduction} \label{sec:introduction}
+Recent research has increasingly focused on the capabilities of Large Language Models (LLMs) in decision-making tasks, revealing their potential to operate as autonomous agents in various economic environments, that typically require involving complex strategic thinking \cite{horton2023large,wang2023voyager,zhu2024capturing,li2024stridetoolassistedllmagent,sun2025game}. Applications of LLM-based agents in such environments include Chess-playing \cite{feng2024chessgpt}, task-oriented dialogue handling \cite{ulmer2024bootstrapping}, financial advisement \cite{lakkaraju2023llms} and beyond. The promising capabilities of LLMs in strategic decision-making call for the study of these agents' behavior through the lens of game theory, e.g. whether and when LLM-based agents naturally converge to Nash-equilibrium \cite{guo2024economics}, and how well they learn to cooperate in repeated interactions \cite{akata2023playing}. The rise of LLM agents also calls for a clear benchmark for assessing the extent to which such agents behave rationally \cite{ramansteer}.
+
+An important property of many real-world economic environments is that communication between agents typically occurs through \emph{natural language}. While economic modeling usually abstracts away these nuances for the sake of keeping the model simple and tractable, in practical scenarios the fact that natural language is involved may significantly affect the interaction outcome. 
+For instance, in bargaining between two parties, the same offer can be interpreted very differently depending on how it is framed. Consider the following two offers for a business partnership:
+
+\begin{itemize}
+    \item[(a)] \emph{"We propose a 40-60 split as we believe your expertise will drive the majority of the success."}
+    \item[(b)] \emph{"We propose a 40-60 split because we’ve already invested significant resources and need a lower share to maintain balance."}
+\end{itemize}
+
+Both of these offer the same numerical terms, but the framing in each case may lead to different reactions based on how the rationale is presented.
+A similar rationale applies to a broader range of economic scenarios. To illustrate this further, let us consider the following representative use cases:
+
+\begin{itemize}
+\item \textbf{Bargaining.} Alice and Bob co-own a startup valued at a million dollar, and must decide how to divide the proceeds from its sale. To reach an agreement, they take turns proposing how to split the shared value, with each delay in reaching a decision reducing the overall value for both parties. The interaction often involves free language in the proposal exchange.
+\item \textbf{Negotiation.} Alice aims to sell a product to a potential buyer, Bob. They negotiate by taking turns proposing prices, with Alice deciding whether to accept Bob's offer and sell, and Bob deciding whether to accept Alice's price and buy, continuing this process until they reach an agreement or the negotiation concludes. The negotiation often involves natural language, such as descriptions of the product, which can influence the outcome.\footnote{Notice that in the economic literature, the terms "bargaining" and "negotiation" are often used interchangeably to describe both the division of a divisible good and the process of price negotiation. In this paper, we use the terminology "bargaining" to describe the former and "negotiation" for the latter, for ease of exposition.}
+\item \textbf{Persuasion.} Alice is a seller trying to sell a product to Bob at an exogenously set fixed price. Alice knows the true quality of the product, while Bob only has a rough expectation of the product's quality. Alice sends a message to persuade Bob to buy the product, aiming to convince him of its value, regardless of its true quality. Bob, however, benefits only if the product is of genuinely high quality. The interaction then repeats for multiple rounds, with the product quality in each round being independently drawn. In such a scenario, Alice balances between her maximizing one-shot gain and building positive reputation, and linguistic communication can play a significant role.
+\end{itemize}
+
+
+These three types of interactions are inspired by influential models in the economics literature. They are also broad and flexible enough to capture a wide variety of real-world applications. The bargaining model, inspired by the seminal work of \citet{rubinstein1982perfect}, forms the basis for understanding how parties negotiate the division of shared resources, applicable in scenarios such as business mergers, partnership dissolution, and legal settlements. 
+The negotiation game reflects celebrated models of bilateral trade \cite{myerson1983efficient,McAfee1992} where buyers and sellers negotiate over the prices of an indivisible good, which often arises in various applications, including real estate transactions, corporate acquisitions, and e-commerce platforms. 
+Lastly, the persuasion model draws on classical models of information asymmetry and strategic communication \cite{akerlof1978market,crawford1982strategic,cheaptalk}, which play a pivotal role in advertising, marketing, political campaigning, and recommendation systems.
+% \footnote{These three fundamental game families are \emph{sequential games}, in which players act in turns, unlike in simultaneous games. We discuss the importance of studying such games in the context of language-based environments in Appendix \ref{app:seq-sim}.}
+
+A key feature of all these games is that they are sequential, meaning players take turns acting rather than acting simultaneously. This makes communication, and in particular language-based communication, a crucial element of the interaction. In sequential games, communication is typically direct, with players able to attach messages to their actions (e.g., in the bargaining example, the textual message is attached to the proposal). In contrast, in simultaneous games, communication tends to be indirect, as players act independently and typically learn to cooperate by observing and reacting to past actions rather than through direct message exchange. 
+A prime example of a simultaneous, language-based economic interaction is the competition among web publishers in search engines. Publishers simultaneously create content (usually in the form of textual documents) for their websites, and then gradually learn and adapt based on outcomes, such as their relative search engine rankings and exposure. However, they usually lack the opportunity for real-time communication or coordination during this process. These simultaneous, language-based interactions are well-studied within the information retrieval community, and the induced publishers' game is indeed modeled as a simultaneous game.\footnote{For instance, see \citet{raifer2017information,ben2019convergence,10.1145/3477495.3532771,hron2022modeling,madmon2025search,madmon2025convergence,nachimovsky2024ranking}, in which SEO competitions are modeled as simultaneous games.}
+Our work is complementary, focusing on sequential settings where direct, language-based communication is prevalent.
+
+The AI and NLP communities have recognized the potential of integrating natural language into stylized economic models of bargaining, negotiation and persuasion. They also recognize the importance of studying the capabilities and limitations of LLM-based agents within such frameworks. 
+Research increasingly focuses on evaluating and improving LLM agents in bargaining and negotiation settings \cite{abdelnabi2023llm,deng2024llms,xia2024measuring,bianchi2024well,noh2024llms,hua2024game}. In the realm of persuasion games, recent studies have introduced language-based frameworks that explore the design of optimal information transmission policies \cite{raifer2022designing} and develop methods for generating data to predict human players' behavior \cite{apel2022predicting,shapira2025human,shapira2024can}.
+
+Although each of these economic setups has been studied in the context of LLM-based agents, the approaches have varied widely across different studies. Each paper often adopts distinct modeling and implementation assumptions, poses unique research questions, and applies diverse evaluation criteria, making it challenging to compare results and draw broader conclusions about the capabilities and limitations of LLM-based agents in economic environments. 
+Moreover, the vast majority of the existing game-theoretic benchmarks for LLMs do not even include setups in which agents are allowed to communicate in natural language \cite{duan2024gtbench,huang2024far,guo2024economics,wang2024tmgbench}.
+
+To enhance the real-world reliability of LLM-based agents, it is essential to establish a clear benchmark that provides a standardized framework for modeling these economic interactions. This benchmark would ensure comparability across studies and enable generalization of findings, facilitating a deeper understanding of how various factors influence interaction outcomes and leading to more robust and reliable conclusions about the performance of LLM-based agents in real-life economic situations.
+
+\subsection{Our Contribution} 
+
+We introduce \texttt{GLEE},
+a unified framework for \textbf{G}ames in \textbf{L}anguage-based \textbf{E}conomic \textbf{E}nvironments,\footnote{Code and data are available in  \url{https://github.com/eilamshapira/GLEE}.}
+focusing on the case of two-player games.
+The two-player case is central, as it marks the shift from single-agent decision-making to strategic, communicative interaction. Such scenarios are common in real life, intuitive to analyze, and still capture the essential dynamics of more complex multi-agent settings.
+Our framework provides a principled way to evaluate the performance of LLM agents and human players in a wide class of fundamental language-based economic scenarios. 
+
+\paragraph{Games Parametrization}
+Central to the framework is a clear and comprehensive parameterization of the space of all bargaining, negotiation and persuasion games (as described above). It defines degrees of freedom and evaluation metrics that are consistent across economic contexts. 
+The generality of the space of games spanned by our parameterization follows from the richness of the degrees of freedom considered, which include the game horizon (number of rounds within each game), information structure (whether agents know each others' preferences or not), and communication form (whether agents communicate via free language or structured messages).
+The framework is implemented as an open-source codebase that allows researchers to instantiate a wide range of economic games and evaluate LLM behavior within them. While the specific LLMs used in experiments may evolve or become outdated, the evaluation setup and metrics remain valid. 
+
+\paragraph{Data Collection}
+Using this framework, we have collected a dataset of LLM vs. LLM games, comprising 587K decisions made by LLM-based agents across more than 80K games, involving 13 different LLMs. The framework enables controlled experimentation across a wide range of language models, game types, and experimental conditions, making the dataset a valuable resource for evaluating LLM behavior in diverse economic settings. It also supports in-depth analyses of how the parameters of the economic environment affect agent strategies and shape interaction outcomes. Additionally, we developed an interactive interface that enables human participants to compete against LLM-based agents across various game configurations. Using this setup, we conducted experiments and compiled a complementary dataset of human vs. LLM interactions.
+
+\paragraph{Experimental Evaluation}
+Through extensive analysis of the collected data, we uncover meaningful behavioral and economic phenomena:
+
+\begin{enumerate}
+    \item We find that the economic outcome, measured by efficiency, fairness, and agent self-gain, is significantly shaped by market parameters, including the information structure, communication form, and interaction horizon.
+    \item We show that there are no absolute best-performing models in terms of any of the evaluation measures, and that the performance of one LLM strongly depends on its competitor's choice of LLM.
+    \item We compare LLMs to human participants and find that human behavior is markedly more extreme: in each setting, they either outperform all LLMs or fall behind them entirely, depending on the game and their assigned role.
+\end{enumerate}
+ 
+Together, these findings show how \texttt{GLEE} can be used not only as an infrastructure for research, but also as a tool for deriving concrete insights into economic reasoning and strategic behavior in language-based interactions.
+
+\subsection{Comparison to Prior Benchmarks}
+\label{app:prior_benchmarks}
+
+To put in context the contribution of \texttt{GLEE} within the broader research landscape, we compare it to several recent benchmarks designed to evaluate the performance of LLMs in strategic settings. While these benchmarks differ in their choice of games, evaluation metrics, and interaction modalities, none focus on multi-turn economic games involving natural language communication. \texttt{GLEE} addresses this gap by offering a unified, richly parameterized framework for studying LLMs in sequential, language-based economic interactions. The following comparisons highlight where \texttt{GLEE} introduces new capabilities and how it complements or extends existing benchmarks.
+
+\paragraph{LLMs as Rational Players} \cite{Fan2023CanLL}. Test the rationality of LLM in the light of game theory, using three simple one-shot games with no interaction between the players.
+\texttt{GLEE} supplies multi-round negotiation/bargaining/persuasion with free-text chat and direct human–agent comparison.
+
+\paragraph{GAMA-Bench} \cite{huang2024far}. Introduce 8 single-turn games studied in game theory to test LLM rationality. The games are not economic games with little interaction between players.
+\texttt{GLEE} targets language–centric games, with games extensively studied in economic literature and extensive human trials.
+
+\paragraph{GTBench} \cite{duan2024gtbench}. Introduces a benchmark to test LLM rationality using board and card games. These games are not economic games, and natural language interaction does not happen.
+\texttt{GLEE} emphasis is on natural language \emph{communication} (e.g., concessions, persuasion) within purely economic games.
+
+\paragraph{Game theoretic LLM} \cite{hua2024game}. Measures LLM behaviour on different multi-turn non-economic games extensively studied in game theory. The games they use have no extensive parameterization, and therefore few variants.
+\texttt{GLEE} is based on three economic games with heavy parameterization, allowing testing LLMs on hundreds of variants of the same game.
+
+\paragraph{TMGBench} \cite{wang2024tmgbench}. Introduces an exhaustive benchmark with 144 $2 \times 2$ normal-form games, but these games are not economic games, are often synthetic, single-shot, and without communication between the players.
+While \texttt{GLEE} covers fewer games, it captures real dynamics with multi-turn and natural language communication between the player.
+
+\paragraph{CompeteAI} \cite{Zhao2023CompeteAIUT}. Introduce a one-competition world with multiple players; the metrics used are qualitative (LLM judgements).
+\texttt{GLEE} generalises across three economic game families with multiple parametrizations, using quantitative metrics derived from game theory research. 
+
+
+\medskip
+We summarize key differences in Table~\ref{tab:comparison}, highlighting where \texttt{GLEE} introduces new capabilities.
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.05}
+\small
+\caption{Comparison of benchmarks evaluating LLMs in strategic games. \texttt{GLEE} stands out by focusing on multi-turn, natural language, economic interactions with extensive human evaluation and openness.}
+\label{tab:comparison}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Framework} & \textbf{Multi turns} & \textbf{NL Communication} & \textbf{Human Evaluation} \\
+\midrule
+\textbf{GLEE (ours)}  & \cmark & \cmark & \cmark \\
+Rational Players \cite{Fan2023CanLL} & \xmark & \xmark & \xmark  \\
+GAMA-Bench \cite{huang2024far} & \xmark & \xmark & \textcolor{orange}{\cmark} \\
+GTBench \cite{duan2024gtbench} & \cmark & \xmark & \xmark  \\
+Game theoric LLM \cite{hua2024game} & \cmark & Structured & \xmark  \\
+TMGBench \cite{wang2024tmgbench} & \xmark & \xmark & \xmark  \\
+CompeteAI \cite{Zhao2023CompeteAIUT} & \cmark & Indirect & \xmark  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Game Families and Parametrization} \label{sec:game_families}
+In this section, we formally define the three game families discussed in the introduction: bargaining, negotiation and persuasion.
+We then further discuss the related economic literature, and review some well-known theoretical results concerning these games. For each family, we provide a formal game-theoretic definition of the game (including the players, strategies and utilities), define degrees of freedom, and define the game outcome and evaluation metrics. 
+While previous research has effectively tackled the challenge of evaluating the rationality of individual agents \cite{ramansteer}, our focus extends to evaluating the outcome reached by the strategic behavior of the agents, using the fundamental economic notions of \emph{efficiency} and \emph{fairness}.\footnote{Metrics are normalized to $[0,1]$, such that higher values indicate better (more efficient or fair) outcomes.}
+
+In our modeling, we focus on three main market characteristics that are critical for understanding the dynamics of LLM-based agents in economic interactions: \emph{game horizon}, \emph{information structure}, and \emph{communication form}. The \emph{game horizon} refers to the number of time periods during which the game is played and whether the length of the horizon is known or unknown to the agents.\footnote{In economic theory, "infinite horizon" typically refers to a large, unspecified duration. Accordingly, we use the term "infinite horizon" to describe cases where the horizon is both large and unknown to the agents.}
+This factor influences the strategies agents adopt, particularly in terms of long-term planning and anticipation of future moves. The \emph{information structure} determines whether agents are aware of each other's preferences, impacting their ability to predict and respond to the actions of others. Lastly, the \emph{communication form} specifies whether communication between agents occurs through free language or structured, concise messages, which affects the richness and clarity of the exchanges.
+
+\subsection{Bargaining Games}
+
+The first family of games is inspired by the celebrated bargaining model of \citet{rubinstein1982perfect}. The model encompasses a class of bargaining games where two players, Alice and Bob, alternate offers over a time horizon $T$ (usually, $T=\infty$) to divide a fixed sum of money $M$ between them. It is clear that under a full rationality assumption, the amount of money does not play a role in the analysis. However, for human (or LLM) players, it is evident that the amount of money indeed matters. Importantly, in these games delays are costly, a concept captured by \emph{discount factors} $\delta_A, \delta_B$ assigned to each player, reflecting the decreasing value of future payoffs as time progresses. Formally:
+
+\begin{enumerate}
+    \item At each odd stage $t$, Alice offers a division $(p,1-p)$ for some $p\in[0,1]$.
+    \item Bob decides whether to accept or reject.
+    \item If Bob accepts, the (Alice, Bob) utility vector is given by $M(\delta_A^{t-1} p, \delta_B^{t-1} (1-p))$.
+    \item At each even stage $t$, Bob offers a division $(q,1-q)$ for some $q\in[0,1]$.
+    \item Alice decides whether to accept or reject.
+    \item If Alice accepts, the game terminates, and the (Alice, Bob) utility vector is given by $M(\delta_A^{t-1} q, \delta_B^{t-1} (1-q))$.
+\end{enumerate}
+  
+If no agreement is reached at any stage, the utilities are defined to be $(0,0)$. In the standard version of the game, the time horizon is infinite and the discount factors are common knowledge (i.e., Alice and Bob know both $\delta_A$ and $\delta_B$). 
+
+In our experiments, we simulate a wide range of such bargaining games, differing in the following degrees of freedom: 
+\begin{itemize}
+     
+
+\item[(i)] whether or not the players know their opponent's discount factor (complete vs. incomplete information);
+\item[(ii)] whether or not the players know when the game terminates (finite vs. infinite);
+\item[(iii)] whether or not players' communication involve natural language (structured vs. linguistic);
+\item[(iv)] the values of $\delta_A, \delta_B \in (0,1)$ and $M$;
+\item[(v)] the value of $T$ in the finite horizon case.
+\end{itemize}
+
+An outcome of the game is a pair $(t_{ev}, p_{ev})$, where $t_{ev}$ is the stage index at which the game terminated, and $p_{ev}$ is the share of $M$ that Alice obtained (without considering the discount in the utilities).
+When the game terminates without reaching an agreement, we define $t_{ev}=\infty$, and the gain for both players is zero.
+The evaluation metrics used to assess the economic outcome are \emph{efficiency} and \emph{fairness}. 
+Efficiency is now measured by the normalized sum of Alice’s and Bob’s discounted payoffs at the time of agreement: 
+\[\delta_A^{t_{ev}-1} p_{ev} + \delta_B^{t_{ev}-1} (1 - p_{ev})\] 
+if $t_{ev} < \infty$, and $0$ if $t_{ev} = \infty$. 
+Fairness is defined as the distance between the actual division and the fairest division, 
+\[1 - 4 \cdot(p_{ev} - \frac{1}{2})^2\] if $t_{ev} < \infty$, and $1$ if $t_{ev} = \infty$. We consider the case of no trade as fair, since both players get the same utility. Obviously, this is also the least efficient outcome, which highlights the natural fairness-efficiency tradeoff.
+
+\subsection{Negotiation Games}
+
+In the second family of games, referred to as negotiation games, a seller (Alice) and a buyer (Bob) are negotiating over the price of a product. 
+At the outset, Alice owns a product she subjectively values at $V_A$. The subjective valuation of the potential buyer, Bob, is $V_B$. 
+To capture the notion of valuation scale in negotiation games, we parameterize $V_i=M \cdot F_i$ for $i \in \{A,B\}$, where $F_i \in (0, 1)$ is a factor parameter $M$ is a scale parameter.
+
+As in the case of bargaining games, Alice and Bob alternate offers: at each odd stage, Alice posts a price and Bob decides whether to buy the product or move on to the next stage. At each even stage, Bob is the one to post a price and Alice decides whether to sell at this price or reject and move on to the next stage. The game is played for $T$ stages, which again can be either finite or "infinite" (i.e., large and unknown to both players). Unlike the bargaining game, here we assume no discount factors on the utilities, hence whenever a price $p$ is accepted, the utilities for Alice and Bob are $p - V_A$ and $V_B - p$ respectively. If no trade is made, then the utilities are defined to be $(0, 0)$.
+
+In this class of games, we consider the following degrees of freedom: 
+
+\begin{itemize}
+\item[(i)] whether or not the players know their opponent's product valuation (complete vs. incomplete information);
+\item[(ii)] whether or not the players know when the game terminates (finite vs. infinite);
+\item[(iii)] whether or not players' communication involve natural language (structured vs. linguistic);
+\item[(iv)] the values of $F_A, F_B \in (0,1)$ and $M$;
+and \item[(v)] the value of $T$ in the finite horizon case.
+\end{itemize}
+
+
+An outcome of a negotiation game is captured by $p_{ev}$, which is the price at which the product is sold when there is a trade, and defined to be $p_{ev} = \emptyset$ whenever no trade is made.
+We consider the following evaluation measures of the game outcome \emph{fairness} and \emph{efficiency}. 
+When there is trade, fairness is measured by 
+\[1 - 4 \cdot \left(\frac{p_{ev} - p_f}{M}\right)^2\]
+where $p_f = \frac{V_A + V_B}{2}$ is the "fairest price".\footnote{Notice that unlike all other metrics, the fairness metric in negotiation games is not normalized, as the price $p_{ev}$ is unbounded in principle. However, we observe that normalizing the difference $p_{ev}-p_f$ by the scale parameter $M$ results in a measure that is between $0$ and $1$ in 99.5\% of the cases.}
+When trade is not made, we define the fairness to be $1$ (i.e., maximal fairness) to reflect that no-trade does not change the default allocation of the product.
+
+\medskip
+Efficiency is defined to be $1$ in the following cases (and zero otherwise): 
+\begin{itemize}
+    \item[(a)] Alice values the product more than Bob, and does not sell it ($V_A \ge V_B$ and $p = \emptyset$);
+and 
+    \item[(b)] Alice values the product less Bob, and sells the product at a price that is beneficial for both players ($V_A \le p \le V_B$).
+\end{itemize}
+When averaged over a large number of simulated games for a certain game configuration, this measure estimated the probability of the event "an efficient trade occurs when it should occur".
+
+\subsection{Persuasion Games}
+
+In a persuasion game, a seller (Alice) tried to persuade a buyer (Bob) to buy a product at a fixed price $\pi$. Alice privately knows the true product quality, which can be either high or low. Bob only knows that the prior probability of the product being of high quality is $p$. 
+Alice gets a utility of $1$ if Bob buys (regardless of the true product quality), and $0$ otherwise. 
+
+Bob values a high-quality product at $v>\pi$ and a low-quality product at $u<\pi$. Therefore, the utility of Bob from buying a high-quality product is $v-\pi>0$, and from buying a low-quality product is $u-\pi<0$. For simplicity, we normalize the price to $\pi=1$ and the value of a low-quality product to $u=0$.
+In addition, we consider a currency scale parameter $M$ that serves as a multiplicative term of Bob's utility function. Overall Bob gets a utility of $M(v-1)$ from buying a high-quality product, $-M$ from buying a low-quality product, and $0$ from not buying the product.
+The timing of a single round is as follows. 
+
+\begin{enumerate}
+    \item First, Alice observes the product quality (which is realized to be high-quality w.p. $p$, independently of other rounds).
+    \item Then, Alice sends a message to Bob. Lastly, Bob decides whether to buy or not to buy the product, and utilities are realized accordingly.
+\end{enumerate}
+
+The game then consists of $T$ such rounds. Alice's goal is to maximize her cumulative utility over time. We differentiate between two types of persuasion game setups:
+
+\begin{itemize}
+    \item[(a)] \textbf{Long-living buyer.} The buyer is long-living, in the sense that he also aims to gain his cumulative utility over time. In this case, both players observe the entire interaction history.
+    \item[(b)] \textbf{Myopic buyers.} Buyers are myopic, in the sense the buyer of stage $t$ only cares about the utility obtained at stage $t$. In this case, each buyer observes the statistics of all previous rounds (i.e., $\%$ of rounds in which Bob bought the product, and $\%$ of rounds in which Bob bought a low-quality product). That is, each buyer observes sufficient statistics from the entire history. This implementation detail is due to context length memory which is an inherent limitation of LLM agents, as well as to reducing cognitive load on human players.
+\end{itemize}
+
+We consider the following degrees of freedom in persuasion games: 
+
+\begin{itemize}
+    \item[(i)] whether or not Alice knows Bob's high-quality product valuation $v$ (complete vs. incomplete information);
+    \item[(ii)] whether or not the players know when the game terminates (finite vs. infinite);
+    \item[(iii)] whether or not Alice's messages involve natural language (structured vs. linguistic);
+    \item[(iv)] the values of $v$, $p$ and $M$;
+    \item[(v)] the value of $T$ in the finite horizon case;
+    \item[(vi)] whether the game is with a long-living Bob or with myopic buyers. 
+\end{itemize}
+
+
+An outcome of the game is a tuple $(n_{ev}, k_{ev}, r_{ev})$, where $n_{ev}$ is the number of rounds in which the product was of high-quality, $k_{ev}$ is the number of rounds in which the product was of high-quality \emph{and} the buyer bought the product, and $r_{ev}$ is the number of rounds in which the product was of low quality \emph{and} the buyer did not buy the product. We define \emph{efficiency} to by the proportion of rounds in which the product was sold out of all rounds in which the product was of high quality (i.e., $\frac{k_{ev}}{n_{ev}}$), and \emph{fairness} to be the proportion of rounds in which the product was not sold out of all rounds in which the product was of low quality (i.e., $\frac{r_{ev}}{T-n_{ev}}$).
+
+\subsection{Game Families Through the Lens of Economic Literature}
+\label{app: games lit}
+\input{appendixes/game_families}
+
+\section{Data Collection and Statistical Analysis}
+\label{sec:data_collection}
+
+In this section, we describe the process of data collection and analysis. We developed a user-friendly game management system to facilitate data collection from the games described in \S\ref{sec:game_families}. The system is written in Python, designed for ease of use and customization, enabling future researchers to seamlessly collect data. Integrating new language models is straightforward, allowing them to participate in any configurable setup. The interface allows users to effortlessly run data collection across multiple configurations while involving various LLMs in the process. Additionally, the system supports analyzing the collected data to gain insights into the performance and interaction patterns of different models. The system features a simple and intuitive interface, as illustrated in the screenshots provided in Appendix \ref{app:llms_screenshots}.
+Prompt samples are described in Appendix \ref{app:system}.
+
+\input{tables/configurations}
+
+\paragraph{Configurations} Since the game space defined by the parameters presented in \S\ref{sec:game_families} is infinite for each of the game families, it is clear that data cannot be collected from all possible games. Therefore, we attempted to cover the game space by selecting diverse values for each of the parameters defining the games, and we collected data from every possible combination generated by these parameters. Table \ref{tab:configurations} shows the parameters defining the groups from which we collected data. In total, we collected data from 1,320 different configurations: 384 configurations of bargaining, 576 configurations of negotiation, and 360 configurations of persuasion games.
+
+\paragraph{Data}
+For data collection, we utilized 13 state-of-the-art large LLMs, spanning multiple architectures and vendors. Table \ref{tab:llm_list} presents the 13 LLMs used for data collection, organized by model name, developer, and release year.
+The 169 possible pairs (including a language model playing against itself, with attention to the assignment for Alice or Bob) played across 1,320 different configurations. Each of the LLMs played as Alice in 2,500 bargaining games, 2,500 negotiation games, and 1,000 persuasion games, and an equal number of games as Bob. Table \ref{tab:game_statistics} contains statistics on the data we collected, which constitutes a contribution of the paper.
+To enable comparison with human behavior, we developed an interface for collecting data from games played between LLMs and humans, and gathered data from 3,405 human participants. Details about the human data collection process are provided in Appendix \ref{app:human_data}.
+
+\begin{table}[h!]
+\centering
+\caption{Large Language Models used for data collection.}
+\begin{tabular}{llc}
+\hline
+\textbf{Developer} & \textbf{Model Name} & \textbf{Release Year} \\
+\hline
+\multirow{2}{*}{Anthropic} & Claude 3.5 Sonnet & 2024 \\
+ & Claude 3.7 Sonnet & 2024 \\
+\hline
+\multirow{4}{*}{Google DeepMind} & Gemini 1.5 Flash & 2024 \\
+ & Gemini 1.5 Pro & 2024 \\
+ & Gemini 2.0 Flash & 2025 \\
+ & Gemini 2.0 Flash Lite & 2025 \\
+\hline
+\multirow{3}{*}{OpenAI} & GPT-4o & 2024 \\
+ & GPT-4o Mini & 2024 \\
+ & GPT-O3 Mini & 2024 \\
+\hline
+xAI & Grok 2 & 2024 \\
+\hline
+\multirow{2}{*}{Meta} & LLaMA 3.1–405B & 2024 \\
+ & LLaMA 3.3–70B & 2024 \\
+\hline
+Mistral AI & Mistral Large & 2024 \\
+
+\hline
+\end{tabular}
+\label{tab:llm_list}
+\end{table}
+
+\begin{table}[ht]
+    \centering
+    \caption{Statistics of data collected by family.}
+    \begin{tabular}{l@{\hspace{20pt}}r@{\hspace{20pt}}r@{\hspace{20pt}}r@{\hspace{20pt}}r}
+        \hline
+        Game Type     & Games  & Decisions & Messages & Words \\
+        \hline
+        Bargaining    & 33.7K  & 92.8K    & 45.8K       & 1.14M     \\
+        Persuasion    & 13.5K  & 402K     & 140K        & 6.95M     \\
+        Negotiation   & 32.9K  & 92.3K    & 44.4K       & 1.69M     \\
+        \hline
+        Total         & 80.1K  & 587K     & 230K        & 9.77M     \\
+        \hline
+    \end{tabular}
+    \label{tab:game_statistics}
+\end{table}
+
+
+\paragraph{Statistical Analysis} \label{par:statistical_analysis}
+To enable adequate comparisons between models that played in different game configurations, we employ a statistical framework that controls for variation in game structure and player composition. Since each model encountered only a subset of all possible game setups, raw metric values are not directly comparable. To address this, we fit linear regression models that predict each target metric based on the full parameterization of the game and the participating players. This allows us to estimate the independent contribution of each parameter while accounting for confounding effects introduced by the game configuration. In doing so, we obtain normalized estimates of model behavior that can be compared across heterogeneous settings.
+We train a separate linear regression model for each combination of game family and evaluation metric (introduced in \S\ref{sec:game_families}). The construction of the feature representation is detailed in Appendix~\ref{app:stat_analisys:lr_input}. 
+
+The estimated regression coefficients ($\beta$ values) enable us to quantify the impact of each parameter value on the metric relative to a predetermined default value. The list of default values is detailed in Appendix \ref{app:stat_analisys:baseline_models}. In addition to the magnitude of the effects, we also report 95\% confidence intervals, computed using the standard procedure for linear regression coefficients \cite{wooldridge2016introductory}. 
+Appendix \ref{app:stat_analisys:validity} shows that the linear model performs comparably to state-of-the-art regression models on our prediction tasks, justifying its use in our analyses.
+
+Importantly, metric values presented in this section are calculated by averaging over all possible game configurations in our dataset. These averages are therefore highly sensitive to the particular configurations and the configuration distributions in our dataset. To tailor the benchmark to specific applications, we recommend re-defining the parameter space and their distributions according to the economic context.\footnote{For instance, one could ask whether agents' performance significantly differs in economic environments where inflation is high (translating into lower discount factors, in bargaining games). To evaluate such a scenario, one can simulate games in which the discount factor distribution fits these conditions, and re-evaluate agents' performance with respect to the new distribution of configurations.}
+
+\section{Economic and Behavioral Insights}
+\label{sec:EDA}
+
+In this section, we present the findings of our analysis, focusing on how different configurations and player compositions affect the outcomes of the games. We examine the general trends observed across all game families and identify specific characteristics that differentiate the performances of language models and human players. We structure our results around the following research questions:
+\begin{itemize}
+    \item[(Q1)] How do the market characteristics, such as information, game horizon, and linguistic communication, affect efficiency and fairness?
+    \item[(Q2)] How do different LLMs behave in strategic interactions, and which models achieve fair, efficient, and high self-gain outcomes?
+    \item[(Q3)] How do humans perform compared to LLMs?
+\end{itemize}
+
+\input{tables/market/main}
+
+\paragraph{Influence of Game Parameters (Q1)} Table \ref{table:market} presents the effect of the market-defining parameters on fairness and efficiency, respectively, for each of the game families. From the table, we observe that market conditions have a decisive impact on the fairness and efficiency achieved in the game.
+
+Across all game families, a prolonged interaction between Alice and Bob consistently enhanced both efficiency and fairness. However, the effects of complete information and textual message allowance varied by game type. In bargaining games, complete information reduced both efficiency and fairness, while allowing messages improved both metrics. Conversely, in persuasion games, the pattern was nearly reversed: allowing messages degraded both efficiency and fairness. This held true for scenarios in which Bob was either a casual or a repeat buyer. In contrast, complete information improved fairness in both settings without significantly affecting efficiency. In negotiation games, complete information improved both metrics, whereas message allowance enhanced fairness without impacting efficiency. 
+
+We hypothesize that the impact of free language communication differs across game types according to the presence of ground truth. In persuasion games, an objective truth (e.g., product quality) allows agents to build trust through consistent behavior, making free-form language less essential and potentially harmful if it introduces noise. In contrast, bargaining and negotiation games lack an objective ground truth, so language becomes essential for coordination, signaling intentions, and achieving mutually beneficial outcomes.
+
+Interestingly, our results suggest that the effect of complete information on fairness and efficiency may depend on whether message allowance is enabled. In particular, in bargaining games, complete information appears to reduce efficiency and fairness only when linguistic messages are allowed. This interaction is noteworthy because traditional economic models typically abstract away from natural language communication. Our findings suggest that some classic theoretical insights, derived under structured or language-free assumptions, may not be applicable when rich linguistic communication is present. While a comprehensive theoretical investigation is out of scope, we believe this is a promising direction for future work at the intersection of language and economic theory.
+
+
+\paragraph{LLMs Performance (Q2)} Table \ref{self_gain} presents the agents' performance as Alice and as Bob in each of the game families in terms of self-gain. 
+Nevertheless, the choice of which LLM to deploy in order to maximize utility is more nuanced than simply selecting the model with the best overall performance. Figures \ref{table:bargaining_self_gain}, \ref{table:negotiation_self_gain}, and \ref{table:persuasion_self_gain} present the payoffs of Alice (left) and Bob (right) in bargaining, negotiation, and persuasion games as a function of the identity of the models playing each role. Notably, when Bob is fixed to play with the LLM that yields the highest utility for him across the evaluated LLMs (\textit{claude-3.5-sonnet}, see Table \ref{self_gain}), Alice maximizes her payoff by selecting to play with \textit{mistral-large-2411}. However, this model generally performs poorly when playing as Alice (ranked 11th out of 13). 
+
+\input{tables/self_gain}
+\input{tables/bargaining_self_gain/main}
+\input{tables/negotiation_self_gain/main}
+\input{tables/persuasion_self_gain/main}
+
+One can think of a \emph{meta-game} in which Alice and Bob (the users) choose LLMs to represent them in an economic game, aiming to maximize their expected utility (over all game parameter realizations). The strategy space consists of available LLMs, and players know only the game family, rather than its specific parameters. Under this setup, the only pure-strategy Nash equilibria are: 
+\begin{itemize}
+    \item \textbf{Bargaining}: Alice selects \texttt{claude-3-5-sonnet} and Bob selects \texttt{claude-3-7-sonnet};
+    \item \textbf{Negotiation}: Alice selects \texttt{gemini-2.0-flash} and Bob selects \texttt{gemini-1.5-pro}, \\  or Alice selects \texttt{llama-3.1-405b} and Bob selects \texttt{grok-2-1212};
+    \item \textbf{Persuasion}: Alice selects \texttt{gemini-1.5-pro} and Bob selects \texttt{mistral-large-2411}.
+\end{itemize}  
+
+
+Figures \ref{table:models_bargaining}, \ref{table:models_negotiation}, and \ref{table:models_persuasion} show how the pair of models playing bargaining, negotiation, and persuasion games influenced the efficiency and fairness of the game. These tables suggest that there is no single model that maximizes both efficiency and fairness against all other models, and that compatibility between models plays an important role in shaping these metrics. Furthermore, across all game families, the scenario in which Alice and Bob employed the same LLM neither improved nor degraded the efficiency or fairness of the game, compared to the scenario in which they used different LLMs.
+
+\input{tables/models_bargaining/main}
+\input{tables/models_negotiation/main}
+\input{tables/models_persuasion/main}
+
+\paragraph{Human Performance (Q3)} Human performance deviates significantly from that of LLMs across the evaluated tasks, in terms of self-gain. In persuasion games, humans consistently outperformed all LLMs by a substantial margin. However, in negotiation games, their self-gain was the lowest among all other LLMs.
+An intriguing pattern emerged in the bargaining games: while humans performed considerably worse than language models when playing the role of Bob, they significantly outperformed the models when playing as Alice, despite the game's ostensibly symmetric structure in terms of information.
+A plausible explanation for this phenomenon lies in a well-documented behavioral bias known as the anchoring effect \cite{tversky1974judgment}, where the way information is presented can heavily influence human decision-making, even when the substantive content remains unchanged. In our setup, Alice initiates the interaction and anchors the bargaining by making the first offer, effectively setting the frame for the discussion. Unlike LLMs, humans tend to anchor their negotiation behavior to the initial proposal, often in a consistent yet irrational manner.
+For example, when Bob is a human and Alice is a LLM, the correlation between Alice's first offer and her final payoff was 0.63, indicating a strong anchoring effect on the human participant. Conversely, when Alice was human and Bob was a LLM, this correlation dropped to just 0.18, suggesting that language models are less influenced by the initial anchor and evaluate offers more rationally than humans, although still not in a fully rational manner.
+ 
+
+% \section{Conclusion}
+% We present \texttt{GLEE}, a framework for evaluating the behavior of Large Language Models (LLMs) in language-based economic games. The goal of \texttt{GLEE} is to provide a comparative tool for assessing the performance of LLMs in various economic scenarios and enable their comparison to human players. We defined the game space within three main families of games: bargaining, negotiation, and persuasion, and introduced metrics to measure player performance. We developed a framework that allows for large-scale data collection from games between diverse LLMs and created an interface that facilitates the collection of data from games involving human players and LLMs. 
+% Through this interface, we gathered data from a variety of economic games, including both LLM vs. LLM and human vs. LLM interactions.
+% Our analysis uncovered several notable phenomena: the varying impact of market parameters on economic outcomes, the interdependence between the game outcome and the type of LLMs used for both players, and the deviations of human performance from that of LLMs across different game families.
+% We believe that \texttt{GLEE} offers a valuable foundation for advancing interdisciplinary research into the economic implications of LLMs, enabling systematic exploration of how AI agents and human decision-makers strategically interact and influence economic outcomes.
+
+\section{Discussion}
+
+In this work, we introduced \texttt{GLEE}, a unified framework and benchmark for studying strategic interaction in 
+\emph{language-based economic environments}. We formalized three foundational families of two-player economic 
+games---bargaining, negotiation, and persuasion---and provided a rich, systematic parameterization of core degrees of freedom, such as horizons, 
+information structures, and communication structure. We developed an open-source simulation infrastructure; 
+collected over 80,000 multi-turn interactions from 13 contemporary LLMs; and built a complementary human--AI 
+dataset. Our statistical analysis revealed how market characteristics, agent 
+identities, and communication channels jointly shape efficiency, fairness, and self-gain. Collectively, 
+\texttt{GLEE} establishes a standardized platform for analyzing the behavioral and economic properties of 
+LLM-based agents and comparing them to humans in controlled strategic settings. Below, we highlight several future research directions in which \texttt{GLEE} could serve as a central platform for advancing research at the intersection of AI alignment, experimental economics, and multi-agent system design.
+
+\paragraph{\texttt{GLEE} for Economic Environment and Mechanism Design}
+Beyond evaluating agents, \texttt{GLEE} can support the design and analysis of \emph{economic environments} 
+themselves (as exemplified in Q1). Classical mechanism design assumes rational agents with fixed, well-defined strategies. In contrast, 
+LLMs exhibit systematic behavioral tendencies, linguistic framing effects, and role-dependent deviations from 
+equilibrium behavior. This creates fertile ground for using \texttt{GLEE} to explore the robustness of existing 
+mechanisms and to design new mechanisms tailored to AI-driven environments.
+
+First, \texttt{GLEE} allows researchers to evaluate classical mechanisms (such as the alternating offers bargaining) under realistic LLM behavior. Second, by varying information structures, communication 
+channels, and horizon lengths, one can investigate which environmental properties promote efficiency, fairness, 
+or stability when strategic AI agents interact. Third, \texttt{GLEE} can facilitate research on 
+\emph{incentive-robust mechanism design}, where agents communicate using free-form text and may strategically 
+frame or misrepresent information. Finally, the framework enables exploratory simulations of market failures, 
+cooperation breakdowns, and inequality dynamics that may arise in AI-populated economic systems.
+In this sense, \texttt{GLEE} connects AI research with long-standing themes in experimental economics, behavioral 
+mechanism design, and multi-agent systems, enabling a new type of computational--experimental pipeline for 
+institutional design.
+
+\paragraph{\texttt{GLEE} as a Platform for Multi-AI Alignment}
+A growing share of real-world systems involve interactions among multiple AI agents---from content marketplaces 
+and recommender platforms to negotiation assistants and autonomous service providers. Such ecosystems raise an 
+important open question: \emph{How should we select, coordinate, and align diverse AI agents to obtain socially 
+desirable outcomes?} Our findings (demonstrated in Q2) show that performance is strongly \emph{interaction-dependent}: the same LLM 
+may behave cooperatively, competitively, fairly, or exploitatively depending on whom it interacts with. 
+\texttt{GLEE} offers a principled testbed for studying such ``multi-AI alignment.''
+
+First, \texttt{GLEE} allows researchers to explore \emph{role allocation} and \emph{model selection}: identifying 
+which LLMs are best suited for particular roles (e.g., buyer vs.\ seller, sender vs.\ receiver) with the aim of 
+optimizing efficiency or fairness. Second, the framework enables the study of \emph{strategic 
+compatibility} and emergent equilibria, revealing how properties of one agent affect the behavior of 
+another. Third, \texttt{GLEE} supports work on \emph{alignment under competition}, where misaligned or 
+self-serving strategies may propagate across interacting AI systems. Finally, its evaluation metrics can be 
+extended to group settings, supporting research on optimizing \emph{system-level} welfare when multiple AI agents 
+interact simultaneously or repeatedly.
+Taken together, these capabilities position \texttt{GLEE} as a foundation for an emerging research area focused 
+not only on human--AI alignment, but on alignment \emph{among} AI agents themselves.
+
+\paragraph{\texttt{GLEE} for Human--AI Interaction Research}
+Another set of opportunities revolves around understanding and improving AI behavior in direct interaction with 
+people. Our human--LLM experiments reveal large and systematic deviations between human and model behavior---for 
+example, anchoring effects in bargaining and human outperformance in persuasion. \texttt{GLEE} provides a 
+general-purpose platform for further work in this direction (as illustrated in Q3).
+
+First, \texttt{GLEE} enables the large-scale exploration of human--AI interactions across a broader range of 
+models, population types, and communication styles. Second, it supports the study of human behavioral biases in 
+strategic communication, and could be used to explore the emergence of phenomena such as anchoring, framing, trust formation, risk aversion, and more. Third, researchers can 
+use \texttt{GLEE} to train and evaluate AI systems that adapt to human behavior, incorporate fairness or 
+empathy-driven constraints, or learn more transparent communication strategies. Finally, the framework can be 
+used to test safety and reliability concerns for AI agents deployed in negotiation, persuasion, dispute 
+resolution, or customer-interaction settings, where long-run dynamics play a crucial role.
+By enabling reproducible, language-based strategic interactions with human participants, \texttt{GLEE} offers an 
+empirical foundation for designing AI systems that interact more predictably, transparently, and effectively with 
+people.
+
+\medskip
+Taken together, these research directions illustrate how \texttt{GLEE} can support a broad agenda for 
+understanding and shaping the behavior of language-based agents in strategic economic environments. As LLMs 
+become increasingly embedded in decision-making platforms---whether as negotiators, advisers, content creators, 
+or strategic participants---\texttt{GLEE} provides a principled foundation for evaluating their capabilities, 
+diagnosing their limitations, and designing systems and environments that encourage beneficial, fair, and 
+efficient outcomes. We hope that this framework catalyzes future interdisciplinary work spanning economics, AI 
+alignment, human--computer interaction, and multi-agent system design.
+
+
+
+\subsection{Ethics Statement} \label{app:ethics_statement}
+This paper aims to provide a platform for experimenting with agents in language-based economic environments. Naturally, this line of research may have various societal and ethical implications, as we now discuss.
+
+First, studying the economic aspects of LLM-based agents has the potential to enhance the ability of agent designers to control and optimize the behavior of these agents. This capability can be utilized for a variety of purposes, ranging from encouraging self-interested behavior at the expense of other participants in the environment (e.g., for maximizing revenue in competitive settings) to promoting efficient trade and fair behavior, or any combination of these sometimes non-aligned objectives. As this research increases the power of LLM-based agents in economic environments, it is essential to emphasize that with great power comes great responsibility. We call for the responsible and ethical use of these emerging capabilities to ensure they are leveraged for socially beneficial purposes rather than exploitative ones.
+
+Furthermore, our framework demonstrates the capability of collecting data from human players to understand the differences and similarities between LLMs and humans in economic environments. While this line of research has the potential for a strong scientific contribution, particularly in the field of behavioral economics, it also raises several ethical considerations. The collection of human data must be conducted with careful regulation and adherence to clear ethical guidelines. The entire process of data collection from human participants is elaborated in Appendix \ref{app:human_data}.
+
+In addition to the challenges associated with the collection of human data, enhancing our understanding of LLMs from the lens of human behavior carries inherent risks. For instance, this research could enhance our ability to design LLM agents that are difficult to distinguish from real humans. Such capabilities could be misused for malicious purposes, including deception or manipulation. While the answer to whether these capabilities could be used for harmful causes is likely yes, we believe that the benefits of pursuing this line of research outweigh the risks when balanced with proper regulations. We advocate for pushing research forward while ensuring that any new technologies are accompanied by safeguards to prevent harmful usage, particularly when human-like LLMs are involved.
+
+Our proposed framework can make these research directions more accessible to researchers from the ML community and beyond, thereby encouraging a broader understanding of LLM behavior in economic contexts. However, as such accessibility increases, it is crucial to maintain ethical oversight and foster an open dialogue on potential misuse. We encourage researchers to use our framework with full transparency and careful attention to potential misuse and negative consequences.
+
+% \paragraph{LLM Usage Disclosure} In accordance with ICLR 2026 policy, we note that ChatGPT and Grammarly were used to aid or polish the writing of this paper. All conceptual contributions, experimental design, analysis, and conclusions are solely those of the authors.

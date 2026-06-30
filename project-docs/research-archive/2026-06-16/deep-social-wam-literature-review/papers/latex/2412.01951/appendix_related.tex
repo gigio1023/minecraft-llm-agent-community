@@ -1,0 +1,131 @@
+
+In this section, we discuss related work in greater detail, including
+relevant works not already covered.
+
+
+\paragraph{Self-improvement and self-training}
+
+Our work is most directly related to a growing body of empirical research that
+studies self-improvement/self-training for language models in a
+supervision-free setting in which there is no external
+feedback~\citep{huang2022large,wang2022self,bai2022constitutional,pang2023language},
+and takes a first step toward providing a theoretical understanding
+for these methods. There is also a closely related body of research on 
+``LLM-as-a-Judge''  techniques, which investigates approaches to
+designing self-reward functions $\rself$, often based on specific
+prompting techniques \citep{zheng2024judging,yuan2024self,wu2024meta,wang2024self}.
+
+A somewhat complementary line of research develops
+algorithms based on self-training and self-play
+\citep{zelikman2022star,chen2024self,wu2024self,qu2024recursive}, but
+leverages various forms of external feedback (e.g., positive examples
+for SFT or explicit reward signal). 
+These methods typically outperform feedback-free self-improvement methods~\citep{zelikman2022star}.
+However, in many scenarios, obtaining external feedback can be costly or laborious; it may require collecting high-quality labeled/annotated data, rewriting examples in a formal language, etc. 
+Thus, these two approaches are not directly comparable.
+
+
+We also mention that the self-improvement problem we
+study is related to a classical line of research on
+\emph{self-distillation}
+\citep{bucilua2006model,hinton2015distilling,devlin2018bert,pham2021meta,rizve2021defense},
+but this specific form of self-training has received limited investigation
+in the context of language modeling.
+
+\paragraph{Entropy minimization} Sharpening is also closely related to a line of work on \emph{entropy minimization} or \emph{minimum entropy regularization}, where we seek models that have high predictive accuracy and low entropy/uncertainty. This line of work originated in the semi-supervised learning literature~\citep{grandvalet2004semi} and was popularized as a test-time adaptation method in computer vision~\citep[c.f.,][]{wang2020tent,press2024entropy}. Maximum-likelihood sharpening, especially via RL, is closely related in that \Cref{eq:rlhf} with $\beta \to 0$ and $\rself=\log\piref$ maximizes $\En_\pi[\log\piref(y\mid{}x)]$ rather than $-H(\pi) = \En_\pi[\log \pi(y\mid{}x)]$. (It is important that the latter is optimized continuously with $\piref$ as an initialization, but when this is done it can be seen to sharpen $\piref$, at least heuristically.) Prior work in this direction is largely empirical, focused on computer vision domains with small output spaces $\cY$, and hence studies statistical benefits of entropy minimization. In contrast, we initiate a theoretical study of sharpening, are primarily motivated by applications to language modeling with exponentially large output spaces, and view sharpening primarily as a computational phenomena. However, it would be interesting to understand whether statistical benefits observed in computer vision translate to the language modeling setting. 
+
+
+
+
+
+
+
+
+\paragraph{Alignment and RLHF}
+The
+specific algorithms for self-improvement/sharpening we study can be
+viewed as special cases of standard alignment algorithms, including
+classical RLHF methods
+\citep{christiano2017deep,bai2022training,ouyang2022training}, direct
+alignment \citep{rafailov2024direct}, and (inference-time or
+training-time) \bestofn methods
+\citep{amini2024variational,sessa2024bond,gui2024bonbon,pace2024west}. \akedit{However,}
+the maximum
+likelihood sharpening objective \eqref{eq:ml_sharpening} used for our
+theoretical results has been relatively unexplored within the
+alignment literature.
+
+
+\paragraph{Inference-time decoding}
+
+Many inference-time decoding
+strategies such as greedy/low-temperature decoding, beam-search
+\citep{meister2020if}, and chain-of-thought decoding
+\citep{wang2024chain} can be viewed as instances of inference-time
+sharpening for specific choices of the self-reward function
+$\rself$. More sophisticated inference-time search strategies such
+tree search and MCTS
+\citep{yao2024tree,wan2024alphazero,mudgal2023controlled,zhao2024probabilistic}
+are also related, though this line of work frequently makes use of
+external reward signals or verification, which is somewhat
+complementary to our work.
+
+
+
+
+
+\paragraph{Theoretical guarantees for self-training}
+      On the theoretical side, current understanding of self-training is limited. One line of work, focusing on the
+      \emph{self-distillation} objective \citep{hinton2015distilling}
+      for binary classification and regression, aims to provide convergence
+      guarantees for self-training in stylized setups such as linear
+      models
+      \citep{mobahi2020self,das2023understanding,das2024retraining,pareek2024understanding},
+      with \iftoggle{workshop}{\cite{allen2020towards}}{\citet{allen2020towards}} giving guarantees for feedforward
+      neural networks. Perhaps most closely related to our work is
+      \iftoggle{workshop}{\cite{frei2022self}}{\citet{frei2022self}}, who show that self-training on a model's
+      pseudo-labels can amplify the margin for linear logistic
+      regression. However, to the best of our knowledge, our work is the first to study
+      self-training in a general framework that subsumes language modeling.
+
+Our results for \rlhfalg are related
+to a body of work that provides sample complexity guarantees
+for alignment methods
+\citep{zhu2023principled,xiong2023gibbs,ye2024theoretical,huang2024correcting,liu2024provably,song2024understanding,xie2024exploratory},
+but our results leverage the structure of the
+\mlsharp self-reward function $\rself(y\mid{}x)=\log\piref(y\mid{}x)$, and
+provide guarantees for the sharpening objective in
+\cref{def:sharpening} instead of the usual notion of reward
+suboptimality used in reinforcement learning theory.\loose
+
+\dfedit{Lastly, we mention that our results---particularly our
+\emph{amortization} perspective on self-improvement---are related to work
+that studies representational advantages afforded by additional inference
+time \citep{malach2023auto,li2024chain}. These work focus on truly sequential tasks, while our work
+focuses on the complementary question of amortizing \emph{parallel}
+computation. Thus the representational implications are quite
+different.}
+
+      \paragraph{Optimization versus sampling}
+      The \mlsharp objective we introduce in \cref{sec:theoretical_framework} connects
+      the study of \emph{self-improvement} to a large body of research in
+      theoretical computer science on computational tradeoffs (e.g.,
+      separations and equivalences) between
+      optimization and sampling      \citep{barahona1982computational,kirkpatrick1983optimization,lovasz2006fast,singh2014entropy,ma2019sampling,talwar2019computational,eldan2022spectral}. On the one hand, this
+line of research highlights that there exist natural classes of
+distributions for which sampling is tractable, yet
+maximum likelihood optimization is intractable, and
+vice-versa. On the other hand, various works in this line of research also demonstrate \emph{computational reductions} between
+optimization and sampling, whereby optimization can be reduced to
+sampling and vice-versa. 
+
+Our setting indeed includes natural model classes where one should not expect there to be a computational reduction from optimization ($\argmax_{y\in\cY}\piref(y\mid{}x)$) to sampling
+($y\sim\piref(\cdot\mid{}x)$), and hence inference-time sharpening is computationally intractable (\cref{prop:softmax-np-hardness}). Of course, coverage assumptions eliminate this intractability. For training-time sharpening (where the goal is to \emph{amortize} across prompts by training a sharpened model, as formulated in \cref{sec:theoretical_framework}) the obstacle in natural, concrete model classes is not just computational but in fact \emph{representational} (\cref{prop:softmax-representational-lb}). %
+Regarding the latter point, we note that while amortized
+Bayesian inference has received extensive investigation empirically
+\citep{beal2003variational,gershman2014amortized,swersky2020amortized,bengio2021flow,hu2023amortizing},
+we are unaware of theoretical guarantees outside of this work.
+
+
+
+

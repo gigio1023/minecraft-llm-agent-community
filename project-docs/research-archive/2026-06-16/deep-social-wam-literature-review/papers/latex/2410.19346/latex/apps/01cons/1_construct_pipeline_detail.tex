@@ -1,0 +1,26 @@
+%\subsubsection{Scenario Extraction}
+
+\subsubsection{Social Goal Extraction}
+
+The first step of social goal extraction is to use GPT-4o to extract the social goals of the current character.
+However, this direct approach has two issues that requires further amendment:
+
+\begin{itemize}
+    \item The goals may be too detailed (e.g. direct instruction), or depend on other characters' goals or some random events during the scenario.
+    To address this problem, we prompt GPT-4o to rewrite the whole scenario, including all extracted social goals, into a similar but new scenario that avoids these issues to the best extent.
+    \item Even after the conversion, some goals remain unattainable for characters, such as those requiring external information, physical actions, or evaluations beyond the scenario, e.g., goals that are too abstract or long-term.
+    Thus, we ask GPT-4o to determine whether each goal matches the above cases. If it does, we instruct it to either rewrite the goal or delete it if rewriting is not feasible.
+\end{itemize}
+
+\subsubsection{Private Information Extraction}
+
+The pipeline first determines whether the current scene involves the inference of private information. If it does, the pipeline proceeds to extract private information for each character from the script, otherwise the private information will be set to null.
+We use GPT-4o to perform reading comprehension on the scenes, extracting questions and answers that only one agent can respond to. The rephrased answers serve as the agent's private information, while the questions serve as test items for other agents.
+Finally, the pipeline generates three incorrect answer options, which, along with the original Q\&A pair, form the complete evaluation question.
+To better assess passive reasoning abilities, we have rephrased the negative options to make them more homogeneous with the correct options.
+
+\subsubsection{Leakage Mitigation and Template Generation}
+
+To prevent data leakage, we first perform scenario leakage mitigation. 
+We prompt GPT-4o to extract elements associated with specific episodes, such as notable location entities like "The Facebook headquarters."
+Next, we ask GPT-4o to suggest replacement candidates to preserve the script's context and minimize the risk of identifying the specific episode.

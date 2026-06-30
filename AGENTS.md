@@ -1,5 +1,51 @@
 # Repo Agent Notes
 
+## Active Central Plan (2026-06-27)
+
+The current central plan for this repository is
+`project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+(search token `ACTIVE_CENTRAL_PLAN`). Read it before planning new runtime,
+predictor, benchmark, or experiment work. It reconciles the dated review in
+`project-docs/research-archive/2026-06-27/wam-direction-stress-test-and-reframe/`
+(reports `00`-`08`) into one decision-gated sequence:
+
+1. Do not pick a research headline yet. Three framings are live and none is
+   provable today: a native action-consequence model (F-native), an advisory
+   predictor improved by a verifier-grounded loop (F-loop), and unprompted
+   sociality from colliding individual goals (F-society).
+2. Build the no-regret core first, because all three need the same thing: a
+   non-degenerate 2-3 actor Minecraft runtime that emits per-layer-tagged
+   transition rows `(state, action, observed_delta incl. other-actor response)`,
+   recorded INDEPENDENTLY of the actor's self-declared `expected_outcome`, under
+   the free-tier budget. Fixing the 60-cycle degeneracy is the first task.
+3. Run the Goldilocks prediction preflight for F-native/F-loop: does a layer
+   exist where the LLM prior is insufficient AND the signal is learnable from
+   observed history? Use the separate society-observable preflight for F-society;
+   prediction lift alone must not prove or kill the society branch.
+4. Defer the loop, the three ledgers, and any foundation-model training until the
+   gate returns. Do not build the cathedral before the soil test.
+
+Where it conflicts, this supersedes: the "advisory social-material WAM / empty
+cell" HEADLINE framing below and in
+`project-docs/Specification/Advisory-Social-Material-WAM.md`; the advisory-ONLY
+constraint as a research wall (the central object may be coupled to action and
+measured by capability ablation, while the separate-measurement rule is kept);
+and the phase ordering in
+`project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+(the preflight now precedes the loop and the ledgers).
+
+This does NOT change runtime authority. Verifier-owns-truth, schema/permission
+validation, the prose-parsing anti-pattern ban, and the rule that provider /
+predictor / PlanBead text never supplies executable parameters or bypasses
+runtime checks all still bind. "Advisory wall reopened" is a research-framing
+change, not permission for any model output to skip validation.
+
+The "WAM" banner name is historical context in older docs. It is taken and
+inverted in robotics (a "World Action Model" there is a policy), so new active
+direction docs should prefer concrete names such as action-consequence model,
+social-material transition model, advisory consequence predictor, or
+`transition-row/v1` depending on the object being discussed.
+
 ## Current Direction
 
 This repository is a rebuild staging area for a headless Minecraft runtime
@@ -7,33 +53,46 @@ loop.
 
 Do not revive the old Voyager-style architecture as the active path.
 
-The current implementation goal is not a full village simulator.
-It is a small, bounded, observable runtime that can later grow into an
-evidence-grounded social simulation seed.
+The current implementation goal is not a full village simulator and not a
+pre-committed WAM/predictor paper. It is the no-regret core from the active
+central plan: a small, bounded, observable runtime that can produce truthful
+`transition-row/v1` records from a non-degenerate 2-3 actor Minecraft runtime
+under the free-tier budget.
 
 Minecraft task completion is a competence gate, not the final research target.
-The project goal is to evaluate whether LLM-controlled embodied actors can
-sustain socially meaningful behavior in natural Minecraft worlds, where social
-claims are constrained by verifiable movement, inventory, crafting, storage,
-communication, memory, and shared-world consequences.
+The project goal for the next phase is to test whether a Goldilocks layer exists:
+a layer where the LLM prior is insufficient and observed Minecraft history adds
+learnable signal. Only after that gate should the repo consider a larger
+confirming experiment for F-native, F-loop, or F-society.
+
+For F-society, use `project-docs/Architecture/Society-Observable-Preflight.md`
+as the separate branch gate. It asks whether recurring evidence-gated
+social-material patterns appear under small embodied constraints. It is not
+settled by prediction lift alone.
 
 Immediate target:
 
-- one actor, backed by one Mineflayer bot, that can perform boring gameplay
-  tasks end-to-end;
-- transcript and runtime artifacts that explain success, failure, stall, and reconnect;
-- reconnect/session lifecycle that stays truthful when explicitly in scope;
-- architecture support for per-actor action skill ownership and later bounded
-  action skill evolution.
+- reproduce and root-cause the 60-cycle degeneracy rather than treating it as
+  social behavior;
+- run a 2-3 actor scenario that produces varied, non-repeating transitions;
+- add an independent `transition-row/v1` logger that records
+  `(state_before, executed_action, observed_delta)` without using the actor's
+  self-declared `expected_outcome` as the target;
+- capture other-actor observable responses inside bounded windows;
+- keep provider/cost usage within the free-tier discipline.
 
-North star:
+Candidate north stars, not yet selected:
 
-- actors, represented by Mineflayer bots, with role context, action skill
-  ownership, memory, relationships, obligations, material claims, public
-  affordances, weak commons, and visible consequences that persist after one
-  immediate task is completed.
-- benchmark and experiment reports that distinguish physical competence from
-  social consequence, continuity, robustness, and efficiency.
+- F-native: a native action-consequence model that learns action -> consequence
+  dynamics;
+- F-loop: an advisory consequence predictor improved by a verifier-grounded
+  coding-agent loop;
+- F-society: unprompted sociality from colliding individual embodied goals in a
+  shared Minecraft world.
+
+Any later benchmark or experiment report must distinguish prediction quality,
+acting outcome, physical competence, social consequence, continuity, robustness,
+and efficiency.
 
 Not current delivery targets:
 
@@ -41,6 +100,62 @@ Not current delivery targets:
 - long-run autonomy as a product goal;
 - large multi-actor society behavior before single-actor competence is trustworthy.
 - benchmark-maximization as the top-level research objective.
+- presenting runtime verification, logs, screenshots, or scoring scripts as the
+  research contribution.
+
+## Minecraft Visual Evidence Rule
+
+Search token: `VISUAL_EVIDENCE_1_21_4_RULE`.
+
+For any Minecraft run whose screenshots will be reviewed, shown in an HTML
+report, used in Qwen/OpenAI comparison material, or used to inspect actual NPC
+movement later, follow
+`project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`
+before running the experiment.
+
+Use `PROBE_SERVER_VERSION=1.21.4` for `prismarine-viewer` screenshot runs unless
+the user explicitly accepts renderer-skewed images or the runtime has migrated
+to a better native-client visual capture path. Do not rely on the default server
+version for visual reports. As of 2026-06-29, the repo's default may be newer
+than `prismarine-viewer`'s supported visual assets; a `1.21.11` run produced
+redstone-like visual artifacts even though runtime block evidence showed normal
+village/terrain blocks.
+
+Before provider-backed visual experiments, run a provider-free deterministic
+visual setup smoke on the same scenario and inspect the artifacts. The smoke may
+exit non-zero if the deterministic actor step blocks; judge setup by the
+world-scenario manifest, seed/reset record, natural-spawn validation,
+`visual_evidence.captures[]`, and `visual_evidence.audit.status`.
+
+Default visual flag for report-grade NPC runs:
+
+```bash
+--visual-profile report
+```
+
+This profile is implemented in the runtime/CLI, not just documentation. It
+selects the supported `1.21.4` visual path when the CLI owns server setup,
+captures every cycle, uses a `960x540` viewport, writes
+`visual-evidence-audit/v1`, and fails the run if the report-profile audit fails.
+It captures three camera modes: `first_person`, `third_person_follow` from
+directly behind the character, and `third_person_high` from a closer elevated
+angle anchored to the actor's facing direction. Use `--allow-renderer-skew` only
+for explicit renderer debugging, not for HTML reports or model-comparison
+screenshots.
+
+Use all report-profile camera modes by default. First-person shows the actor's
+local view and obstructions. `third_person_follow` is the main character-centric
+review image. `third_person_high` is for immediate surroundings without falling
+back to a distant overhead map. Each visual report must pair screenshots with
+same-cycle or neighboring state evidence: capture JSON, action evidence,
+`observe`, `worldStateSummary`, `world-state-scan/v1`, natural-spawn validation,
+verifier artifacts, or `transition-row/v1`.
+
+Screenshots remain review-only evidence. Never infer block identity, progress,
+placement, redstone, material state, or social consequence from pixels alone.
+If a screenshot looks strange, classify it as `renderer-artifact`,
+`camera-obstruction`, `real-world-weirdness`, or
+`insufficient-visual-evidence` using the visual evidence protocol.
 
 ## Research Value Boundary
 
@@ -50,7 +165,23 @@ seed/reset records, cost traces, and scoring scripts are support infrastructure:
 they make claims checkable, prevent fake progress, and let runs be reviewed.
 They are necessary hygiene, not the thing being studied.
 
-The research value must come from a more substantive question:
+Verification is expected engineering hygiene. Do not talk as if "verified
+actions" or "verifier-backed evidence" are a novel contribution. Unless this
+repo explicitly starts studying a model-based verifier, checking executed
+Minecraft actions against runtime observations is simply the baseline standard
+for credible embodied-agent experiments.
+
+Before the Goldilocks gate, the research value must come from a more substantive
+question:
+
+```text
+Is there a Minecraft layer where an LLM prior is insufficient, observed
+interaction history provides learnable signal, and the resulting action ->
+consequence target is neither trivial engineering hygiene nor promotional
+society theater?
+```
+
+The broader society question still matters:
 
 ```text
 What counts as a Minecraft society, organization, settlement, or social life
@@ -59,21 +190,38 @@ relationships, material stakes, conflict, cooperation, repair, and continuation
 beyond one scripted task?
 ```
 
-Benchmark design should therefore measure lived social behavior, not the
-existence of benchmark artifacts. A good benchmark is a lens for seeing whether
-actors form and maintain meaningful social patterns under Minecraft constraints.
-It is not valuable merely because it records evidence cleanly.
+Benchmark design should serve the Goldilocks question first: it should produce
+independent state/action/observed-delta transition rows, then test whether a
+plain LLM prior, a grounded prompt, or a later learned model has real headroom on
+the interesting layers. A good benchmark is a lens for seeing whether actors
+form and maintain meaningful social patterns under Minecraft constraints. It is
+not valuable merely because it records evidence cleanly.
 
 Do not let the project drift into a "reproducibility-only" or
 "evidence-first benchmark" paper. Reproducibility and evidence are the audit
-surface. The main work is defining and testing realistic social dynamics:
+surface. The main work is first defining and testing whether a meaningful
+social-material consequence target exists:
 
-- why actors stay near each other or separate;
+- what physical/material/social delta a candidate action is expected to cause;
+- why actors stay near each other or separate after a material change;
 - how needs create dependence, exchange, refusal, conflict, or repair;
 - how possession, access, and place become socially meaningful;
 - how roles, norms, obligations, trust, and reputation arise or fail to arise;
 - how social state changes after the immediate goal is done;
 - how the world itself, not just dialogue, shapes collective behavior.
+
+Prediction and acting must be reported separately. A strong actor with a weak
+predictor is not the same result as a weak actor with a calibrated predictor.
+An advisory consequence predictor branch may inform analysis or future
+selection, but it must not select the executed action, fill missing parameters,
+declare progress, close obligations, or override runtime checks.
+
+Per the Active Central Plan above, the advisory-ONLY stance is reopened as a
+research-framing choice: the central object may be coupled to action and measured
+by capability ablation. The separate-measurement rule in this paragraph still
+binds, and so do all runtime-authority limits in it (no filling missing
+parameters, no declaring progress, no closing obligations, no overriding runtime
+checks) - those are runtime safety, not the advisory headline.
 
 Project Sid is a cautionary reference here. It claims broad Minecraft
 civilization-scale behavior, but the public artifact is a technical report plus
@@ -86,6 +234,11 @@ Do not discard useful Project Sid material: extract case designs, metrics,
 failure modes, and prompt/config patterns with exact citation, while labeling
 them as unverified report claims until runnable code, raw logs, scoring scripts,
 or independent replication exist.
+
+Use `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+as the active research spine for new direction-setting docs. Use
+`project-docs/Specification/Advisory-Social-Material-WAM.md` as a subordinate
+historical/reference spec where it does not conflict with the central plan.
 
 ## PlanBeads Intent Rule
 
@@ -284,45 +437,81 @@ Codex/MCP-style references should be adapted as autonomy substrate: action
 surface, direct/deferred tool exposure, hooks, permission gates, event streams,
 verification, and artifacts. Do not adapt them as hidden domain strategy.
 
+WAM, VLA, MineStudio, MineDojo, Voyager, Project Sid, Generative Agents, SOTOPIA,
+Concordia, ENPIRE, Codex, Claude Code, SWE-agent, DSPy, and related systems are
+all references, not specs. Translate them through the active spine:
+
+1. what action-conditioned consequence prediction they teach;
+2. which physical/material/social transition labels they make easier to collect
+   or score;
+3. whether they are actor policy, predictor, loop method, substrate, or only a
+   contrast class.
+
+Do not headline "structured state" or "verified evidence" as the novelty. Before
+the Goldilocks gate, the novelty target is not selected; the current job is to
+find whether a non-trivial, learnable social-material consequence target exists
+beyond LLM prior.
+
 ## Canonical Docs
 
-Read these first:
+Start with the active central plan -
+`project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md` -
+which takes precedence over the headline framing in the docs below where they
+conflict (see "Active Central Plan" near the top of this file). Then read these:
+
+For screenshot-producing Minecraft runs, also read
+`project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`
+before starting the server or provider run.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CLAUDE.md`
-4. `GEMINI.md`
-5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-7. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
-8. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-9. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-10. `project-docs/Specification/Reference-Adaptation-Guide.md`
-11. `project-docs/Documentation-Map.md`
-12. `project-docs/Agent-Search-Index.md`
-13. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-14. `project-docs/Terminology.md`
-15. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-16. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-17. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-18. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-19. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-20. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-21. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-22. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-23. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-24. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-25. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-26. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-27. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
-28. `project-docs/Architecture/Implementation-Workstreams.md`
-29. `project-docs/Architecture/Action-Skill-Verification.md`
-30. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-31. `project-docs/Architecture/Minimal-Probe.md`
-32. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-33. `project-docs/Setup/Headless-Server.md`
-34. `project-docs/Setup/Provider-Setup.md`
-35. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+3. `project-docs/Architecture/Research-Documentation-Hierarchy.md`
+4. `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+5. `project-docs/Architecture/Research-Value-Harness.md`
+6. `project-docs/Architecture/Prior-Work-Proximity-Current-Spine-2026-06-29.md`
+7. `project-docs/Architecture/No-Regret-Core-Research-Protocol.md`
+8. `project-docs/Architecture/Transition-Row-V1-Contract.md`
+9. `project-docs/Architecture/Seed-Reset-Record-V1-Contract.md`
+10. `project-docs/Architecture/Transition-Row-Label-Codebook.md`
+11. `project-docs/Architecture/No-Regret-Core-Scenario-Catalog.md`
+12. `project-docs/Architecture/Goldilocks-Preflight-Protocol.md`
+13. `project-docs/Architecture/Society-Observable-Preflight.md`
+14. `project-docs/Architecture/Research-Decision-Current-Spine-2026-06-29.md`
+15. `project-docs/Architecture/No-Regret-Core-Implementation-Campaign.md`
+16. `CLAUDE.md`
+17. `GEMINI.md`
+18. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+19. `project-docs/Specification/Advisory-Social-Material-WAM.md`
+20. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+21. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
+22. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+23. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+24. `project-docs/Specification/Reference-Adaptation-Guide.md`
+25. `project-docs/Documentation-Map.md`
+26. `project-docs/Agent-Search-Index.md`
+27. `project-docs/Terminology.md`
+28. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+29. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+30. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+31. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+32. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+33. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
+34. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+35. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+36. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+37. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
+38. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+39. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+40. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+41. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
+42. `project-docs/Architecture/Implementation-Workstreams.md`
+43. `project-docs/Architecture/Action-Skill-Verification.md`
+44. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+45. `project-docs/Architecture/Minimal-Probe.md`
+46. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+47. `project-docs/Setup/Headless-Server.md`
+48. `project-docs/Setup/Provider-Setup.md`
+49. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
@@ -466,9 +655,19 @@ observations on common LLM coding mistakes:
   material task.
 - Loop until the chosen verification has run or until the blocker is recorded
   with the exact command, platform, provider, artifact path, and failure mode.
+- Prefer implementation and empirical evidence over expanding test harnesses.
+  Unit tests should be minimal, focused, and tied to a real invariant or
+  regression. Do not build large test scaffolds, broad mocks, or test-only
+  frameworks when a small implementation change plus a concrete run artifact
+  would teach more.
 - Prefer real runtime evidence when behavior matters. Unit tests protect narrow
   regressions, but social-cycle value is proven by truthful reports, helper
-  events, verifier output, actor workspace artifacts, and provider usage records.
+  events, verifier output, actor workspace artifacts, transition rows, seed/reset
+  records, provider usage records, and live or managed Minecraft runs.
+- Do not treat a passing test suite as completion for runtime, research, or
+  Minecraft-behavior work. Completion needs the smallest useful implementation
+  plus the strongest practical evidence artifact available under cost/platform
+  constraints.
 
 ## Search Index
 
@@ -480,7 +679,26 @@ Important search tokens:
 - `HEADLESS_MINEFLAYER_PROBE`
 - `MINECRAFT_GAMEPLAY_MODEL`
 - `SPEC_GOVERNANCE`
+- `ACTIVE_CENTRAL_PLAN`
+- `NO_REGRET_CORE`
+- `NO_REGRET_CORE_RESEARCH_PROTOCOL`
+- `NO_REGRET_CORE_IMPLEMENTATION_CAMPAIGN`
+- `GOLDILOCKS_GATE`
+- `GOLDILOCKS_PREFLIGHT_PROTOCOL`
+- `SOCIETY_OBSERVABLE_PREFLIGHT`
+- `TRANSITION_ROW_V1`
+- `SEED_RESET_RECORD_V1`
+- `TRANSITION_ROW_LABEL_CODEBOOK`
+- `NO_REGRET_SCENARIO_CATALOG`
+- `NO_REGRET_CORE_CURRENT_STATUS_2026_06_29`
+- `CURRENT_PRIOR_WORK_PROXIMITY_2026_06_29`
+- `CURRENT_RESEARCH_DECISION_2026_06_29`
 - `DOCUMENTATION_MAP`
+- `DOC_WORK_HIERARCHY`
+- `RESEARCH_DOCUMENTATION_HIERARCHY`
+- `ARCHIVE_CANDIDATES`
+- `ARCHIVED_HANDOFF_PROMPTS`
+- `RESEARCH_PLAN_REALIGNMENT_2026_06_29`
 - `KARPATHY_GUIDELINES`
 - `TERMINOLOGY`
 - `SOUL_GROUNDED_SOCIAL_SIMULATION`
@@ -502,10 +720,15 @@ Important search tokens:
 - `RUNTIME_ACTION_CONTRACT`
 - `RUNTIME_RETRY_CONSTRAINT`
 - `CONTEXT_COMPACTION`
+- `ADVISORY_SOCIAL_MATERIAL_WAM`
+- `SOCIAL_MATERIAL_TRANSITION`
+- `VERIFICATION_IS_HYGIENE`
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW`
 - `SOCIAL_SIMULATION_SEED`
 - `SPEED_BOUNDED_SOCIAL_SIMULATION`
 - `LIVE_TRANSCRIPT_FIRST`
+- `MINECRAFT_VISUAL_EVIDENCE_CAPTURE`
+- `VISUAL_EVIDENCE_1_21_4_RULE`
 - `CHECKPOINT_READY_RUNTIME`
 - `MINIMAL_ACTION_SKILL_MEMORY_HOOK`
 - `ACTION_SKILL_VERIFICATION`
@@ -518,9 +741,10 @@ Important search tokens:
 
 ## Design Rules
 
-- Use Minecraft as an experiment accelerator.
+- Use Minecraft as an experiment accelerator and embodied social-material
+  transition substrate.
 - The first meaningful proof is not a big society. It is boring competence plus
-  strong observability.
+  transition rows that separate prediction quality from acting outcome.
 - Keep implementation aggressively simple. Prefer small, named modules over large files.
 - Keep architecture extensible by making ownership boundaries explicit, not by
   adding general-purpose abstractions early. Prefer small typed modules with
@@ -550,9 +774,9 @@ Important search tokens:
 - Prefer bounded TypeScript helpers and bounded action skill bundles over raw
   eval.
 - Prefer autonomy substrate over domain-specific strategy encoding. Improve
-  context packets, `action_surface`, gates, hooks, verifier feedback, and actor
-  memory before adding a specialized planner for one activity such as house
-  building.
+  context packets, `action_surface`, gates, hooks, runtime feedback, transition
+  logging, and actor memory before adding a specialized planner for one activity
+  such as house building.
 - Preserve enough world-state evidence for post-run diagnosis. A claim such as
   "no matching block was observed" must be backed by a bounded scan or an
   explicit loaded-world limitation, not only by a thin nearest-block summary.
@@ -611,10 +835,13 @@ Important search tokens:
   refs.
 - Compaction must not launder weak evidence into progress. Provider text,
   memory notes, `wait`, or repeated observation are context, not physical
-  success unless verifier-backed world, inventory, position, block, container,
-  chat, or transcript evidence supports them.
-- Human visual inspection is optional. Prefer transcript, checkpoint-like runtime
-  artifacts, structured logs, and optional viewer evidence.
+  success unless observed world, inventory, position, block, container, chat, or
+  transcript evidence supports them.
+- Human visual inspection is optional support evidence. When screenshots are
+  used, follow `project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`:
+  treat `prismarine-viewer` images as review-only evidence, pair them with
+  observe/worldStateSummary/world-state-scan artifacts, and never infer block
+  identity or progress from pixels alone.
 - Failures should be explainable from artifacts without immediate reproduction.
 - Progress must be real. Do not confuse partial motion, initial animation, or
   optimistic status text with success.
@@ -775,6 +1002,35 @@ Reference anchors:
   deprecated instead of leaving it ambiguous.
 - Prefer one canonical definition doc over several drifting ones.
 - Never use absolute local paths in committed docs.
+
+## Commit And Push Discipline
+
+When an important task is completed, do not leave the result only as local dirty
+workspace state. Important tasks include provider-backed Minecraft experiments,
+HTML/static reports, architecture or governance changes, active plan updates,
+runtime contract changes, transition-row or seed/reset artifacts, and any work
+the user asks to record for future review.
+
+Before the final response for such work, prepare a scoped commit unless the user
+explicitly says not to commit. If the user asks to push, push the committed
+branch after the commit succeeds. Do not use this rule to sweep unrelated dirty
+files into the commit.
+
+Follow `CONTRIBUTING.md` exactly:
+
+- split commits when the scope changes;
+- stage only files that belong to the commit's stated purpose;
+- avoid broad subjects such as `misc`, `cleanup`, `update`, or `wip`;
+- use the subject format `<area>: <imperative summary>`;
+- include a detailed body with `Why:`, `What changed:`, and `Validation:`;
+- add `Notes:` for limitations, follow-ups, skipped validation, budget caveats,
+  generated-artifact policy, or intentional omissions.
+
+For experiment/report commits, the body should name the scenario, seed, models,
+cycle count, provider preflight result, major outcome counts, visual-capture
+status, budget caveats, and which raw artifacts were committed or intentionally
+left out. If screenshots are needed for an HTML report, commit the report-local
+image assets or explicitly state why the report is local-only.
 
 ## Default LLM Planner (Codegen)
 

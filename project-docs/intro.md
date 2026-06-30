@@ -4,13 +4,14 @@ sidebar_position: 1
 
 # Overview
 
-**minecraft-llm-agent-community** is a headless Mineflayer runtime for
-Soul/LifeGoal-grounded social-cycle experiments, where Minecraft provides live
-observation and evidence.
+**minecraft-llm-agent-community** is a headless Mineflayer runtime for advisory
+social-material WAM experiments, where Minecraft provides embodied actions and
+observable consequences.
 
-The project is intentionally small. It tests whether an actor can act from
+The project is intentionally small. It tests whether actors can act from
 ActorSoul, LifeGoal, memory, relationship context, and world state while
-leaving enough runtime evidence to explain the result.
+leaving transition rows that compare predicted consequences with observed
+results.
 
 ## What It Does
 
@@ -25,7 +26,9 @@ leaving enough runtime evidence to explain the result.
   defaults can look like progress;
 - derives `runtime_retry_constraints` after exact repeated target/args blockers
   and blocks another identical attempt before Mineflayer execution;
-- verifies progress from Minecraft state, not model text;
+- checks progress from Minecraft state, not model text;
+- records predicted-vs-observed physical/material/social deltas when a WAM is
+  present;
 - writes transcripts, provider inputs, evidence, and review artifacts.
 
 ## Core Model
@@ -36,10 +39,16 @@ That workspace owns the actor's active action skills, candidate repairs, memory,
 PlanBeadGraph state, evidence, provider inputs, reviews, and relationships.
 Runtime code reads from that workspace before it allows a primitive to execute.
 
-The hot path stays narrow:
+The runtime hot path stays narrow:
 
 ```text
 observe -> gate -> execute -> verify -> record
+```
+
+The research path adds an advisory prediction before execution:
+
+```text
+state_before + candidate_action -> predicted_delta -> observed_delta
 ```
 
 Reviewer and repair work runs after the turn from saved artifacts.
@@ -48,6 +57,7 @@ Reviewer and repair work runs after the turn from saved artifacts.
 flowchart TD
   Workspace["actor workspace"]
   Context["bounded provider context"]
+  WAM["advisory WAM"]
   Cards["Action Cards"]
   Proposal["Actor Turn tool selection"]
   Gate["active action skill gate"]
@@ -56,16 +66,20 @@ flowchart TD
   Contract["runtime action parameters contract"]
   Retry["runtime_retry_constraints"]
   Judgment["CycleJudgment and memory"]
+  Row["transition row"]
   Review["async reviewer sidecars"]
 
   Workspace --> Context
   Context --> Cards
+  Context --> WAM
   Cards --> Proposal
   Proposal --> Contract
   Contract --> Gate
   Retry --> Gate
   Gate --> Action
   Action --> Evidence
+  WAM --> Row
+  Evidence --> Row
   Evidence --> Judgment
   Judgment --> Workspace
   Evidence --> Retry
@@ -77,6 +91,8 @@ The next architecture layer is actor-owned goal continuity: `soul.md`, a
 persistent LifeGoal, per-cycle CycleGoal selection, and CycleJudgment artifacts.
 It separates "Minecraft evidence passed" from "the actor's social-life judgment
 actually controlled the current goal."
+The WAM layer adds a different separation: prediction quality is not the same
+as acting outcome.
 
 The latest live testing showed this separation matters. A 100-cycle
 long-objective stress test with the OpenAI social-cycle provider reused prior
@@ -94,14 +110,17 @@ flowchart LR
   Action["bounded Minecraft actions"]
   Evidence["runtime evidence"]
   Verifier["verifier"]
+  WAM["future work: advisory delta prediction"]
   Future["future work: partial-progress reporting and richer diagnostics"]
 
   Observation --> Context
   Event --> Context
   Context --> Surface
   Surface --> Action
+  Context --> WAM
   Action --> Evidence
   Evidence --> Verifier
+  WAM --> Future
   Verifier --> Future
 ```
 
@@ -111,20 +130,21 @@ This is not a loose generated-code gameplay loop, generic Minecraft benchmark,
 race-to-diamond project, house-building architecture, or persona-first NPC demo.
 
 The current proof is simpler: complete concrete Minecraft tasks, reject fake
-progress, and make failures easy to inspect.
+progress, make failures easy to inspect, and prepare transition rows.
 
 This is not a revival of unverifiable Voyager-style generated-code execution.
 Direct generated TypeScript is allowed when it is tied to an objective,
 helper-call artifacts, and current-run evidence.
 
 The repo should not treat a model-written JavaScript file, a progress-looking
-animation, or an optimistic provider explanation as success. Success belongs to
-runtime verification backed by world, inventory, position, container, or
-transcript evidence.
+animation, or an optimistic provider explanation as success. Runtime checks are
+mandatory hygiene, not the research contribution. The research contribution is
+the advisory prediction of social-material consequences and its measurement.
 
 ## Read Next
 
 - [Soul-Grounded Social Simulation](Specification/Soul-Grounded-Social-Simulation.md)
+- [Advisory Social-Material World Action Model](Specification/Advisory-Social-Material-WAM.md)
 - [Runtime Evidence And Action Skills](Specification/Runtime-Evidence-And-Action-Skills.md)
 - [Engineering Governance And Testing](Specification/Engineering-Governance-And-Testing.md)
 - [Reference Adaptation Guide](Specification/Reference-Adaptation-Guide.md)

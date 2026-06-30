@@ -1,0 +1,162 @@
+% =========================
+% Experiments (Template)
+% =========================
+
+\section{Experiments}\label{sec:experiment}
+
+In this section, we validate our theoretical predictions across three settings: a \emph{linear regression simulation} that is consistent with our analytical assumptions,
+\textcolor{black}{alongside \emph{Variational Autoencoders (VAEs) on MNIST} and fine-tuning a pretrained \texttt{SmolLM2-135M} \citep{allal2025smollm2smolgoesbig} on a large-scale news summarization task,
+which together illustrate practical behavior under iterative retraining and filtering.}
+Across all settings, the empirical results closely align with our theoretical predictions. Experimental code used to generate the results is publicly
+available at \url{https://github.com/liuqiyuanhhh/Verified-Synthetic-Data}.
+
+\begin{figure}[t] % [h!] forces the figure to stay in the middle of the text here
+    \centering
+    % -------- Top Row: One-Step (Theoretical vs Empirical) --------
+    \begin{subfigure}[b]{0.43\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{./plot/theory.pdf}
+        \caption{One-step: Theoretical Loss Landscape}
+        \label{fig:linear_one_round_theory}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.43\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{./plot/empirical.pdf}
+        \caption{One-step: Empirical Loss Landscape}
+        \label{fig:linear_one_round_empirical}
+    \end{subfigure}
+
+    \vspace{0mm} % Adjust this gap between top and bottom rows as needed
+
+    % -------- Bottom Row: Iterative (With vs Without Bias) --------
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{./plot/linear1_random_2.pdf}
+        \caption{Iterative: Verifier with bias}
+        \label{fig:linear1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{./plot/no_bias_linear_regression_2.pdf}
+        \caption{Iterative: Verifier without bias}
+        \label{fig:no_bias_linear_regression}
+    \end{subfigure}
+    \caption{
+        \textbf{Top:} Error changes of the one-step  retraining estimator $\hat{\theta}^1$  versus  estimator $\hat{\theta}^0$ only using  original real data, measured by $\log(\frac{||\hat{\theta}^0 - \theta^\star||}{||\hat{\theta}^1 - \theta^\star||})$: theory's prediction (a) and empirical comparisons (b). 
+        \textbf{Bottom:} Iterative synthetic retraining over 60 rounds with a biased verifier ($\Delta=1$) and an unbiased verifier ($\Delta=0$).
+    }
+    \label{fig:linear_combined}
+\end{figure}
+\vspace{-2mm}
+\subsection{Linear Regression on Simulated Data}
+
+\paragraph{Setting.}
+We consider the linear model $y =  x^{\top}\theta^\star + \xi$, with $\xi \sim \mathcal{N}(0,1)$, $\theta^\star \in \mathbb{R}^p$, and $x \in \mathbb{R}^p$. 
+We first fit an OLS estimator on the real dataset $(X^0, Y^0)$, and then perform multiple rounds of synthetic retraining,
+where the synthetic covariate design is aligned with the right singular vectors of $X^0$.
+\vspace{-3mm}
+\paragraph{One-step Synthetic Retraining.}
+Figures~\ref{fig:linear_one_round_theory} and \ref{fig:linear_one_round_empirical} empirically validates Theorem~\ref{thm:linear:one_step} by comparing the real-data estimator $\hat{\theta}^0$ with the one-step synthetic estimator $\hat{\theta}^1$, where color regions reflect different levels of error reduction, measured by $\log(\frac{||\hat{\theta}^0 - \theta^\star|| }{||\hat{\theta}^1 - \theta^\star||})$.
+Theoretical predictions (Figure~\ref{fig:linear_one_round_theory}) align closely with empirical results (Figure~\ref{fig:linear_one_round_empirical}), validating the sharpness of our bounds.
+\textcolor{black}{Using 100 real and 800 synthetic samples, we set $\theta^\star = \mathbf{1}_8$ and the verifier center $\theta_c = \theta^\star + \Delta \cdot u$, where $u$ is a random unit vector and $\Delta$ controls bias magnitude.}
+The radius $r$ (see~\eqref{equ:linear:verify_condition}) determines verifier selectivity.
+These results confirm that synthetic retraining outperforms the baseline under small bias (green region) but degrades under excessive bias (red region), consistent with the predicted short-term bias--variance trade-off.
+
+\vspace{-3mm}
+\paragraph{Iterative Synthetic Retraining.}
+Figure~\ref{fig:linear1} validates Theorem~\ref{thm:linear:long_term}, showing that under a biased verifier ($\Delta=1$), the retrained estimator converges to the verifier's knowledge center $\theta_c$ rather than the true parameter $\theta^\star$.
+In this 60-round experiment, sample size increases linearly from 100 to 5500, and results show that a more selective verifier (smaller $r$) accelerates convergence.
+Figure~\ref{fig:no_bias_linear_regression} presents the unbiased case ($\Delta=0$), where verifier-based retraining consistently outperforms unfiltered baselines.
+Together, these findings illustrate how the verifier's contraction effect sustains error reduction and prevents model collapse.
+\textcolor{black}{Additional experiments confirm that our conclusions are robust to random covariate designs (Appendix~\ref{sec:random_synthetic_data}) and different verifier shapes (Appendix~\ref{sec:verifier_shape}).}
+
+
+\subsection{Variational Autoencoders (VAEs) on MNIST}
+Extending beyond linear regression, we evaluate our theory on real-world image generation tasks using Variational Autoencoders (VAEs) on the MNIST dataset.
+\vspace{-3mm}
+\paragraph{Setting and evaluation metrics.} 
+\textcolor{black}{Specifically, we adopt Conditional VAEs (CVAEs) to leverage class conditioning and avoid verifier-induced imbalance; otherwise, easily generated digits would dominate the retained synthetic data.}
+To test the bias--variance trade-off and verifier information injection, we initialize the CVAE with only 500 real images (a challenging \emph{small dataset} scenario). 
+A discriminator, trained on varying amounts of real data alongside an equal number of synthetic samples, serves as the verifier.
+It assigns a reality probability to each synthetic sample, from which we retain the top 10\% per digit.
+Motivated by our one-step analysis, this 10\% threshold optimally balances sample quality against diversity.
+The CVAE is iteratively retrained on verified data for 40 iterations until performance stabilizes.
+The synthetic sample size $n_k$ follows either a fixed or linear growth schedule.
+We evaluate generative performance using Fr\'echet Inception Distance (FID) \citep{heusel2017gans} and the evidence lower bound (ELBO) \citep{kingmaauto2014}.
+\textcolor{black}{Appendices~\ref{app:detail} and \ref{sec:initial_sample_size} provide implementation details and initial sample size ablations.}
+\vspace{-3mm}
+\paragraph{Results.}
+
+Since our verifier emphasizes perceptual realism over likelihood calibration, we report FID as the primary metric and defer qualitatively similar ELBO results to Appendix~\ref{app:detail}.
+As shown in Figure~\ref{fig:fid}, synthetic retraining with a strong verifier (trained on 60K real images) yields rapid early FID improvement before plateauing, whereas unverified retraining (dashed curves) leads to severe degradation.
+This validates our theory: early gains arise from the short-term bias-variance trade-off (Theorem~\ref{thm:linear:one_step}), and the verifier's contraction effect drives convergence to a fixed—though biased—point that substantially improves upon the initial CVAE (Theorem~\ref{thm:linear:long_term}).
+The eventual plateau reflects two limitations: training the initial generator on only 500 real images inherently restricts overall diversity, and the standard MLP verifier lacks diversity-preserving mechanisms, introducing selection bias by disproportionately rejecting harder-to-generate modes.
+For reference, a baseline CVAE trained on 60K real images achieves 17.56 FID, whereas the best synthetic model reaches 21.17 after 40 iterations.
+Figure~\ref{fig:verifier} further shows that with 20K synthetic samples per round, stronger verifiers (trained on more real data) produce larger FID improvements, while weaker ones cause early plateau or even degradation. 
+Qualitative results are shown in Figure~\ref{fig:mnist-illustration}, with consistent MNIST-specific FID results reported in Appendix~\ref{sec:mnist-fid}.
+
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[t]{0.495\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./plot/fid.png}
+        \caption{Filtering and training sample size.}
+        \label{fig:fid}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.495\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{./plot/verifier.pdf}
+        \caption{Verifier quality.}
+        \label{fig:verifier}
+    \end{subfigure}
+    \caption{FID results across retraining rounds. 
+    (a) Effect of filtering and retained sample size. 
+    (b) Effect of verifier quality, varied by training data size. 
+    Together, the plots highlight how both sample selection and verifier strength shape generative performance.}
+    \label{fig:fid_verifier}
+\end{figure}
+
+\subsection{Large-Scale News Summarization} \label{sec:llm_experiment}
+
+Extending beyond image generation, we evaluate our theory on natural-language tasks using the \textsc{XSUM} news-summarization dataset~\citep{xsum-emnlp}.
+
+\paragraph{Setting and evaluation metrics.}
+
+\textcolor{black}{
+We use the the pretrained \texttt{SmolLM2-135M} model~\citep{allal2025smollm2smolgoesbig} as our generator, first fine-tuning it on 12.5\% of the \textsc{XSUM} training set for one epoch using full-parameter training.
+While following the base setup of \cite{feng2024beyond}, we depart from their single-round evaluation by considering a \emph{multi-iteration} generate--verify--retrain regime to capture how performance evolves over repeated cycles.} Given the low-entropy nature of news summarization, we follow the common practice of employing greedy decoding for both generation and evaluation.
+
+\begin{wrapfigure}{r}{0.45\linewidth}
+    \centering
+    % \vspace{-1em}
+    \includegraphics[width=\linewidth]{./plot/rouge1_vs_iteration.pdf}
+    \caption{\textbf{ROUGE-1 score vs.\ iteration on the \textsc{XSUM} dataset.}
+    Filtered retraining yields consistent early improvements, whereas unfiltered retraining shows no significant gain.
+    }
+    \label{fig:xsum_rouge_iterations}
+    % \vspace{-1em}
+\end{wrapfigure}
+In each iteration, the model generates synthetic summaries for the training corpus, which are scored using ROUGE-1 against ground-truth references. 
+Acting as an oracle verifier, we select the top 12.5\% of these summaries to form the synthetic retraining dataset. The model is then retrained on this subset, and test ROUGE-1 scores are recorded after each iteration.
+
+
+\paragraph{Results.} Figure~\ref{fig:xsum_rouge_iterations} reports ROUGE-1 scores across 15 rounds for both filtered and unfiltered retraining regimes, while all other experimental conditions remain identical. 
+Under verifier filtering, performance improves monotonically during early iterations before eventually stabilizing. 
+In contrast, the unfiltered baseline fluctuates around its initial score without meaningful improvement. 
+These observed dynamics mirror our MNIST findings and theoretical predictions, demonstrating that our framework scales to natural-language tasks.
+
+
+
+\begin{comment}
+    
+\paragraph{Computational resources.}
+All experiments were conducted on a dedicated cluster equipped with 4 NVIDIA A800 GPUs (256\,GB memory each).  
+Training and inference follow a standard full-finetuning pipeline with batch size~32, learning rate~$5\times 10^{-5}$, cosine scheduler, one training epoch, and maximum sequence length of~256.
+\end{comment}
+
+
+

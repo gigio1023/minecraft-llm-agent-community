@@ -1,0 +1,26 @@
+\subsection{VPT Foundation Model Training and Zero-Shot Performance}
+\label{section:results_foundation}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{assets/foundation_full.pdf} 
+    \vspace{-6px}
+    \caption{\label{fig:foundation} \textbf{(Left)} Training and validation loss on the \texttt{web\_clean} internet dataset with IDM pseudo-labels, and loss on the main IDM contractor dataset, which has ground-truth labels but is out-of-distribution (see text). \textbf{(Right)} Amount a given item was collected per episode averaged over 2500 60-minute survival episodes as a function of training epoch, shaded with the standard error of the mean. Basic mining refers to collection of dirt, gravel, or sand (all materials that can be gathered without tools). Logs are obtained by repeatedly hitting trees for three seconds, a difficult feat for an RL agent to achieve as we show in Sec.~\ref{section:RL_finetuning}. Planks can be crafted from logs, and crafting tables crafted from planks. Crafting requires using in-game crafting GUIs, and proficient humans take a median of 50 seconds (970 consecutive actions) to make a crafting table.
+    }
+\end{figure}
+
+We now explore the emergent behavior learned by a behavioral cloning policy trained on an extremely large, but noisy, internet dataset labeled with our IDM.
+To collect the unlabeled internet dataset, we searched for publicly available videos of Minecraft play with search terms such as ``minecraft survival for beginners.''
+These searches resulted in $\sim$270k hours of video, which we filtered down to ``clean'' video segments yielding an \emph{unlabeled} dataset of $\sim$70k hours, which we refer to as \texttt{web\_clean} (Appendix~\ref{appendix:collecting_internet_data} has further details on data scraping and filtering).
+We then generated pseudo-labels for \texttt{web\_clean} with our best IDM (Section~\ref{fig:first_idm_results}) and then trained the VPT foundation model with behavioral cloning. Preliminary experiments suggested that our model could benefit from 30 epochs of training and that a 0.5 billion parameter model was required to stay in the efficient learning regime \cite{kaplan2020scaling} for that training duration (Appendix~\ref{Appendix:FoundationModelScaling}), which took $\sim$9 days on 720 V100 GPUs.
+
+We evaluate our models by measuring validation loss (Fig.~\ref{fig:foundation}, left) and rolling them out in the Minecraft environment. Unless otherwise noted, in all environment evaluations we spawn agents in a standard survival mode game where they play for 60 minutes, i.e. 72000 consecutive actions, and we plot the mean and shade the standard error of the mean for various game statistics such as crafting and collection rates (Fig.~\ref{fig:foundation}, right).
+The VPT foundation model quickly learns to chop down trees to collect logs, a task we found near impossible for an RL agent to achieve with the native human interface (Sec.~\ref{section:RL_finetuning}).
+It also learns to craft those logs into wooden planks and then use those planks to craft a crafting table, which are required to unlock most other technology in the game and take a human proficient in Minecraft approximately 50 seconds (970 consecutive actions) to collect.
+While these behaviors are fairly complex in the native human action space, the VPT foundation model crafts these items at a rate far below that of our proficient contractors, e.g.\ on average our contractors craft 5.44 crafting tables in 60 minutes of play versus 0.19 for the foundation model.
+The model also crafts a non-negligible amount of wooden sticks, which are required to make wooden tools; collects various flowers and crafts dyes from them; kills zombies that appear during the night; hunts wild animals; collects various berries and mushrooms and eats them; and finds game-generated villages from which to collect various rare items from chests. The model also learned to navigate uneven terrain, swim, and pillar jump, which involves the agent repeatedly jumping and quickly placing a block below itself such that it climbs upward by making a pillar.\footnote{Sample videos: \href{https://www.youtube.com/playlist?list=PLNAOIb\_agjf3U3rSvG\_BCWqJ869NdBhcP}{https://www.youtube.com/playlist?list=PLNAOIb\_agjf3U3rSvG\_BCWqJ869NdBhcP}}
+
+While training and validation loss decrease healthily over training (Fig.~\ref{fig:foundation}, left), loss on our contractor dataset (which the VPT model does not train on) begins increasing after 7 epochs.
+Contractor data could be out-of-distribution because our contractors may have a different distribution of play or because there is some impactful visual domain shift compared to videos from the web.
+While one could have expected this would be predictive of declining evaluation performance, we do not see notable game statistics from the VPT foundation model rollouts (Figure \ref{fig:foundation}, right) decrease over training, and in the next section we show that BC fine-tuning performance continually improves as the VPT foundation model trains.
+We provide more insight into this curious phenomenon in Appendix~\ref{Appendix:FoundationModelScaling}.

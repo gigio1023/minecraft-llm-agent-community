@@ -1,0 +1,140 @@
+\section{DreamerV2}
+\label{sec:method}
+
+We present DreamerV2, an evolution of the Dreamer agent \citep{hafner2019dreamer}. We refer to the original Dreamer agent as DreamerV1 throughout this paper. This section describes the complete DreamerV2 algorithm, consisting of the three typical components of a model-based agent \citep{sutton1991dyna}. We learn the world model from a dataset of past experience, learn an actor and critic from imagined sequences of compact model states, and execute the actor in the environment to grow the experience dataset. In \cref{sec:modifications}, we include a list of changes that we applied to DreamerV1 and which of them we found to increase empirical performance.
+
+\subsection{World Model Learning}
+
+World models summarize an agent's experience into a predictive model that can be used in place of the environment to learn behaviors. When inputs are high-dimensional images, it is beneficial to learn compact state representations of the inputs to predict ahead in this learned latent space \citep{watter2015e2c,karl2016dvbf,ha2018worldmodels}. These models are called latent dynamics models. Predicting ahead in latent space not only facilitates long-term predictions, it also allows to efficiently predict thousands of compact state sequences in parallel in a single batch, without having to generate images. DreamerV2 builds upon the world model that was introduced by PlaNet \citep{hafner2018planet} and used in DreamerV1, by replacing its Gaussian latents with categorical variables.
+
+\input{figures/model/figure}
+
+\paragraph{Experience dataset}
+
+The world model is trained from the agent's growing dataset of past experience that contains sequences of images $x_{1:T}$, actions $a_{1:T}$, rewards $r_{1:T}$, and discount factors $\gamma_{1:T}$. The discount factors equal a fixed hyper parameter $\gamma=0.999$ for time steps within an episode and are set to zero for terminal time steps. For training, we use batches of $B=50$ sequences of fixed length $L=50$ that are sampled randomly within the stored episodes. To observe enough episode ends during training, we sample the start index of each training sequence uniformly within the episode and then clip it to not exceed the episode length minus the training sequence length.
+
+\paragraph{Model components}
+
+The world model consists of an image encoder, a Recurrent State-Space Model \citep[RSSM;][]{hafner2018planet} to learn the dynamics, and predictors for the image, reward, and discount factor. The world model is summarized in \cref{fig:model}. The RSSM uses a sequence of deterministic recurrent states $h_t$, from which it computes two distributions over stochastic states at each step. The posterior state $z_t$ incorporates information about the current image $x_t$, while the prior state $\hat{z}_t$ aims to predict the posterior without access to the current image. The concatenation of deterministic and stochastic states forms the compact model state. From the posterior model state, we reconstruct the current image $x_t$ and predict the reward $r_t$ and discount factor $\gamma_t$. The model components are:
+
+\eq{
+\begin{alignedat}{4}
+\raisebox{1.95ex}{\llap{\blap{\ensuremath{
+\text{RSSM} \hspace{1ex} \begin{cases} \hphantom{A} \\ \hphantom{A} \\ \hphantom{A} \end{cases} \hspace*{-2.4ex}
+}}}}
+& \text{Recurrent model:}        \padspace && h_t            &\ =    &\ f_\phi(h_{t-1},z_{t-1},a_{t-1}) \\
+& \text{Representation model:}   \padspace && z_t            &\ \sim &\ \qp(z_t | h_t,x_t) \\
+& \text{Transition predictor:}   \padspace && \hat{z}_t      &\ \sim &\ \pp(\hat{z}_t | h_t) \\
+& \text{Image predictor:}        \padspace && \hat{x}_t      &\ \sim &\ \pp(\hat{x}_t | h_t,z_t) \\
+& \text{Reward predictor:}       \padspace && \hat{r}_t      &\ \sim &\ \pp(\hat{r}_t | h_t,z_t) \\
+& \text{Discount predictor:}     \padspace && \hat{\gamma}_t &\ \sim &\ \pp(\hat{\gamma}_t | h_t,z_t).
+\end{alignedat}}
+
+All components are implemented as neural networks and $\phi$ describes their combined parameter vector. The transition predictor guesses the next model state only from the current model state and the action but without using the next image, so that we can later learn behaviors by predicting sequences of model states without having to observe or generate images. The discount predictor lets us estimate the probability of an episode ending when learning behaviors from model predictions.
+
+\input{algos/st}
+
+\paragraph{Neural networks}
+
+The representation model is implemented as a Convolutional Neural Network \citep[CNN;][]{lecun1989cnn} followed by a Multi-Layer Perceptron (MLP) that receives the image embedding and the deterministic recurrent state. The RSSM uses a Gated Recurrent Unit \citep[GRU;][]{cho2014gru} to compute the deterministic recurrent states. The model state is the concatenation of deterministic GRU state and a sample of the stochastic state. The image predictor is a transposed CNN and the transition, reward, and discount predictors are MLPs. We down-scale the $84 \times 84$ grayscale images to $64 \times 64$ pixels so that we can apply the convolutional architecture of DreamerV1. We use the ELU activation function for all components of the model \citep{clevert2015elu}. The world model uses a total of 20M trainable parameters.
+
+\input{algos/klbalancing}
+
+\paragraph{Distributions}
+
+The image predictor outputs the mean of a diagonal Gaussian likelihood with unit variance, the reward predictor outputs a univariate Gaussian with unit variance, and the discount predictor outputs a Bernoulli likelihood. In prior work, the latent variable in the model state was a diagonal Gaussian that used reparameterization gradients during backpropagation \citep{kingma2013vae,rezende2014vae}. In DreamerV2, we instead use a vector of several categorical variables and optimize them using straight-through gradients \citep{bengio2013straight}, which are easy to implement using automatic differentiation as shown in \cref{alg:st}. We discuss possible benefits of categorical over Gaussian latents in the experiments section.
+
+\paragraph{Loss function}
+
+All components of the world model are optimized jointly. The distributions produced by the image predictor, reward predictor, discount predictor, and transition predictor are trained to maximize the log-likelihood of their corresponding targets. The representation model is trained to produce model states that facilitates these prediction tasks, through the expectation below. Moreover, it is regularized to produce model states with high entropy, such that the model becomes robust to many different model states during training. The loss function for learning the world model is:
+
+\eq{
+\mathcal{L}(\phi)
+\doteq
+\operatorname{E}_{\qp(z_{1:T} | a_{1:T}, x_{1:T})}\Big[
+  \textstyle\sum_{t=1}^T
+    &\describe{-\ln\pp(x_t | h_t,z_t)}{image log loss}
+    \describe{-\ln\pp(r_t | h_t,z_t)}{reward log loss}
+    \describe{-\ln\pp(\gamma_t | h_t,z_t)}{discount log loss} \\
+&\describe{+\beta\KL[\qp(z_t | h_t,x_t) || \pp(z_t | h_t)]}{KL loss}
+\Big].
+\label{eq:model_loss}\raisetag{5ex}}
+
+We jointly minimize the loss function with respect to the vector $\phi$ that contains all parameters of the world model using the Adam optimizer \citep{kingma2014adam}. We scale the KL loss by $\beta=0.1$ for Atari and by $\beta=1.0$ for continuous control \citep{higgins2016beta}.
+
+\paragraph{KL balancing}
+
+The world model loss function in \cref{eq:model_loss} is the ELBO or variational free energy of a hidden Markov model that is conditioned on the action sequence. The world model can thus be interpreted as a sequential VAE, where the representation model is the approximate posterior and the transition predictor is the temporal prior. In the ELBO objective, the KL loss serves two purposes: it trains the prior toward the representations, and it regularizes the representations toward the prior. However, learning the transition function is difficult and we want to avoid regularizing the representations toward a poorly trained prior. To solve this problem, we minimize the KL loss faster with respect to the prior than the representations by using different learning rates, $\alpha=0.8$ for the prior and $1-\alpha$ for the approximate posterior. We implement this technique as shown in \cref{alg:klbalancing} and refer to it as KL balancing. KL balancing encourages learning an accurate prior over increasing posterior entropy, so that the prior better approximates the aggregate posterior. KL balancing is different from and orthogonal to beta-VAEs \citep{higgins2016beta}.
+
+\subsection{Behavior Learning}
+
+DreamerV2 learns long-horizon behaviors purely within its world model using an actor and a critic. The actor chooses actions for predicting imagined sequences of compact model states. The critic accumulates the future predicted rewards to take into account rewards beyond the planning horizon. Both the actor and critic operate on top of the learned model states and thus benefit from the representations learned by the world model. The world model is fixed during behavior learning, so the actor and value gradients do not affect its representations. Not predicting images during behavior learning lets us efficiently simulate 2500 latent trajectories in parallel on a single GPU.
+
+\paragraph{Imagination MDP}
+
+To learn behaviors within the latent space of the world model, we define the imagination MPD as follows. The distribution of initial states $\hat{z}_0$ in the imagination MDP is the distribution of compact model states encountered during world model training. From there, the transition predictor $\pp(\hat{z}_t | \hat{z}_{t-1},\hat{a}_{t-1})$ outputs sequences $\hat{z}_{1:H}$ of compact model states up to the imagination horizon $H=15$. The mean of the reward predictor $\pp(\hat{r}_t|\hat{z}_t)$ is used as reward sequence $\hat{r}_{1:H}$. The discount predictor $\pp(\hat{\gamma}_t|\hat{z}_t)$ outputs the discount sequence $\hat{\gamma}_{1:H}$ that is used to down-weight rewards. Moreover, we weigh the loss terms of the actor and critic by the cumulative predicted discount factors to softly account for the possibility of episode ends.
+
+\input{figures/policy/figure}
+
+\paragraph{Model components}
+
+To learn long-horizon behaviors in the imagination MDP, we leverage a stochastic actor that chooses actions and a deterministic critic. The actor and critic are trained cooperatively, where the actor aims to output actions that lead to states that maximize the critic output, while the critic aims to accurately estimate the sum of future rewards achieved by the actor from each imagined state. The actor and critic use the parameter vectors $\psi$ and $\xi$, respectively:
+
+\eq{
+\begin{alignedat}{3}
+& \text{Actor:}   \padspace && \hat{a}_t \sim \p<p_\psi>(\hat{a}_t | \hat{z}_t) \\
+& \text{Critic:}  \padspace && v_\xi(\hat{z}_t) \approx \operatorname{E}_{p_\phi,p_\psi}\Big[
+  \textstyle\sum_{\tau \geq t} \hat{\gamma}^{\tau-t} \hat{r}_\tau
+\Big]. \\
+\end{alignedat}
+}
+
+In contrast to the actual environment, the latent state sequence is Markovian, so that there is no need for the actor and critic to condition on more than the current model state. The actor and critic are both MLPs with ELU activations \citep{clevert2015elu} and use 1M trainable parameters each. The actor outputs a categorical distribution over actions and the critic has a deterministic output. The two components are trained from the same imagined trajectories but optimize separate loss functions.
+
+\paragraph{Critic loss function}
+
+The critic aims to predict the discounted sum of future rewards that the actor achieves in a given model state, known as the state value. For this, we leverage temporal-difference learning, where the critic is trained toward a value target that is constructed from intermediate rewards and critic outputs for later states. A common choice is the 1-step target that sums the current reward and the critic output for the following state. However, the imagination MDP lets us generate on-policy trajectories of multiple steps, suggesting the use of n-step targets that incorporate reward information into the critic more quickly. We follow DreamerV1 in using the more general $\lambda$-target \citep{sutton2018rlbook,schulman2015gae} that is defined recursively as follows:
+
+\eq{
+V^\lambda_t \doteq
+\hat{r}_t + \hat{\gamma}_t
+\begin{cases}
+  (1 - \lambda) v_\xi(\hat{z}_{t+1}) + \lambda V^\lambda_{t+1} & \text{if}\quad t<H, \\
+  v_\xi(\hat{z}_H) & \text{if}\quad t=H. \\
+\end{cases}
+}
+
+Intuitively, the $\lambda$-target is a weighted average of n-step returns for different horizons, where longer horizons are weighted exponentially less. We set $\lambda=0.95$ in practice, to focus more on long horizon targets than on short horizon targets. Given a trajectory of model states, rewards, and discount factors, we train the critic to regress the $\lambda$-return using a squared loss:
+
+\eq{
+\mathcal{L}(\xi) \doteq
+\operatorname{E}_{p_\phi,p_\psi}\Big[
+  \textstyle \sum_{t=1}^{H-1}
+    \frac{1}{2} \big(
+      v_\xi(\hat{z}_t) - \operatorname{sg}(V^\lambda_t)
+    \big)^2
+\Big].
+}
+
+We optimize the critic loss with respect to the critic parameters $\xi$ using the Adam optimizer. There is no loss term for the last time step because the target equals the critic at that step. We stop the gradients around the targets, denoted by the $\operatorname{sg}(\cdot)$ function, as typical in the literature. We stabilize value learning using a target network \citep{mnih2015dqn}, namely, we compute the targets using a copy of the critic that is updated every $100$ gradient steps.
+
+\paragraph{Actor loss function}
+
+The actor aims to output actions that maximize the prediction of long-term future rewards made by the critic. To incorporate intermediate rewards more directly, we train the actor to maximize the same $\lambda$-return that was computed for training the critic. There are different gradient estimators for maximizing the targets with respect to the actor parameters. DreamerV2 combines unbiased but high-variance Reinforce gradients with biased but low-variance straight-through gradients. Moreover, we regularize the entropy of the actor to encourage exploration where feasible while allowing the actor to choose precise actions when necessary.
+
+Learning by Reinforce \citep{williams1992reinforce} maximizes the actor's probability of its own sampled actions weighted by the values of those actions. The variance of this estimator can be reduced by subtracting the state value as baseline, which does not depend on the current action. Intuitively, subtracting the baseline centers the weights and leads to faster learning. The benefit of Reinforce is that it produced unbiased gradients and the downside is that it can have high variance, even with baseline.
+
+DreamerV1 relied entirely on reparameterization gradients \citep{kingma2013vae,rezende2014vae} to train the actor directly by backpropagating value gradients through the sequence of sampled model states and actions. DreamerV2 uses both discrete latents and discrete actions. To backpropagate through the sampled actions and state sequences, we leverage straight-through gradients \citep{bengio2013straight}. This results in a biased gradient estimate with low variance. The combined actor loss function is:
+
+\eq{
+\begin{aligned}
+\mathcal{L}(\psi) \doteq
+\operatorname{E}_{p_\phi,p_\psi}\Big[
+  \textstyle \sum_{t=1}^{H-1} \big(
+    \describe{-\rho \ln\p<p_\psi>(\hat{a}_t|\hat{z}_t)\operatorname{sg}(V^\lambda_t-v_\xi({\hat{z}_t}))}{reinforce}
+    \describe{-(1-\rho) V^\lambda_t}{\ensuremath{\substack{\text{\scriptsize dynamics} \\ \text{\scriptsize backprop}}\vspace*{-2ex}}}
+    \describe{-\eta \operatorname{H}[a_t|\hat{z}_t]}{entropy regularizer}
+\big)\Big].
+\end{aligned}}
+
+We optimize the actor loss with respect to the actor parameters $\psi$ using the Adam optimizer. We consider both Reinforce gradients and straight-through gradients, which backpropagate directly through the learned dynamics. Intuitively, the low-variance but biased dynamics backpropagation could learn faster initially and the unbiased but high-variance could to converge to a better solution. For Atari, we find Reinforce gradients to work substantially better and use $\rho=1$ and $\eta=10^{-3}$. For continuous control, we find dynamics backpropagation to work substantially better and use $\rho=0$ and $\eta=10^{-4}$. Annealing these hyper parameters can improve performance slightly but to avoid the added complexity we report the scores without annealing.

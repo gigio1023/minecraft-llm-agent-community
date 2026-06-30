@@ -1,0 +1,148 @@
+\section{Discussion}
+\label{sec:one-time-exam}
+
+% Future Directions for LLM Benchmarks
+In this section, we first discuss potential contamination beyond rephrased samples.
+We then discuss the importance of the LLM decontaminator while using LLM such as GPT-4 to generate training data.
+% in the context where popular training datasets use LLMs, such as GPT-4 to generate new training samples. 
+% \weilin{this sentence is confusing.}
+In the end, we propose suggestions to enhance LLM evaluation (e.g. with fresh one-time exams). 
+
+%need to discuss the importance of using the LLM decontaminator to inspect the dataset and explore possible methods to enhance the benchmark.
+
+\subsection{Beyond rephrased samples}
+%Number Substituted Only Case}
+% \todo{remove}
+
+% In this work, we defined rephrase contamination and found multiple examples of it in open datasets.
+In this study, we argue that rephrased test samples should be considered as contamination because including them in the training data can skew the benchmark results.
+However, formulating a precise definition of what constitutes contamination remains challenging.
+% During the development of the LLM decontaminator, we discovered other possible contamination. 
+For instance, we discover in the GSM-8k math benchmark, a training and a test example may only differ in numbers (see Example~\ref{ex:gsm-8k}). %Does it count as a contamination pair?
+% Aside from this, the question remains largely unchanged. We call this ``number substituted only case''.
+% We rephrase the test set to bypass detection while imitating possible contamination in real-world datasets. 
+%We show that models trained on rephrased samples can achieve dramatically high scores.
+%Situations that are more typical in math benchmarks are present in the GSM-8k and MATH training sets.
+% We show that models trained on rephrased samples can achieve dramatically high scores.
+% while they can be quickly identified by the LLM decontaminator, they don't always meet the criteria for contamination. The ``number replaced only'' case describes this circumstance.
+%Although the LLM decontaminator can easily detect these, they are not considered rephrased samples. The ``number substituted only'' scenario exemplifies this circumstance.
+
+% \begin{tcolorbox}[title={GSM-8k Number Replaced Only Case}]
+% \begin{multicols}{2}
+
+% \textbf{GSM-8k test} \newline 
+
+% Emil is 19 years old now. When he turns 24, he will be half the age of his dad but twice as old as his brother.  What is the sum of the ages of his dad and his brother now?
+
+% \columnbreak 
+
+% \textbf{GSM-8k} \newline
+
+% When Diane turns 30, she will be half the age of Alex and twice as old as Allison. Diane is 16 years old now. What is the sum of the ages of Alex and Allison now?
+
+% \end{multicols}
+% \end{tcolorbox}
+
+\begin{example}[GSM-8k Number Substituted Only Case]\label{ex:gsm-8k}
+
+\textbf{(GSM-8k test)} \
+
+Emil is 19 years old now. When he turns 24, he will be half the age of his dad but twice as old as his brother.  What is the sum of the ages of his dad and his brother now?
+
+% \vspace{0.5cm} % Adds some space between the two texts
+
+\textbf{(GSM-8k)}
+
+When Diane turns 30, she will be half the age of Alex and twice as old as Allison. Diane is 16 years old now. What is the sum of the ages of Alex and Allison now?
+
+\end{example}
+
+
+% As we can see, aside from the numerical shift, there is little difference in this question. Considering that they have different answers, this situation isn't referred to as contamination.
+% But does this indicate that such a dataset is uncontaminated? 
+% Essentially, models trained on the GSM-8k dataset reduce an applied problem to a straightforward arithmetic issue.
+% This modification lessens the benchmark's usefulness in various ways. A model that does well in basic math but has trouble in reading comprehension can still perform well on GSM-8k with some fine-tuning. 
+% The benchmark score does not indicate that the model is capable of handling real-world simple math problems. Once there's a variation beyond numbers, the model loses its problem-solving capability.
+
+% Since these questions change beyond wordings, they are not considered as rephrased samples. However, does this imply the dataset is free from contamination? 
+%In this work, we do not consider them as rephrased samples.
+If models are trained with such number substituted cases, they tend to only memorize the solutions and may have poor generalization beyond the seen patterns.
+Thus, the resulting benchmark numbers may not be effective in capturing model's performance in math problem-solving.
+This is an open question we suggest the community to debate further.
+%simplify a comprehensive problem into a basic arithmetic task.
+%benchmark's effectiveness in several ways. A model adept at basic math but struggling with reading comprehension might still excel on GSM-8k after it is trained on the number substituted only cases. 
+%Thus, a high benchmark score may not accurately reflect a model's ability to generalize beyond. When faced with variations beyond mere numerical changes, the model's problem-solving capacity may diminish.
+
+\subsection{Contamination in Synthetic Data}
+% \DL{maybe change the wording "synthetic data" as this is not common in LLM papers.}
+
+% Rephrase contamination is currently at its peak, mainly due to two dataset construction methods: web scraping and LLM-generated data. The former risks contamination from undetected benchmark variations, while the latter introduces another contamination source. GPT-4~\citep{openai2023gpt4} and Llama-2~\citep{touvron2023llama}'s technical reports confirm this issue in their training data. Llama-2 flags tokens in n-grams over 10 tokens from both evaluation and training sets as contaminated. In llama-2-70B, 11\% of the MMLU benchmark prompts have over 80\% contaminated tokens. GPT-4's report highlights contamination from the BIG-bench benchmark.
+
+The issue of unintentional contamination may occur more often as models are increasingly trained on data generated by LLMs, in which subtle benchmark contamination may present.
+%because of the new technique for building datasets: LLM-generated data. 
+% The former risks contamination from undetected benchmark variations, while the latter introduces another contamination source.
+% Tokens in n-grams with more than 10 tokens, from both the assessment and training sets, are flagged as contaminated by Llama-2~\citep{touvron2023llama}. 
+% 11\% of the MMLU benchmark prompts in Llama-2-70B had more than 80\% contaminated tokens. The contamination from the BIG-bench benchmark is highlighted in the GPT-4 report~\citep{openai2023gpt4}. 
+% Since LLMs always generate data similar to their training data, these generated data might contain rephrased samples. \weilin{I'd suggest to rewrite this sentence.} 
+% LLMs tend to generate content that is relative to their training data. 
+% Consequently, rephrased samples of benchmarks can be generated if LLMs' training data is contaminated.
+For instance, we discover several contamination in CodeAlpaca dataset generated by GPT in Section~\ref{sec:real-world}.
+% \weilin{rewrite, say our decontaminator discovered rephrased sample in CodeAlpaca}
+% Using GPT-generated data, as in the case of CodeAlpaca, is more likely to cause rephrase contamination.
+Phi-1~\citep{gunasekar2023textbooks} also detected subtle contamination from LLM-generated data.
+As a result, we have to be more aware of potential contamination while training models on synthetic data. 
+We suggest model developers to adopt stronger measures for decontamination.
+
+% As a result, it is necessary to use the LLM decontaminator while developing datasets with synthetic data.
+% \weilin{this is not a convincing ending. we should say when training on synthetic data, we have to be more aware of potential contamination as it may occur in a subtle way etc}
+% \weilin{cite Phi, saying they discover subtle contamination}
+
+\subsection{Enhancing Benchmarks for LLMs}
+
+% While the LLM decontaminator offers a safeguard against certain unintentional contaminations, there are still issues with benchmark vulnerabilities. 
+% The trustworthiness of benchmarks can also be undermined by deliberate training on test sets. To provide a more precise illustration of model capabilities, there is a need to enhance existing benchmarks and develop dynamic, non-static benchmarking systems.
+While our proposed decontamination method can serve as a useful tool, how to detect contamination without access to training data remains an open problem.
+ % Thus, benchmark scores are still unreliable in the presence of intentional contamination.
+%While the LLM decontaminator serves as a protective measure against certain unintentional contaminations, 
+%benchmark scores are still unreliable. Notably, benchmarks' credibility can be reduced by intentional training on test sets. 
+% From the first principle, why do these contaminations happen? This is because the current benchmarks are reused again and again for model development. 
+% \weilin{this is not true, it's also possible that we are ``running out'' of questions} 
+We propose to build \textit{fresh} one-time questions to evaluate LLMs instead of relying on static benchmarks.
+For example, in coding domain, one could consider using weekly coding competitions such as CodeForces.
+We suggest that benchmarks should iterate as fast as model development.
+%One model can only be tested on an exam once, so it is hard to overfit a one-time benchmark. 
+% For instance, we can use CodeForce's weekly competitions as one-time exams for LLMs. Such non-static benchmarks may effectively prevent models from scoring high by merely memorizing answers.
+% \weilin{this section is not a convincing }
+
+
+
+
+% As a result, there is an urgent need to improve current benchmarks and develop one-time exams to evaluate LLMs accurately.
+
+
+% On one hand, we can implement perturbation on test sets~\citep{zong2023fool} on existing benchmarks (.e.g MMLU). 
+% If a model is trained on test cases directly, it may not answer correctly when the answering format is changed. For example, if a model gets a dramatically lower score after 
+% A model's high benchmark score may be fundamentally unstable if it has poor generalization abilities and is trained on contaminated data.
+
+% To fundamentally address the contamination problem, developing one-time exams is a viable approach. We can use CodeForce weekly competitions as one-time exams for LLMs. Such non-static benchmarks effectively prevent models from scoring high by merely memorizing answers.
+
+% The most direct approach to enhance existing benchmarks is through perturbation. 
+% A model's high benchmark score may be fundamentally unstable if it has poor generalization abilities and is trained on contaminated data.~\citep{zong2023fool} 
+% We may determine to some extent whether the model has just remembered contaminated data by altering the sequence of the multiple-choice questions and requiring the model to output in a specific format. 
+% Another approach is to employ live benchmarks, such as one-time exams like LeetCode weekly competitions. Such non-static benchmarks effectively prevent models from scoring high by merely memorizing answers.
+
+
+
+
+% \subsection{LLM benchmark should be one-time exams}
+% \subsection{Enhancing benchmarks by Perturbation}
+
+% \todo{@weilin}
+
+% - call for action
+
+% - list several proposals (Kaggle competition, ML common, LeetCode/CodeForce weekly competition)
+
+% - budget
+
+

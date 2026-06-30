@@ -1,0 +1,180 @@
+\newcommand{\thinktag}[1]{\textcolor{blue}{\textless #1\textgreater}}
+\newcommand{\searchtag}[1]{\textcolor{teal}{\textless #1\textgreater}}
+\newcommand{\exptag}[1]{\textcolor{violet}{\textless #1\textgreater}}
+\newcommand{\knowledgetag}[1]{\textcolor{orange}{\textless #1\textgreater}}
+\newcommand{\infotag}[1]{\textcolor{purple}{\textless #1\textgreater}}
+\newcommand{\answertag}[1]{\textcolor{red}{\textless #1\textgreater}}
+
+\begin{figure*}[hbtp]
+    \centering
+    \includegraphics[width=1\linewidth]{img/frame.pdf}
+    \caption{
+        \textbf{Overview of the EvolveR framework's experience lifecycle.}
+        \textbf{Left}: The main loop alternates between an \textit{Online Phase}, where the agent interacts with the environment and its policy parameters are updated via RL, and an \textit{Offline Phase}, where the agent's parameters are frozen and it performs self-distillation and maintains its Experience Base ($\mathcal{E}$).
+        \textbf{Top Right}: A detailed view of the \texttt{Search ExpBase} action, where the agent retrieves scored principles along with their associated trajectories.
+        \textbf{Bottom Right}: The \texttt{Update ExpBase} process, which involves summarizing trajectories and applying a suite of curation operations (distill, deduplicate, update, and filter).
+    }
+    \vspace{-0.25em}
+    \label{fig:framework}
+\end{figure*}
+
+
+In this section, we present \textbf{EvolveR}, a novel framework designed to enable agent self-evolution through a complete, closed-loop experience lifecycle. Inspired by the human cycle of work and reflection, our approach is structured around three core, interconnected components, as depicted in Figure~\ref{fig:framework}. First, in the \textbf{Offline Experience Self-Distillation} phase, the agent's policy parameters are frozen, and it systematically distills raw trajectories into a curated base of strategic principles. Second, during the \textbf{Online Interaction} phase, the agent applies this distilled wisdom to guide its deliberative reasoning and action, generating new, high-quality interaction data. Finally, the entire cycle is driven by a \textbf{Policy Evolution} mechanism, where the trajectories collected online are used to update the agent's policy parameters via reinforcement learning, thus closing the loop. This iterative process allows the agent to continuously transform its interactions into evolving expertise.
+
+\subsection{Preliminaries: Formalizing Agent Interaction}
+
+At each state $t$, the agent, situated in an unknown state $s_t$, selects an action $a_t \in \mathcal{A}$ based on its policy. Our agent's action space $\mathcal{A}$ is designed for complex, knowledge-intensive tasks and comprises three key operations:
+
+\begin{itemize}[leftmargin=2em]
+    % \item \thinktag{think}: Agent generates an internal monologue to reason about the current problem state, analyze past actions, plan its next steps or analyze potential experiences. This action does not interact with the external environment.
+    
+    \item \searchtag{search\_experience}: Agent queries its internal experience base $\mathcal{E}$ to retrieve relevant principles distilled from past trajectories. Environment returns retrieved principles as an observation.
+    
+    \item \knowledgetag{search\_knowledge}: Agent queries an external knowledge base (e.g., a search engine) to acquire factual information. Environment returns retrieved information as an observation.
+    \item \answertag{answer}: Agent outputs its final answer to the problem and concludes the interaction. 
+ 
+\end{itemize}
+
+
+
+
+% The agent's decisions are based on its history $h_t = (o_1, a_1, \dots, a_{t-1}, o_t)$, which is governed by a policy $\pi_\theta(a_t | h_t)$ parameterized by $\theta$. The objective is to find the optimal parameters $\theta^*$ that maximize the expected discounted return:
+
+% \begin{equation}
+% J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=1}^{T} \gamma^{t-1} r_t \right]
+% \label{eq:objective}
+% \end{equation}
+
+% where $\gamma \in [0, 1]$ is a discount factor and a trajectory $\tau = (o_1, a_1, r_1, \dots, o_T, a_T, r_T)$ represents a complete episode. These trajectories serve as the foundational data for the EvolveR lifecycle, which we detail in the subsequent sections.
+
+
+
+\subsection{The EvolveR Lifecycle: From Interactions to Principles}
+\subsubsection{Offline Experience Self-Distillation}
+
+The core of EvolveR is a self-perpetuating lifecycle designed to transform raw interaction data into a strategic principle. This process is divided into two distinct, alternating phases: an offline self-distillation phase for distilling the principle, and an online interaction phase for applying the principle and gathering new interaction data.
+
+% \vspace{-1em}
+\paragraph{Principle from Self-Distillation.}
+The process begins with self-distillation. We leverage the agent's own policy model $\pi_\theta$ to analyze its past interaction trajectories. By adopting the persona of an expert through carefully designed prompts, the model reviews each trajectory and, based on its outcome, distills the core strategic insight into a concise natural language statement. This results in either a \textbf{guiding principle} from a success or a \textbf{cautionary principle} from a failure. 
+
+Inspired by structured memory frameworks such as Mem0~\citep{chhikara2025mem0buildingproductionreadyai} and G-Memory~\citep{zhang2025gmemorytracinghierarchicalmemory}, each principle consists of two components: a natural language description paired with several structured knowledge triples, as illustrated in Figure~\ref{fig:framework}. 
+% For example, principle is consist of (Linguistic Records, Verification, Historical Phrases) with the natural language description: “Verification often involves cross-referencing recorded documents or historical accounts to attest to their first appearance, ensuring accuracy in claims about earliest usage of terms.”
+% This hybrid representation captures both the high-level strategic rationale and the underlying relational structure, enabling the agent to autonomously generate knowledge.
+This self-distillation approach enables the agent to autonomously generate reusable knowledge. 
+
+
+\paragraph{Deduplication and Integration.}
+To maintain a high-quality experience base ($\mathcal{E}$), we do not add every distilled principle. Instead, each new principle undergoes a rigorous integration process. First, to handle redundancies arising from similar trajectories (e.g., from GRPO sampling), we perform a deduplication step. We use the agent model $\pi_\theta$ to pair-wise check for semantic equivalence among newly generated principles that originate from the same problem, keeping only one representative from each semantically equivalent cluster. 
+
+Second, for each unique principle, we apply a two-stage matching procedure: we first retrieve the most similar existing principles from $\mathcal{E}$ via embedding similarity, then prompt the agent model to provide a binary semantic equivalence judgment.
+If a principle is novel, it is added as a new entry in $\mathcal{E}$; otherwise, the new trajectory is merged under the existing principle, enriching it without introducing redundancy.
+
+Let $p_{\text{cand}}$ be a new candidate principle distilled from trajectory $\tau_{\text{src}}$. We update the experience base $\mathcal{E}$ as follows:
+
+\begin{equation}
+\mathcal{E} \leftarrow 
+\begin{cases} 
+    \mathcal{E} \cup \{p_{\text{cand}}\} & \text{if } \max_{p \in \mathcal{E}} \text{sim}(p_{\text{cand}}, p) < \theta_{\text{sim}} \\
+    \text{Merge}(\mathcal{E}, p^*, \tau_{\text{src}}) & \text{otherwise}
+\end{cases}
+\label{eq:merge_create_concise}
+\end{equation}
+
+where $\text{sim}(\cdot, \cdot)$ is the cosine similarity between principle, $\theta_{\text{sim}}$ is a similarity threshold, and $p^* = \text{argmax}_{p \in \mathcal{E}} \text{sim}(p_{\text{cand}}, p)$. The $\text{Merge}$ operation links $\tau_{\text{src}}$ to its best match $p^*$.
+
+This two-level check ensures that $\mathcal{E}$ grows with novel insights while strengthening existing ones with new evidence.
+
+\paragraph{Quality Control via Dynamic Scoring.}
+
+As the experience base accumulates principles over time, it becomes essential to evaluate their practical utility and prioritize the most effective strategies. To this end, each principle tracks its usage and success counts, enabling the computation of an empirical score that reflects historical performance.
+% The principles in $\mathcal{E}$ are continuously evaluated. Each principle object tracks its usage count and success count. 
+We quantify the empirical utility of each principle using a metric score, which is updated as:
+
+\begin{equation}
+s(p) = \frac{c_{\text{succ}}(p) + 1}{c_{\text{use}}(p) + 2}
+\label{eq:laplace_smoothing}
+\end{equation}
+
+
+where $c_{\text{succ}}(p)$ and $c_{\text{use}}(p)$ are the success and usage counts for a given principle $p$, $s(p)$ is the metric score.
+
+This score provides a reliable measure of a principle's historical effectiveness. To ensure the long-term health of the experience base, we periodically prune principles whose scores fall below a threshold $\theta_{\text{prune}}$. This systematic process of distillation, integration, and quality control ensures that the agent's wisdom remains a compact and high-quality repository of its most effective strategies.
+
+
+\subsubsection{Online Interaction}
+
+The online phase serves as the interactive testbed where the agent applies its distilled principles to solve problems. The agent operates within a deliberative reasoning loop (e.g., Think-Act-Observe), which enables it to engage in multi-turn, autonomous tool use. However, the core novelty of EvolveR's online phase is not the loop itself, but how the principles retrieved from the experience base ($\mathcal{E}$) fundamentally alter the agent's behavior within it.
+
+
+\paragraph{Experience as a Strategic Principle.}
+Unlike standard agents that must discover reasoning patterns from scratch through trial and error, an EvolveR agent is guided by a strategic wisdom provided by its own past experiences. At any point in its reasoning loop, the agent can issue a \searchtag{search\_experience} action. The retrieved principles $\mathcal{P}_k$ do not merely provide factual information; they offer heuristic guidance that shapes the agent's subsequent reasoning. For instance, retrieving a principle such as ``For comparison questions, gather data on both items before concluding,'' can directly influence the agent's internal monologue (\thinktag{think}) and steer its subsequent potential \knowledgetag{search\_knowledge} actions. This makes the agent's exploration more efficient and less prone to common pitfalls, as it learns to follow the wisdom in its own distilled principles.
+
+
+\paragraph{Generating High-Quality Trajectories for Future Distillation.}
+The ultimate purpose of the online phase, within the EvolveR paradigm, extends beyond solving the immediate task. It is responsible for generating high-quality data for the next cycle of offline reflection. Because the agent's actions are guided by proven principles, the resulting trajectories, $\tau_{\text{new}}$, are not random walks but are instead rich recordings of structured, experience-guided problem-solving. 
+These trajectories capture the interplay between distilled principles, internal reasoning, and external tool use (e.g., \knowledgetag{search\_knowledge}), and serve as valuable input for the offline phase, enabling EvolveR to refine existing principles and discover more effective strategies in a virtuous cycle.
+
+% These trajectories—capturing the interplay between distilled principles, internal thoughts, and external tool use (e.g., \knowledgetag{search\_knowledge})—serve as highly valuable input for the offline phase, allowing EvolveR to refine existing principles and discover even more insightful strategies in a virtuous cycle.
+
+
+
+
+\subsection{Policy Evolution: Closing the Loop with Reinforcement Learning}
+\label{subsec:policy_evolution}
+
+To enable the agent to learn from its actions and evolve its policy $\pi_\theta$, we employ a reinforcement learning framework. The learning process is guided by a composite reward function and a policy optimization algorithm that leverages the trajectories collected during the online phase.
+
+
+
+\paragraph{Reward Function.}
+We design a composite reward function $R(\tau)$ for a given trajectory $\tau$ that balances task success with procedural correctness. It is a weighted sum of an outcome reward and a format reward: $R(\tau) = w_o R_{\text{outcome}}(\tau) + w_f R_{\text{format}}(\tau)$.
+
+\begin{wrapfigure}{r}{0.6\columnwidth} % Use {r} for right, and \columnwidth for single-column width
+    \centering
+    \includegraphics[width=\linewidth]{img/grpo.png}
+    \caption{Policy model update optimization algorithm of EvolveR.}
+    \label{fig:grpo}
+\end{wrapfigure}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Outcome Reward} $R_{\text{outcome}}$, is a sparse, binary reward based on the final answer's correctness. Following prior work, it is determined by an exact match with the ground truth:
+    
+    \begin{equation}
+        R_{\text{outcome}}(\tau) = \text{EM}(a_{\text{pred}}, a_{\text{gold}})
+    \end{equation}
+    where $a_{\text{pred}}$ is the final answer extracted from the trajectory $\tau$ and $a_{\text{gold}}$ is the ground truth answer.
+
+    \item \textbf{Format Reward} $R_{\text{format}}$, is a dense shaping reward that evaluates the quality of the reasoning process. Let $N_{\text{think}}(\tau)$, $N_{\text{exp}}(\tau)$ and $N_{\text{know}}(\tau)$ denote the counts of valid \thinktag{think}, \searchtag{search\_experience} and \knowledgetag{search\_knowledge} actions within $\tau$. $R_{\text{format}}$ is composed of a think score $R_{\text{think}}$, rewarding a balanced number of reasoning steps, and a search score $R_{\text{search}}$ promoting search experience and knowledge. The final format reward is calculated as:
+
+    \begin{equation}
+        R_{\text{format}}(\tau) = \mathbb{I}(\tau_{\text{complete}}) \cdot \frac{R_{\text{think}}(\tau) + R_{\text{search}}(\tau)}{2}
+    \end{equation}
+    
+    where $\mathbb{I}(\tau_{\text{complete}})$ is an indicator function that is $1$ only if the trajectory contains at least one of each required action type (\thinktag{think}, any search, and \answertag{answer}), and $0$ otherwise. This ensures that only structurally complete trajectories receive a format reward.
+\end{itemize}
+
+
+
+
+\paragraph{Policy Optimization.}
+The policy $\pi_\theta$ is updated using the collected trajectories. We utilize Group Relative Policy Optimization (GRPO)
+~\citep{shao2024deepseekmathpushinglimitsmathematical}, which balances the optimization stability and efficiency by using the average reward of multiple sampled trajectories as a baseline, thus avoiding the need for a learned value function. Specifically, for each input, we sample a group of $G$ trajectories. The policy is then optimized by maximizing the following objective function:
+
+\begin{equation}
+\mathcal{J}_{\text{GRPO}}(\theta) = \mathbb{E}_{\tau \in \mathcal{D}} \left[ \sum_{t=1}^{|\tau|} \min \left( \rho_t(\theta) \hat{A}_t, \text{clip}(\rho_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) - \beta D_{\text{KL}}[\pi_\theta || \pi_{\text{ref}}] \right]
+\label{eq:grpo_objective}
+\end{equation}
+
+
+where $\rho_t(\theta) = \frac{\pi_\theta(a_t|h_t)}{\pi_{\text{old}}(a_t|h_t)}$ is the importance sampling ratio, $\hat{A}_t$ is the advantage estimate, and the final term is a KL-divergence penalty to constrain policy updates.
+
+% \begin{wrapfigure}{!r}{0.55\textwidth}
+%     \centering
+%  \includegraphics[width=\linewidth]{img/grpo.png}
+%     \caption{Policy model update optimization algorithm of EvolveR.}
+%     \label{fig:grpo}
+% \end{wrapfigure}
+
+Crucially, this optimization process is deeply integrated with our experience lifecycle. As the agent's actions during the online phase are conditioned on the principles $\mathcal{P}_k$ retrieved from its experience base, the trajectories collected in $\mathcal{D}$ are inherently experience-guided. Consequently, the GRPO update does not merely learn a generic reasoning policy. Instead, it explicitly learns a policy of how to effectively utilize its own distilled wisdom to generate successful outcomes. The optimization process, therefore, reinforces the valuable connections between retrieving high-quality principles and producing high-reward trajectories, successfully closing the learning loop.
+

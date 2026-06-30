@@ -1,0 +1,576 @@
+{
+\captionsetup{type=figure}
+\captionof{figure}{Trajectory for instance \texttt{matplotlib\_\_matplotlib-23964}.}
+\begin{issuebox}[matplotlib\_\_matplotlib-23964]We're currently solving the following issue within our repository. Here's the issue text:
+
+ISSUE:
+
+[Bug]: Text label with empty line causes a "TypeError: cannot unpack non-iterable NoneType object" in PostScript backend
+
+{\large \textbf{Bug summary}}
+
+
+
+When saving a figure with the PostScript backend, a
+
+> TypeError: cannot unpack non-iterable NoneType object
+
+
+
+happens if the figure contains a multi-line text label with an empty line (see example).
+
+{\large \textbf{Code for reproduction}}
+
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+python
+from matplotlib.figure import Figure
+
+
+
+figure = Figure()
+
+ax = figure.add\_subplot(111)
+
+# ax.set\_title('\nLower title')  # this would cause an error as well
+
+
+ax.annotate(text='\nLower label', xy=(0, 0))
+
+figure.savefig('figure.eps')
+\end{CodeVerbatim}
+
+
+{\large \textbf{Actual outcome}}
+
+
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+./venv/Scripts/python save_ps.py
+Traceback (most recent call last):
+  File "C:\temp\matplotlib_save_ps\save_ps.py", line 7, in <module>
+    figure.savefig('figure.eps')
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\figure.py", line 3272, in savefig
+    self.canvas.print_figure(fname, **kwargs)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\backend_bases.py", line 2338, in print_figure
+    result = print_method(
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\backend_bases.py", line 2204, in <lambda>
+    print_method = functools.wraps(meth)(lambda *args, **kwargs: meth(
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\_api\deprecation.py", line 410, in wrapper
+    return func(*inner_args, **inner_kwargs)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\backends\backend_ps.py", line 869, in _print_ps
+    printer(fmt, outfile, dpi=dpi, dsc_comments=dsc_comments,
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\backends\backend_ps.py", line 927, in _print_figure
+    self.figure.draw(renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\artist.py", line 74, in draw_wrapper
+    result = draw(artist, renderer, *args, **kwargs)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\figure.py", line 3069, in draw
+    mimage._draw_list_compositing_images(
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\image.py", line 131, in _draw_list_compositing_images
+    a.draw(renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\axes\_base.py", line 3106, in draw
+    mimage._draw_list_compositing_images(
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\image.py", line 131, in _draw_list_compositing_images
+    a.draw(renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\text.py", line 1995, in draw
+    Text.draw(self, renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\text.py", line 736, in draw
+    textrenderer.draw_text(gc, x, y, clean_line,
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\backends\backend_ps.py", line 248, in wrapper
+    return meth(self, *args, **kwargs)
+  File "C:\temp\matplotlib_save_ps\venv\lib\site-packages\matplotlib\backends\backend_ps.py", line 673, in draw_text
+    for ps_name, xs_names in stream:
+TypeError: cannot unpack non-iterable NoneType object
+\end{CodeVerbatim}
+
+{\large \textbf{Expected outcome}}
+
+The figure can be saved as `figure.eps` without error.
+
+{\large \textbf{Additional information}}
+
+- seems to happen if a text label or title contains a linebreak with an empty line
+- works without error for other backends such as PNG, PDF, SVG, Qt
+- works with matplotlib<=3.5.3
+- adding `if curr\_stream:` before line 669 of `backend\_ps.py` seems to fix the bug 
+
+{\large \textbf{Operating system}}
+
+Windows
+
+{\large \textbf{Matplotlib Version}}
+
+3.6.0
+
+{\large \textbf{Matplotlib Backend}}
+
+\_No response\_
+
+{\large \textbf{Python version}}
+
+3.9.13
+
+{\large \textbf{Jupyter version}}
+
+\_No response\_
+
+{\textbf\large Installation}
+
+pip
+
+INSTRUCTIONS: (31 lines)
+
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+(Open file: n/a)
+(Current directory: /matplotlib\_\_matplotlib)
+bash-$
+\end{CodeVerbatim}
+
+\end{issuebox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+First, I'll create a new Python script to reproduce the bug as described in the issue. This script will contain the code provided in the issue text. Let's start by creating a file named `reproduce\_bug.py`.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+create reproduce_bug.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /matplotlib__matplotlib/reproduce_bug.py (1 lines total)]
+1:
+
+(Open file: n/a)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+Now let's paste in the example code from the issue into `reproduce\_bug.py` to reproduce the bug.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+edit 1:1
+from matplotlib.figure import Figure
+
+figure = Figure()
+ax = figure.add_subplot(111)
+# ax.set_title('\nLower title')  # this would cause an error as well
+ax.annotate(text='\nLower label', xy=(0, 0))
+figure.savefig('figure.eps')
+print("Script completed successfully, no errors.")
+end_of_edit
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /matplotlib__matplotlib/reproduce_bug.py (8 lines total)]
+1:from matplotlib.figure import Figure
+2:
+3:figure = Figure()
+4:ax = figure.add_subplot(111)
+5:# ax.set_title('\nLower title')  # this would cause an error as well
+6:ax.annotate(text='\nLower label', xy=(0, 0))
+7:figure.savefig('figure.eps')
+8:print("Script completed successfully, no errors.")
+File updated. Please review the changes and make sure they are correct (correct indentation, no duplicate lines, etc). Edit the file again if necessary.
+
+(Open file: /matplotlib__matplotlib/reproduce_bug.py)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+The script has been updated with the code to reproduce the bug. Let's run the script to confirm that the bug occurs as described.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+python reproduce_bug.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+Traceback (most recent call last):
+  File "/matplotlib__matplotlib/reproduce_bug.py", line 7, in <module>
+    figure.savefig('figure.eps')
+  File "/matplotlib__matplotlib/lib/matplotlib/figure.py", line 3275, in savefig
+    self.canvas.print_figure(fname, **kwargs)
+  File "/matplotlib__matplotlib/lib/matplotlib/backend_bases.py", line 2339, in print_figure
+    result = print_method(
+             ^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/backend_bases.py", line 2205, in <lambda>
+    print_method = functools.wraps(meth)(lambda *args, **kwargs: meth(
+                                                                 ^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/_api/deprecation.py", line 410, in wrapper
+    return func(*inner_args, **inner_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py", line 869, in _print_ps
+    printer(fmt, outfile, dpi=dpi, dsc_comments=dsc_comments,
+  File "/matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py", line 927, in _print_figure
+    self.figure.draw(renderer)
+  File "/matplotlib__matplotlib/lib/matplotlib/artist.py", line 74, in draw_wrapper
+    result = draw(artist, renderer, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/figure.py", line 3072, in draw
+    mimage._draw_list_compositing_images(
+  File "/matplotlib__matplotlib/lib/matplotlib/image.py", line 131, in _draw_list_compositing_images
+    a.draw(renderer)
+  File "/matplotlib__matplotlib/lib/matplotlib/artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/axes/_base.py", line 3107, in draw
+    mimage._draw_list_compositing_images(
+  File "/matplotlib__matplotlib/lib/matplotlib/image.py", line 131, in _draw_list_compositing_images
+    a.draw(renderer)
+  File "/matplotlib__matplotlib/lib/matplotlib/artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/text.py", line 2027, in draw
+    Text.draw(self, renderer)
+  File "/matplotlib__matplotlib/lib/matplotlib/artist.py", line 51, in draw_wrapper
+    return draw(artist, renderer)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/text.py", line 768, in draw
+    textrenderer.draw_text(gc, x, y, clean_line,
+  File "/matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py", line 248, in wrapper
+    return meth(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py", line 673, in draw_text
+    for ps_name, xs_names in stream:
+        ^^^^^^^^^^^^^^^^^
+TypeError: cannot unpack non-iterable NoneType object
+
+(Open file: /matplotlib__matplotlib/reproduce_bug.py)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+The script has successfully reproduced the bug, as we received the `TypeError: cannot unpack non-iterable NoneType object` error. According to the issue description, the bug seems to be in the `backend\_ps.py` file around line 669. Let's open that file and navigate to the relevant section to investigate further.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+open lib/matplotlib/backends/backend_ps.py 669
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py (1366 lines total)]
+(653 more lines above)
+654:            self._character_tracker.track(font, s)
+655:            stream = []
+656:            prev_font = curr_stream = None
+657:            for item in _text_helpers.layout(s, font):
+658:                ps_name = (item.ft_object.postscript_name
+659:                           .encode("ascii", "replace").decode("ascii"))
+660:                if item.ft_object is not prev_font:
+661:                    if curr_stream:
+662:                        stream.append(curr_stream)
+663:                    prev_font = item.ft_object
+664:                    curr_stream = [ps_name, []]
+665:                curr_stream[1].append(
+666:                    (item.x, item.ft_object.get_glyph_name(item.glyph_idx))
+667:                )
+668:            # append the last entry
+669:            stream.append(curr_stream)
+670:
+671:        self.set_color(*gc.get_rgb())
+672:
+673:        for ps_name, xs_names in stream:
+674:            self.set_font(ps_name, prop.get_size_in_points(), False)
+675:            thetext = "\n".join(f"{x:g} 0 m /{name:s} glyphshow"
+676:                                for x, name in xs_names)
+677:            self._pswriter.write(f"""\
+678:gsave
+679:{self._get_clip_cmd(gc)}
+680:{x:g} {y:g} translate
+681:{angle:g} rotate
+682:{thetext}
+683:grestore
+684:""")
+685:
+686:    @_log_if_debug_on
+687:    def draw_mathtext(self, gc, x, y, s, prop, angle):
+688:        """Draw the math text using matplotlib.mathtext."""
+689:        width, height, descent, glyphs, rects = \
+690:            self._text2path.mathtext_parser.parse(s, 72, prop)
+691:        self.set_color(*gc.get_rgb())
+692:        self._pswriter.write(
+693:            f"gsave\n"
+694:            f"{x:g} {y:g} translate\n"
+695:            f"{angle:g} rotate\n")
+696:        lastfont = None
+697:        for font, fontsize, num, ox, oy in glyphs:
+698:            self._character_tracker.track_glyph(font, num)
+699:            if (font.postscript_name, fontsize) != lastfont:
+700:                lastfont = font.postscript_name, fontsize
+701:                self._pswriter.write(
+702:                    f"/{font.postscript_name} {fontsize} selectfont\n")
+703:            glyph_name = (
+704:                font.get_name_char(chr(num)) if isinstance(font, AFM) else
+705:                font.get_glyph_name(font.get_char_index(num)))
+706:            self._pswriter.write(
+707:                f"{ox:g} {oy:g} moveto\n"
+708:                f"/{glyph_name} glyphshow\n")
+709:        for ox, oy, w, h in rects:
+710:            self._pswriter.write(f"{ox} {oy} {w} {h} rectfill\n")
+711:        self._pswriter.write("grestore\n")
+712:
+713:    @_log_if_debug_on
+714:    def draw_gouraud_triangle(self, gc, points, colors, trans):
+715:        self.draw_gouraud_triangles(gc, points.reshape((1, 3, 2)),
+716:                                    colors.reshape((1, 3, 4)), trans)
+717:
+718:    @_log_if_debug_on
+719:    def draw_gouraud_triangles(self, gc, points, colors, trans):
+720:        assert len(points) == len(colors)
+721:        assert points.ndim == 3
+722:        assert points.shape[1] == 3
+723:        assert points.shape[2] == 2
+724:        assert colors.ndim == 3
+725:        assert colors.shape[1] == 3
+726:        assert colors.shape[2] == 4
+727:
+728:        shape = points.shape
+729:        flat_points = points.reshape((shape[0] * shape[1], 2))
+730:        flat_points = trans.transform(flat_points)
+731:        flat_colors = colors.reshape((shape[0] * shape[1], 4))
+732:        points_min = np.min(flat_points, axis=0) - (1 << 12)
+733:        points_max = np.max(flat_points, axis=0) + (1 << 12)
+734:        factor = np.ceil((2 ** 32 - 1) / (points_max - points_min))
+735:
+736:        xmin, ymin = points_min
+737:        xmax, ymax = points_max
+738:
+739:        data = np.empty(
+740:            shape[0] * shape[1],
+741:            dtype=[('flags', 'u1'), ('points', '2>u4'), ('colors', '3u1')])
+742:        data['flags'] = 0
+743:        data['points'] = (flat_points - points_min) * factor
+744:        data['colors'] = flat_colors[:, :3] * 255.0
+745:        hexdata = data.tobytes().hex("\n", -64)  # Linewrap to 128 chars.
+746:
+747:        self._pswriter.write(f"""\
+748:gsave
+749:<< /ShadingType 4
+750:   /ColorSpace [/DeviceRGB]
+751:   /BitsPerCoordinate 32
+752:   /BitsPerComponent 8
+753:   /BitsPerFlag 8
+(613 more lines below)
+
+(Open file: /matplotlib__matplotlib/reproduce_bug.py)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+We have opened the `backend\_ps.py` file and navigated to the section around line 669, which is where the issue suggests the bug is located. The user has suggested adding a conditional check `if curr\_stream:` before line 669 to fix the bug. Let's make that edit to the code.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+edit 669:669
+            if curr_stream:
+                stream.append(curr_stream)
+end_of_edit
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py (1367 lines total)]
+(618 more lines above)
+619:
+620:        if self._is_transparent(gc.get_rgb()):
+621:            return  # Special handling for fully transparent.
+622:
+623:        if ismath == 'TeX':
+624:            return self.draw_tex(gc, x, y, s, prop, angle)
+625:
+626:        if ismath:
+627:            return self.draw_mathtext(gc, x, y, s, prop, angle)
+628:
+629:        if mpl.rcParams['ps.useafm']:
+630:            font = self._get_font_afm(prop)
+631:            scale = 0.001 * prop.get_size_in_points()
+632:            stream = []
+633:            thisx = 0
+634:            last_name = None  # kerns returns 0 for None.
+635:            xs_names = []
+636:            for c in s:
+637:                name = uni2type1.get(ord(c), f"uni{ord(c):04X}")
+638:                try:
+639:                    width = font.get_width_from_char_name(name)
+640:                except KeyError:
+641:                    name = 'question'
+642:                    width = font.get_width_char('?')
+643:                kern = font.get_kern_dist_from_name(last_name, name)
+644:                last_name = name
+645:                thisx += kern * scale
+646:                xs_names.append((thisx, name))
+647:                thisx += width * scale
+648:            ps_name = (font.postscript_name
+649:                       .encode("ascii", "replace").decode("ascii"))
+650:            stream.append((ps_name, xs_names))
+651:
+652:        else:
+653:            font = self._get_font_ttf(prop)
+654:            self._character_tracker.track(font, s)
+655:            stream = []
+656:            prev_font = curr_stream = None
+657:            for item in _text_helpers.layout(s, font):
+658:                ps_name = (item.ft_object.postscript_name
+659:                           .encode("ascii", "replace").decode("ascii"))
+660:                if item.ft_object is not prev_font:
+661:                    if curr_stream:
+662:                        stream.append(curr_stream)
+663:                    prev_font = item.ft_object
+664:                    curr_stream = [ps_name, []]
+665:                curr_stream[1].append(
+666:                    (item.x, item.ft_object.get_glyph_name(item.glyph_idx))
+667:                )
+668:            # append the last entry
+669:            if curr_stream:
+670:                stream.append(curr_stream)
+671:
+672:        self.set_color(*gc.get_rgb())
+673:
+674:        for ps_name, xs_names in stream:
+675:            self.set_font(ps_name, prop.get_size_in_points(), False)
+676:            thetext = "\n".join(f"{x:g} 0 m /{name:s} glyphshow"
+677:                                for x, name in xs_names)
+678:            self._pswriter.write(f"""\
+679:gsave
+680:{self._get_clip_cmd(gc)}
+681:{x:g} {y:g} translate
+682:{angle:g} rotate
+683:{thetext}
+684:grestore
+685:""")
+686:
+687:    @_log_if_debug_on
+688:    def draw_mathtext(self, gc, x, y, s, prop, angle):
+689:        """Draw the math text using matplotlib.mathtext."""
+690:        width, height, descent, glyphs, rects = \
+691:            self._text2path.mathtext_parser.parse(s, 72, prop)
+692:        self.set_color(*gc.get_rgb())
+693:        self._pswriter.write(
+694:            f"gsave\n"
+695:            f"{x:g} {y:g} translate\n"
+696:            f"{angle:g} rotate\n")
+697:        lastfont = None
+698:        for font, fontsize, num, ox, oy in glyphs:
+699:            self._character_tracker.track_glyph(font, num)
+700:            if (font.postscript_name, fontsize) != lastfont:
+701:                lastfont = font.postscript_name, fontsize
+702:                self._pswriter.write(
+703:                    f"/{font.postscript_name} {fontsize} selectfont\n")
+704:            glyph_name = (
+705:                font.get_name_char(chr(num)) if isinstance(font, AFM) else
+706:                font.get_glyph_name(font.get_char_index(num)))
+707:            self._pswriter.write(
+708:                f"{ox:g} {oy:g} moveto\n"
+709:                f"/{glyph_name} glyphshow\n")
+710:        for ox, oy, w, h in rects:
+711:            self._pswriter.write(f"{ox} {oy} {w} {h} rectfill\n")
+712:        self._pswriter.write("grestore\n")
+713:
+714:    @_log_if_debug_on
+715:    def draw_gouraud_triangle(self, gc, points, colors, trans):
+716:        self.draw_gouraud_triangles(gc, points.reshape((1, 3, 2)),
+717:                                    colors.reshape((1, 3, 4)), trans)
+718:
+(649 more lines below)
+File updated. Please review the changes and make sure they are correct (correct indentation, no duplicate lines, etc). Edit the file again if necessary.
+
+(Open file: /matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+The edit has been made to the `backend\_ps.py` file. Now, let's re-run the `reproduce\_bug.py` script to ensure that the bug has been fixed.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+python reproduce_bug.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+Script completed successfully, no errors.
+
+(Open file: /matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+The script ran successfully without any errors, which suggests that the bug has been fixed. Now that the issue is resolved, we can clean up by removing the `reproduce\_bug.py` script as it is no longer needed.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+rm reproduce_bug.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+
+(Open file: /matplotlib__matplotlib/lib/matplotlib/backends/backend_ps.py)
+(Current directory: /matplotlib__matplotlib)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[matplotlib\_\_matplotlib-23964]
+The `reproduce\_bug.py` script has been successfully removed. Now that we have fixed the issue and cleaned up, we should submit our changes to the code base. Let's submit the changes using the `submit` command.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+submit
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[matplotlib\_\_matplotlib-23964]\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+
+diff --git a/figure.eps b/figure.eps
+new file mode 100644
+index 0000000000..0c47c46f1e
+--- /dev/null
++++ b/figure.eps
+[figure.eps content omitted]
+b/backends/backend_ps.py b/lib/matplotlib/backends/backend_ps.py
+index f209e811f1..bd996b7509 100644
+--- a/lib/matplotlib/backends/backend_ps.py
++++ b/lib/matplotlib/backends/backend_ps.py
+@@ -666,7 +666,8 @@ grestore
+                     (item.x, item.ft_object.get_glyph_name(item.glyph_idx))
+                 )
+             # append the last entry
+-            stream.append(curr_stream)
++            if curr_stream:
++                stream.append(curr_stream)
+ 
+         self.set_color(*gc.get_rgb())
+ 
+\end{CodeVerbatim}
+\end{observationbox}
+\begin{goldpatchbox}[matplotlib\_\_matplotlib-23964]
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+diff --git a/lib/matplotlib/backends/backend_ps.py b/lib/matplotlib/backends/backend_ps.py
+--- a/lib/matplotlib/backends/backend_ps.py
++++ b/lib/matplotlib/backends/backend_ps.py
+@@ -665,8 +665,9 @@ def draw_text(self, gc, x, y, s, prop, angle, ismath=False, mtext=None):
+                 curr_stream[1].append(
+                     (item.x, item.ft_object.get_glyph_name(item.glyph_idx))
+                 )
+-            # append the last entry
+-            stream.append(curr_stream)
++            # append the last entry if exists
++            if curr_stream:
++                stream.append(curr_stream)
+ 
+         self.set_color(*gc.get_rgb())
+ 
+\end{CodeVerbatim}
+\end{goldpatchbox}
+}

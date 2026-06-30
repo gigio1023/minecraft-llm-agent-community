@@ -1,0 +1,68 @@
+\vspace{-5pt}
+\section{Evaluating social interaction between LLMs in \sotopia} 
+\label{sec:model_performance}
+\vspace{-5pt}
+
+\begin{wraptable}[13]{r}{8.7cm}
+\small
+\vspace{-10pt}
+\centering
+    \begin{tabularx}{8.7cm}{@{\hspace{10pt}}rrrrrr@{\hspace{6pt}}}
+    \toprule
+         Dim.& Range & GPT-4  &  GPT-3.5 & Llama-2 & MPT  \\\midrule
+         \socialrules &[-10, 0] &-0.07 & -0.08& -0.11 & -0.09\\
+         \secret & [-10, 0] & -0.14 & -0.08 & -0.14 & -0.07  \\
+         \financialbenefits & [-5, 5] & \textbf{0.81} &  0.46 &  0.40 &  0.28 \\
+         \relationship & [-5, 5] & \textbf{1.94} & 1.23 & 0.91 & 0.58\\
+         \knowledge & [0, 10] & \textbf{3.73} &  3.40 &  3.11 &  2.11 \\
+         \goalcompletion & [0, 10] & \textbf{7.62} &  6.45 &  5.38 &  4.10\\ 
+         \believability& [0, 10] &  \textbf{9.28} & 9.15 &  8.10 &  6.17 \\
+    \bottomrule
+    \end{tabularx}
+    \vspace{-5pt}
+    \caption{The aggregated performance of each model by averaging across different partner models. The best performance for each dimension is bolded when significantly better than the second best in t-test ($p<0.05$).}
+    \label{tab:model_performance}
+\end{wraptable}
+
+We analyze models' interactions and performance on \sotopia to understand their social intelligence.
+Table \ref{tab:model_performance} presents the models' average scores when interacting with different \emph{partner models} (i.e., the model it is paired with in interaction, \citealt{fu2023improving,hu2020otherplay}).
+\footnote{Presented are automated evaluation results. The human evaluation shows a similar trend, see Table \ref{tab_app:model_performance_human_eval}}
+GPT-4 performs best on most dimensions, followed by GPT-3.5, Llama-2-70b-chat, and MPT-30b-chat.
+
+\textbf{Different trends from static benchmarks}
+Llama-2-70b-chat has relatively low scores in all dimensions compared to GPT-3.5 (except when MPT-30b-chat is the reference model, which is likely due to the fact that MPT-30b-chat is a much weaker model compared to other models in our experiments).
+This finding diverges from various static language understanding benchmarks showing that Llama-2-70b-chat is on par or better than GPT-3.5 \citep{alpaca_eval, touvron2023llama, liang2022holistic}.
+\footnote{Some reported results could come from different versions of GPT-3.5.}
+We hypothesize that this is because Llama-2-70b-chat is less heavily trained on human feedback/user interaction data than GPT-3.5.
+
+
+Through inspecting the interactions between Llama-2-70b-chat (MPT-30b-chat) and other models, we find that Llama-2-70b-chat and MPT-30b-chat often struggle to maintain their persona (Figure \ref{fig:qualitative_example_identity_confusion}), move the conversation forward (Figure \ref{fig:qualitative_example_stalled_conversation}), and respond to the other agent actively (Figure \ref{fig:qualitative_example_no_response}).
+Performing well on static benchmarks does not guarantee success in interactive scenarios, thus highlighting the importance of dynamic benchmarks like \sotopiaeval \citep{lee2023evaluating}.
+
+
+\begin{wrapfigure}[14]{l}{4cm}
+    \centering
+    \vspace{-10pt}
+    \includegraphics[width=4cm, trim={7 7 7 7},clip]{figures/heatmap_overall.pdf}
+    \vspace{-20pt}
+    \caption{\footnotesize Pairwise overall performance of models. G-4/G-3.5/L-2 denote GPT-4/GPT-3.5/Llama-2-70b-chat.}
+    \label{fig:heatmap_overall}
+\end{wrapfigure}
+\textbf{Weaker partners models weaken their conversation partners}
+Figure \ref{fig:heatmap_overall}, shows the overall performance of model pairs, which is the average performance across different dimensions. It is noticeable that a reference model that under-performs in \sotopia can lead to worse performance of other models.
+
+For example, in a scenario where agents try to find a mutual friend (Figure \ref{fig:qualitative_example_weaker_model}). 
+The task fails for both GPT-4 and Llama-2-70b-chat because Llama-2-70b-chat consistently fails to answer the previous question even after GPT-4 attempts to steer the conversation back to the right track (e.g., ``\texttt{I noticed you didn't answer my question about whether you know my friends or not.}'').
+Since most of our social scenarios are fundamentally cooperative, the collapse of communication could be due to models' lack of ``cooperation'' abilities \citep{ODOUARD2023359}. 
+
+\textbf{All models are at risk of divulging secrets and violating %
+norms}
+Table \ref{tab:model_performance} shows that all models have a negative score in the \socialrules and \secret dimensions.
+Even though GPT-4 performs better in most dimensions, it is not better than other models in the \socialrules and \secret dimensions. 
+For example, in a scenario where one needs to persuade a close friend to confess, the model leaks their secret at the beginning of the conversation (Figure \ref{fig:qualitative_example_reveal_secret}). 
+This further shows the importance of considering multiple dimensions when evaluating models' social intelligence. 
+
+\textbf{Models sometimes use creative strategies to accomplish goals}
+We also find that models, especially GPT-4, could come up with ``out-of-the-box'' solutions to social problems. 
+For example, when the agent is asked to take turns driving on the road trip, the agent (i.e., GPT-4), instead of directly rejecting their friend's request, proposes ``\texttt{How about we pull over for a bit and get some rest?}'' (Figure \ref{fig:qualitative_example_creative_solution_rest_together}).
+Additionally, in the scenario where two agents make a plan to improve the company's financial status, agents figure out strategies such as ``\texttt{having a small group tasked with identifying potential suppliers}'', ``\texttt{while we conduct the search for new suppliers, we continue to negotiate with our current supplier}'' (Figure \ref{fig:qualitative_example_creative_solution_company_financial}).

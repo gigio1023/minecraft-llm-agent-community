@@ -1,0 +1,389 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{colm2024_conference}
+
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\definecolor{darkblue}{rgb}{0, 0, 0.5}
+\hypersetup{colorlinks=true, citecolor=darkblue, linkcolor=darkblue, urlcolor=darkblue}
+\definecolor{mydarkgreen}{RGB}{0,153,0}
+\newcommand{\revision}[1]{\textcolor{black}{#1}}
+
+
+\title{V-STaR: Training Verifiers for Self-Taught Reasoners}
+
+
+\newcommand{\msrlogo}{{\includegraphics[height=0.8em]{logos/msr_logo.png}}}
+\newcommand{\milalogo}{\includegraphics[height=0.8em]{logos/mila_mauve_logo.png}}
+\newcommand{\gdmlogo}{\includegraphics[height=0.8em]{logos/gdm_logo.png}}
+\newcommand{\uelogo}{\includegraphics[height=0.8em]{logos/edinb_logo.png}}
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \colmfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+% \texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
+\author{Arian Hosseini    \milalogo \textsuperscript{}\thanks{\textsuperscript{}Correspondence to: $<$arian.hosseini9@gmail.com$>$ and
+$<$rishabhagarwal@google.com$>$}   \quad Xingdi Yuan \msrlogo \quad Nikolay Malkin \milalogo\uelogo\\\textbf{Aaron Courville} \milalogo \quad \textbf{Alessandro Sordoni} \milalogo\msrlogo \quad \textbf{Rishabh Agarwal} \gdmlogo \\\\
+\milalogo Mila, Universit\'e de Montr\'eal\\
+\msrlogo Microsoft Research\\
+\uelogo University of Edinburgh\\
+\gdmlogo Google Deepmind\\
+% \texttt{arian.hosseini9@gmail.com}
+}
+
+
+
+% \And
+% Alessandro Sordoni\\
+% Mila, Universit\'e de Montr\'eal\\Microsoft Research\\
+% \And
+% Rishabh Agarwal\\
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+% user
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{microtype}
+\usepackage{graphicx}
+% \usepackage{subfigure}
+\usepackage{subcaption}
+\usepackage{booktabs} % for professional tables
+\usepackage{csquotes}
+\usepackage{diagbox}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{wrapfig}
+
+\RequirePackage[ruled]{algorithm2e}
+\RequirePackage{algorithmic}
+\renewcommand*{\figureautorefname}{Fig.}
+% \newcommand{\algorithmautorefname}{Alg.}
+\newcommand{\propositionautorefname}{Prop.}
+\renewcommand*{\equationautorefname}{Eq.}
+\makeatletter
+\renewcommand*{\appendixautorefname}{\S\@gobble}
+\renewcommand*{\sectionautorefname}{\S\@gobble}
+\renewcommand*{\subsectionautorefname}{\S\@gobble}
+\renewcommand*{\subsubsectionautorefname}{\S\@
+gobble}
+\makeatother
+
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathAlphabet{\bbold}{U}{bbold}{m}{n}
+\newcommand{\id}{\ensuremath{\bbold{1}}}
+
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+
+\usepackage{listings}
+\lstdefinelanguage{yaml}{
+  keywords={true,false,null,y,n,h,input, next\_prompt, prompt, prompt_memory, message, backward_infos, backward_info, loss, template, message_alternatives},
+  keywordstyle=\color{darkgray}\bfseries,
+  ndkeywords={for, if, in, endfor, endif, END},
+  ndkeywordstyle=\color{delim}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=false,
+  breaklines=true,
+  columns=fullflexible,
+  basewidth = {.6em},
+  breakindent = {0em},
+  tabsize=1,
+  aboveskip=0em,
+  belowskip=0em,
+  %moredelim=[l]{}{:},
+  %comment=[l]{\#},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{purple}\ttfamily,
+  stringstyle=\color{blue}\ttfamily,
+  %morestring=[l]{-}{},
+  morestring=[b]',
+  morestring=[b]",
+  alsoletter={.},
+  morekeywords={backward_info.input, backward_info.output, backward_info.loss, backward_info.target}
+}
+
+\makeatletter
+% sections with less space
+\def\section{\@startsection {section}{1}{\z@}{-1.5ex plus
+    -0.5ex minus -.2ex}{1.0ex plus 0.3ex
+minus0.2ex}{\large\bf\raggedright}}
+\def\subsection{\@startsection{subsection}{2}{\z@}{-1.0ex plus
+-0.5ex minus -.2ex}{0.5ex plus .2ex}{\normalsize\bf\raggedright}}
+\def\subsubsection{\@startsection{subsubsection}{3}{\z@}{-1.0ex
+plus      -0.5ex minus -.2ex}{0.5ex plus
+.2ex}{\normalsize\bf\raggedright}}
+\def\paragraph{\@startsection{paragraph}{4}{\z@}{1.5ex plus
+0.5ex minus .2ex}{-1em}{\normalsize\bf}}
+\def\subparagraph{\@startsection{subparagraph}{5}{\z@}{1.5ex plus
+  0.5ex minus .2ex}{-1em}{\normalsize}}
+\def\subsubsubsection{\vskip
+5pt{\noindent\normalsize\rm\raggedright}}
+\makeatother
+
+\newcommand{\zerodisplayskips}{%
+  \setlength{\abovedisplayskip}{2mm}%
+  \setlength{\belowdisplayskip}{2mm}%
+  \setlength{\abovedisplayshortskip}{1mm}%
+  \setlength{\belowdisplayshortskip}{1mm}}
+\appto{\normalsize}{\zerodisplayskips}
+\appto{\small}{\zerodisplayskips}
+\appto{\footnotesize}{\zerodisplayskips}
+\makeatother
+
+\parskip=4pt
+
+\newcommand{\vstar}{V-STaR}
+\newcommand{\stardag}{$\text{STaR}^{\dag}$}
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+\usepackage[textsize=tiny]{todonotes}
+\colmfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Common self-improvement approaches for large language models~(LLMs), such as STaR, iteratively fine-tune  LLMs on self-generated solutions to improve their problem-solving ability. However, these approaches discard the large amounts of incorrect solutions generated during this process, potentially neglecting valuable information in such solutions. To address this shortcoming, we propose \vstar{} that utilizes both the correct and incorrect solutions generated during the self-improvement process to train a verifier using DPO that judges correctness of model-generated solutions. This verifier is used at inference time to select one solution among many candidate solutions. Running \vstar{} for multiple iterations results in progressively better reasoners and verifiers, delivering a 4\% to 17\% test accuracy improvement over existing self-improvement and verification approaches on common code generation and math reasoning benchmarks with LLaMA2 models.
+\end{abstract}
+
+\input{icml2023/intro}
+\input{icml2023/method}
+\input{icml2023/experiments}
+\input{icml2023/related}
+\input{icml2023/conclusion}
+
+% \subsection{Retrieval of style files}
+
+% The style files for COLM and other conference information are available online at:
+% \begin{center}
+%    \url{http://www.colmweb.org/}
+% \end{center}
+% The file \verb+colm2024_conference.pdf+ contains these
+% instructions and illustrates the
+% various formatting requirements your COLM paper must satisfy.
+% Submissions must be made using \LaTeX{} and the style files
+% \verb+colm2024_conference.sty+ and \verb+colm2024_conference.bst+ (to be used with \LaTeX{}2e). The file
+% \verb+colm2024_conference.tex+ may be used as a ``shell'' for writing your paper. All you
+% have to do is replace the author, title, abstract, and text of the paper with
+% your own.
+
+% The formatting instructions contained in these style files are summarized in
+% sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
+
+% \section{General formatting instructions}
+% \label{gen_inst}
+
+% The text must be confined within a rectangle 5.5~inches (33~picas) wide and
+% 9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).
+% Use 10~point type with a vertical spacing of 11~points. Palatino is the
+% preferred typeface throughout. Paragraphs are separated by 1/2~line space,
+% with no indentation.
+
+% Paper title is 17~point, in small caps and left-aligned.
+% All pages should start at 1~inch (6~picas) from the top of the page.
+
+% Authors' names are
+% set in boldface, and each name is placed above its corresponding
+% address. The lead author's name is to be listed first, and
+% the co-authors' names are set to follow. Authors sharing the
+% same address can be on the same line.
+
+% Please pay special attention to the instructions in section \ref{others}
+% regarding figures, tables, acknowledgments, and references.
+
+
+% There will be a strict upper limit of 9 pages for the main text of the initial submission, with unlimited additional pages for citations. 
+
+% We strongly recommend following arXiv's guidelines for making your paper friendly for HTML conversion: \url{https://info.arxiv.org/help/submit_latex_best_practices.html}.
+
+
+% \section{Headings: first level}
+% \label{headings}
+
+% First level headings are in lower case (except for first word and proper nouns), bold face,
+% flush left and in point size 12. One line space before the first level
+% heading and 1/2~line space after the first level heading.
+
+% \subsection{Headings: second level}
+
+% Second level headings are in lower case (except for first word and proper nouns), bold face,
+% flush left and in point size 10. One line space before the second level
+% heading and 1/2~line space after the second level heading.
+
+% \subsubsection{Headings: third level}
+
+% Third level headings are in lower case (except for first word and proper nouns),
+% flush left and in point size 10. One line space before the third level
+% heading and 1/2~line space after the third level heading.
+
+% \section{Citations, figures, tables, references}
+% \label{others}
+
+% These instructions apply to everyone, regardless of the formatter being used.
+
+% \subsection{Citations within the text}
+
+% Citations within the text should be based on the \texttt{natbib} package
+% and include the authors' last names and year (with the ``et~al.'' construct
+% for more than two authors). When the authors or the publication are
+% included in the sentence, the citation should not be in parenthesis using \verb|\citet{}| (as
+% in ``See \citet{Vaswani+2017} for more information.''). Otherwise, the citation
+% should be in parenthesis using \verb|\citep{}| (as in ``Transformers are a key tool
+% for developing language models~\citep{Vaswani+2017}.'').
+
+% The corresponding references are to be listed in alphabetical order of
+% authors, in the \textsc{References} section. As to the format of the
+% references themselves, any style is acceptable as long as it is used
+% consistently.
+
+% \subsection{Footnotes}
+
+% Indicate footnotes with a number\footnote{Sample of the first footnote} in the
+% text. Place the footnotes at the bottom of the page on which they appear.
+% Precede the footnote with a horizontal rule of 2~inches
+% (12~picas).\footnote{Sample of the second footnote}
+
+% \subsection{Figures}
+
+% All artwork must be neat, clean, and legible. Lines should be dark
+% enough for purposes of reproduction; art work should not be
+% hand-drawn. The figure number and caption always appear after the
+% figure. Place one line space before the figure caption, and one line
+% space after the figure. The figure caption is lower case (except for
+% first word and proper nouns); figures are numbered consecutively.
+
+% Make sure the figure caption does not get separated from the figure.
+% Leave sufficient space to avoid splitting the figure and figure caption.
+
+% You may use color figures.
+% However, it is best for the
+% figure captions and the paper body to make sense if the paper is printed
+% either in black/white or in color.
+% \begin{figure}[h]
+% \begin{center}
+% %\framebox[4.0in]{$\;$}
+% \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+% \end{center}
+% \caption{Sample figure caption.}
+% \end{figure}
+
+% \subsection{Tables}
+
+% All tables must be centered, neat, clean and legible. Do not use hand-drawn
+% tables. The table number and title always appear before the table. See
+% Table~\ref{sample-table}.
+
+% Place one line space before the table title, one line space after the table
+% title, and one line space after the table. The table title must be lower case
+% (except for first word and proper nouns); tables are numbered consecutively.
+
+% \begin{table}[t]
+
+% \label{sample-table}
+% \begin{center}
+% \begin{tabular}{ll}
+% \toprule
+% \multicolumn{1}{c}{\bf PART}  &\multicolumn{1}{c}{\bf DESCRIPTION} \\
+% \midrule
+% Dendrite         &Input terminal \\
+% Axon             &Output terminal \\
+% Soma             &Cell body (contains cell nucleus) \\
+% \bottomrule
+% \end{tabular}
+% \end{center}
+% \caption{Sample table title}
+% \end{table}
+
+
+
+
+% \section{Final instructions}
+% Do not change any aspects of the formatting parameters in the style files.
+% In particular, do not modify the width or length of the rectangle the text
+% should fit into, and do not change font sizes (except perhaps in the
+% \textsc{References} section; see below). Please note that pages should be
+% numbered.
+
+% \section{Preparing PostScript or PDF files}
+
+% Please prepare PostScript or PDF files with paper size ``US Letter'', and
+% not, for example, ``A4''. The -t
+% letter option on dvips will produce US Letter files.
+
+% Consider directly generating PDF files using \verb+pdflatex+
+% (especially if you are a MiKTeX user).
+% PDF figures must be substituted for EPS figures, however.
+
+% Otherwise, please generate your PostScript and PDF files with the following commands:
+% \begin{verbatim}
+% dvips mypaper.dvi -t letter -Ppdf -G0 -o mypaper.ps
+% ps2pdf mypaper.ps mypaper.pdf
+% \end{verbatim}
+
+% \subsection{Margins in LaTeX}
+
+% Most of the margin problems come from figures positioned by hand using
+% \verb+\special+ or other commands. We suggest using the command
+% \verb+\includegraphics+
+% from the graphicx package. Always specify the figure width as a multiple of
+% the line width as in the example below using .eps graphics
+% \begin{verbatim}
+%    \usepackage[dvips]{graphicx} ...
+%    \includegraphics[width=0.8\linewidth]{myfile.eps}
+% \end{verbatim}
+% or % Apr 2009 addition
+% \begin{verbatim}
+%    \usepackage[pdftex]{graphicx} ...
+%    \includegraphics[width=0.8\linewidth]{myfile.pdf}
+% \end{verbatim}
+% for .pdf graphics.
+% See section~4.4 in the graphics bundle documentation (\url{http://www.ctan.org/tex-archive/macros/latex/required/graphics/grfguide.ps})
+
+% A number of width problems arise when LaTeX cannot properly hyphenate a
+% line. Please give LaTeX hyphenation hints using the \verb+\-+ command.
+
+% \subsubsection*{Author Contributions}
+% If you'd like to, you may include  a section for author contributions as is done
+% in many journals. This is optional and at the discretion of the authors.
+
+% \subsubsection*{Acknowledgments}
+% Use unnumbered third level headings for the acknowledgments. All
+% acknowledgments, including those to funding agencies, go at the end of the paper.
+
+% \section{Ethics Statement}
+% Authors can add an optional ethics statement to the paper. 
+% For papers that touch on ethical issues, this section will be evaluated as part of the review process. The ethics statement should come at the end of the paper. It does not count toward the page limit, but should not be more than 1 page. 
+
+
+
+\bibliography{colm2024_conference}
+\bibliographystyle{colm2024_conference}
+
+
+\newpage
+\appendix
+
+\input{icml2023/appendix}
+
+
+\end{document}

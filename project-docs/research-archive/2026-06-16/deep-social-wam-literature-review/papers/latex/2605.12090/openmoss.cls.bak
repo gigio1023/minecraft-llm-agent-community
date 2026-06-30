@@ -1,0 +1,353 @@
+%%======== Package options and base class ========
+%% --------------------------------------------------------
+%% Acknowledgement: 
+%% This template is adapted from the Bytedance Seed template.
+%% We sincerely thank the original authors for providing an 
+%% elegant and well-structured foundation for this work.
+%% --------------------------------------------------------
+
+%\newboolean{logo}
+\PassOptionsToPackage{table}{xcolor}
+\NeedsTeXFormat{LaTeX2e}
+% \ProvidesClass{openmoss_template}
+\LoadClassWithOptions{article}
+% \pdfoutput=1
+
+% Layout 
+\RequirePackage[top=2.75cm, bottom=2.5cm, left=2.5cm, right=2.5cm, columnsep=0.65cm]{geometry}
+% \RequirePackage{microtype}
+\RequirePackage{placeins}
+\RequirePackage{hyphenat}
+\RequirePackage{setspace}
+\setstretch{1.04}
+\RequirePackage{parskip}
+\RequirePackage[latin, english]{babel}
+\RequirePackage{lipsum}
+\RequirePackage{etoolbox}
+\RequirePackage{fancyhdr}  % custom headers/footers
+\RequirePackage{ulem}  % 引用下划线
+% \DisableLigatures[f]{family=sf*} 
+\RequirePackage{graphicx}
+\RequirePackage{subcaption}
+
+\RequirePackage{booktabs}
+\RequirePackage{nicematrix}
+\RequirePackage{multirow}
+\RequirePackage{bm}
+\newcommand{\nm}[1]{#1}
+% \RequirePackage[table]{xcolor} 
+\RequirePackage[most]{tcolorbox}
+%\RequirePackage{xcolor}
+
+% % --- Colors old ver (seed ver)---
+% \definecolor{openmossbg}{HTML}{2E5AA8} % 如果 OpenMOSS 有标准主色调，可在此修改 HEX 码
+% \definecolor{openmossblue}{HTML}{2E5AA8}
+% \newcommand{\openmossblue}[1]{{\bfseries\color[HTML]{2E5AA8} #1}} 
+% \definecolor{OpenMossCyan}{HTML}{82D9FF} 
+% \definecolor{OpenMossBlue}{HTML}{82B1FF}
+
+% --- Colors ---
+% 保留作为摘要背景渐变的辅色
+\definecolor{OpenMossCyan}{HTML}{82D9FF} 
+\definecolor{OpenMossBlue}{HTML}{82B1FF}
+
+% 将主背景色和主文字色修改为OpenMOSS的深蓝色
+\definecolor{openmossbg}{HTML}{387BD9} 
+\definecolor{openmossblue}{HTML}{387BD9}
+
+% 高亮命令直接调用新的 openmossblue
+\newcommand{\openmossblue}[1]{{\bfseries\color{openmossblue} #1}}
+
+% References %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\RequirePackage{hyperref}
+\RequirePackage[noabbrev,nameinlink]{cleveref}
+\hypersetup{
+  colorlinks,
+  linkcolor=openmossblue,
+  citecolor=openmossblue,
+  urlcolor=openmossblue
+}
+
+\RequirePackage[numbers, sort&compress]{natbib}
+%\RequirePackage[round,authoryear]{natbib}
+\def\bibfont{\small}
+
+%%========  Bibliography using bibtex ========
+\addto{\captionsenglish}{\renewcommand{\refname}{References}}
+\newcommand{\citeas}[1]{\Needspace*{8\baselineskip}\noindent\bibentry{#1}}
+
+% Section and caption format 
+\newcommand{\sectionfont}
+{\fontsize{12}{10}\selectfont} 
+
+\newcommand{\subsectionfont}
+{\fontsize{11}{10}\selectfont} 
+
+\RequirePackage{titlesec}
+\titleformat*{\paragraph}{\itshape\openmossblue}
+% \titleformat*{\paragraph}{\subsectionfont\bfseries}
+\titleformat*{\section}{\sectionfont\bfseries\openmossblue}
+\titleformat*{\subsection}{\subsectionfont\bfseries\openmossblue}
+
+%一级二级三级标题用12 11 10
+\titleformat*{\subsubsection}{\normalsize\bfseries\openmossblue}
+
+% \newcommand{\bffont}
+% {\fontsize{8.8}{10}\selectfont} 
+
+% \DeclareTextFontCommand{\textbf}{\bffont\bfseries}
+\RequirePackage{caption}
+\DeclareCaptionLabelSeparator{custom}{}
+% \DeclareCaptionFormat{custom}{{\textbf{#1 #2}} #3}
+\DeclareCaptionFormat{custom}{{{\bfseries #1 #2}} #3}
+\captionsetup{singlelinecheck=true,format=custom,labelsep=custom,font=small}
+\captionsetup[sub]{singlelinecheck=true,format=custom,labelsep=custom,font=small}
+
+\RequirePackage[T1]{fontenc}
+
+% 先加载标准的 AMS 数学包，解决宏包冲突
+\RequirePackage{amsthm, amsmath, amsfonts, amssymb}
+
+% \RequirePackage{XCharter}
+
+% % 使用 XCharter 作为主要字体，并配置与之匹配的数学字体
+% \RequirePackage[xcharter,bigdelims,vvarbb]{newtxmath}
+
+% % 使用 lmodern 的打字机字体 (用于代码等)，并进行缩放以匹配主字体
+% \RequirePackage[scaled=1.1]{zlmtt}
+
+% --- 完全一致的 Palatino 系列栈 ---
+\RequirePackage{newpxtext}                     % 正文 Palatino 家族
+\RequirePackage[bigdelims,vvarbb]{newpxmath}   % 数学 Palatino 家族
+\RequirePackage[scaled=1.1]{zlmtt}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% Authors, affiliations, infos %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% =======================================================
+%             修改后的代码 (增加 2mm 垂直间距)
+% =======================================================
+\newcounter{authorcount}
+\renewcommand\addtolist[5][]{
+  \begingroup
+    \stepcounter{authorcount}
+    \if\relax#3\relax
+      \def\sep{}
+    \else
+      \ifnum\value{authorcount}=5
+        % 在第一行和第二行作者之间增加 0.5mm 的额外垂直距离
+        \def\sep{\\[0.5mm]}%
+      \else
+        \ifnum\value{authorcount}=10
+          % 在第二行和第三行作者之间增加 -0.2mm 的额外垂直距离
+          \def\sep{\\[-0.2mm]}%
+        \else
+          \def\sep{#5}%
+        \fi
+      \fi
+    \fi
+    \let\protect\@unexpandable@protect 
+    \xdef#3{\expandafter{#3}\sep #4[#1]{#2}}%
+  \endgroup
+}
+
+\newcommand{\authorfont}
+{\fontsize{12}{14}\selectfont} 
+
+\newcommand\authorlist{}
+
+\newcommand\authorformat[2][]{\authorfont {\bfseries #2$^{#1}$}}
+% \newcommand\authorformat[2][]{\authorfont {#2$^{#1}$}}
+
+\renewcommand\author[2][]{\addtolist[#1]{#2}{\authorlist}{\authorformat}{, }}
+
+%给affiliation换成medium字体
+\newcommand{\affiliationfont}
+{\fontsize{10}{12}\selectfont}
+
+\newcommand\affiliationlist{}
+% \newcommand\affiliationformat[2][]{{\affiliationfont {\fontfamily{bytesansmedium}\selectfont $^{#1}$#2}}}
+\newcommand\affiliationformat[2][]{{\affiliationfont $^{#1}$#2}}
+\newcommand\affiliation[2][]{\addtolist[#1]{#2}{\affiliationlist}{\affiliationformat}{, }}
+
+\newcommand{\contributionfont}
+{\fontsize{10}{12}\selectfont}
+
+\newcommand\contributionlist{}
+\newcommand\contributionformat[2][]{{\contributionfont $^{#1}$#2}}
+\newcommand\contribution[2][]{\addtolist[#1]{#2}{\contributionlist}{\contributionformat}{, }}
+
+\newcommand{\checkdatafont}
+{\fontsize{7.92}{10}\selectfont}
+
+\newcommand\checkdatalist{}
+\newcommand\checkdataformat[2][]{{\small {\checkdatafont \bfseries #1:} #2}}
+\newcommand\checkdata[2][]{\addtolist[#1]{#2}{\checkdatalist}{\checkdataformat}{\par}}
+
+\newcommand{\abstractinfont}
+{\fontsize{10}{12}\selectfont} 
+
+\renewcommand{\abstract}[1]{\def\abstractlist{{\abstractinfont #1}}}
+\newcommand{\email}[1]{\href{mailto:#1}{\texttt{#1}}}
+
+\renewcommand\date[1]{\checkdata[Date]{#1}}
+\newcommand\correspondence[1]{\checkdata[Correspondence]{#1}}
+
+\newcommand{\titlefont}
+{\fontsize{18}{20}\selectfont} 
+
+% \renewcommand{\title}[1]{\newcommand{\titlelist}{\titlefont{ #1}}}
+\renewcommand{\title}[1]{\newcommand{\titlelist}{\titlefont{\bfseries #1}}}
+% \renewcommand{\title}[1]{\newcommand{\titlelist}{\titlefont{#1}}}
+
+\newcommand{\abstractfont}
+{\fontsize{12}{12}\selectfont} 
+
+\newcommand{\beginabstract}{\abstractfont{\bfseries \openmossblue{Abstract}\par}}
+
+\newcommand{\beginappendix}{\appendix{\titlefont \openmossblue{Appendix}\par}}
+
+\usepackage[subfigure]{tocloft}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}} % 目录后一行连续的点
+\renewcommand{\cftsecfont}{}
+%\renewcommand{\cftsubsecfont}{\large}
+\renewcommand{\cftsecpagefont}{}{\color{openmossblue}}
+\renewcommand{\cfttoctitlefont}
+{\sectionfont\openmossblue}
+
+%%======== Header and Footer Content ========
+\fancypagestyle{firststyle}{
+    \fancyhead[R]{
+    }
+    \fancyhead[L]{
+        \vskip 6mm
+    \includegraphics[height=9mm]{OpenMOSS.pdf}
+    }
+}
+
+%去除页眉页脚横线
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% rules for title box at top of first page
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%此处为标题两侧线段，0.5pt 长160mm
+\newcommand{\@toptitlebar}{
+  \openmossblue{\hrule height 2.5pt }
+  \vskip 6mm
+  %\vskip -\parskip%
+}
+\newcommand{\@bottomtitlebar}{
+  \vskip 5mm
+  %\vskip -\parskip
+  \openmossblue{\hrule height 1pt}
+  %\vskip 0.09in%
+}
+
+\newcommand{\mymaketitle}{%
+  %\tcbset{enhanced,frame hidden}
+  \tcbset{enhanced}
+  \tcbset{left=8mm}
+  \tcbset{right=8mm}
+  \tcbset{top=6mm}
+  \tcbset{bottom=6mm}
+  \tcbset{colback=white}  
+   % 框线颜色
+  \tcbset{colframe=openmossbg} 
+  % 调整框线粗细
+  \tcbset{boxrule=0.5pt} 
+  \tcbset{before skip=0pt}
+  \tcbset{grow to left by=1.5pt}
+  \tcbset{grow to right by=1.5pt}
+  \tcbset{arc=2.5mm}
+      {
+      \setlength{\parskip}{0mm}
+      \centering
+      \nohyphens
+      %
+      
+      {
+      \@toptitlebar
+        
+        \titlelist\par
+         \@bottomtitlebar
+      }
+      \vskip 6mm
+      \authorlist
+      \vskip 3mm
+      %
+      \affiliationlist\par
+      \vskip 3mm
+      %
+      \contributionlist\par
+    }
+   \vskip 6mm   
+   
+  % 修改 abstract 部分的 tcolorbox 设置
+  \begin{tcolorbox}[
+    % colback=openmossbg!7,  % 浅蓝色背景 (10% 的 openmossbg 颜色)
+    % colframe=white,     % 白色边框 (相当于无框)
+    % boxrule=0pt,        % 边框宽度为0
+    % arc=2.5mm,          % 圆角
+    % left=6mm,           % 左边距
+    % right=6mm,          % 右边距
+    % top=4mm,            % 上边距
+    % bottom=4mm          % 下边距
+    enhanced,
+    arc=12pt,             % 圆角大小
+    boxrule=0pt,          % 无边框
+    colback=white,        % 底部背景色
+    left=15pt, right=15pt, top=20pt, bottom=15pt,
+    interior style={left color=OpenMossCyan!15, right color=OpenMossBlue!5}
+  ]
+    \setlength{\parindent}{0cm}
+    \setlength{\parskip}{0cm}
+
+    %
+    
+    \begin{center}
+        \beginabstract
+        \vskip 3mm
+    \end{center}
+    
+    \abstractlist\par
+    %
+    \vskip 3mm
+    %
+    {
+      \setlength{\parskip}{0cm}
+      \ifdefempty{\checkdatalist}{\vspace*{0.65cm}}{\checkdatalist\par}
+    }
+  \end{tcolorbox}
+  \tcbset{reset}
+  \FloatBarrier
+
+  %加入页眉页脚
+  \thispagestyle{firststyle}
+}
+
+\if@twocolumn%
+\renewcommand{\maketitle}{
+\twocolumn[%
+ \vskip 3mm
+  \mymaketitle
+  \vskip 8mm
+]
+}%
+\else%
+\renewcommand{\maketitle}{
+  \mymaketitle
+  \vskip 8mm
+  %\setlength{\parskip}{4mm}
+}%
+\fi
+
+\AtEndOfClass{
+    \RequirePackage[tracking=smallcaps]{microtype}
+    % 在 microtype 加载后，再使用它提供的命令
+    % \DisableLigatures[f]{family=sf*}
+}

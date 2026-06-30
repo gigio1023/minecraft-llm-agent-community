@@ -1,0 +1,153 @@
+\section{Dependent rejector}\label{sec:dependent_rejector}
+Dependent rejectors analyze the predictor's output to identify examples that the predictor is likely to mispredict. The rejector is typically represented as a confidence function $c_h \colon \mathcal{X} \to [0,1]$ that measures how likely the predictor is to make a correct prediction. Formally, the model for a dependent architecture has the form:
+\begin{equation}
+m(x) = 
+\begin{cases}
+\rr{} & \text{if } r(x; h) < \tau; \\
+h(x)  & \text{otherwise.}
+\end{cases}
+\label{eq:dependent_rejector}
+\end{equation}
+where $r$ may depend on the feature vector $x$, and on the predictor $h$ through the confidence function $c_h$. Similar to the separated rejector, the model rejects the example ($\rr{}$) only if the rejector outputs a value lower than $\tau$. Without loss of generality, we assume the confidence values $c_h(x) \in [0,1]$, as one can always transform a score function into this range.  %refer to a real score function and min-max normalize it. 
+
+The learning task for a dependent rejector usually entails (1) selecting a confidence function that measures how confident the predictor is in its predictions, and (2) setting the rejection threshold $\tau$. % such that low-confidence predictions get rejected. 
+
+
+\paragraph{\textbf{Learning a dependent rejector: types of confidence function $c_h$.}}
+The form of  the confidence function depends on the desired rejection type. For \emph{ambiguity rejection}, the metric should indicate the variability of the target variable or the potential predictor bias. For \emph{novelty rejection}, the confidence should capture the example's similarity to the training data. 
+We distinguish among four ways to derive the confidence scores: i) estimating the conditional probability $P(Y|X)$, ii) estimating the class conditional density $p(X|Y)$, iii) performing a sensitivity analysis, and iv) exploiting the predictor's properties.
+
+
+The \emph{conditional probability} approaches allow for ambiguity rejections by using the maximum of the class conditional probability as confidence function~\citep{Pazzani1994,Fumera2004a,Lam1995}
+\begin{eqnarray}\label{eq:c_h_class_conditional_ambiguity}
+    c_h(x) &=& \max_{k\in \mathcal{Y}} P(Y=k|X=x)
+\end{eqnarray}
+where $k$ is either the true target value or the predictor's output. Low $P(Y|X)$ values for two or more targets $k_1, k_2 \in \mathcal{Y}$ indicate high randomness of the data or proximity to the decision boundary~\citep{Arlandis2002}. Deriving the conditional probabilities from the predictor's outputs can be done by post-processing the predictor's output using techniques such as sigmoid calibration for binary classification tasks~\citep{Cordella2014,Brinkrolf2017}
+\begin{eqnarray*}
+    P(Y = 1|X=x) &\approx& \frac{1}{1+\exp(A h(x) + B)},
+\end{eqnarray*}
+with parameters $A$ and $B$ learned during the training~\citep{Brinkrolf2018}, softmax transformation for multi-class classification tasks~\citep{Kwok1999}
+\begin{eqnarray*}
+    P(Y = k|X=x) &\approx& \frac{\exp{(h_k(x))}}{\sum_{j \in \mathcal{Y}} \exp{(h_j(x))}},
+\end{eqnarray*}
+where $h_j(x)$ is the predictor's output for $x$ related to class $j$, or by fitting Gaussian Processes for regression tasks~\citep{SambuSeo2000}. In case of multiple predictors $h_1, \dots, h_V$, one can also measure the ensemble agreement as the conditional probability~\citep{Glodek2012,Zhang2013}
+\begin{eqnarray*}
+    P(Y = k|X=x) &\approx& \frac{\sum_{v=1}^V \mathbbm{1} [h_v(x) = k]}{V}.
+\end{eqnarray*}
+
+
+On the other hand, the \emph{class conditional density} approaches perform novelty rejection putting~\citep{Dubuisson1993,Dubuisson1985}
+\begin{eqnarray}\label{eq:c_h_class_conditional_novelty}
+    c_h(x) &=& \max_{k \in \mathcal{Y}} p(X=x|Y=k).
+\end{eqnarray}
+Intuitively, a low density $p(X|Y)$ expresses that a sample is rare~\citep{Condessa2015b}. Common methods to estimate the confidence in Eq.~\ref{eq:c_h_class_conditional_novelty} employ generative predictors that directly measure the data density such as \glspl{gmm}~\citep{Vailaya2000}. It is also possible to employ heuristic approaches such as normalizing the class distance between the example $x$ and its $v-$th nearest neighbor $x'$~\citep{Conte2012,Villmann2015,Fischer2014a}, i.e.
+\begin{eqnarray*}
+    p(X=x|Y=k) &\approx& \frac{d(x,x')}{\sum_{\{(x_*, y_*) \in D \colon y_* = k\}} d(x_*,x'_*)}
+\end{eqnarray*}
+and computing the proportion of neighbors within a specified radius $R$~\citep{Berlemont2015} as 
+\begin{eqnarray*}
+    p(X=x|Y=k) &\approx& \frac{|\{x' \colon d(x, x') \le R, (x',y')\in D, y' = k\}|}{\sum_{(x',y') \in D} |\{x_* \colon d(x', x_*) \le R, (x_*,y_*)\in D, y_* = k\}|}.
+\end{eqnarray*}
+
+
+The \emph{sensitivity analysis line} allows only \emph{ambiguity rejection}, as it measures the robustness of the predictor under perturbation of either (a) its parameters or (b) the examples~\citep{Lewicke2008,Hellman1970}. 
+Intuitively, slightly perturbing the predictor's parameters has major effects on the predictions only for examples that fall in the proximity of the decision boundary: slight variations of the parameters yield slight changes in the decision boundary, which, in turn, may end up flipping the predictions for some examples. Examples of employed perturbations involve adding some noise to the model's parameter values (e.g., adding a random sample from a normal distribution with null mean and small variance to the weights of a neural network), employing neural networks with a dropout layer~\citep{NIPS2017_7073}, or using a Bayesian simulation~\citep{Perini2020}.
+In the case of constructing multiple predictors, a common and simple confidence metric is
+\begin{equation*}
+    c_{\{h_1,\dots, h_M\}} (x) = 1 - \Var\{h_1(x),\dots,h_M(x)\}
+\end{equation*}
+where $h_1, \dots, h_M$ are the $M$ predictors constructed by perturbing the parameters, and the variance is scaled to be in $[0,1]$. In some cases, one can directly employ an ensemble of $M$ similar predictors and measure the variance of their predictions~\citep{Fumera2004,Jiang2020}.
+
+Alternatively, one can perturb the test example $x$ to be $x+\varepsilon$, where $\varepsilon$ is a random noise such that $\|\varepsilon\|$ is small. Intuitively, we want a predictor's output to remain the same when the example is only slightly perturbed. Thus, the confidence metric should reflect the robustness of $h$~\citep{Mena2020,Denis2020,Joana2021}, such as
+\begin{equation*}
+    c_{h} (x) = P(h(x+\varepsilon) = h(x)),
+\end{equation*}
+which measures how likely it is that the prediction does not change when the example is perturbed. More generally, we can apply transformations such as rotations and symmetries to the examples~\citep{Chen2018}. Finally, because choosing a specific value for $\varepsilon$ is hard, one can use existing approaches to find each example's minimum $\varepsilon$ that will alter its predicted label~\citep{Devos2021} and derive a confidence metric as a function of the training $\varepsilon$.
+
+The \emph{property-based} methods consist of learning the confidence based on some of the predictor's properties, such as using the leaf configurations of a tree ensemble or the neural network's weight of specific neurons. This line allows both ambiguity and novelty rejection, depending on the utilized property. These methods tend to exploit heuristic and data-driven intuitions and there are no overarching themes that connect these intuitions. 
+For instance, \citet{Devos2023} present a method to detect evasion attacks in tree ensembles. By enumerating the leaves of each tree as $o_i$, they map each example $x$ to the configuration $o = (o_1,\dots,o_V) \in \mathbb{N}^V$ of the $V$ activated leaves (one per tree) when passing $x$ as input to the ensemble. In such output configuration space, they quantify the proximity to the decision boundary by measuring the Hamming distance between the configuration $o$ of a test example with ensemble's prediction $y$ and the closest training example's configuration $o'$ with flipped prediction $\hat{y} \ne y$:
+\begin{equation*}
+    \textsc{OC-score}(x) = \min_{o' \in R_{\hat{y}}} \left(\sum_{v=1}^V \mathbbm{1} \left[o_v \ne o'_v\right]\right)
+\end{equation*}
+where $R_{\hat{y}}$ is the set of training configurations with flipped predictions. One can derive a confidence metric $c_h$ by, for instance, min-max normalizing the $\textsc{OC-score}$.
+On the other hand, confidence values can also be derived from the weight vectors of a \gls{som}~\citep{Sousa2014,GamelasSousa2015}. Because \gls{som}’s can approximate the input data density, they approximate $p(X=x|Y=k)$ with $p(w|Y=k,X=x)$, where $w$ are the weights of the neural network, using standard statistical techniques, such as the Parzen Windows~\citep{Vesanto1999}.
+Moreover, \citet{El-Yaniv2011} propose a disbelief principle, which computes the confidence function by measuring how much the predictor $h$ deteriorates if retrained with the constraint to predict a specific example $x$ differently (i.e., $h_x$)
+\begin{eqnarray*}
+    c_h(x) = \frac{1}{R(h_x) - R(h)},
+\end{eqnarray*}
+where $R(h_x) > R(h) > 0$.
+Finally, the literature presents additional ad-hoc confidence metrics for $k$-NN and Random Forest~\citep{Gopfert2018,Dalitz2009}.
+
+
+\paragraph{\bf{Learning the rejection threshold $\tau$.}}
+
+Setting an appropriate rejection threshold $\tau$ is crucial for having an accurate dependent rejector. At a high level, the threshold is set in three main ways: using domain knowledge,  adhering to user-provided constraints, or tuning it empirically based on some objective function.
+
+In some situations, users possess \emph{domain knowledge} that enables setting $\tau$ to achieve a desired rejection rate $\rho$~\citep{LeCapitaine2012,Pang2021}. Setting $\tau$ in this situation entails (1) ranking training examples based on their confidence level, and (2) setting $\tau$ such that the desired percentage of predictions are rejected~\citep{Sotgiu2020}, that is, at
+\begin{equation*}
+    P_X(c_h(x) < \tau) = \rho.
+\end{equation*}
+Note that this approach is also used when evaluating the model performance/rejection trade-off, which needs to measure the model performance for a fixed rejection rate (see Sec.~\ref{subsec:eval_arc})~\citep{Ma2001,NEURIPS2018_285e19f2,Fumera2003}.
+
+In other cases, users provide knowledge as \emph{specific constraints} that should be satisfied~\citep{Pietraszek2005b}. On the one hand, the user may provide an upper bound $\mathfrak{R}$ for the rejection rate and aim to limit the number of rejections. This results in learning the appropriate $\tau$ by minimizing the model misclassification risk while adhering to the rejection rate constraint~\citep{Zhou2022,Pugnana2023a,Pugnana2023}
+\begin{equation*}
+    \tau = \argmin_{t \in [0,1]} P_{XY}(h(x) \ne y, c_h(x) \ge t)  \quad \text{ subject to } \quad P_X(c_h(x) < t) \le \mathfrak{R}.
+\end{equation*}
+On the other hand, the user may provide an upper bound $\mathfrak{M}$ for the proportion of mispredictions, and aim to control the allowable error~\citep{Varshney2011,Sayedi2010}. Thus, one needs to learn $\tau$ by setting up the complementary problem as before, namely by minimizing the model rejection rate while satisfying the constraints on error~\citep{Li2006,Franc2019,Franc2021}
+\begin{equation*}
+    \tau = \argmin_{t \in [0,1]} P_X(c_h(x) < t) \quad \text{ subject to } \quad P_{XY}(h(x) \ne y, c_h(x) \ge t) \le \mathfrak{M}.
+\end{equation*}
+Moreover, one can generalize this problem by finding the threshold $\tau$ such that the predictor’s misclassification risk at test time is guaranteed to be bounded with high probability~\citep{NIPS2017_7073}.
+
+
+Finally, it is possible to set $\tau$ empirically according to some objective function. 
+The most common approach is to set a \emph{single global threshold} $\tau$, which makes the rejection both simple and transparent, yet usually effective~\citep{Fukunaga1972}. 
+This is the case for Chow's rule \citep{Chow1970a} which involves learning the optimal $\tau$ by minimizing the risk function that includes the expected error rate and the rejection rate
+\begin{equation}\label{eq:chows_minimumrisk_rule}
+    \tau = \argmin_{t\in[0,1]} \left[{\underbrace{\int_{\{x \in \mathcal{X} \colon c_h(x) \ge t\}} (1 - c_h(x)) \, p(x) \, dx}_{\textsc{Error rate}}} + t {\underbrace{\int_{\{x \in \mathcal{X} \colon c_h(x) < t\}} p(x) \, dx}_{\textsc{Rejection rate}}}\right].
+\end{equation}
+However, in real-world scenarios, obtaining complete knowledge of class distributions is challenging, limiting the applicability of Chow's rule~\citep{Shekhar2019}. 
+Thus, in a binary classification case, \citet{Tortorella2000} proposes to use two rejection thresholds $\tau_1$ and $\tau_2$ such that
+\begin{equation}
+h(x) = 
+\begin{cases}
+0 & \text{if } c_h(x) < \tau_1; \\
+1  & \text{if } c_h(x) > \tau_2; \\
+\rr{} & \text{if } \tau_1 \le c_h(x) \le \tau_2
+\end{cases}
+\end{equation}
+with $c_h(x) = P(Y=1|X=x)$.
+He proposes to learn $\tau_1$, $\tau_2$ by optimizing a cost function that is identical to finding the intersection between  the cost function and the convex hull of the \gls{roc} curve
+\begin{eqnarray}
+    \tau_1 &=& \argmin_{t \in [0,1]} P(Y = 1) (C_{fn} - C_r) FNR(t) + P(Y=0) (C_{tn}-C_r) TNR(t)\\
+    \tau_2 &=& \argmin_{t \in [0,1]} P(Y=1) (C_{tp} - C_r) TPR(t) + P(Y=0) (C_{fp} - C_r) FPR(t)
+\end{eqnarray}
+where $C_{fn}$, $C_{fp}$, $C_{tn}$, and $C_{tp}$ are the costs for false negatives, false positives, true negatives, and true positives, while $FNR(t)$, $TNR(t)$, $TPR(t)$ and $FPR(t)$ are the false negative, false positive, true negative and true positive rates obtained by evaluating the models with the thresholds set to $t$.
+This approach is theoretically equivalent to Chow's rule under the Bayesian optimality assumption~\citep{Santos-Pereira2005,Du2010}. However, when estimating posterior probabilities, Chow's rule is not suitable, and $\tau$ should be learned using a cost-based approach~\citep{Marrocco2007,Kotropoulos2009}.
+Different approaches have extended \citeauthor{Tortorella2000}'s method to address other scenarios~\citep{SANSONE2001}, such as stable formulations of ROC curves for small datasets~\citep{Jigang2006}, robust and fast-to-retrain rejections for cost-sensitive situations~\citep{Dubos2016,Fischer2015}, and tailored solutions for learning meta-classifiers or handling multiple classes~\citep{Pietraszek2007,Cecotti2013}.
+
+For tasks requiring a more fine-grained rejection capability, considering \emph{multiple local thresholds} $\tau_1, \tau_2, \ldots$ (up to a finite number) may be beneficial~\citep{Muzzolini1998,Kummert2016,Krawczyk2018}. Normally, setting local thresholds requires dividing the feature space into $J$ regions $\mathcal{J}_i$ and setting a (local) threshold in each region. For instance, one can design regions and thresholds by
+\begin{itemize}
+    \item constructing one region for each  class, i.e. $\mathcal{J}_i = \{x_* \ | \ y_* = i\}$, which means that the number of regions $J$ equals the number of classes $K$~\citep{Fumera2000a}; then, one often finds the local threshold by using for each $\mathcal{J}_i$ the same approach as for global thresholds;
+    \item using the Voronoi-cell decomposition, which requires $J$ prototypes $w_i$ to have $\mathcal{J}_i = \{x_* \ | \ d(x_*, w_j) \le d(x_*, w_k) \ \forall k \ne i\}$, for $i \le J$~\citep{Villmann2015,Fischer2015b,Fischer2015,Fischer2016}; then, \citet{Fischer2014b} present a greedy optimization method to adaptively determine local thresholds using a heuristic principle;
+    \item setting up an optimization problem that finds the optimal thresholds by assigning different class rejection costs; for instance, in binary classification, \citet{Zheng2011} proposes to find 
+    \begin{equation*}
+        \begin{split}
+            \tau_1, \tau_2 = \argmin_{0\le t_1, t_2 \le 1} \Big[& P_{XY}(c_h(x)<t_1 | y = 0) C_{r,0} + P_{XY}(c_h(x)<t_2 | y = 1) C_{r,1}\\
+            &+ P_{XY}(m(x) \ne y) C_e \Big]
+        \end{split}
+    \end{equation*}
+    where $C_{r,0}$ and $C_{r,1}$ are the costs for rejecting examples from the negative and positive classes;
+    \item optimizing an objective function that accounts for different user-specified class misclassification risks $\mathfrak{M}_1, \dots, \mathfrak{M}_K$; \citet{Lin2022} treat each class independently, setting
+    \begin{equation*}
+        L(t_k) = \hat{A}(t_k) + \sum_j^K \lambda_j (\hat{\mathfrak{M}}_j -  \mathfrak{M}_j)^2
+    \end{equation*}
+    where $\hat{A}(t_k)$ is any ambiguity metric, $\lambda_j$ is a penalization term that needs to be set to high values to penalize high differences between the model's misclassification risk $\hat{\mathfrak{M}}$ and the user-specified target.
+\end{itemize}
+Although multiple thresholds give more fine-grained control over a rejector's performance~\citep{Laroui2021,Gangrade2021a}, this is usually more computationally expensive. However, \citet{Fischer2016a} propose efficient schemes for optimizing local thresholds and show that the computation time can be reduced to polynomial~\citep{Boulegane2019}.
+
+
+\paragraph{\bf{Benefits and drawbacks of a dependent rejector.}} Designing a dependent rejector has several \emph{benefits}.
+First, the interaction between the predictor and rejector enables both types of rejection, because the rejector learns from the predictor's output the regions of the feature space where examples are mispredicted or unlikely to fall.
+Second, a dependent rejector can extend an existing predictor (including black-box) by simply setting a proper threshold on a confidence measure. Third, it allows the reuse of previously learned models, eliminating the need for costly retraining~\citep{Zou2011,Tang2014}. Fourth, a confidence-based rejection could be improved by considering multiple confidence metrics where each one captures different aspects of the underlying uncertainty~\citep{Tax2008}. However, this architecture has potential \emph{drawbacks} as well. First, the quality of the dependent rejector is highly influenced by the quality of the confidence metric, which is usually hard to evaluate. Second, typically a dependent rejector does not affect the predictor's learning phase. This results in possible sub-optimal predictions of the model with a reject option.
+

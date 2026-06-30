@@ -1,0 +1,361 @@
+
+\section{One-Dimensional Gaussian Toolkit}\label{app:gaussian}
+In this section, we provide a toolkit for analyzing the one-dimensional Gaussian mean estimation problem with verifier-filtered synthetic data.
+This toolkit serves as the foundation for our analysis of the linear regression models.
+We will establish several key lemmas and theorems that characterize the MSE of the mean estimator under the one-dimensional Gaussian model.
+These results will be instrumental in proving Theorem~\ref{thm:linear:one_step} and Theorem~\ref{thm:linear:long_term} in Appendix~\ref{app:linear}.
+\subsection{Setup and Notations}
+We consider the one-dimensional mean estimation problem where the real data \( X^0_1, \dots, X^0_{n_0} \) are independently and identically distributed (i.i.d.) from a Gaussian distribution:
+\[
+X^0_1, \dots, X^0_{n_0} \overset{\text{i.i.d.}}{\sim} \mathcal{N}(\mu, \sigma^2),
+\]
+with known variance \( \sigma^2 \).
+
+In our setting, a verifier exists and encodes external knowledge that the true mean lies in an interval $[a,b]$ (i.e.\( \mu \in [a, b]\)). 
+Therefore, $\bar{X}^{0} = \frac{X_1 + \cdots + X_{n_0}}{n_0}$ is the empirical mean of real data, which minimizes MSE if \emph{no extra} information is supplied.
+We are interested in whether data verification could effectively inject new information and improve over $\bar{X}^{0}$.
+Consider the following synthetic data generation and filtering procedure:
+\begin{itemize}
+     \item Generate $n_1$ synthetic data \(X^1_1, \dots, X^1_{n_1} \overset{\text{i.i.d.}}{\sim} \mathcal{N}(\bar{X}^{0}, \sigma^2)\).
+     \item Retain \(X^0_i \in [a, b]\) as \(X'^1_1, \dots, X'^1_{n_1'}\), and estimate \(\mu\) using $\bar{X}^{1} = \frac{1}{n_1'} \sum_{i=1}^{n_1'} X'^1_i.$
+\end{itemize}
+
+We will compare the estimator $\bar{X}^{1}$ with $\bar{X}^{0}$ and formally characterize when data verification enhances or degrades model performance - i.e., when $\mathbb{E}(\bar{X}^{1}-\mu)^2 < \mathbb{E}(\bar{X}^{0}-\mu)^2$ or not.
+Our key finding is that $\bar{X}^{1}$ introduces the core bias-variance trade-off that underpins model improvement or degradation.
+We will characterize the MSE of $\bar{X}^1$ which reveals how key quantities such as the real and synthetic sample size, the verifier's bias and variance will decide performance of the filtering strategy.
+These insights provide intuition for extending verifier-guided re-training to more complex settings.
+
+
+We first review some notation and key results for the truncated normal distribution, which will be used in the subsequent sections.
+Consider a one-dimensional normal distribution $X \sim \mathcal{N}(\mu, \sigma^2)$ and let $X'$ be its truncated version restricted to the interval $[a, b]$.
+The distribution of $X'$ is the called the \textsl{truncated normal distribution}, denoted as $X' \sim \mathcal{N}(x|\mu, \sigma^2) \cdot \mathbbm{1}_{\{a<x<b\}}$.
+The mean and variance of the truncated normal distribution $X'$ are given analytically:
+\begin{align}
+    \E[X'|\mu] &= \mu - \sigma \frac{\phi(\frac{b-\mu}{\sigma}) - \phi(\frac{a-\mu}{\sigma})}{\Phi(\frac{b-\mu}{\sigma}) - \Phi(\frac{a-\mu}{\sigma})} := \mu + \sigma m_1(\frac{a-\mu}{\sigma}, \frac{b-\mu}{\sigma}) \notag\\
+    \Var(X'|\mu) &= \sigma^2 \left[ 1 - \frac{\frac{b-\mu}{\sigma} \phi(\frac{b-\mu}{\sigma}) - \frac{a-\mu}{\sigma} \phi(\frac{a-\mu}{\sigma})}{\Phi(\frac{b-\mu}{\sigma}) - \Phi(\frac{a-\mu}{\sigma})} - \left( \frac{\phi(\frac{b-\mu}{\sigma}) - \phi(\frac{a-\mu}{\sigma})}{\Phi(\frac{b-\mu}{\sigma}) - \Phi(\frac{a-\mu}{\sigma})} \right)^2 \right]\notag\\
+    &:= \sigma^2 m_2(\frac{a-\mu}{\sigma},\frac{b-\mu}{\sigma}) \label{equ:trunc_normal}
+\end{align}
+where $\phi(x)$ and $\Phi(x)$ denote the standard normal density and cumulative distribution functions, respectively.
+Standardizing $X$ via $Z := \frac{X-\mu}{\sigma}$ and setting
+\begin{align}
+\alpha = \frac{a - \mu}{\sigma}, \quad \beta = \frac{b - \mu}{\sigma}, \label{equ:alpha_beta}
+\end{align}
+the expression in \eqref{equ:trunc_normal} become:
+\begin{align}
+    \mathbb{E}[Z'] &= m_1(\alpha, \beta) \notag\\
+    \Var(Z') &= m_2(\alpha, \beta) \label{equ:trunc_normal_standard}
+\end{align}
+where $Z'\sim \mathcal{N}(x|0, 1) \cdot \mathbbm{1}_{\{\alpha<x<\beta\}}$ is the standardized truncated normal distribution.
+For convenience, we write $\mathcal{N}_{trunc}(\alpha, \beta) := \mathcal{N}(x|0, 1) \cdot \mathbbm{1}_{\{\alpha<x<\beta\}}$.
+Thus, $m_1$ and $m_2$ correspond to the first and second central moments of the standardized truncated normal distribution.
+In addition, we also define the third central moment  of the standardized truncated normal distribution:
+\begin{align}\label{equ:trunc_normal_standard2}
+    m_3(\alpha, \beta) &:= \E(Z'-\E Z')^3 \notag\\
+&= -\frac{(\beta^2 - 1)\phi(\beta) - (\alpha^2 - 1)\phi(\alpha)}{(\Phi(\beta) - \Phi(\alpha))} - \frac{3(\phi(\beta) - \phi(\alpha))(\beta\phi(\beta) - \alpha\phi(\alpha))}{(\Phi(\beta) - \Phi(\alpha))^2} \notag\\
+&\quad - \frac{2(\phi(\beta) - \phi(\alpha))^3}{(\Phi(\beta) - \Phi(\alpha))^3}.
+\end{align}
+In particular, $0<m_2(\alpha,\beta)<1$ for any $\alpha<\beta$ and $m_1(\alpha,\beta)=m_3(\alpha,\beta)=0$ if $\alpha+\beta=0$.
+
+
+
+\subsection{Characterization of $\E(\bar{X}^{1}-\mu)^2$, Bias-Variance Trade-off, and Model Improvement}
+
+\begin{theorem}\label{thm:gaussian:main}
+    Assume that \( n_1 > n_0 \geq 100\). Then there exists constant \( K\), depending only on \(\alpha\) and \(\beta\), such that
+    \begin{align}
+         &\left| \frac{1}{\sigma^2}\mathbb{E}(\bar{X}^1-\mu)^2 - \underbrace{\frac{m_2(\alpha,\beta)}{n_1}}_{\textcolor{red}{\text{Synthetic Variance}}} - \underbrace{\bigg(m_1^2(\alpha,\beta) + \frac{m^2_2(\alpha,\beta)+m_3(\alpha,\beta)m_1(\alpha,\beta)}{n_0}\bigg)}_{\textcolor{red}{\text{Verification Bias+Variance}}} \right| \notag\\
+         & < K\left(\frac{1}{n_1n^{1/3}_0}+\frac{1}{n^{3/2}_0}\right)\label{equ:high_prob_y'}
+    \end{align}
+     holds with probability at least \( 1 - \exp\left(-\frac{1}{2}n_0^{1/3}\right) \).
+\end{theorem}
+\begin{proof}[Proof of Theorem~\ref{thm:gaussian:main}]
+
+It will be convenient to reparameterize the sample mean estimators by centering them around the true mean. Specifically, we define the residuals:
+\begin{align}
+    \epsilon_1 := \frac{\bar{X}^{0}-\mu}{\sigma}, \quad \epsilon_1 \sim \mathcal{N}(0, \frac{1}{n_0}). \label{equ:epsilon}
+\end{align}
+Note that \(\bar{X}^{1}\) is the mean of \(n_1\) i.i.d. samples from the truncated normal distribution \(\mathcal{N}(x|\bar{X}^0,\sigma^2)\cdot \mathbbm{1}_{\{a<x<b\}}\). 
+The MSE of \( \bar{X}^1 \) can be decomposed as follows:
+\begin{align}
+\mathbb{E}[(\bar{X}^1 - \mu)^2] 
+&= \mathbb{E}_{\bar{X}^{0}} \, \mathbb{E}_{\bar{X}^1 \mid\bar{X}^{0}} \left[(\bar{X}^1 - \mu)^2\right] \notag \\
+&= \mathbb{E}_{\bar{X}^{0}} \left[ \operatorname{Var}(\bar{X}^1 \mid, \bar{X}^{0}) + \left( \mathbb{E}[\bar{X}^1 \mid \bar{X}^{0}] - \mu \right)^2 \right] \notag \\
+&= \sigma^2 \mathbb{E}_{\bar{X}^{0}} \left[   \frac{m_2(\alpha-\epsilon_1, \beta-\epsilon_1)}{n_1}  \right] + \mathbb{E}_{\bar{X}^{0}} \left[ (\bar{X}^{0} - \mu - \sigma m_1(\alpha-\epsilon_1, \beta-\epsilon_1))^2 \right] \notag \\
+&= \frac{\sigma^2}{n_1} \mathbb{E}_{\epsilon_1}\left[m_2(\alpha-\epsilon_1, \beta-\epsilon_1)\right] + \sigma^2 \, \mathbb{E}_{\epsilon_1} \left[ \left(m_1(\alpha - \epsilon_1, \beta - \epsilon_1) + \epsilon_1 \right)^2 \right] \label{equ:yrisk2}
+\end{align}
+       
+For the first term in \ref{equ:yrisk2}, we consider the event \( E_1 := \left\{ |\epsilon_1| < n_0^{-1/3} \right\} \), the function \( m_2(\cdot, \cdot) \) is Lipschitz continuous in a neighborhood of \( (\alpha, \beta) \), so we have
+\begin{equation}\label{equ:first}
+    \left| m_2(\alpha - \epsilon_1, \beta - \epsilon_1) - m_2(\alpha, \beta) \right| 
+    = |\epsilon_1| \cdot \left| m_2^{(1)}(\alpha - \xi, \beta - \xi) \right| 
+    < \frac{M_1}{n_0^{1/3}},
+\end{equation}
+  
+    for some \( \xi \in (0, \epsilon_1) \), where we define 
+    \[
+    M_1 := \sup_{|\xi| < \frac{1}{100^{\frac{1}{3}}}} \left| m_2^{(1)}(\alpha - \xi, \beta - \xi) \right|,
+    \]
+    and \( M_1 \) is a constant independent of \( n_0 \) as long as \( n_0 \geq 100\).
+Event $E_1$ hold with high probability:
+\[
+\mathbb{P}\left(|\epsilon_1| < n_0^{-1/3}\right) >1- \frac{\exp\left(-\frac{n_0^{1/3}}{2}\right)}{\sqrt{\pi / 2} \cdot n_0^{1/6}} >1- \frac{\exp\left(-\frac{n_0^{1/3}}{2}\right)}{\sqrt{\pi / 2} \cdot 100^{1/6}} >  1-\exp\left(-\frac{n_0^{1/3}}{2}\right).
+\]
+Then we consider then second term in \ref{equ:yrisk2}. The Taylor expansion of the function
+\[
+m_1(\epsilon_1) := m_1(\alpha - \epsilon_1, \beta - \epsilon_1)
+\]
+up to the third-order terms is:
+\begin{align}\label{equ:taylor}
+m_1(\epsilon_1) 
+&= m_1(\alpha,\beta) - \left[ 1 - m_2(\alpha, \beta) \right] \epsilon_1 +\frac{1}{2}m_3(\alpha,\beta) \epsilon_1^2 + \frac{1}{6} m_1^{(3)}(\xi) \epsilon_1^3, \quad \text{for some } \xi \in (0, \epsilon_1),
+\end{align}
+where \( m_1^{(3)}(\xi) \) denotes the third derivative of \(m_1\) evaluated at some point between \(0\) and \(\epsilon_1\).
+Then we can get 
+\begin{align}
+    \mathbb{E}_{\epsilon_1} \left[ \left(m_1(\alpha - \epsilon_1, \beta - \epsilon_1) + \epsilon_1 \right)^2 \right] &= \mathbb{E}\left( m_1(\alpha,\beta) + m_2(\alpha, \beta) \epsilon_1 + \frac{1}{2}m_3(\alpha,\beta) \epsilon_1^2 + \frac{1}{6} m_1^{(3)}(\xi) \epsilon_1^3 \right)^2\notag\\
+&= m_1^2(\alpha,\beta) +\frac{m_2^2(\alpha,\beta) + m_1(\alpha,\beta)m_3(\alpha,\beta)}{n_0} + \frac{3m_3^2(\alpha,\beta)}{4n^2_0} \notag \\
+\qquad & + \mathbb{E}\left( m_1(\alpha,\beta) +m_2(\alpha,\beta)\epsilon_1 + \frac{1}{2}m_3(\alpha,\beta)\epsilon^2_1\right) \frac{m_1^{(3)}(\xi)}{3}\epsilon_1^3 \notag \\
+\qquad & + \mathbb{E}\left( \frac{m_1^{(3)^2}(\xi)}{36}\epsilon_1^6\right). \label{equ:infinite_mse}
+\end{align}
+
+First, using the fact that there exists constant $M$ that only depends on $\alpha$ and $\beta$, such that $|m_1^{(3)}(x)| < M$ for any $x$, we have:
+\begin{align}
+&\left|\mathbb{E}\left[\left( m_1(\alpha,\beta) + m_2(\alpha,\beta)\epsilon_1 + \frac{1}{2}m_3(\alpha,\beta)\epsilon_1^2 \right) \frac{m_1^{(3)}(\xi)}{3} \epsilon_1^3 \right] \right| \notag \\
+\leq\;& \mathbb{E}\left[\left( |m_1(\alpha,\beta)| + m_2(\alpha,\beta)|\epsilon_1| + \frac{1}{2}|m_3(\alpha,\beta)|\epsilon_1^2 \right) \cdot \frac{M}{3} |\epsilon_1|^3 \right] \notag \\
+=\;& \mathbb{E}\left[ \frac{M}{3} |m_1(\alpha,\beta)| |\epsilon_1|^3 + \frac{M}{3} m_2(\alpha,\beta) |\epsilon_1|^4 + \frac{M}{6} |m_3(\alpha,\beta)| |\epsilon_1|^5 \right] \notag \\
+\leq\;& \frac{K_1}{n_0^{3/2}}. \notag
+\end{align}
+for some constant \( K_1 \) depending only on \( \alpha \) and \( \beta \).
+
+Secondly, the last term in \eqref{equ:infinite_mse} is bounded by:
+\[
+\mathbb{E} \left[ \frac{{m_1^{(3)}}^2(\xi)}{36} \epsilon_1^6 \right]
+\leq \frac{M^2}{36} \mathbb{E}[\epsilon_1^6] 
+= \frac{5 M^2 \sigma^6}{12 n_0^3} \leq \frac{K_2}{n_0^3},
+\]
+for some constant \( K_2 \).
+
+So the second term in \ref{equ:yrisk2} is bounded by
+\begin{equation}\label{equ:second}
+    \left| \mathbb{E}_{\epsilon_1} \left[ \left(m_1(\alpha - \epsilon_1, \beta - \epsilon_1) + \epsilon_1 \right)^2 \right] 
+- m_1^2(\alpha, \beta) 
+- \frac{m_2^2(\alpha, \beta) + m_1(\alpha,\beta)m_3(\alpha, \beta)}{n_0}
+\right| 
+< \frac{K}{n_0^{3/2}}
+\end{equation}
+for some constant \( K \).
+
+Combining \ref{equ:yrisk2}, \ref{equ:first}, and \ref{equ:second} completes the proof.
+
+
+\end{proof}
+
+\subsection{Iterative Retraining and Long-Term Dynamics in One-Dimensional Gaussian Mean Estimation}
+
+Now consider the verifier-guided synthetic retraining in the Gaussian mean estimation setting.
+The iterative retraining process can be described by the following algorithm.
+
+\begin{algorithm}[H]
+\caption{Iterative Verifier-Guided Retraining for Gaussian Mean Estimation}
+\label{alg:gaussian_mean}
+\begin{algorithmic}[1]
+  \State \textbf{Input:} Initial estimate $\bar X^{0}$ from real data
+  \For{$k = 0,1,2,\dots$}
+    \State Draw $\xi_i \stackrel{\text{i.i.d.}}{\sim}\mathcal N(0,\sigma^2)$ and construct synthetic samples $X_i^{k} = \bar X^{k} + \xi_i$.
+    \State Retain points with $a < X_i^{k} < b$, yielding $n_k$ verified samples $\{X'^k_i:i=1,2,\ldots n_k\}$.
+    \State $\bar X^{k+1} \gets \frac{1}{n_k}\sum_{i=1}^{n_k} X'^k_i$.
+  \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm \ref{alg:gaussian_mean} defines a Markov process $\{\bar{X}^0,\bar{X}^1, \dots \bar{X}^k, \dots\}$, where the conditional distribution $p(\bar{X}^{k+1} |\bar{X}^{k})$ is given by
+\begin{align}\label{equ:gaussian:transition}
+p(\bar{X}^{k+1} |\bar{X}^{k}): \bar{X}^{k+1} = \bar{X}^k + \sigma \frac{\sum_{i=1}^{n_k}\xi'^{k+1}_i}{n_k}, \qquad \xi'^{k+1}_i \;\text{i.i.d}\; \sim \mathcal{N}_{trunc}(\frac{a - \bar{X}^k}{\sigma}, \frac{b - \bar{X}^k}{\sigma})
+\end{align}
+
+The following theorem summarizes these findings:
+
+\begin{theorem}
+\label{thm:gaussian:limit}
+Let $\bar{X}^k$ be the Markov process determined by \eqref{equ:gaussian:transition} with initial condition
+\begin{align}
+    \bar{X}^0 \sim \mathcal{N}(0,\frac{\sigma^2}{n_0}),\notag
+\end{align}
+and assume $n_k$ is non-decreasing in $k$.
+Then the following statements hold:
+
+\begin{itemize} 
+    \item If $|a|,|b| < \infty$, there exists a constant $0<\rho < 1$ such that, 
+    \[\mathbb{E}\left(\bar{X}^k - \frac{a+b}{2}\right)^2 \leq \rho^{2k}\mathbb{E}(\bar{X}^0-\frac{a+b}{2})^2+\sum_{j=0}^{k-1}\frac{\rho^{2(k-j)-1}}{n_j}.\]
+    Moreover, if $\lim_{k \to \infty} n_k = \infty$, $\lim_{k \to \infty} \mathbb{E}|\bar{X}^k - \frac{a+b}{2}|^2 = 0$.
+    \item If $-\infty=a<b<\infty$, then $\liminf_{k \to \infty} \bar{X}^k = -\infty$. If $-\infty<a<b=\infty$, then $\limsup_{k \to \infty} \bar{X}^k = \infty$.
+\end{itemize}
+
+\end{theorem}
+\begin{proof}[Proof of Theorem~\ref{thm:gaussian:limit}]
+Define
+\begin{align}
+    \epsilon_k = \frac{\bar{X}^k - \mu}{\sigma}\label{equ:def_epsilon},
+\end{align}
+which represents the standardized error of the estimator $\bar{X}^k$.
+It is easy to see that $\epsilon_k \in [\alpha,\beta] \Leftrightarrow \bar{X}^k \in [a,b]$, where $\alpha,\beta$ are defined in \eqref{equ:alpha_beta}.
+Therefore, it suffices to consider the standardized process $\{\epsilon_k,k=0,1,2,\ldots\}$.
+\eqref{equ:gaussian:transition} can be standardized as:
+
+% \begin{align}
+%     \epsilon_{k+1} &\sim \mathcal{N}\left(\epsilon_k + m_1(\alpha - \epsilon_k,\beta - \epsilon_k), \frac{m_2(\alpha - \epsilon_k,\beta - \epsilon_k)}{n_k} \right) \label{equ:gaussian:transition2},
+% \end{align}
+\begin{align}
+     \epsilon_{k+1}  = \epsilon_{k} + \frac{\sum_{i=1}^{n_k}\xi'^{k+1}_i}{n_k}, \qquad \xi'^{k+1}_i \sim \mathcal{N}_{\text{trunc}}\left(\alpha - \epsilon_k,\beta - \epsilon_k \right)\label{equ:gaussian:transition_standard},
+\end{align}
+
+For convenience, we shift the noise terms $\xi'^{k+1}_i$ in \eqref{equ:gaussian:transition_standard} to have mean zero. Therefore, we introduce
+
+\begin{align}\label{equ:gaussian:Tv_def}
+T_{\alpha,\beta}(x):=x+\mathbb{E}\!\big[Z\;\big|\;\alpha-x\le Z\le \beta-x\big],\qquad
+v_{\alpha,\beta}(x):= \mathrm{Var}\!\big(Z\;\big|\;\alpha-x\le Z \le\beta-x\big).
+\end{align}
+where $Z\sim\mathcal{N}(0,1)$.
+
+Therefore, \eqref{equ:gaussian:transition_standard} can be rewritten as
+\begin{equation}\label{equ:gaussian:contraction}
+\epsilon_{k+1}=T_{\alpha,\beta}(\epsilon_k)+\eta_{k+1}
+\end{equation}
+where $\eta_{k+1} = \frac{1}{n_k}\sum_{i=1}^{n_k}\left(\xi'^{k+1}_i - \mathbb{E}\xi'^{k+1}_i\right)$ is the average of independent mean zero noise in \eqref{equ:gaussian:transition_standard}. In particular, we have
+\[
+\mathbb{E}[\eta_{k+1} \mid \mathcal{F}_k] = 0,\qquad
+\mathrm{Var}(\eta_{k+1} \mid \mathcal{F}_k) = \frac{v_{\alpha,\beta}(\epsilon_k)}{n_k}.
+\]
+
+where $\mathcal{F}_k := \sigma(\epsilon_0, \eta_1, \dots, \eta_k)$ and $n_k$ is the (post-filtering) batch size at round $k$.
+
+It is easy to see that 
+\begin{align}
+    T_{\alpha,\beta}(x) &= x + m_1(\alpha - x,\beta - x),\notag\\
+    v_{\alpha,\beta}(x) &= m_2(\alpha - x,\beta - x),\notag\\
+    T_{\alpha,\beta}'(x) &= v_{\alpha,\beta}(x). \notag
+\end{align}
+
+
+We first consider $|a|,|b| < \infty$. In this case, we first show that the derterministic part $T_{\alpha,\beta}(x)$ in \eqref{equ:gaussian:contraction} is a global contraction.
+Since $-\infty < \alpha < \beta <\infty$, we have
+
+\[
+\sup_{x \in \mathbb{R}} T_{\alpha,\beta}'(x) = \sup_{x \in \mathbb{R}} \mathrm{Var}\big(Z \mid\, \alpha - x \le Z \le \beta-x\big)  = \mathrm{Var}\big(Z \mid\, |Z| < |\frac{\alpha+\beta}{2}|\big):= \rho < 1.
+\]
+
+Therefore, $T_{\alpha,\beta}(x)$ is a global contraction. By the contractive mapping theorem that $T_{\alpha,\beta}(x)$ has a unique fixed point $x^*$, which solves $x^* = T_{\alpha,\beta}(x^*)$.
+It is easy to see that
+\begin{align}
+x^* = T_{\alpha,\beta}(x^*) \implies x^* = x^* + \mathbb{E}(Z \big| \alpha - x^*\le Z \le \beta - x^*) \implies x^* = \frac{\alpha+\beta}{2}.
+\end{align}
+
+
+By the mean-value theorem,
+\begin{equation}
+|T_{\alpha,\beta}(\epsilon_k)-\frac{\alpha+\beta}{2}|\,\le\,\rho\,|\epsilon_k-\frac{\alpha+\beta}{2}|.\notag
+\end{equation}
+
+Let $V_k:=(\epsilon_k-\frac{\alpha+\beta}{2})^2$, we have
+\begin{align}
+\mathbb{E}\!\big[V_{k+1}\mid \epsilon_k\big]
+=(T_{\alpha,\beta}(\epsilon_k)-\frac{\alpha+\beta}{2})^2+\frac{v_{\alpha,\beta}(\epsilon_k)}{n_k}
+\;\le\;\rho^2 (\epsilon_k-\frac{\alpha+\beta}{2})^2+\frac{\rho}{n_k}.\notag
+\end{align}
+Taking expectations yields
+\begin{equation}\label{equ:gaussian:onetep}
+\mathbb{E} V_{k+1}\;\le\;\rho^2\,\mathbb{E} V_k\;+\;\frac{\rho}{n_k}\,.
+\end{equation}
+
+Unrolling \eqref{equ:gaussian:onetep},
+\begin{align}\label{equ:gaussian:bound}
+\mathbb{E} V_k
+\;\le\;\rho^{2k}\mathbb{E}V_0\;+\;\rho\sum_{j=0}^{k-1}\frac{\rho^{2(k-1-j)}}{n_j}.
+\end{align}
+It is easy to see that 
+\begin{align}
+\mathbb{E} V_k
+\;\le\; \rho^{2k}\mathbb{E}V_0\;+\;\rho\sum_{j=0}^{k-1}\frac{\rho^{2(k-1-j)}}{n_0} < \rho^{2k}\mathbb{E}V_0\;+\;\frac{\rho}{n_0(1-\rho^2)}.\notag
+\end{align}
+
+Therefore, by the Cauchy-Schwarz inequality, $\lim_{k \to \infty} \mathbb{E} \epsilon^2_k < \infty$ easily follows.
+Moreover, when $n_k \to \infty$, let $g_i:=\rho^{2i}$ and $a_j:=1/n_j\to 0$. A standard $\ell^1$-convolution argument shows $(g*a)_k:=\sum_{j=0}^{k-1} g_{k-1-j}a_j = \sum_{j=0}^{k-1}\frac{\rho^{2(k-1-j)}}{n_j} \to 0$.
+Therefore $\lim_{k \to \infty}\mathbb{E} V_k = \lim_{k \to \infty}\mathbb{E} (\epsilon_k - \frac{\alpha+\beta}{2})^2 = 0$.
+
+
+Now we consider the case $-\infty= a < b < \infty$ (equivalently $-\infty= \alpha < \beta < \infty$). We will show that $\liminf_{k \to \infty} \epsilon_k = -\infty \text{ a.s.}$.
+
+Let $t_k := \beta - \epsilon_k$ and the recursion \eqref{equ:gaussian:contraction} can be rewritten for $t_k$:
+\[
+t_{k+1} = t_k + \lambda(t_k) - \eta_{k+1},
+\]
+where $\lambda(t_k) = -\mathbb{E}(Z|Z < \beta - \epsilon_k) =\mathbb{E}[Z \mid Z \geq -t_k]$.
+
+Consider the hitting time $\tau_M := \inf\{k : t_k \geq M\}$ for any $M > 0$.
+Fix $M > 0$ and define
+\[
+m(M) := \min_{t \leq M} \lambda(t) = \mathbb{E}[Z \mid Z \geq -M] > 0,
+\]
+which is strictly positive the fact that $\lambda(t) > 0$ and $\lambda(t)$ is a decreasing function.
+On the event $\{\tau_M > K\}$ we have $t_j < M$ for $j = 0, \dots, K-1$, hence $\lambda(t_j) \geq m(M)$.
+Summing the recursion yields
+\[
+t_K = t_0 + \sum_{j=0}^{K-1} \lambda(t_j) - \sum_{j=0}^{K-1} \eta_{j+1}
+\geq t_0 + K\,m(M) - S_K,
+\]
+where $S_K := \sum_{j=0}^{K-1} \eta_{j+1}$ and $t_0 = \beta - \epsilon_0$ is $\mathcal{F}_0$-measurable (hence random). Therefore,
+\begin{equation}\label{equ:gaussian:even_inclusion}
+\{\tau_M > K\} \subseteq \Big\{ S_K \geq t_0 + K\,m(M) - M \Big\}.
+\end{equation}
+Define the (random) burn-in index
+\[
+K_0 := \Big\lceil \frac{2(M-t_0)}{m(M)} \Big\rceil.
+\]
+Then for all $K \geq K_0$,
+\[
+t_0 + K\,m(M) - M \geq \frac{m(M)}{2} K,
+\]
+and \eqref{equ:gaussian:even_inclusion} gives, conditionally on $\mathcal{F}_0$,
+\begin{equation}\label{equ:gaussian:even_inclusion2}
+\{\tau_M > K\} \subseteq \Big\{ S_K \geq \frac{m(M)}{2} K \Big\}, \qquad \text{for all } K \geq K_0.
+\end{equation}
+
+Next, we will show that $S_K$ is a sub-exponential random variable in event $\{\tau_M > K\}$.
+Since $S_K = \sum_{j=0}^{K-1} \eta_{j+1} = \sum_{j=0}^{K-1} \frac{1}{n_j}\sum_{i=1}^{n_j}\left(\xi'^{j+1}_i -\mathbb{E}\xi'^{j+1}_i\right)$, we will first show that $\xi'^{j+1}_i -\mathbb{E}\xi'^{j+1}_i$ is sub-exponential.
+
+Since $\xi'^{j+1}_i \sim \mathcal{N}_{\text{trunc}}(-\infty,\beta - \epsilon_j) = \mathcal{N}_{\text{trunc}}(-\infty, t_j)$, 
+on the event $\{\tau_M > K\}$ we have 
+\begin{align}
+\xi'^{j+1}_i - \mathbb{E}\xi'^{j+1}_i < t_j - \mathbb{E}[Z\mid Z < t_j] \leq M - \mathbb{E}[Z\mid Z < M] := b(M) <\infty.\notag
+\end{align}
+The above inequality follows from the fact that $t - \mathbb{E}[Z\mid Z < t]$ is an increasing function of $t$ and 
+$t_j < M$ for $j = 0, \dots, K-1$ on the event $\{\tau_M > K\}$. In addition, $\mathrm{Var}(\xi'^{j+1}_i) = \mathrm{Var}(Z|Z < t_j) \leq 1$.
+Therefore, $\xi'^{j+1}_i - \mathbb{E}\xi'^{j+1}_i$ is mean zero, bounded above by $b(M)$ with $\mathrm{Var}\left(\xi'^{j+1}_i - \mathbb{E}\xi'^{j+1}_i\right) < 1$.
+By Bennet/Bernstein MGF inequality, we have
+\begin{align}
+    \log \mathbb{E}e^{\lambda(\xi'^{j+1}_i - \mathbb{E}\xi'^{j+1}_i)} \leq \frac{\lambda^2}{2(1 - b(M)\lambda/3)},\notag
+\end{align}
+for $0<\lambda<\frac{3}{b(M)}$. This shows that $\xi'^{j+1}_i - \mathbb{E}\xi'^{j+1}_i$ is sub-exponential with parameters $SE(1,2b(M)/3)$.
+By standard properties of sub-exponential random variables, $\eta_{j+1} = \frac{1}{n_j}\sum_{i=1}^{n_j}\left(\xi'^{j+1}_i -\mathbb{E}\xi'^{j+1}_i\right)$ is $SE(1/n_j, 2b(M)/(3n_j))$ and $S_K = \sum_{j=0}^{K-1} \eta_{j+1}$ is $SE(\sum_{j=0}^{K-1} 1/n_j, 2b(M)/(3n_1))$ since $n_j$ is non-decreasing.
+Therefore, for any $t > 0$ we have tail bound
+\begin{align}\label{equ:gaussian:tail_bound}
+\mathbb{P}\left( S_K \geq t \right) \leq \exp\left(-\frac{1}{2}\min\{\frac{t^2}{\sum_{j=0}^{K-1} 1/n_j},\frac{n_1t}{2b(M)}\}\right) \leq \exp\left(-\frac{1}{2}\min\{\frac{n_1t^2}{K},\frac{n_1t}{2b(M)}\}\right).
+\end{align}
+Use the tail bound \eqref{equ:gaussian:tail_bound} in \eqref{equ:gaussian:even_inclusion2}, we have 
+\begin{align}
+\mathbb{P}\left(\tau_M > K\mid \mathcal{F}_0\right) \leq \mathbb{P}\left( S_K \geq \frac{m(M)}{2} K \right) \leq \exp\Big(-c(M)n_1 K\Big)
+\end{align}
+
+for all $K \geq K_0$ with $c(M) = \min\left\{\frac{m(M)^2}{8},\frac{n(M)}{8b(M)}\right\}$.
+\begin{align}\label{equ:gaussian:tail}
+\mathbb{P}\left( \tau_M > K \right) &= \mathbb{E} \left[\mathbb{P}\left( \tau_M > K \mid \mathcal{F}_0 \right)\right]\notag\\
+&\le\mathbb{E} \left[\exp\Big(-c(M)n_1K\Big)\mathbbm{1}_{\{K > K_0\}}\right]+\mathbb{P}\left( K \leq K_0 \right)
+\end{align}
+
+Let $K \to \infty$ in \eqref{equ:gaussian:tail}, we get $\mathbb{P}(\tau_M < \infty) = 1$. Since $M$ is arbitrary, this implies $\liminf_{k \to \infty} \epsilon_k = -\infty \text{ a.s.}$.
+
+The case $-\infty < a < b = \infty$ can be proved in the same way, therefore is omitted.
+
+\end{proof}
+
+

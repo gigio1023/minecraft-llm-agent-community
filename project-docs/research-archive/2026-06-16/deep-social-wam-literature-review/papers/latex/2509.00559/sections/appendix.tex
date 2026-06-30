@@ -1,0 +1,321 @@
+\section{Appendix}
+
+\subsection{Limitations}
+\label{app:limitations}
+Despite the promising results demonstrated by our S³AP approach, several important limitations must be acknowledged:
+
+Our approach assumes LLM parsers can reliably convert narratives into \protocolname structures. In practice, they may struggle with culturally nuanced or ambiguous scenarios, leading to oversimplified or misleading representations \citep{rao2025normadframeworkmeasuringcultural}.
+Experiments were limited to controlled benchmarks (ToMi, ParaToMi, HiToM, FANToM, MMToM-QA, SOTOPIA, and others detailed in the appendix) and focused on accuracy metrics. These settings may not reflect the full complexity of real-world social interactions. Still, consistent improvements across both third- and first-person tasks suggest that \protocolname generalizes well.
+While our \texttt{Foresee and Act} algorithm looks one step ahead, longer rollouts could potentially offer more benefits. However, it also compounds both inference cost and model error: imperfect predicted states may drift over multiple steps, and agents may overfit to artifacts in the simulated trajectory. We left the study for longer rollouts for future work.
+We don't explicitly address biases in LLMs, which may carry over into social world models and misrepresent certain groups. Representing mental states also raises privacy concerns. However, the structured format makes such issues more visible and easier to audit than black-box methods.
+Finally, our method uses predefined templates rather than learning representations from raw experience, which may limit generalization. However, its modular design allows for future integration with learned representation methods as they improve.
+
+
+\subsection{\protocolname-Parser Details}
+\label{app:parser_details}
+Here's the json schema for the \protocolname-Parser. 
+
+\begin{lstlisting}[language=json, caption=SocializedStructure JSON Schema, numbers=none]
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SocializedStructure",
+  "type": "object",
+  "properties": {
+    "timestep": {
+      "type": "string",
+      "description": "The timestep of the current socialized structure, it could be a integer number or a description of the time of the state."
+    },
+    "state": {
+      "type": "string",
+      "description": "The current state of the world (including all the agents) at this timestep. Important note: this is the state before the action is taken (e.g., the initial state could be 'none' at the beginning if there are no prior contexts before the interaction starts)."
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "The observations for each agent in the social world at this timestep. Note that the different agents may have different observations. 1. The special tag '<same_as_state />' indicates the observation covers the current state. 2. The special tag '<same_as_last_action_x />' indicates the observation covers the last timestep agents' actions, x means the index of the agents. If no x provided, it means the observation covers the last timestep agents' actions. 3. The special tag '<mental_state>...</mental_state>' indicates the mental state of the agent. 4. 'none' means the agent does not observe anything at this timestep. Important note: this is the observation before the action is taken (e.g., the observation could be 'none' at the beginning if there are no prior contexts before the interaction starts)."
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "The actions for each agent in the social world at this timestep. 'none' represents that the agent does not take any action at this timestep."
+    }
+  },
+  "required": ["timestep", "state", "observations", "actions"],
+  "definitions": {
+    "SocializedStructureForModel": {
+      "type": "object",
+      "properties": {
+        "timestep": {
+          "type": "string",
+          "description": "The timestep of the current socialized structure, it could be a integer number or a description of the time of the state."
+        },
+        "state": {
+          "type": "string",
+          "description": "The current state of the world (including all the agents) at this timestep. Important note: this is the state before the action is taken (e.g., the initial state could be 'none' at the beginning if there are no prior contexts before the interaction starts)."
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The observations for each agent in the social world at this timestep. Note that the different agents may have different observations. The observation would go into corresponding agent's memory, so make sure the observation is clear for the agent to understand (first person perspective narrative is preferred). 1. If the observation covers the current state, use the special tag '<same_as_state />' to indicate that. 2. If the observation covers last timestep agents' actions, use '<same_as_last_action_x />' to cover that, x means the index of the agents (just use <same_as_last_action /> if only one agent acts at the last timestep). 3. For the internal thoughts, beliefs, or emotions of the agent that is not directly observable by other agents, use the special tag '<mental_state>...</mental_state>' to indicate the internal observation. You can of course combine these tags and add extra information after the tags (seperated by space). 4. Put 'none' if the agent does not observe anything at this timestep. Important note: this is the observation before the action is taken (e.g., the observation could be 'none' at the beginning if there are no prior contexts before the interaction starts). The format for each entry in the list is: 'agent_name: observation'"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The actions for each agent in the social world at this timestep. The length of the list should be the same as the number of agents. Put 'none' if the agent does not take any action at this timestep. The format for each entry in the list is: 'agent_name: action'"
+        }
+      },
+      "required": ["timestep", "state", "observations", "actions"]
+    }
+  }
+}
+\end{lstlisting}
+
+For all the LLMs powering the parser, we use the 0 temperature if applicable.
+
+\subsection{LLM-as-a-Judge Evaluation for \protocolname Parser Quality}
+\label{app:parser_quality}
+We evaluate how accurately different parser models generate \protocolname representations by comparing a model-produced representation to a manually corrected ground-truth representation on the same ParaToMi scenario. Each evaluation instance contains (i) the original story and question, (ii) a ground-truth \protocolname representation, and (iii) a generated \protocolname representation from a parser model.
+This evaluation is designed to compare parsers at scale, but it inherits the limitations of any automated judge. In particular, an LLM judge may overvalue stylistic similarities or under-penalize subtle perspective mistakes. We mitigate this by (a) using a manually corrected reference representation as the anchor for each instance, and (b) focusing the judge on observation fidelity (who saw what, when), which is the primary failure mode in ToMi/ParaToMi.
+
+\paragraph{Step 1: Structural validation.}
+We first check whether the generated \protocolname output conforms to the expected schema (e.g., required fields such as timestep/state/observations/actions are present and well-formed). This yields a \textbf{structural score} in $[0,1]$, where higher is better.
+
+\paragraph{Step 2: Observation accuracy via an LLM judge.}
+Because the key difficulty in ToMi/ParaToMi is perspective tracking, we focus the judge on whether each agent \emph{observes the right things at the right timesteps}. Concretely, we provide the judge with the story, the question, the formatted ground-truth \protocolname representation, and the formatted generated representation, and ask it to rate \textbf{observation accuracy} (score in $[0,1]$) and provide a brief rationale.
+The judge is instructed to prioritize whether agents:
+(i) observe events only when they are present in the relevant location,
+(ii) do \emph{not} observe events that occur when they are absent,
+and (iii) correctly track what they witnessed in prior timesteps.
+The judge also considers (as secondary criteria) state accuracy and action attribution.
+We use GPT-5 as the judge and request a JSON response containing a numeric score and reasoning text.
+
+\paragraph{Step 3: Composite score.}
+We combine the two signals into an overall parser-quality score:
+\[
+\texttt{overall\_score} = 0.3 \times \texttt{structural\_score} + 0.7 \times \texttt{observation\_accuracy}.
+\]
+This weighting emphasizes observation fidelity, which most directly affects downstream theory-of-mind reasoning.
+
+\subsection{Experiment Details}
+\label{app:experiment_details}
+
+For tasks that operate under different assumptions about agent perception and knowledge (e.g., in ToMi tasks, agents are assumed to perceive all events occurring within their physical space), we provide task-specific instructions and one exemplar to guide the encoding process.
+
+\subsubsection{Prompt for All Third-person Static Tasks}
+Here's the prompt for parsing free-form narratives into \protocolname representations. 
+
+\begin{lstlisting}
+Please analyze the following narrative/context.
+
+#### Context: {context}
+
+#### Task specific instructions: {task_specific_instructions}
+
+Example analysis: {example_analysis}
+
+Previous attempt had these issues. 
+Please fix them based on the previous attempt and feedback below:
+{feedback}
+
+Follow these format instructions:
+{format_instructions}
+\end{lstlisting}
+
+Here are the task specific instructions for each benchmark:
+
+\paragraph{ToMi}: \texttt{You are dissecting the TOMI scenarios. The assumptions are that the characters can perceive every scene in their location but not scenes occurring elsewhere. If the agent leaves the location, they cannot perceive the scene in that location anymore. In the agent's observation, remember to include the objects' locations if the agents are in the same location as the object.}
+
+\paragraph{HiToM}: \texttt{You are dissecting the HITOM scenarios. You should assume the following: (1) An agent witnesses everything and every movements before exiting a location. (2) An agent A can infer another agent B's mental state only if A and B have been in the same location, or have private or public interactions. (3) Note that every agent tend to lie. What a character tells others doesn't affect his actual belief. (4) Agents in private communications know that others won't hear them, but they know that anyone can hear any public claims. In the agent's observation, remember to include the objects' locations if the agents are in the same location as the object.}
+
+\paragraph{FANToM}: \texttt{You are analyzing a social conversation and need to answer a question about it. When the agents leave the conversation, they cannot perceive the conversation anymore untill they join the conversation again. For convenience, you can use <same\_as\_last\_action /> in the state field to indicate that the state is the same as the last action.}
+
+\paragraph{MMToM-QA}: \texttt{You are dissecting the MMToM scenarios. The assumptions are that agents can perceive objects and events only in their current location. When an agent moves to a new location, they can no longer perceive what happens in previous locations. Importantly, agents should not have knowledge about the contents of containers (like fridges, cabinets, etc.) until they directly observe inside them, unless explicitly stated in their prior knowledge. In mental states, clearly represent the agent's goals, beliefs about object locations, and how these beliefs are updated through observations. In the agent's observation, include objects' locations when the agent is in the same location as the objects, but only after the agent has actually observed them.}
+
+\paragraph{ConfAIde}: \texttt{For convenience, you can use <same\_as\_last\_action /> in the state field to indicate that the state is the same as the last action.}
+
+Here's the prompt for question answering:
+
+\begin{lstlisting}
+## Context
+{context}
+## Extra Info
+(to help you better understand the meeting)
+{extra_info}
+## Task
+{question}
+\end{lstlisting}
+
+We place \protocolname representations in the extra information entry.
+
+\subsubsection{Model Configurations}
+For all experiments, we used the following models:
+\begin{itemize}
+    \item GPT-4o: \texttt{gpt-4o-2024-08-06}
+    \item GPT-4.1: \texttt{gpt-4.1-2025-04-14}
+    \item \texttt{o1}: \texttt{o1-2024-12-17}
+    \item \texttt{o1}-mini: \texttt{o1-mini-2024-09-12}
+    \item \texttt{o3}: \texttt{o3-2025-04-16}
+    \item \texttt{o3}-mini: \texttt{o3-mini-2025-01-31}
+    \item DeepSeek-R1: \texttt{together\_ai/deepseek-ai/DeepSeek-R1}
+    \item Llama-4-Maverick: \texttt{together\_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8}
+    \item Llama-4-Scout: \texttt{together\_ai/meta-llama/Llama-4-Scout-17B-16E-Instruct}
+\end{itemize}
+
+For the experiments in Section~\ref{sec:social_understanding}, we used temperature $0.0$ for all the non-reasoning models (reasoning models do not require temperature).
+
+\subsubsection{Prompt for \texttt{Foresee and Act} Method}
+\label{app:forsee_and_act}
+Here's the prompt for refining the action:
+
+\begin{lstlisting}
+You are {agent}.
+Here is the interaction history between you and the other agent so far:
+{history}
+
+Here is your intended action:
+{intended_action}
+
+Here is the predicted mental states after you take the intended action 
+(you should use them to generate better actions for achieving your goal):
+{socialized_context_info}
+
+Please generate a refined action 
+so that you can achieve your (i.e., {agent}'s) goal better.
+
+Please only generate a JSON string 
+including the action type and the argument.
+Your action should follow the given format:
+{format_instructions}
+\end{lstlisting}
+
+\subsection{ConfAIde Benchmark Results}
+\label{app:confaide_results}
+
+\paragraph{ConfAIde} \citep{mireshghallah2024can} evaluates inference-time privacy in LLMs. We focus on tier 4 meeting summary tasks, where models must include key details while avoiding disclosure of private information to outsiders. This requires reasoning about each person's knowledge and what information should be shared with different stakeholders. We report the percentage of summaries that satisfy this criterion, using only the meeting summary portion (200 examples) for social reasoning evaluation.
+
+Table \ref{tab:confaide_results} shows the performance comparison of models with and without \protocolname representations on the ConfAIde benchmark. Our approach demonstrates consistent improvements across most models, with particularly notable gains for models like GPT-4o (from 0.575 to 0.740) and \texttt{o3-mini} (from 0.765 to 0.770). The results indicate that \protocolname helps models better reason about information privacy and perspective-taking in meeting contexts.
+
+\begin{table}[ht]
+    \centering
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Model} & \textbf{ConfAIde} & \textbf{ConfAIde w \protocolname} \\
+        \midrule
+        \texttt{GPT-4o} & 0.575 & 0.740 \\
+        \texttt{GPT-4.1} & 0.995 & 0.985 \\
+        \texttt{o1} & 0.980 & 0.975 \\
+        \texttt{o3} & 0.910 & 0.955 \\
+        \texttt{o3-mini} & 0.765 & 0.770 \\
+        \texttt{R1} & 0.835 & 0.785 \\
+        \texttt{Llama 4} & 0.810 & 0.820 \\
+        \midrule
+        \textbf{Average} & 0.839 & 0.861 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Performance comparison on ConfAIde benchmark with and without \protocolname representations.}
+    \label{tab:confaide_results}
+\end{table}
+
+\subsection{Additional Experimental Results}
+\label{app:add_results}
+
+Table \ref{tab:social_reasoning_o1} shows the performance comparison of models with and without \protocolname representations. The \protocolname representations is parsed by the \texttt{o1}-based \protocolname-Parser.
+
+
+\input{tables/social_reasoning_o1}
+
+\subsubsection{SOTOPIA Additional Results}
+\label{app:sotopia_additional}
+
+Figure \ref{fig:sotopia_heatmap} presents a detailed heatmap analysis of model performance across different social world model configurations on the SOTOPIA-hard benchmark. The heatmap visualizes how different combinations of agent models and social world models interact, revealing patterns in which pairings yield the strongest performance improvements.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{figs/sotopia_heatmap.pdf}
+    \caption{Heatmap showing goal completion scores for different combinations of agent models (rows) and social world models (columns) on SOTOPIA-hard. Values represent goal completion scores (0-10 scale), with darker colors indicating better performance. This visualization reveals which model pairings produce the most effective social reasoning.}
+    \label{fig:sotopia_heatmap}
+\end{figure}
+
+Figure \ref{fig:sotopia_vanilla} shows the baseline performance of various models without social world modeling support. This serves as a reference point for understanding the improvements gained through \protocolname-powered social world models.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figs/sotopia_vanilla.pdf}
+    \caption{Baseline performance of different models on SOTOPIA-hard without social world model support. Values represent goal completion scores (0-10 scale). These baselines correspond to the right panel in Figure \ref{fig:model_performance_comparison}.}
+    \label{fig:sotopia_vanilla}
+\end{figure}
+
+\subsection{Experiments compute resources}
+\label{app:compute_resource}
+
+For our experiments, we utilized two main API services for model access:
+
+\begin{itemize}
+    \item OpenAI API\footnote{\url{https://platform.openai.com/docs/api-reference}} for accessing GPT-4o, GPT-4.1, \texttt{o1}, \texttt{o1}-mini, \texttt{o3}, and \texttt{o3}-mini models
+    \item Together AI API\footnote{\url{https://docs.together.ai/}} for accessing DeepSeek-R1, Llama-4-Maverick, and Llama-4-Scout models
+\end{itemize}
+
+All experiments were conducted using these cloud-based APIs, eliminating the need for local GPU resources. The API-based approach allowed us to efficiently scale our experiments while maintaining consistent model access across different benchmarks.
+
+\subsection{Mapping \protocolname to Social World Model Components (Informal)}
+\label{app:proof_of_social_world_state}
+
+We provide an informal mapping showing how \protocolname aligns with the components of the social world model defined in Section 3.1. This is \emph{not} a formal completeness proof: any representation is bounded by the information present (or inferable) in the narrative and the parser’s assumptions. The goal here is to clarify what information \protocolname makes explicit and how it can be used to operationalize $\mathcal{S}^t$ in practice:
+
+\begin{enumerate}
+    \item \textbf{State Space $\mathcal{S}$}: \protocolname approximates the state space through its structured format containing:
+    \begin{itemize}
+        \item Environment state $\mathcal{E}^t$ in the \texttt{state} field
+        \item Joint observation space $\mathcal{O}^t$ in the \texttt{observations} field
+        \item Joint action space $\mathcal{A}^t$ in the \texttt{actions} field
+    \end{itemize}
+    
+    \item \textbf{Observation Space $\mathcal{O}$}: \protocolname captures both external and introspective observations:
+    \begin{itemize}
+        \item External observations $\mathcal{O}^{\text{ex}}_i$ through direct state descriptions and agent actions
+        \item Introspective observations $\mathcal{O}^{\text{in}}_i$ through the \texttt{<mental\_state>} tag
+    \end{itemize}
+    
+    \item \textbf{Memory Function $\Psi$}: While \protocolname doesn't explicitly store memory, it enables memory reconstruction through:
+    \begin{itemize}
+        \item The sequence of simulation steps that can be used to reconstruct $\mathcal{M}_i^t$
+        \item Special tags like \texttt{<same\_as\_last\_action>} that maintain temporal consistency
+    \end{itemize}
+    
+    \item \textbf{Transition Function $T$}: The social world model's transition function is approximated through:
+    \begin{itemize}
+        \item The \texttt{timestep} field that maintains temporal ordering
+        \item The sequential nature of simulation steps that captures state transitions
+    \end{itemize}
+\end{enumerate}
+
+A crucial assumption in our social world model is that agents act independently at each timestep $t$, with no agent having knowledge of others' simultaneous actions. \protocolname supports this assumption through its structured format:
+\begin{itemize}
+    \item Each agent's actions are recorded separately in the \texttt{actions} field
+    \item The \texttt{observations} field captures only what each agent can observe at the current timestep
+    \item The sequential nature of simulation steps ensures that agents cannot access future or simultaneous actions
+\end{itemize}
+
+Furthermore, \protocolname satisfies key properties of a social world state, though in an approximate manner:
+
+\begin{enumerate}
+    \item \textbf{Completeness}: Each simulation step contains all necessary components ($\mathcal{E}^t$, $\mathcal{O}^t$, $\mathcal{A}^t$) to represent a complete social world state at time $t$, though some details may be simplified or omitted.
+    
+    \item \textbf{Consistency}: The structured format ensures that observations and actions are consistent with the environment state through:
+    \begin{itemize}
+        \item Special tags that maintain referential integrity
+        \item The parser's ability to infer missing elements through reasoning
+    \end{itemize}
+    
+    \item \textbf{Extensibility}: The JSON schema allows for additional metadata and future extensions while maintaining the core social world state representation.
+\end{enumerate}
+
+Therefore, \protocolname provides an approximate but practical operationalization of the social world state as defined in our theoretical framework. While it may not capture every nuance of the theoretical model, it offers a structured and computationally tractable way to represent social interactions, and it makes explicit the key fields required to drive downstream reasoning and simulation.

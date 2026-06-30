@@ -1,0 +1,74 @@
+\documentclass{article}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{amsmath}
+
+\begin{document}
+
+\begin{algorithm}[t]
+\caption{Hypothetical Minds Agent Algorithm}
+\label{alg:HM}
+\begin{algorithmic}[1]
+\Require Pretrained language model $\text{LLM}$, initial memory $\mathcal{M}_0$, learning rate $\alpha$, intrinsic reward constant $c$, validation threshold $V_{\text{thr}}$, top-$k$ hypotheses for refinement
+\State Initialize memory $\mathcal{M} \gets \mathcal{M}_0$
+\State Initialize hypothesis set $\mathcal{H} \gets \emptyset$
+\State Initialize hypothesis values $V_{h_i} \gets 0$ for all $h_i \in \mathcal{H}$
+\For{each episode}
+    \For{each time step $t$}
+        \State \textbf{Perception and Memory Update}
+        \State Observe environment, obtain observation $o_t$
+        \State Update memory $\mathcal{M} \gets \mathcal{M} \cup \{o_t\}$
+        \Statex
+        \State \textbf{Theory of Mind Module}
+        \State \textbf{Hypothesis Generation and Refinement}
+            \State Select top-$k$ hypotheses $\mathcal{H}_{\text{top}} \subseteq \mathcal{H}$ based on $V_{h_i}$
+            \State Generate new hypothesis $h_{\text{new}}$:
+                \Statex \quad $h_{\text{new}} \gets \text{LLM}\big(\text{Prompt: ``Based on memory } \mathcal{M} \text{ and top hypotheses } \mathcal{H}_{\text{top}}, \text{ generate and refine hypotheses about other agents' strategies.''}\big)$
+            \State Add $h_{\text{new}}$ to hypothesis set: $\mathcal{H} \gets \mathcal{H} \cup \{h_{\text{new}}\}$
+            \State Initialize value $V_{h_{\text{new}}} \gets 0$
+        \Statex
+        \State \textbf{Hypothesis Evaluation}
+        \For{each hypothesis $h_i \in \mathcal{H}$}
+            \State Predict other agents' behavior $\hat{\phi}_i$ given $h_i$:
+                \Statex \quad $\hat{\phi}_i \gets \text{LLM}\big(\text{Prompt: ``Given hypothesis } h_i \text{ and memory } \mathcal{M}, \text{ predict other agents' next actions.''}\big)$
+            \State Observe other agents' actual behavior $\phi$
+            \State Compute intrinsic reward $r_i$:
+                \Statex \quad $r_i \gets \begin{cases} 
+                    +c, & \text{if } \hat{\phi}_i = \phi \\
+                    -c, & \text{if } \hat{\phi}_i \neq \phi
+                \end{cases}$
+            \State Update hypothesis value:
+                \Statex \quad $V_{h_i} \gets V_{h_i} + \alpha \left( r_i - V_{h_i} \right)$
+        \EndFor
+        \Statex
+        \State \textbf{Hypothesis Selection}
+        \State Select validated hypotheses:
+            \Statex \quad $\mathcal{H}_{\text{valid}} \gets \{ h_i \in \mathcal{H} \mid V_{h_i} \geq V_{\text{thr}} \}$
+        \If{$\mathcal{H}_{\text{valid}} \neq \emptyset$}
+            \State Select best hypothesis:
+                \Statex \quad $h^* \gets \arg\max_{h_i \in \mathcal{H}_{\text{valid}}} V_{h_i}$
+        \Else
+            \State Use latest hypothesis:
+                \Statex \quad $h^* \gets h_{\text{new}}$
+        \EndIf
+        \Statex
+        \State \textbf{High-Level Planning}
+        \State Generate high-level plan $z$:
+            \Statex \quad $z \gets \text{LLM}\big(\text{Prompt: ``Based on memory } \mathcal{M} \text{ and hypothesis } h^*, \text{ generate a high-level plan of action.''}\big)$
+        \Statex
+        \State \textbf{Subgoal Module}
+        \State Generate subgoals $\mathbf{g}$:
+            \Statex \quad $\mathbf{g} \gets \text{LLM}\big(\text{Prompt: ``Given observation } o_t, \text{ memory } \mathcal{M}, \text{ and plan } z, \text{ generate a sequence of subgoals to achieve the plan.''}\big)$
+        \Statex
+        \State \textbf{Action Planning and Execution}
+        \State Translate subgoals $\mathbf{g}$ into low-level actions $a_t$ using an action planner
+        \State Execute action $a_t$ in environment
+        \State Observe environment reward $r_t$
+        \State Update memory $\mathcal{M} \gets \mathcal{M} \cup \{a_t, r_t\}$
+    \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}

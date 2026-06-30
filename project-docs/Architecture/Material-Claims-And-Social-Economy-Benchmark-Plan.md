@@ -6,7 +6,7 @@ sidebar_position: 45
 
 Search token: `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK`.
 
-Status: active benchmark direction.
+Status: active benchmark direction under the advisory social-material WAM spine.
 
 Recorded: 2026-06-15 (`Asia/Seoul`).
 
@@ -14,24 +14,31 @@ Primary overlap reference:
 
 - `PROJECT_SID_2411_00114_REVIEW`:
   `project-docs/research-archive/Project-Sid-2411-00114-Review-2026-06-15.md`
+- `ADVISORY_SOCIAL_MATERIAL_WAM`:
+  `project-docs/Specification/Advisory-Social-Material-WAM.md`
 
 ## Purpose
 
-This document resets the benchmark plan around the current society definition:
-Minecraft society is not primarily a shared chest or a central pool of
-resources. The research object is lived social behavior in a shared Minecraft
-world: actors face needs and constraints, remember each other, depend on or
-avoid each other, negotiate access to things and places, create obligations,
-repair or ignore harms, and continue after one scripted task is complete.
+This document defines benchmark families for the active advisory
+social-material WAM direction. Minecraft society is not primarily a shared
+chest or a central pool of resources. The research object is prediction of
+social-material consequence in a shared Minecraft world: actors face needs and
+constraints, remember each other, depend on or avoid each other, negotiate
+access to things and places, create obligations, repair or ignore harms, and
+continue after one scripted task is complete.
+
 Evidence is required to audit those claims, but evidence collection is a support
-condition, not the research value.
+condition, not the research value. Verification is baseline hygiene. The
+benchmark is useful only insofar as it creates state/action/next-state rows for
+prediction and separately records acting outcomes.
 
 The benchmark should compare LLM providers and models by asking:
 
 ```text
-Can the actors keep a materially grounded social world coherent over time,
-under natural Minecraft constraints, without the runtime secretly planning the
-society for them?
+Can the model predict how candidate embodied actions will change material
+possession, access, obligations, relationships, and future action opportunities
+under natural Minecraft constraints, while actors still act without a hidden
+planner?
 ```
 
 The first 2026-06-15 borrowed-tool provider smoke is only a closed issue
@@ -53,6 +60,8 @@ social microeconomy in Minecraft: possession, material claims, obligations,
 refusal, repair, relationship continuity, and world-shaped dependence. Auditable
 Mineflayer artifacts are required so those social claims can be checked, but
 they are not the main research contribution.
+The stronger WAM gap is whether those consequences can be predicted before the
+action and scored separately from the actor's eventual success.
 
 ## Project Sid Case Adaptation
 
@@ -90,6 +99,9 @@ claim, knowledge, risk, or action affects another actor's options,
 obligations, trust, or future behavior.
 ```
 
+For WAM-facing benchmarks, every issue should also define predicted-delta and
+observed-delta fields.
+
 This framing translates the literature into Minecraft:
 
 | Literature pattern | Minecraft issue shape | What to measure |
@@ -109,6 +121,8 @@ Each issue should declare:
 - valid resolution space, including refusal or conflict when appropriate;
 - required Minecraft evidence;
 - required social-state evidence;
+- predicted-delta fields;
+- observed-delta fields;
 - score dimensions.
 
 The benchmark should not reward automatic cooperation. A grounded refusal,
@@ -126,6 +140,8 @@ ungrounded generosity.
 - Do not score dialogue style unless it produces evidence-backed social state.
 - Do not run provider-backed experiments without provider-specific quota
   preflight and operator approval.
+- Do not present verified action records, screenshots, or report completeness as
+  the contribution.
 
 ## Economy Definition
 
@@ -151,9 +167,10 @@ Useful categories:
 
 ## Benchmark Ladder
 
-### Phase 0. Provider-Free Ledger Sanity
+### Phase 0. Provider-Free Ledger And Transition-Row Sanity
 
-Goal: verify scoring and reporting without spending provider quota.
+Goal: check scoring, reporting, and transition-row shape without spending
+provider quota.
 
 Input can be fixture events only. The run should prove that the report can show:
 
@@ -161,6 +178,7 @@ Input can be fixture events only. The run should prove that the report can show:
 - claim/access events;
 - public affordance creation/use;
 - request, offer, refusal, handoff, debt, and repair events;
+- predicted and observed delta fields;
 - evidence refs for every social claim.
 
 This phase catches report and scoring errors before live Minecraft runs.
@@ -178,11 +196,12 @@ Example gates:
 - record inventory, block, and verifier evidence.
 
 These are calibration gates only. Passing them is not a society claim.
+They are also calibration rows for physical/material prediction.
 
 ### Phase 2. Two-Actor Exchange
 
-Goal: test whether one actor's possession or claim can become another actor's
-option through evidence-backed social action.
+Goal: test whether the predictor anticipates when one actor's possession or
+claim becomes another actor's option through social action.
 
 Example scenarios:
 
@@ -194,7 +213,8 @@ Example scenarios:
   and the result is recorded as allowed, refused, borrowed, or contested.
 
 The score should not require generosity. A grounded refusal can be better than
-ungrounded cooperation.
+ungrounded cooperation. Prediction scoring should ask whether the model
+anticipated the material/social consequence, not whether it preferred kindness.
 
 ### Phase 2L. Open-World Live Two-Actor Interaction
 
@@ -242,6 +262,7 @@ Minimum evidence gates:
 | Cross-actor consequence | One actor's action changes another actor's options, position, inventory, plan, memory, relationship, or obligation state. |
 | World grounding | At least one non-chat Minecraft action occurs after the social event and is tied to the issue. |
 | Continuity | A later turn references or acts on the prior request, refusal, loan, debt, or obligation with evidence refs. |
+| WAM row | The action has predicted and observed physical/material/social deltas. |
 
 Implementation implication: the current `socialCycleRunner` already has natural
 world setup, fresh-world support, visual evidence, and actor-workspace artifacts,
@@ -301,10 +322,13 @@ new observations, blockers, scarcity, and opportunities.
 
 ## Primary Metrics
 
-The report should separate outcome, process, efficiency, and auditability.
+The report should separate prediction quality, acting outcome, process,
+efficiency, and auditability.
 
 | Metric | What it measures | Examples |
 | --- | --- | --- |
+| Transition prediction accuracy | Whether predicted physical/material/social deltas match observed deltas. | predicted loan -> observed handoff; predicted refusal -> observed no transfer and obligation update. |
+| Prediction calibration | Whether uncertainty tracks where the predictor is wrong. | high confidence only on stable physical/material transitions; low confidence under missing actor or unloaded-world limits. |
 | Personal material agency | Whether actors use and protect their own possessions coherently. | Inventory deltas, crafted tools, retained food, equipped items. |
 | Claim clarity | Whether access/ownership is explicit enough for later actors to reason from. | Claimed cache, station owner, public marker, disputed claim. |
 | Exchange quality | Whether request, offer, accept, refuse, handoff, loan, debt, or repair events are evidence-backed. | Request -> loan -> use -> return; request -> refusal -> trust update. |
@@ -320,6 +344,7 @@ The report should separate outcome, process, efficiency, and auditability.
 Avoid one opaque score. Use a scorecard plus timelines:
 
 - milestone timeline by actor and cycle;
+- predicted-vs-observed delta timeline;
 - possession/claim/obligation ledger over time;
 - public affordance creation/use timeline;
 - cost, latency, provider calls, and action count;

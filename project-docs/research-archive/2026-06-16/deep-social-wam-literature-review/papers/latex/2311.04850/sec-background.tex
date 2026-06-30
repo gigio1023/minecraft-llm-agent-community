@@ -1,0 +1,178 @@
+\section{Background}
+\label{sec:background}
+
+% We start with the definition of contamination and then show the mainstream contamination detection methods.
+
+% \subsection{Definition of Contamination}
+
+% In statistics and machine learning, leakage is described as the use of information in the model training process that would not be expected to be available at prediction time, causing the predictive scores (metrics) to overestimate the model's utility. 
+
+% Leakage refers to the unintentional inclusion of test information during model training.
+
+% \todo{combine together}
+% Contamination~\citep{contamination-blog} occurs when test set information is included in the training set, resulting in an overly optimistic estimate of the model’s score (accuracy, AUC, etc.).
+
+% A primary reason for benchmark vulnerabilities is their dependence on detection methods like n-gram overlap to identify contaminated training data. 
+% However, due to the simplicity of current detection methods, many samples that meet contamination criteria are undetected. 
+% As a result, many benchmarks that develop based on current detection methods are often unreliable. 
+% Therefore, the dependence on detection methods like n-gram overlap worsens benchmark vulnerabilities.
+% These techniques often fail to capture all instances that meet contamination criteria, allowing some leakage to go undetected.
+
+
+% The main cause of the benchmark's failure is its reliance on detection techniques like n-gram overlap to spot contaminated training data. 
+% These detection algorithms were unable to identify all data that satisfied the criterion of contamination, resulting in the widespread presence of rephrased samples.
+
+
+
+% \subsection{Contamination Detection Methods}
+
+Contamination occurs when test set information is leaked in the training set, resulting in an overly optimistic estimate of the model’s score (accuracy, AUC, etc.).
+% \weilin{I'd strongly suggest to remove this blog citation}
+In this section, we introduce common contamination detection methods, which include n-gram overlap, embedding similarity search, decoding matching, and influence function.
+Table \ref{table:detection-algorithms} compares the computational costs of these methods, and whether they require access to training data or the model.
+%access requirements for both training data and the model of the four methods along with their computational costs.  
+
+\textbf{N-gram overlap}. The most common and widely used decontamination method is n-gram overlap. 
+% OpenAI often denotes a sample as contaminated if it has 8-13 overlaps with a test sample. 
+% \todo{gram -> character}
+The GPT-3 paper~\citep{brown2020language} defines a 13-gram overlap as contamination, and the GPT-4 report~\citep{openai2023gpt4} defines a 50-character overlap as contamination. N-gram overlap detection is favored for its simplicity and speed but it can result in a higher false negative rate if there's a small difference. 
+% Moreover, it is subject to false positives~\ref{sec:false_pos}.
+
+\textbf{Embedding similarity search}. Embedding similarity search uses transformer-generated embeddings to capture prompts' semantics. 
+Popular approaches use models such as sentence BERT~\citep{reimers-2019-sentence-bert} to generate embeddings and employ cosine similarity to measure the relevance of prompts. High similarity between training and test prompts suggests potential contamination~\citep{lee2023platypus}.
+% Although it can capture more semantic information than the n-gram approach, the requirement to specify a threshold and its low precision prevent it from being widely adopted~\citep{gunasekar2023textbooks}.
+Although it can capture more semantic information than the n-gram approach, it requires specifying a threshold. 
+If the threshold is set too high, it will result in a high false negative rate; otherwise, setting it too low will lead to a high false positive rate.
+% it requires specifying a threshold of what
+% \todo{low precision extend}
+% \todo{it requires specifying an appropriate threshold ...}
+
+
+\textbf{Decoding matching}. Both n-gram overlap and embedding similarity search require access to training data. 
+% However, when only the model is available, decoding matching becomes an alternative method for contamination detection. 
+In cases where training data is not available but the model is available, decoding matching can be used as an alternative method to detect contamination.
+% The premise is simple: if the model has been fine-tuned on the test set, presenting it with a partial test prompt might lead it to automatically complete the input, suggesting potential contamination in the training data. 
+The intuition is that if the model is trained on contaminated training data, it is more likely to auto-complete a partial test prompt.~\citep{li2023estimating}
+%The idea is straightforward: if the model was fine-tuned on the test set, giving it an incomplete test prompt could cause it to auto-complete the input.
+% However, due to the instability of this method, it is seldom acknowledged as definitive evidence of contamination.
+However, an auto-completed test prompt does not necessarily indicate that the model has been trained on contaminated data, and a model trained on test cases with variation will not auto-complete the test prompt either.
+Therefore, decoding matching is often not acknowledged as definitive evidence of contamination. 
+% \weilin{why?}
+% \todo{cite decoding matching}
+
+\textbf{Influence function}. When both the model and the training data are available, the influence function~\citep{koh2020understanding} can be used to identify contaminated samples.
+% We first find the gradient of the loss function for a given test point and then compute the second derivative of the loss function using the inverse of the Hessian matrix. This helps in sorting training data according to how they affect the test point. 
+This method takes a test sample and iteratively calculates an influence factor for each training sample. This influence factor quantitatively measures how relevant each training sample is to the current test sample. It then sorts the influence factor to provide the most relevant training examples, where humans can then judge whether these training examples meet the contamination criteria.
+However, this approach is impractical because it induces a high computational overhead.
+% \weilin{what's human laboring? I suggest shrink down or remove this method as it's not discussed at all in later sections.}
+
+%This method consists of two steps. First, it calculates the gradient of the loss function for a specific test sample. Then, by leveraging the inverse of the Hessian matrix, it determines the second derivative of the loss function and sorts training data according to how they affect the test sample.
+%Test samples will be significantly impacted by contaminated samples, facilitating contamination detection. However, the approach is impractical for this situation due to its computational overhead.
+
+
+
+% \textbf{LLM judge}. We propose a new contamination detection method, which involves using LLM to compare prompts for contamination detection. We provide a strong LLM with a pair of prompts, one from the training set and one from the test set. Through prompt engineering, we can make the LLM judge whether they belong to the same question. The advantage of this method is that, when the LLM is powerful, decontamination has a very high accuracy rate. The effectiveness of this method highly depends on the quality of the LLM. A high-quality LLM typically implies significant memory consumption and computational costs, and might even require calling the OpenAI API to obtain high-quality judgments. 
+
+% Table \ref{table:detection-algorithms} outlines the access requirements for both training data and the model of the four methods along with their computational costs.  
+
+% $C_1$ represents the cost of string matching, $C_2$ represents the average cost required for dot product queries, $C_3$ represents the average cost to generate embeddings, $C_4$ represents the average cost for one completion, $C_5$ represents the cost for one Influence.
+
+% \begin{table*}[h]
+% \caption{Major contamination detection algorithms. $M$ denotes the size of the training set, and $N$ indicates the size of the test set.}
+% \label{table:detection-algorithms}
+% \begin{tabular}{llll}
+% \toprule
+% Method                      & Access to training data & Access to model & Computational cost \\
+% \midrule
+% N-gram overlap              & yes                     & no              & \(O(MN)\)        \\
+% Embedding similarity search & yes                     & no              & \(O(MN+M+N)\)  \\
+% Decoding matching           & no                      & yes             & \(O(N)\)         \\
+% Influence function          & yes                     & yes             & \(O(M^2+MN)\)      \\
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+
+\begin{table*}
+\centering
+\caption{Contamination detection methods. \( M \) denotes the size of the training set, and \( N \) indicates the size of the test set.}
+\label{table:detection-algorithms}
+\begin{tabular}{llll}
+\toprule
+Method                      &  require access to training data & require access to model & computational cost \\
+\midrule
+N-gram overlap              & yes                     & no              & \(O(MN)\)        \\
+Embedding similarity search & yes                     & no              & \(O(MN+M+N)\)  \\
+Decoding matching           & no                      & yes             & \(O(N)\)         \\
+Influence function          & yes                     & yes             & \(O(M^2+MN)\)      \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+
+% \begin{table}
+% \centering
+% \caption{Major contamination detection algorithms. \( M \) denotes the size of the training set, and \( N \) indicates the size of the test set.}
+% \label{table:detection-algorithms}
+% \small % Reduce font size
+% \setlength\tabcolsep{3.5pt} % Reduce column separation
+% \begin{tabular}{llll}
+% \toprule
+% Method                      &  Data & Model & Cost \\
+% \midrule
+% N-gram overlap              & yes  & no    & \(O(MN)\) \\
+% Embedding similarity search & yes  & no    & \(O(MN+M+N)\) \\
+% Decoding matching           & no   & yes   & \(O(N)\) \\
+% Influence function          & yes  & yes   & \(O(M^2+MN)\) \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+
+
+
+
+% $C_{cpu}$ indicates the time required for an operation on a CPU, and $C_{gpu}$ indicates the time required for an operation on a GPU. $C_{large}$ represents a very large constant.
+
+% \begin{table}[h]
+% \caption{Major contamination detection algorithms}
+% \label{table:detection-algorithms}
+% \begin{tabular}{llll}
+% \toprule
+% Method                      & Access to training data & Access to model & Computational cost \\
+% \midrule
+% N-gram overlap              & yes                     & no              & $C_{1}MN$        \\
+% Embedding similarity search & yes                     & no              & $C_{2}MN+C_{3}(M+N)$  \\
+% Decoding matching           & no                      & yes             & $C_{4}N$         \\
+% Influence function          & yes                     & yes             & $C_{5}MN$      \\
+% LLM judge                   & yes                     & no              & $C_{6}MN$      \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+% \subsection{Evidence of benchmark contamination}
+
+% % \todo{change name "anecdote evidence"}
+
+% % \todo{mention GPT-4, llama-2, PaLM paper admit contamination is common in Big-Bench, MMLU, humaneval, GPT-4 codeforce. and later mention newhope, phi-1}
+
+% % 1. many models claim they are better than GPT-4
+
+% % 2. there are many arguments over cheating (Twitter: phi-ctnl / bad generalization )
+
+% % 3. benchmark author blame cheater (c-eval)
+
+% % 4. intentional cheating is found (new hope / code wizard HumanEval dataset evolve)
+
+% % 5. unintentional contamination is found (contaminated dataset)
+
+% Now, more and more models claim to have outperformed GPT-4. We can also see various lesser-known models ahead of GPT-4 on many leaderboards, some of which have a parameter size of 14B. However, if there are so many powerful models, why do most people still only use GPT-4? This suggests that some datasets might have been contaminated, and people are still using them unintentionally.
+
+% \textbf{Data contamination in GPT-4 and Llama-2}. The technical reports of GPT-4 and Llama-2 acknowledge serious benchmark contamination in their training data. Llama-2 considers a token to be contaminated if it is in any token n-gram longer than 10 tokens in both the evaluation sample and the training set. In llama-2-70B, prompts in the MMLU benchmark, where over 80\% of tokens are contaminated, account for 11\%.~\citep{touvron2023llama} The GPT-4 report ~\citep{openai2023gpt4} mentions that its training data was contaminated by the BIG-bench benchmark.
+
+% \textbf{Unintentional Contamination}. There are two main reasons that lead to unintentional contamination: sampling data from the test set and using synthetic data. MathInstruct~\citep{yue2023mammoth} is compiled from 13 math-related datasets and expands the scope of problem-solving using chain-of-thought (CoT) and program-of-thought (PoT). Due to their lack of differentiation when sampling MATH data, they inadvertently leaked the MMLU benchmark.
+% Given that large models like GPT-4 and Llama-2 have serious benchmark contamination issues, the safety of datasets generated based on them warrants our caution. Many models are trained on synthetic data, such as phi-1.5 and wizardmath. The high scores of these models have sparked discussions among people. Phi-1.5's performance in perplexity was not as good as opt-1.3b, which raised some questions. The fact that WizardCoder's data preparation relies on the HumanEval pass@1 score also sparked discussions about whether this approach is appropriate.
+% In section 4.2, we found that the coding dataset generated by GPT-4 leaked the test set from HumanEval. 
+
+

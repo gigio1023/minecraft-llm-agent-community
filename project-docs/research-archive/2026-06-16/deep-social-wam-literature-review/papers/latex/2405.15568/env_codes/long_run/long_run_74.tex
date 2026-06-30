@@ -1,0 +1,147 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Receive pass and kick ball past moving obstacles and goalie into goal.
+
+    The robot is placed on a large flat ground designed to look like a soccer/football pitch with markings. 
+
+    A teammate robot is positioned 5 meters to the side of the main robot. After a fixed delay at the start of the episode, the teammate robot passes a ball towards a point 3 meters in front of the main robot at a speed of 3 m/s. The pass target point is fixed, but the main robot's initial position has some randomness, so it will need to adjust to align itself with the passed ball.
+
+    3 cylindrical obstacles of 0.5 meter radius and 1 meter height are placed at random positions 3 to 8 meters in front of the robot's initial position. The obstacles are colored to resemble soccer players and move randomly back and forth over a 2 meter range at speeds between 0.5 and 1.5 m/s. The obstacles do not actively chase the ball but will block it if it comes near them.
+
+    A goal area 5 meters wide and 2 meters deep is placed 10 meters in front of the robot's initial position, centered along the front line. 
+
+    A goalie obstacle 1 meter wide, 0.5 meters deep, and 1.5 meters tall moves side to side across the goal line at a speed of 1.5 m/s, tracking the ball when it is within 3 meters. The goalie is colored differently than the field obstacles.
+
+    The task is for the main robot to receive the teammate's pass and then kick the moving ball past the field obstacles and goalie to score a goal, without touching any of the obstacles.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.ground_size = [100.0, 100.0, 0.1]
+        self.ground_position = [0.0, 0.0, 0.0]
+        self.ground_id = self.create_box(mass=0.0, half_extents=[self.ground_size[0] / 2, self.ground_size[1] / 2, self.ground_size[2] / 2], position=self.ground_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.ground_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.ball_radius = 0.5
+        self.ball_position_init = [0.0, 0.0, self.ground_size[2] / 2 + self.ball_radius]
+        self.ball_id = self.create_sphere(mass=1.0, radius=self.ball_radius, position=self.ball_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.num_obstacles = 5
+        self.obstacle_radius = 0.5
+        self.obstacle_height = 1.0
+        self.obstacle_ids = []
+        self.obstacle_positions = []
+        for _ in range(self.num_obstacles):
+            position = [np.random.uniform(10.0, 50.0), np.random.uniform(-25.0, 25.0), self.ground_size[2] / 2 + self.obstacle_height / 2]
+            obstacle_id = self.create_cylinder(mass=0.0, radius=self.obstacle_radius, height=self.obstacle_height, position=position, color=[0.0, 0.0, 1.0, 1.0])
+            self.obstacle_ids.append(obstacle_id)
+            self.obstacle_positions.append(position)
+        self.goal_width = 10.0
+        self.goal_depth = 2.0
+        self.goal_position = [50.0, 0.0, self.ground_size[2] / 2]
+        self.goal_id = self.create_box(mass=0.0, half_extents=[self.goal_depth / 2, self.goal_width / 2, 0.1], position=self.goal_position, color=[1.0, 1.0, 0.0, 0.5])
+        self.goalie_width = 1.0
+        self.goalie_depth = 0.5
+        self.goalie_height = 1.5
+        self.goalie_position_init = [self.goal_position[0] - self.goal_depth / 2 - self.goalie_depth / 2, 0.0, self.ground_size[2] / 2 + self.goalie_height / 2]
+        self.goalie_id = self.create_box(mass=0.0, half_extents=[self.goalie_depth / 2, self.goalie_width / 2, self.goalie_height / 2], position=self.goalie_position_init, color=[0.0, 1.0, 1.0, 1.0])
+        self.robot_position_init = [self.ball_position_init[0] - 1.0, 0.0, self.ground_size[2] / 2 + self.robot.links['base'].position_init[2]]
+        self.robot_orientation_init = self._p.getQuaternionFromEuler([0.0, 0.0, 0.0])
+        self.ball_velocity_threshold = 0.1
+        self.max_steps = 1000
+        self.grace_period_steps = 10
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_cylinder(self, mass, radius, height, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, height=height)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_object_velocity(self, object_id):
+        return np.asarray(self._p.getBaseVelocity(object_id)[0])
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.ball_id, self.ball_position_init, [0.0, 0.0, 0.0, 1.0])
+        self._p.resetBaseVelocity(self.ball_id, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot_orientation_init)
+        for i in range(self.num_obstacles):
+            self._p.resetBasePositionAndOrientation(self.obstacle_ids[i], self.obstacle_positions[i], [0.0, 0.0, 0.0, 1.0])
+        self.steps = 0
+        return observation
+
+    def step(self, action):
+        self.ball_position = self.get_object_position(self.ball_id)
+        self.ball_velocity = self.get_object_velocity(self.ball_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.steps += 1
+        goalie_position = self.get_object_position(self.goalie_id)
+        goalie_velocity = np.array([0.0, np.sin(self.steps * 0.1) * 1.0, 0.0])
+        self._p.resetBasePositionAndOrientation(self.goalie_id, goalie_position + goalie_velocity * self.dt, [0.0, 0.0, 0.0, 1.0])
+        for i in range(self.num_obstacles):
+            obstacle_position = self.get_object_position(self.obstacle_ids[i])
+            obstacle_velocity = np.random.uniform(low=-1.0, high=1.0, size=3)
+            obstacle_velocity[2] = 0.0
+            obstacle_velocity /= np.linalg.norm(obstacle_velocity)
+            obstacle_velocity *= np.random.uniform(low=0.5, high=2.0)
+            new_obstacle_position = obstacle_position + obstacle_velocity * self.dt
+            new_obstacle_position[0] = np.clip(new_obstacle_position[0], 10.0, 50.0)
+            new_obstacle_position[1] = np.clip(new_obstacle_position[1], -25.0, 25.0)
+            self._p.resetBasePositionAndOrientation(self.obstacle_ids[i], new_obstacle_position, [0.0, 0.0, 0.0, 1.0])
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_ball_position = self.get_object_position(self.ball_id)
+        new_ball_velocity = self.get_object_velocity(self.ball_id)
+        kick_velocity = np.linalg.norm(new_ball_velocity) if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.ball_id)) > 0 else 0.0
+        goal_distance = np.linalg.norm(new_ball_position[:2] - np.array(self.goal_position)[:2])
+        obstacle_collision_penalty = 0.0
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.ball_id, bodyB=obstacle_id)) > 0:
+                obstacle_collision_penalty = -1.0
+                break
+        robot_collision_penalty = 0.0
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0:
+                robot_collision_penalty = -1.0
+                break
+        goalie_collision_penalty = -1.0 if len(self._p.getContactPoints(bodyA=self.ball_id, bodyB=self.goalie_id)) > 0 else 0.0
+        goal_scored = 10.0 if self.goal_position[0] - self.goal_depth / 2 < new_ball_position[0] < self.goal_position[0] + self.goal_depth / 2 and np.abs(new_ball_position[1]) < self.goal_width / 2 else 0.0
+        return {'kick_velocity': kick_velocity, 'goal_distance': -goal_distance / 10.0, 'obstacle_collision_penalty': obstacle_collision_penalty, 'robot_collision_penalty': robot_collision_penalty, 'goalie_collision_penalty': goalie_collision_penalty, 'goal_scored': goal_scored}
+
+    def get_terminated(self, action):
+        ball_stopped = self.steps > self.grace_period_steps and np.linalg.norm(self.ball_velocity) < self.ball_velocity_threshold
+        obstacle_collision = False
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.ball_id, bodyB=obstacle_id)) > 0 or len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0:
+                obstacle_collision = True
+                break
+        goalie_collision = len(self._p.getContactPoints(bodyA=self.ball_id, bodyB=self.goalie_id)) > 0
+        ball_out_of_bounds = np.abs(self.ball_position[0]) > 50.0 or np.abs(self.ball_position[1]) > 50.0
+        time_limit_reached = self.steps >= self.max_steps
+        return ball_stopped or obstacle_collision or goalie_collision or ball_out_of_bounds or time_limit_reached
+
+    def get_success(self):
+        ball_in_goal = self.goal_position[0] - self.goal_depth / 2 < self.ball_position[0] < self.goal_position[0] + self.goal_depth / 2 and np.abs(self.ball_position[1]) < self.goal_width / 2
+        no_obstacle_collision = True
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.ball_id, bodyB=obstacle_id)) > 0:
+                no_obstacle_collision = False
+                break
+        no_goalie_collision = len(self._p.getContactPoints(bodyA=self.ball_id, bodyB=self.goalie_id)) == 0
+        return ball_in_goal and no_obstacle_collision and no_goalie_collision
+\end{lstlisting}

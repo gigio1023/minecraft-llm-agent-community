@@ -1,0 +1,135 @@
+\section{Detailed experimental setup}\label{app: problem settings}
+
+\paragraph*{Hyperparameters for \our{}. }Unless otherwise stated, we adopt the parameters in \cref{tab: reevo-params} for \our{} runs. During initialization, the LLM temperature is added by 0.3 to diversify the initial population.
+
+\paragraph*{Heuristic generation pipeline. }
+We perform 3 \our{} runs for each COP setting. Unless otherwise stated, the heuristic with the best validation performance is selected for final testing on 64 held-out instances.
+
+\paragraph*{Cost and hardware. }
+When the hardware permits, heuristics from the same generation are generated, reflected upon, and evaluated in parallel. The duration of a single \our{} run can range from approximately two minutes to hours, depending on the evaluation runtime and the hardware used. Each run costs about \$0.06 when using GPT3.5 Turbo. When conducting runtime comparisons, we employ a single core of an AMD EPYC 7742 CPU and an NVIDIA GeForce RTX 3090 GPU.
+
+\begin{table}[h]
+    \small
+    \caption{Parameters of \our{}.}
+    % \resizebox{\textwidth}{!}{
+    \begin{tabular}{l|l}
+    \toprule
+    Parameter & Value \\ \midrule
+    LLM (generator and reflector)& gpt-3.5-turbo \\
+    LLM temperature (generator and reflector) & 1 \\
+    Population size & 10 \\
+    Number of initial generation & 30 \\
+    Maximum number of evaluations & 100 \\
+    Crossover rate & 1 \\
+    Mutation rate & 0.5 \\
+    \bottomrule
+    \end{tabular}
+    \label{tab: reevo-params}
+\end{table}
+
+
+\subsection{Penalty heuristics for Guided Local Search}
+
+Guided Local Search (GLS) explores solution space through local search operations under the guidance of heuristics. We aim to use \our{} to find the most effective heuristics to enhance GLS. In our experimental setup, we employed a variation of the classical GLS algorithm \cite{Voudouris_Tsang_1999} that incorporated perturbation phases \cite{arnold2019_KGLS_VRP}, wherein edges with higher heuristic values will be prioritized for penalization. In the training phase, we evaluate each heuristic with TSP200 using 1200 GLS iterations. For generating results in \cref{tab: main-exp-gls}, we use the parameters in \cref{tab: gls parameters}. The iterations stop when reaching the predefined threshold or when the optimality gap is reduced to zero.
+
+
+\begin{table}[]
+    \small
+    \centering
+    \caption{GLS parameters used for the evaluations in \cref{tab: main-exp-gls}.}
+    \begin{tabular}{c|ccc}
+    \toprule
+        Problem & Perturbation moves & Number of iterations & Scale parameter $\lambda$ \\
+        \midrule
+         TSP20  &  5   & 73  &  \multirow{4}{*}{0.1}   \\
+         TSP50  &  30  & 175 \\
+         TSP100 &  40  & 1800 \\
+         TSP200 &  40  & 800  \\
+         \bottomrule
+    \end{tabular}
+    \label{tab: gls parameters}
+\end{table}
+
+\subsection{Heuristic measures for Ant Colony Optimization}
+Ant Colony Optimization is an evolutionary algorithm that interleaves solution samplings with the update of pheromone trails. Stochastic solution samplings are biased toward more promising solution space by heuristics, and \our{} searches for the best of such heuristics. For more details, please refer to \cite{ye2023deepaco}.
+
+\cref{tab: aco parameters} presents the ACO parameters used for heuristic evaluations during LHH evolution. They are adjusted to maximize ACO performance while ensuring efficient evaluations. Instance generations and ACO implementations follow \citet{ye2023deepaco}. To conduct tests in \cref{fig: aco-evolution-curves}, we increase the number of iterations to ensure full convergence.
+
+\begin{table}[]
+    \small
+    \centering
+    \caption{ACO parameters used for heuristic evaluations during training.}
+    \begin{tabular}{c|cc}
+    \toprule
+        Problem &  Population size &  Number of iterations \\
+        \midrule
+         TSP &   30   &  100   \\
+         CVRP &  30    &  100    \\
+         OP &    20  &   50  \\
+         MKP &   10   &  50   \\
+         BPP &    20  &   15  \\
+         \bottomrule
+    \end{tabular}
+    \label{tab: aco parameters}
+\end{table}
+
+\subsection{Genetic operators for Electronic Design Automation}
+
+Here we briefly introduce the expert-design GA for DPP. Further details can be found in \cite[Appendix B]{kim2023devformer}.
+
+The GA designed by \citet{kim2023devformer} is utilized as an expert policy to collect expert guiding labels for imitation learning. The GA is a widely used search heuristic method for the Decoupling Capacitor Placement Problem (DPP), which aims to find the optimal placement of a given number of decoupling capacitors (decaps) on a Power Distribution Network (PDN) with a probing port and 0-15 keep-out regions to best suppress the impedance of the probing port.
+
+Key aspects of the designed GA include:
+\begin{itemize}
+    \item \textbf{Encoding and initialization.} The GA generates an initial population randomly, and each solution consists of a set of numbers representing decap locations on the PDN. The population size is fixed to 20, and each solution is evaluated and sorted based on its objective value.
+    \item \textbf{Elitism.} After the initial population is formulated, the top-performing solutions (elite population) are kept for the next generation. The size of the elite population is predefined as 4.
+    \item \textbf{Selection. }The better half of the population is selected for crossover.
+    \item \textbf{Crossover.} This process generates new population candidates by dividing each solution from the selected population in half and performing random crossover.
+    \item \textbf{Mutation.} After crossover, solutions with overlapping numbers are replaced with random numbers while avoiding locations of the probing port and keep-out regions.
+\end{itemize}
+
+In this work, we sequentially optimize the crossover and mutation operators using \our{}. When optimizing crossover, all other components of the GA pipeline remain identical to the expert-designed one. When optimizing mutation, we additionally set the crossover operator to the best one previously generated by \our{}.
+
+During training, we evaluate \( F \) on three training instances randomly generated following \cite[Appendix A.5]{kim2023devformer}. The evaluation on each instance runs 10 GA iterations and returns the objective value of the best-performing solution. For the final test in \cref{fig:dpp-fig-tab}, we utilize the same test dataset as in \cite{kim2023devformer}.
+
+
+
+\subsection{Attention reshaping for Neural Combinatorial Optimization}\label{app: attention reshaping}
+
+
+For autoregressive NCO solvers, e.g. POMO \cite{kwon2020pomo} and LEHD \cite{luo2023nco_heavy_decoder}, the last decoder layer outputs the logits of the next node to visit. Then, the attention-reshaping heuristic values are added to the logits before masking, logit clipping, and softmax operation.
+
+For the autoregressive NCO models with a heavy encoder and a light decoder, the last decoder layer computes logits using \cite{kool2019attention} 
+\begin{equation}
+	u_{(c)j} = \begin{cases}
+		C \cdot \tanh \left(\frac{\mathbf{q}_{(c)}^T \mathbf{k}_j}{\sqrt{d_{\text{k}}}}\right) & \text{if } j \neq \pi_{t'} \quad \forall t' < t \\
+        -\infty & \text{otherwise.}
+    \end{cases}
+\end{equation}
+Here, \( u_{(c)j} \) is the compatibility between current context and node \(j\), \( C \) a constant for logit clipping, \( \mathbf{q}_{(c)} \) the query embedding of the current context, \( \mathbf{k}_j \) the key embedding of node \( j \), and \(d_{\text{k}}\) the query/key dimensionality. For each node \( j \) already visited, i.e. \( j = \pi_{t'}, \exists t' < t \), \( u_{(c)j} \) is masked.
+
+We reshape the attention scores by using
+\begin{equation}
+	u_{(c)j} = \begin{cases}
+		C \cdot \tanh \left(\frac{\mathbf{q}_{(c)}^T \mathbf{k}_j + h_{(c)j}}{\sqrt{d_{\text{k}}}}\right) & \text{if } j \neq \pi_{t'} \quad \forall t' < t \\
+        -\infty & \text{otherwise.}
+    \end{cases}
+\end{equation}
+\( h_{(c)j} \) is computed via attention-reshaping heuristics. In practice, for TSP and CVRP, \( h_{(c)j} = \mathbf{H}_{c, j}\), where \( \mathbf{H} \) is the heuristic matrix and \( c \) is simplified to the current node.
+
+
+For the autoregressive NCO models with a light encoder and a heavy decoder \cite{luo2023nco_heavy_decoder}, or only a decoder \cite{drakulic2023bqnco}, the last decoder layer computes logits using:
+\begin{equation}
+    u_i = W_o \mathbf{h}_i,
+\end{equation}
+where \( W_o \) is a learnable matrix at the output layer and node \( i \) is among the available nodes. We reshape the logits with
+
+\begin{equation}
+    u_i = W_o \mathbf{h}_i + \mathbf{H}_{c, i},
+\end{equation}
+where node \( c \) is the current node.
+
+% For more details, we refer the readers to \cite{wang2024distance_aware_attention_reshaping}.
+
+
+For evaluations in \cref{tab: attention-reshaping exp}, we generalize the models trained on TSP100 and CVRP100 to larger instances with 200, 500, and 1000 nodes. For TSP, we apply the same \our{}-generated heuristic across all sizes, whereas for the CVRP, we use distinct heuristics for each size due to the observed variations in desirable heuristics.

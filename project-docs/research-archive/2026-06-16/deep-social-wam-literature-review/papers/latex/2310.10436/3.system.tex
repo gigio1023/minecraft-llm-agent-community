@@ -1,0 +1,105 @@
+\section{Framework Overview}\label{sec::system}
+
+In this section, we present the overall framework of the macroeconomic simulation. As illustrated in Figure \ref{fig:framework}, it follows the well-acknowledged simulation frameworks and provides an environment driven by EconAgent. The simulation encompasses four primary components: labor, consumption, financial markets, and government taxation. We simulate the two most critical decisions individuals make in real life: work and consumption~\cite{gatti2011macroeconomics,wolf2013multi,dawid2018agent}, which subsequently influence the fiscal revenues of the government~\cite{zheng2022ai,trott2021building,dawid2018agent} and impact the dynamics of labor and consumption markets~\cite{lengnick2013agent,deissenberg2008eurace,dawid2012eurace}. Accordingly, banks adjust interest rates based on market inflation or deflation~\cite{wolf2013multi,dawid2018agent}. 
+
+
+\begin{figure*}[t]
+\centering
+    \includegraphics[width=0.8\linewidth]{figs/paper.pdf}
+\caption{The illustration of our EconAgent~(left) and simulation environment~(right).}
+\label{fig:framework}
+\end{figure*}
+
+
+
+
+
+\subsection{Agent Decisions}
+Labor supply and consumption are necessary agent~(household) decisions in macroeconomic simulations. In our framework, each simulation step indicates one month, in which agent $i$ decides,
+\begin{itemize}[leftmargin=*]
+  
+  \item whether to work $l_i\sim Bernoulli(p_i^w)$, where $p_i^w$ is the work propensity. If they decide to work~($l_i=1$), they receive a monthly wage as the income, which varies among agents. Each agent is initialized with an hourly wage $w_i$ following the Pareto distribution~\cite{zheng2022ai}, and the monthly wage $v_i$ is calculated by multiplying $168$ hours~(21 working days at 8 hours/day~\cite{lengnick2013agent}). Those who abstain from work~($l_i=0$) have an income of zero.
+  \item the consumption propensity $p_i^c$, indicating the proportion of their wealth (including their current savings and income in this month) they wish to spend for essential goods.
+
+\end{itemize}
+As the first challenge, simulating heterogeneous agents' decisions is vital for the emergence of macroeconomic phenomena. Moreover, each agent is influenced by multifaceted economic factors, such as the expected income, the tax paid, \textit{etc}. However, conventional simulations typically model a limited number of factors via predetermined equations~\cite{lengnick2013agent,gatti2011macroeconomics,wolf2013multi}. These models lack of flexibility to simulate diverse decision-making mechanisms and assume one or a few representative rules~\cite{axtell2022agent}. 
+
+\subsection{Government Taxation}
+The government assumes the responsibility of taxation and provision of public services in society, as well as fiscal redistribution to ensure social equity. Taxes are collected from all the agents' income\footnote{We only consider income tax in this work and leave other taxes for future work, such as value-added tax.}. The progressive tax for income $z_i$ is calculated as follows,
+\begin{align}
+    T(z_i) &= \sum_{k=1}^{B} \tau_{k}\left(\left(b_{k+1}-b_{k}\right) \mathbf{1}\left[z_i>b_{k+1}\right]\right. \nonumber \\
+    &\left.+\left(z_i-b_{k}\right) \mathbf{1}\left[b_{k}<z_i \leq b_{k+1}\right]\right),
+\end{align}
+where $b_k$ is the $k$-th tax bracket, $\tau_k$ is corresponding tax rate, and $\mathbf{1}[\cdot]$ is indicator function. The tax brackets and rates are set as the 2018 U.S. Federal tax schedule.
+
+The tax revenue is then evenly redistributed among all the agents. Therefore, the post-tax income is
+\begin{equation}
+    \hat{z}_i = z_i - T(z_i) + z^r = z_i - T(z_i) + \frac{1}{N}\sum_{j=1}^N T(z_j),
+\end{equation}
+where $z^r$ indicates the redistribution. The individual savings for the agent are then updated as follows,
+\begin{equation}
+    s_i \leftarrow s_i + \hat{z}_i
+\end{equation}
+
+\subsection{Productivity and Consumption}
+Incorporating agent decisions and government taxation, we simulate labor and consumption market dynamics based on economic principles. First, working agents contribute 168 hours of productivity monthly, translating to the production of essential goods\footnote{Note that we leave the simulation of firms as future work.}. The inventory of goods $G$ is then updated as,
+\begin{equation}
+    G \leftarrow G + S = G + \sum_{j=1}^N l_j\times 168\times A,
+\end{equation}
+where $S$ denotes the production volume from agents' labor supply, and $A$ is a universal productivity.
+As for the consumption, the total demand of goods is,
+\begin{equation}
+    D = \sum_{j=1}^N d_j = \sum_{j=1}^N \frac{c_j}{P} = \sum_{j=1}^N \frac{p_j^c s_j}{P},
+\end{equation}
+where $d_j$ is the intended demand of agent $j$, $c_j$ is the intended consumption, $s_j$ is current savings, and $P$ is the price of essential goods. Furthermore, both labor and consumption markets evolve based on the imbalance between supply and demand. Specifically, the imbalance is defined as,
+\begin{equation}
+    \Bar{\varphi} = \frac{D - G}{\max(D, G)},
+\end{equation}
+When the essential goods are in shortage, \textit{i.e.}, the supply can not meet the demand, the worker's wage should be increased to stimulate production. Due to the rise in labor costs for firms, they will also increase the goods price to ensure a certain profit margin~\cite{lengnick2013agent,dawid2018agent,wolf2013multi}. The hourly wage is adjusted as follows,
+\begin{equation}
+    w_i \leftarrow w_i (1 + \varphi_i), \varphi_i \sim sign(\Bar{\varphi}) U(0, \alpha_w\vert\Bar{\varphi}\vert),
+\end{equation}
+and the price is adjusted as follows,
+\begin{equation}
+    P \leftarrow P (1 + \varphi_P), \varphi_P \sim sign(\Bar{\varphi})U(0, \alpha_P\vert\Bar{\varphi}\vert),
+\end{equation}
+where $\alpha_w$ and $\alpha_P$ are the maximum rate of change when adjusting the wage and price, respectively.
+We also simulate the dynamics of goods consumption. Specifically, an agent $j$ is randomly selected to consume essential goods, and real consumption goods and money are limited by current inventory of goods,
+\begin{equation}
+    \hat{d}_j = \min(d_j, G), \hat{c}_j = \hat{d}_j\times P
+\end{equation}
+which means the demand is met if, and only if, there is a sufficient supply. The inventory of total goods also decreases,
+\begin{equation}
+    G \leftarrow G - \hat{d}_j.
+\end{equation}
+The process continues until every agent has consumed goods once.
+
+
+
+\subsection{Financial Market}
+Annually, the savings of each agent increase based on the interest rate set by the bank,
+\begin{equation}
+    s_i \leftarrow s_i\times (1 + r).
+\end{equation}
+Furthermore, in the first month of each year, the bank adjusts the interest rate based on the inflation in the consumption market and the unemployment rate in the labor market. Specifically, we adopt the widely-used Taylor rule to set the interest rate~\cite{wolf2013multi,dawid2018agent},
+\begin{equation}
+    r = \max(r^n + \pi^t + \alpha^\pi(\pi - \pi^t) + \alpha^u(u^n - u), 0),
+\end{equation}
+where $r^n$ and $u^n$ indicate the natural interest rate and unemployment rate, respectively. Besides, $\pi^t$ is the target inflation rate. The interest rate is adjusted adaptively according to annual inflation rate $\pi$ and unemployment rate $u$, where $\alpha^\pi$ and $\alpha^u$ denote inflation and unemployment adaptation coefficients, respectively. We define the inflation and unemployment rate as follows,
+\begin{equation}
+\label{def-indicator}
+    \pi = \frac{\Bar{P}_n - \Bar{P}_{n-1}}{\Bar{P}_{n-1}}, u = \frac{\sum_{m=1}^{12}\sum_{j=1}^N (1-l_j)}{12 N},
+\end{equation}
+where $\Bar{P}_n$ is the average goods price over the $n$-th year, and $m$ denotes the $m$-th month.
+
+When considering the dynamics of labor, consumption, and financial markets, the influence of these macroeconomic trends on agent decision-making is also seldom considered, raising the second challenge. 
+
+
+
+
+
+
+
+
+
+

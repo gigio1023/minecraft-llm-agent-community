@@ -1,0 +1,40 @@
+\section{Contractor Data}
+\label{appendix:contractor_data}
+
+\subsection{Recording Contractor Play}
+Our contractors use a custom Minecraft recorder that we built that records their actions and game video feeds as they play. The recorder is implemented using the MCP-Reborn (\href{https://github.com/Hexeption/MCP-Reborn}{github.com/Hexeption/MCP-Reborn}) modding package. To ensure that the recorder environment is as close as possible to the Minecraft environment used for RL rollouts and evaluations (Appendix~\ref{appendix:minecraft_environment}), we use the same underlying game engine for both. The recorder is a Java app that runs in a window mode, with constant resolution of 1280x760. Brightness is set to 0 (the "gloomy" setting in Minecraft), which is the default setting. Other graphics settings (field of view, GUI scale) are fixed to the values used in the Minecraft environment (\ref{appendix:minecraft_env_observation_space}); we explicitly prevented users from changing graphics settings.
+Unlike the environment, the recorder allows all keyboard key presses and continuous (as opposed to binned) mouse actions. On every game step (or ``tick'') the frame buffer used to display the game window is downsized to 640x360 and written into a video file. In-game actions are recorded in a separate JSONL file (a text file where each line is a JSON-formatted string). All recordings are chunked into 5 minute clips: after each 5 minute segment of contractor game play the recorder automatically uploads the video file, the JSONL file with actions, as well as a Minecraft state file. To ensure that contractors cannot corrupt each other's data, we provided every contractor with an individual cloud bucket, as well as with credentials giving write access only to that bucket. Credentials also included adjective-adjective-noun names (e.g.\ grumpy-amethyst-chipmunk), generated with the \texttt{namegenerator} python package to ensure contractor anonymity when we publish the data.
+
+\subsection{Contractor Contract}
+\label{appendix:contractor_contract}
+
+
+We recruited contractors by posting the following offer on the UpWork freelancing platform. 
+
+\begin{displayquote}
+``We are collecting data for training AI models in Minecraft. You'll need to install java, download the modified version of Minecraft (that collects and uploads your play data), and play Minecraft survival mode! Paid per hour of gameplay. Prior experience in Minecraft not necessary. We do not collect any data that is unrelated to Minecraft from your computer.''
+\end{displayquote}
+
+We had the applications open for a day, and then randomly selected 10 applicants for the first round of contractors. Later in the project, as we needed more data and as some contractors asked to terminate their contracts, we added more applicants from the original pool as well as referrals from the currently working contractors.
+The contractors were paid \$20 per hour (minus Upwork platform fees and applicable taxes). All of the results presented in this paper are based on about 4,500 hours of data (including data recorded to gather statistics of human play that was not used for training), which cost us around \$90,000. Over the course of the project, we collected some data we did not use due to bugs in the recorder and for some ideas we ultimately did not pursue. In total, we spent about \$160k for contractor compensation over the course of the project. However, as we discuss in Sec.~\ref{section:idm_data_scaling}, we could likely obtain most of our results with an IDM trained using only \$2000 worth of data, i.e. the foundation VPT model, BC fine-tuning to the \texttt{earlygame\_keyword} dataset, and the RL fine-tuning results. Collecting the \texttt{contractor\_house} dataset cost about \$8000. Because we used the IDM trained on about 2000 hours of contractor data, the actual cost of contractor data for those results was around \$40,000.
+
+In early stages of the project, we were planning to use contractor data solely for the purpose of training the IDM.
+As such, no specific tasks were given, other than ``play the survival mode of Minecraft like you normally would.''
+Later in the project, we requested that contractors perform specific tasks in Minecraft, such as:
+\begin{itemize}
+    \item Collect as many units of wood as possible, using only wooden or stone tools (\texttt{treechop})
+    \item Start a new world every 30 minutes of game play
+    \item Build a basic house in 10 minutes using only dirt, wood, sand, and either wooden or stone tools (\texttt{contractor\_house}, more details below in Appendix~\ref{appendix:contractor_house_data}).
+    \item Starting from a new world and an empty inventory, find resources and craft a diamond pickaxe in 20 minutes (\texttt{obtain\_diamond\_pickaxe}). This dataset was used to obtain statistics for how long it takes humans on average to complete this task (and the subtasks required to complete it) when obtaining a diamond pickaxe is their goal.
+\end{itemize}
+
+Since we only recorded in-game events and videos, the data does not include personally identifiable information. That being said, the contractors could theoretically use Minecraft's open-world property to generate personally identifiable information and/or offensive content (e.g.\ by using Minecraft blocks to write their name or offensive messages, then finding a spot from which the message would be visible). In practice, we have not seen any attempts to do so in the contractor videos that we watched. Of course, 
+we train our BC models on videos from the internet of people playing Minecraft, and if such behavior is in those videos our model could also potentially learn it, although we expect such behavior is rare enough that our model would not be likely to reproduce it.
+
+\subsection{Data for the Inverse Dynamics Model.}
+Since the IDM's task is to infer actions given the video, any labelled data is appropriate for IDM training. In practice, 
+we included general gameplay as well as the \texttt{treechop} task data described in the previous section, which amounted to a total of 1962 hours. Due to collecting datasets like \texttt{contractor\_house} only at late stages of the project, they were not included in IDM training.
+
+\subsection{contractor\_house.}
+\label{appendix:contractor_house_data}
+The \texttt{contractor\_house} contains about 420 hours of data. We asked contractors to  build a basic house in 10 minutes, using only basic dirt, wood, and sand, blocks. Each trajectory starts in a newly generated world and a timer forcibly ends a trajectory after a 20 minute time limit. For this task, many contractors chose to begin their trajectories by crafting basic tools and building blocks, specifically it was common for the first 2 minutes to be spent crafting a wooden pickaxe and then mining stone for an assortment of stone tools before gathering more building blocks and beginning to create their structure.

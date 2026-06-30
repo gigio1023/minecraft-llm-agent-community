@@ -1,0 +1,169 @@
+\section{Introduction}
+
+Frequently, tasks in machine learning can be expressed as the problem of
+optimizing an objective function $f(\theta)$ defined over some domain
+$\theta\in\Theta$. The goal in this case is to find the minimizer
+$\theta^* =
+\argmin_{\theta\in\Theta}f(\theta)$. While any method capable of minimizing
+this objective function can be applied, the standard approach for
+differentiable functions is some form of gradient descent, resulting in a
+sequence of updates
+\begin{align*}
+  \theta_{t+1} = \theta_t - \alpha_t \nabla f(\theta_t)
+  \,.
+\end{align*}
+The performance of vanilla gradient descent, however, is hampered by the fact
+that it \emph{only} makes use of gradients and ignores second-order
+information. Classical optimization techniques correct this behavior by
+rescaling the gradient step using curvature information, typically via the
+Hessian matrix of
+second-order partial derivatives---although other choices such as the
+generalized Gauss-Newton matrix or Fisher information matrix are possible.
+
+Much of the modern work in optimization is based around designing update rules
+tailored to specific classes of problems, with the types of problems of
+interest differing between different research communities.  For example, in the
+deep learning community we have seen a proliferation of optimization methods
+specialized for high-dimensional, non-convex optimization problems. These
+include momentum \citep{nesterov:1983,tseng:1998}, Rprop \citep{riedmiller:1992},
+Adagrad \citep{duchi:2011}, RMSprop \citep{tieleman:2012}, and ADAM \citep{kingma:2015}. More
+focused methods can also be applied when more structure of the optimization
+problem is known
+\citep{martens:2015}. In contrast, communities who focus on sparsity tend to
+favor very different approaches~\citep{donoho:2006,bach:2012}. This is even
+more the case for combinatorial optimization for which relaxations are often
+the norm \citep{nemhauser:1988}.
+
+\begin{wrapfigure}[18]{r}{0.5\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/optimizer-optimizee}
+\caption{The optimizer (left) is provided with performance of the optimizee
+(right) and proposes updates to increase the optimizee's performance.
+\citep[photos:][]{neuron1,neuron2}}
+\label{fig:optimizee}
+\end{wrapfigure}
+
+This industry of optimizer design allows different communities to create
+optimization methods which exploit structure in their problems of interest at
+the expense of potentially poor performance on problems outside of that scope.
+Moreover the \emph{No Free Lunch Theorems for Optimization}
+\citep{wolpert:1997} show that in the setting of combinatorial optimization, no
+algorithm is able to do better than a random strategy in expectation.  This
+suggests that specialization to a subclass of problems is in fact the
+\emph{only} way that improved performance can be achieved in general.
+
+% In this setting \citeauthor{wolpert:1997} consider
+% combinatorial optimization problems and show that in expectation (over the set
+% of all optimization problems) no algorithm is able to do better than a random
+% strategy. It is only by considering a suitable subset and tailoring the
+% algorithm to that subset is improved performance attainable---in particular
+% this new algorithm \emph{must exhibit worse performance} on problems outside
+% the class.
+
+
+In this work we take a different tack and instead propose to replace hand-designed update rules with a learned update rule, which we call the optimizer
+$g$, specified by its own set of parameters $\phi$. This results in updates to
+the optimizee $f$ of the form
+\begin{equation}
+  \theta_{t+1} = \theta_t + g_t(\nabla f(\theta_t), \phi)
+  \,.
+  \label{eq:meta-update}
+\end{equation}
+A high level view of this process is shown in Figure~\ref{fig:optimizee}.  In
+what follows we will explicitly model the update rule $g$ using a recurrent
+neural network (RNN) which maintains its own state and hence dynamically
+updates as a function of its iterates.
+
+% Given a fixed set of
+% parameters $\phi$ the learning rule $g_t$ will then act like a form of gradient
+% descent and we will refer to this process as \emph{learning by gradient
+% descent}. Here the base learning procedure has the same semantics as are
+% typically used in machine learning, where $f$ may represent an average loss
+% over some supervised dataset.
+
+% The process of learning a learning rule has a long history,
+% generally going under the name of \emph{learning to learn} or \emph{meta-learning}
+% \citep{thrun:1998}.
+% Training $\phi$ results in a gradient-based optimization procedure, so we call
+% this \emph{learning to learn by gradient descent}, and given that we also train
+% $\phi$ using gradient descent we call the full procedure \emph{learning to
+% learn by gradient descent by gradient descent}. This formalism allows us to
+% train the learning mechanism restricted to a suitable set of example functions
+% $f$ and hence tailor the rule to this particular subset.
+
+
+\subsection{Transfer learning and generalization}
+
+The goal of this work is to develop a procedure for constructing a learning
+algorithm which performs well on a particular class of optimization problems.
+Casting algorithm design as a learning problem allows us to specify the class
+of problems we are interested in through example problem instances.  This is in
+contrast to the ordinary approach of characterizing properties of interesting
+problems analytically and using these analytical insights to design learning
+algorithms by hand.
+
+It is informative to consider the meaning of \emph{generalization} in this
+framework.  In ordinary statistical learning we have a particular function of
+interest, whose behavior is constrained through a data set of example function
+evaluations.  In choosing a model we specify a set of inductive biases about
+how we think the function of interest should behave at points we have not
+observed, and generalization corresponds to the capacity to make predictions
+about the behavior of the target function at novel points.
+In our setting the examples are themselves \emph{problem instances}, which
+means generalization corresponds to the ability to transfer knowledge between
+different problems.  This reuse of problem structure is commonly known as
+\emph{transfer learning}, and is often treated as a subject in its own right.
+However, by taking a meta-learning perspective, we can cast the problem of
+transfer learning as one of generalization, which is much better studied in the
+machine learning community.
+
+One of the great success stories of deep-learning is that we can rely on the
+ability of deep networks to generalize to new examples by learning interesting
+sub-structures. In this work we aim to leverage this generalization power, but
+also to lift it from simple supervised learning to the more general setting of
+optimization.
+
+\subsection{A brief history and related work}
+
+The idea of using \emph{learning to learn} or \emph{meta-learning} to acquire
+knowledge or inductive biases has a long history \citep{thrun:1998}. More
+recently, \cite{lake:2016} have argued forcefully for its importance as a
+building block in artificial intelligence. Similarly, \cite{santoro:2016}
+frame multi-task learning as generalization, however unlike our approach they
+directly train a base learner rather than a training algorithm.  In general
+these ideas involve learning which occurs at two different time scales: rapid
+learning within tasks and more gradual, \emph{meta} learning across many
+different tasks.
+
+Perhaps the most general approach to meta-learning is that of
+\cite{schmidhuber:1992, schmidhuber:1993}---building on work from
+\citep{schmidhuber:1987}---which considers networks that are able to modify
+their own weights. Such a system is differentiable end-to-end, allowing both
+the network and the learning algorithm to be trained jointly by gradient
+descent with few restrictions.  However this generality comes at the expense of
+making the learning rules very difficult to train.  Alternatively, the work of
+\cite{schmidhuber:1997} uses the Success Story Algorithm to modify its search
+strategy rather than gradient descent; a similar approach has been recently
+taken in \cite{daniel:2016} which uses reinforcement learning to train a
+controller for selecting step-sizes.
+
+\cite{bengio:1990, bengio:1995} propose to learn updates which avoid
+back-propagation by using simple parametric rules. In relation to the focus of
+this paper the work of \citeauthor{bengio:1990} could be characterized as
+\emph{learning to learn \textbf{without} gradient descent by gradient descent}.
+The work of \cite{runarsson:2000} builds upon this work by replacing the simple
+rule with a neural network.
+
+\cite{cotter:1990}, and later \cite{younger:1999}, also show fixed-weight
+recurrent neural networks can exhibit dynamic behavior without need to modify
+their network weights. Similarly this has been shown in a filtering context
+\citep[e.g.][]{feldkamp:1998}, which is directly related to simple
+multi-timescale optimizers \citep{sutton:1992, schraudolph:1999}.
+
+Finally, the work of \cite{younger:2001} and \cite{hochreiter:2001} connects
+these different threads of research by allowing for the output of
+backpropagation from one network to feed into an additional \emph{learning}
+network, with both networks trained jointly. Our approach to meta-learning
+builds on this work by modifying the network architecture of the optimizer in
+order to scale this approach to larger neural-network optimization problems.
+

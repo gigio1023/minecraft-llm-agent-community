@@ -1,0 +1,88 @@
+\appendix
+\section*{Appendix: Formulations of additional models}
+\label{sec:appendixMoreModels}
+
+In this appendix we give more examples of how published networks can fit in the frame defined by Equation~\ref{eq:gn-functions}.
+
+\subsubsection*{Interaction networks}
+Interaction Networks \citep{battaglia2016interaction,watters2017visual} and the Neural Physics Engine \cite{chang2016compositional} use a full GN but for the absence of the global to update the edge properties:
+\begin{alignat*}{4}
+\phi^e\left(\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}, \globals\right) &\coloneqq f^e\left(\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) &&= \mathrm{NN}_{e}\left([\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}]\right) \\
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &&= \mathrm{NN}_{v}\left([\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals]\right) \\
+\rho^{e\rightarrow v}\left(E'_i\right) &\coloneqq \; &&= \sum_{\{k:\, r_k=i\}} \mathbf{e}'_k \\
+\end{alignat*}
+That work also included an extension to the above formulation which output global, rather than per-node, predictions:
+\begin{alignat*}{4}
+\phi^e\left(\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}, \globals\right) &\coloneqq f^e\left(\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) &&= \mathrm{NN}_{e}\left([\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}]\right) \\
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &&= \mathrm{NN}_{v}\left([\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals]\right) \\
+\phi^u\left(\mathbf{\bar{e}}', \mathbf{\bar{v}}', \globals\right) &\coloneqq f^u\left(\mathbf{\bar{v}}', \globals\right) &&= \mathrm{NN}_{u}\left([\mathbf{\bar{v}}', \globals]\right) \\
+\rho^{v\rightarrow g}\left(V'\right) &\coloneqq \; &&= \sum_i \mathbf{v}'_i
+\end{alignat*}
+
+\subsubsection*{Non-pairwise interactions}
+
+Gated Graph Sequence Neural Networks (GGS-NN) \citep{li2015gated} use a slightly generalized formulation where each edge has an attached type $t_k \in \{1, .., T\}$, and the updates are:
+\begin{alignat*}{3}
+\phi^e\left(\left(\mathbf{e}_k, t_k\right), \mathbf{v}_{r_k}, \mathbf{v}_{s_k}, \globals\right) &\coloneqq f^e\left(\mathbf{e}_k, \mathbf{v}_{s_k}\right) &&= \mathrm{NN}_{e, t_k}\left(\mathbf{v}_{s_k}\right) \\
+%
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i\right) &&= \mathrm{NN}_v\left([\mathbf{\bar{e}}'_i, \mathbf{v}_i]\right) \\
+\rho^{e\rightarrow v}\left(E'_i\right) &\coloneqq \; &&= \sum_{\{k:\, r_k=i\}} \mathbf{e}'_k \\
+\end{alignat*}
+These updates are applied recurrently (the $\mathrm{NN}_v$ is a GRU \citep{cho2014learning}), followed by a global decoder which computes a weighted sum of embedded final node states. Here each $\mathrm{NN}_{e, t_k}$ is a neural network with specific parameters.
+
+CommNet \citep{sukhbaatar2016learning} (in the slightly more general form described by \citep{hoshen2017vain}) uses:
+\begin{alignat*}{3}
+\phi^e\left(\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}, \globals\right) &\coloneqq f^e\left(\mathbf{v}_{s_k}\right) &&= \mathrm{NN}_e \left(\mathbf{v}_{s_k}\right) \\
+%
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i\right) &&= \mathrm{NN}_v \left([\mathbf{\bar{e}}'_i, \mathrm{NN}_{v'}\left(\mathbf{v}_i\right)]\right) \\
+\rho^{e\rightarrow v}\left(E'_i\right) &\coloneqq \; &&= \frac{1}{|E'_i|} \sum_{\{k:\, r_k=i\}} \mathbf{e}'_k \\
+\end{alignat*}
+
+\subsubsection*{Attention-based approaches}
+The various attention-based approaches use a $\phi^e$ which is factored into a scalar pairwise-interaction function which returns the unnormalized attention term, denoted  $\alpha^e\left(\mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) = a'_k$, and a vector-valued non-pairwise term, denoted $\beta^e\left(\mathbf{v}_{s_k}\right) = \mathbf{b}'_k$,
+\begin{alignat*}{4}
+\phi^e\left(\mathbf{e}_k, \mathbf{v}_{r_k}, \mathbf{v}_{s_k}, \globals\right) &\coloneqq f^e\left(\mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) &&= \left( \alpha^e\left(\mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right), \; \beta^e\left(\mathbf{v}_{s_k}\right) \right) &&= (a'_k, \mathbf{b}'_k) &&= \mathbf{e}'_k \\
+\end{alignat*}
+
+The single-headed self-attention (SA) in the Transformer architecture  \citep{vaswani2017attention}, implements the non-local formulation as:
+\begin{alignat*}{4}
+&\phantom{{}={}} \alpha^e\left(\mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) &&= \exp\left(\mathrm{NN}_{\alpha^\mathrm{query}}\left(\mathbf{v}_{r_k}\right)^\intercal \cdot \mathrm{NN}_{\alpha^\mathrm{key}} \left(\mathbf{v}_{s_k}\right)\right) \\
+&\phantom{{}={}} \beta^e\left(\mathbf{v}_{s_k}\right) &&= \mathrm{NN}_\beta \left(\mathbf{v}_{s_k}\right) \\
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\mathbf{\bar{e}}'_i\right) &&= \mathrm{NN}_v \left(\mathbf{\bar{e}}'_i\right)
+\end{alignat*}
+where $\mathrm{NN}_{\alpha^{\mathrm{query}}}$, $\mathrm{NN}_{\alpha^\mathrm{key}}$, and $\mathrm{NN}_{\beta}$ are again neural network functions with different parameters and possibly different architectures.
+They also use a multi-headed version which computes $N_h$ parallel $\mathbf{\bar{e}}'^h_i$ using different $\mathrm{NN}_{\alpha^\mathrm{query}_h}$, $\mathrm{NN}_{\alpha^\mathrm{key}_h}$, $\mathrm{NN}_{\beta_h}$, where $h$ indexes the different parameters. These are passed to $f^v$ and concatenated:
+\begin{alignat*}{4}
+&\quad\ f^v\left(\{\mathbf{\bar{e}}'^h_i\}_{h=1\dots N^h}\right) &&= \mathrm{NN}_v \left([\mathbf{\bar{e}}'^1_i, \dots, \mathbf{\bar{e}}'^{N_h}_i]\right)
+\end{alignat*}
+
+Vertex Attention Interaction Networks \citep{hoshen2017vain} are very similar to single-headed SA, but use Euclidean distance for the attentional similarity metric, with shared parameters across the attention inputs' embeddings, and also use the input node feature in the node update function,
+\begin{alignat*}{4}
+&\phantom{{}={}} \alpha^e\left(\mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) &&= \exp\left(-\Vert\mathrm{NN}_{\alpha}\left(\mathbf{v}_{r_k}\right) - \mathrm{NN}_{\alpha}\left(\mathbf{v}_{s_k}\right)\Vert^2\right) \\
+&\phantom{{}={}} \beta^e\left(\mathbf{v}_{s_k}\right) &&=  \mathrm{NN}_{\beta}\left(\mathbf{v}_{s_k}\right) \\
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\mathbf{\bar{e}}'_i\right) &&= \mathrm{NN}_v \left([\mathbf{\bar{e}}'_i, \mathbf{v}_i]\right)
+\end{alignat*}
+
+Graph Attention Networks \citep{velivckovic2017graph} are also similar to multi-headed SA, but use a neural network as the attentional similarity metric, with shared parameters across the attention inputs' embeddings:
+\begin{alignat*}{4}
+&\phantom{{}={}} \alpha^e\left(\mathbf{v}_{r_k}, \mathbf{v}_{s_k}\right) &&= \exp\left(\mathrm{NN}_{\alpha'}\left([\mathrm{NN}_\alpha\left(\mathbf{v}_{r_k}\right), \mathrm{NN}_\alpha\left(\mathbf{v}_{s_k}\right)\right)\right) \\
+&\phantom{{}={}} \beta^e\left(\mathbf{v}_{s_k}\right) &&=  \mathrm{NN}_\beta\left(\mathbf{v}_{s_k}\right) \\
+\phi^v\left(\mathbf{\bar{e}}'_i, \mathbf{v}_i, \globals\right) &\coloneqq f^v\left(\{\mathbf{\bar{e}}'^h_i\}_{h = 1 \dots N_h}\right) &&= \mathrm{NN}_v\left([\mathbf{\bar{e}}'^1_i, \dots, \mathbf{\bar{e}}'^{N_h}_i]\right)
+\end{alignat*}
+
+Stretching beyond the specific non-local formulation, \cite{shaw2018self} extended multi-headed SA with relative position encodings. ``Relative'' refers to an encoding of the spatial distance between nodes in a sequence or other signal in a metric space. This can be expressed in GN language as an edge attribute $\mathbf{e}_k$, and replacing the $\beta^e\left(\mathbf{v}_{s_k}\right)$ from multi-headed SA above with:
+\begin{alignat*}{4}
+&\phantom{{}={}} \beta^e\left(\mathbf{e}_k, \mathbf{v}_{s_k}\right) &&= \mathrm{NN}_e\left(\mathbf{v}_{s_k}\right) + \mathbf{e}_k
+\end{alignat*}
+
+
+\subsubsection*{Belief Propagation embeddings}
+
+Finally, we briefly summarize how the general ``structure2vec'' algorithm of \cite{dai2016} can fit into our framework. In order to do so, we need to slightly modify our main Equation~\ref{eq:gn-functions}, i.e.:
+\begin{alignat*}{4}
+      \bm{\bar{\epsilon}}_k &= \rho \left(  \{ \mathbf{e}_l \}_{\substack{s_l = r_k \\ r_l \neq s_k}}\right) && \coloneqq  \sum_{\substack{r_l = s_k \\ s_l \neq r_k}} \mathbf{e}_l \\
+    \mathbf{e}'_k &= \phi^e\left(\bm{\bar{\epsilon}}_k \right) &&\coloneqq f(\bm{\bar{\epsilon}}_k) = \mathrm{NN}(\bm{\bar{\epsilon}}_k) \\
+    \mathbf{\bar{e}}'_i &= \rho \left( \{ \mathbf{e}'_k \}_{r_k = i} \right) && \coloneqq \sum_{\{k:\, r_k = i\}}  \mathbf{\mathbf{e}}_k \\
+    \mathbf{v}'_i &= \phi^v\left(\mathbf{\bar{e}}'_i\right) &&\coloneqq f(\mathbf{\bar{e}}_i')  =  \mathrm{NN}(\mathbf{\bar{e}}_i')
+ \end{alignat*}
+Edges' features now takes the meaning of ``message'' between their receiver and sender; note that there is only one set of parameters to learn for both the edges and nodes updates.

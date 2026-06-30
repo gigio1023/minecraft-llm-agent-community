@@ -1,0 +1,57 @@
+\label{sec:intr}
+
+\begin{figure}[ht]
+    \centering
+  \includegraphics[width=0.35\textwidth]{figures/first_page_fig.pdf}
+  \caption{An example of the optimization problem we explore, shown for a multi-hop retrieval LM program. Given some question--answer pairs and a metric, the optimizer proposes new instructions and bootstraps new demonstrations (not pictured) for each stage.
+  }
+  \label{fig:motivation}
+  \vspace{-5mm}
+\end{figure}
+
+Solving complex tasks with Language Models (LMs) often requires applying sophisticated prompting techniques~\citep{wei2022chain,chen2022program} and chaining them together into multi-stage pipelines ~\citep{wu2022ai,dohan2022language,khattab2022demonstrate,beurer2023prompting,yao2023react,schlag2023large}. Such \textit{Language Model (LM) Programs} continue to advance NLP tasks~\citep{pourreza2023din,khattab2024dspy,ridnik2024code} through systematic composition \citep{khattab2021baleen,creswell2022faithful, pan2024autonomous} and tool use~\citep{qin2023toolllm}.  However, LM programs today are commonly designed via ``prompt engineering'': crafting prompts via manual trial and error to coerce a specific LM to operate each step in a specific pipeline. 
+Recent work such as APE \citep{zhou2023large}, OPRO \citep{yang2024large}, and EvoPrompt \citep{guo2024connecting} %
+presents \textit{prompt optimizers}, i.e.,\ algorithms that search over strings to identify high-performing prompts. Unfortunately, the majority of this work does not directly apply to multi-stage LM programs in which we lack gold labels or evaluation metrics for the individual LM calls.
+\citet{khattab2024dspy} study how to express \textit{arbitrary LM pipelines} such that the instructions, demonstrations (input/output examples), and LM weights of each LM call are treated as parameters that can be optimized toward any metric. While the authors present optimizers that can create demonstrations of multi-stage pipelines and use them to optimize prompts, weights, or even both together \cite{soylu2024finetuningpromptoptimizationgreat}, their proposed optimizers cannot tune instructions for multi-prompt pipelines.
+
+
+
+We seek to efficiently optimize prompts in arbitrary LM programs, especially those with multiple stages (Figure~\ref{fig:motivation}) and explore approaches that hold under weak assumptions, consistent with the abstractions from the DSPy programming model~\citep{khattab2024dspy}. In particular, we assume no access to LM weights, log-probabilites, or handwritten metrics or labels for intermediate stages in a chain of LM calls. We require only the LM program itself, a metric to optimize, and a training set of inputs (and, depending on the metric, final outputs). 
+
+
+We formally define the problem of prompt optimization for LM programs and outline the design space by identifying two key challenges. First, the \emph{proposal challenge}: the space of possible prompts is intractably large, and this is exacerbated as the number of modules increase.  Proposing a few high-quality instructions is thus essential. Second, the \emph{credit assignment challenge}: our problem requires jointly optimizing over many distinct variables that parameterize the prompts of all modules. To allocate search effort, we must infer the impact of our configurations for each variable effectively.
+
+We define several strategies to tackle each of these challenges and systematically explore the tradeoffs they present. We find that optimizing bootstrapped few-shot examples is often essential for realizing the greatest performance gains, but that optimizing instructions becomes more essential for tasks with conditional rules. We also find that optimizing both instructions and few-shot examples together generally leads to the best results.
+
+We make three contributions. First, we present a formalization of the problem of optimizing language model programs (\S \ref{sec:problem-statement}) and propose an algorithm design space with three strategies to address the challenge of prompt proposal and three strategies to resolve the issue of credit assignment (\S \ref{sec:design}). Second, we release a benchmark suite for LM program optimizers spanning seven tasks (\S\ref{sec:experiments}). Third, we construct and evaluate a rich subset of possible algorithms for prompt optimization (\S \ref{sec:optimizers}).  Highlighted amongst these algorithms is MIPRO (\underline{M}ulti-prompt \underline{I}nstruction \underline{PR}oposal \underline{O}ptimizer) which outperforms  baseline optimizers on five of seven tasks in our benchmark, by as much as 13\% accuracy improvement.  Using our algorithms, we derive five key lessons for practitioners looking to optimize LM programs (\S \ref{sec:results_and_discussion}).
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

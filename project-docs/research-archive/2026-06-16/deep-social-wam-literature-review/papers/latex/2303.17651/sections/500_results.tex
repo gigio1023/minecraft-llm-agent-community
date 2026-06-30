@@ -1,0 +1,39 @@
+
+\subsection{Metrics}
+\label{subsec:metrics}
+We report three types of metrics:
+\squishlist
+\item Task specific metric: When available, we use automated metrics from prior work (\gsm: \% solve rate; \codeopt: \% programs optimized; Constrained Gen: coverage \%)
+\item Human-pref: In \dialgen, \coderead, \sentxfer, and \acrogen, since no automated metrics are available, we perform a blind human A/B evaluation on a subset of the outputs to select the preferred output.  Additional details are provided in \Cref{sec:abtesting}.
+\item \gptf-pref: In addition to human-pref, we use \gptf as a proxy for human preference following prior work \citep{fu2023gptscore, chiang2023vicuna, koala_blogpost_2023, sun2023principle}, and found high correlation (82\% for \sentxfer, 68\% for \acrogen, and 71\% for \dialgen) with human-pref. 
+For \coderead, we prompt \gptf to calculate fraction of the variables that are appropriately named given the context~(\eg $\texttt{x = []} \rightarrow \texttt{input\_buffer = []}$). 
+Additional details are provided in \Cref{sec:gpt4eval}.
+\squishend
+
+
+
+\input{tables/main_results}
+
+\subsection{Results} 
+\label{sec:results}
+
+\Cref{tab:results} shows our main results:
+
+\niparagraph{\ours consistently improves over base models} across all model sizes, and additionally outperforms the previous state-of-the-art across all tasks. For example, \gptf{}+\ours improves over the base \gptf by 8.7\% (absolute) in Code Optimization, increasing optimization percentage from 27.3\% to 36.0\%. Confidence intervals are provided in \Cref{sec:statistical_tests}. For code-based tasks, we found similar trends when using \codex; those results are included in  \Cref{sec:sota}. 
+
+One of the tasks in which we observe the highest gains compared to the base models is Constrained Generation, where the model is asked to generate a sentence containing up to 30 given concepts. We believe that this task benefits significantly from \ours because there are more opportunities to miss some of the concepts on the first attempt, and thus \ours allows the model to fix these mistakes subsequently. Further, this task has an extremely large number of reasonable outputs, and thus \ours allows to better explore the space of possible outputs.
+
+In preference-based tasks such as Dialogue Response Generation, Sentiment Reversal, and Acronym Generation, \ours leads to especially high gains. 
+For example in \dialgen, \gptf preference score improve by 49.2\% -- from 25.4\% to 74.6\%.
+Similarly, we see remarkable improvements in the other preference-based tasks across all models. 
+
+The modest performance gains in \gsm can be traced back to the inability to accurately identify whether there is any error. In math, errors can be nuanced and sometimes limited to a single line or incorrect operation. Besides, a consistent-looking  reasoning chain can deceive \llms to think that ``everything looks good'' (e.g., \chatgpt feedback for 94\% instances is 'everything looks good'). In \Cref{selfcorrect-math-comparison}, we show that the gains with \ours on \gsm are much bigger~(5\%+) if an external source can identify if the current math answer is incorrect.
+
+
+
+\niparagraph{Improvement is consistent across base \llms sizes}
+Generally, \gptf{}+\ours performs better than \gptt{}+\ours and \chatgpt{}+\ours across all tasks, even in tasks where the initial base results of \gptf were lower than \gptt or \chatgpt. We thus believe that \ours allows stronger models (such as \gptf) to unlock their full potential, even in cases where this potential is not expressed in the standard, single-pass, output generation.
+Comparison to additional strong baselines is provided in \Cref{sec:sota}.
+
+
+

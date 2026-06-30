@@ -1,0 +1,43 @@
+\section{Gradient preprocessing}\label{sec:pre}
+
+One potential challenge in training optimizers is that different input coordinates (i.e. the gradients w.r.t. different
+optimizee parameters) can have very different magnitudes.
+This is indeed the case e.g. when the optimizee is a neural network and different parameters
+correspond to weights in different layers.
+This can make training an optimizer difficult, because neural networks
+naturally disregard small variations in input signals and concentrate on bigger input values.
+
+To this aim we propose to preprocess the optimizer's inputs.
+One solution would be to give the optimizer $\left(\log(|\nabla|),\,\operatorname{sgn}(\nabla)\right)$ as an input, where
+$\nabla$ is the gradient in the current timestep.
+This has a problem that $\log(|\nabla|)$ diverges for $\nabla \rightarrow 0$.
+Therefore, we use the following preprocessing formula 
+\begin{align*}
+    \nabla^k &\rightarrow
+\begin{cases}
+    \left(\frac{\log(|\nabla|)}{p}\,, \operatorname{sgn}(\nabla)\right)& \text{if } |\nabla| \geq e^{-p}\\
+    (-1, e^p \nabla)             & \text{otherwise}
+\end{cases}
+\end{align*}
+where $p>0$ is a parameter controlling how small gradients are disregarded (we use $p=10$ in all our experiments).
+
+We noticed that just rescaling all inputs by an appropriate constant instead also works fine, but
+the proposed preprocessing seems to be more robust and gives slightly better results on some problems.
+
+
+
+%Different optimizees $f$ have very different gradient magnitudes, which can make training an optimizer very difficult.
+%One possible way to mitigate this problem is Batch Normalization \todo{cite}.
+%It however has a disadvantage that it assumes that the distribution of the gradients is stationary.
+
+%Therefore, we propose 2 different solutions for this problem.
+%The simplest one is to simply scale all the gradients by some constant (the same for all timesteps), which makes them
+%have a distribution with a standard deviation approximately $1$.
+
+%The way neural networks are trained naturally causes them to disregard
+%very small variations in input signals.
+
+%We have found that it can be useful to transform the input to the
+%optimizer network into a representation that takes this into account. For example we have considered the transformation,
+
+

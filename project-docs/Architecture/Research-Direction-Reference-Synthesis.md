@@ -6,9 +6,10 @@ sidebar_position: 47
 
 Search token: `RESEARCH_DIRECTION_REFERENCE_SYNTHESIS`.
 
-Status: active research-direction guide. This is not a runtime authority spec;
-it guides which benchmarks and implementation work should be prioritized under
-the existing Soul/LifeGoal and runtime-evidence rules.
+Status: active research-direction guide, superseded in headline by
+`Specification/Advisory-Social-Material-WAM.md`. This is not a runtime authority
+spec; it guides which references, benchmarks, and implementation work should be
+prioritized under the active WAM direction.
 
 Recorded: 2026-06-16 (`Asia/Seoul`).
 
@@ -24,9 +25,14 @@ Primary archive:
   `project-docs/research-archive/2026-06-16/minestudio-reference-check.md`
 - `MINESTUDIO_IMPLEMENTATION_ANALYSIS_2026_06_16`:
   `project-docs/research-archive/2026-06-16/minestudio-implementation-analysis.md`
+- `DEEP_SOCIAL_WAM_LITERATURE_REVIEW_2026_06_16`:
+  `project-docs/research-archive/2026-06-16/deep-social-wam-literature-review/`
+- `SDK_AUTORESEARCH_SOCIAL_WAM_POSITIONING_2026_06_17`:
+  `project-docs/research-archive/2026-06-17/sdk-autoresearch-social-wam-positioning/`
 
 Related active docs:
 
+- `Specification/Advisory-Social-Material-WAM.md`
 - `Specification/Evidence-Grounded-Minecraft-Society.md`
 - `Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
 - `Architecture/Project-Sid-Harness-Absorption-Plan.md`
@@ -35,14 +41,15 @@ Related active docs:
 ## One-Line Direction
 
 ```text
-Evaluate whether LLM-controlled Minecraft actors can sustain evidence-grounded
-social trajectories in a natural open world, where social claims are constrained
-by physical action, material possession, obligations, memory continuity, and
-post-goal continuation.
+Study whether an advisory social-material World Action Model can predict how
+embodied Minecraft actions change physical state, material access, obligations,
+relationships, memory, and future action opportunities in wild, reproducible
+Minecraft worlds.
 ```
 
-This should be the main research direction beneath the broader Soul-grounded
-social simulation goal.
+This is the main research direction beneath the broader Soul-grounded social
+simulation motivation. Runtime verification, logs, screenshots, ledgers, and
+scoring scripts remain mandatory hygiene, not the differentiating claim.
 
 ## Why This Is Better Than A Project Sid-Centered Frame
 
@@ -58,33 +65,36 @@ research claim should be smaller and more defensible:
 The project should instead claim:
 
 ```text
-We build and evaluate a verifiable Minecraft runtime for grounded social
-trajectories: speech, action, resource movement, memory, relationship state,
-and future behavior must stay coherent under natural-world pressure.
+We build and evaluate an advisory social-material WAM for Minecraft: given
+state and a candidate embodied action, the model predicts physical, material,
+and social deltas, and those predictions are compared with observed runtime
+transitions under natural-world pressure.
 ```
 
-Evidence-first reporting remains essential, but it is support infrastructure.
-The research value is the grounded social behavior and the evaluation protocol
-that makes such behavior measurable.
+Audit-clean reporting remains essential, but it is support infrastructure. The
+research value is the prediction object and the measurement of social-material
+consequence prediction, not the mere existence of evidence.
 
 ## Research Gap
 
 Primary gap: application + methodological.
 
 ```text
-Minecraft LLM-agent work has strong open-world and multi-agent task benchmarks,
-but it mostly measures bounded task completion, exploration, construction, or
-task-oriented collaboration. LLM social simulation work has richer social
-interaction, memory, and population-scale framing, but often lacks a hard
-physical substrate where social claims are constrained by verified movement,
-crafting, storage, inventory, and environmental consequences.
+Minecraft LLM-agent work has strong open-world agents, visual policies, task
+benchmarks, and collaboration settings, but it mostly measures bounded task
+completion, exploration, construction, pixel/world modeling, or task-oriented
+coordination. LLM social simulation work has richer social interaction,
+memory, and population-scale framing, but often lacks embodied material state
+where possession, access, obligations, and future action opportunities are
+observed as consequences.
 ```
 
 Secondary gap: evidence.
 
 ```text
-We do not yet have reproducible evidence about whether stronger or more costly
-LLMs produce better grounded social trajectories when measured by obligation
+We do not yet have reproducible measurements of whether models can predict
+social-material transitions, separately from whether they act well, when
+measured by physical/material/social delta accuracy, calibration, obligation
 lifecycle, material flow, memory continuity, post-goal continuation, action
 efficiency, latency, and provider cost.
 ```
@@ -101,7 +111,7 @@ over-optimizes, collapses diversity, or launders weak evidence into progress.
 
 | Reference family | What it teaches mechanically | Local adaptation |
 | --- | --- | --- |
-| Collaborative Dialogue in Minecraft, CraftAssist, MindCraft | Grounded dialogue, architect/builder separation, partial observability, partner belief, asymmetric knowledge and skills. | Start social benchmarks from situated dialogue plus verified action, not from civilization-scale spectacle. |
+| Collaborative Dialogue in Minecraft, CraftAssist, MindCraft | Grounded dialogue, architect/builder separation, partial observability, partner belief, asymmetric knowledge and skills. | Start social benchmarks from situated dialogue plus checked action outcomes, not from civilization-scale spectacle. |
 | MineDojo, Voyager | Open-world task diversity, curriculum, action skill libraries, environment feedback, self-verification. | Use as competence gates and actor-owned action skill inspiration. Do not make tech-tree progress the product goal. |
 | VillagerBench, TeamCraft, MINDcraft/MineCollab, CausalMACE, S-Agents, MindForge, HAS | Spatial/causal/temporal dependencies, resource sharing, communication bottlenecks, role/expertise asymmetry, organization structures. | Borrow dependency and resource-flow metrics, but score durable social consequences rather than task completion alone. |
 | Generative Agents, SOTOPIA, AgentSense, Lifelong SOTOPIA | Social goals, memory, believability, multi-turn interaction, long-history degradation. | Use social scenario design and continuity scoring; ground claims in Minecraft evidence and ActorSoul/LifeGoal state. |
@@ -110,6 +120,8 @@ over-optimizes, collapses diversity, or launders weak evidence into progress.
 | SimBench, Sim2Real gap, social-simulation boundary work, solver-sampler mismatch | Plausibility is not validity; model strength may not imply faithful behavior; claims need boundaries. | Report social behavior as behavior, with cost and failure traces. Keep human-fidelity claims for a later validation layer. |
 | NitroGen, VPT, SIMA, GATO, Game-TARS | Generalist visual game-action policies, action-labeled gameplay data, unified action spaces, and cross-game transfer evaluation. | Treat as a future low-level policy substrate and contrast class. Do not make visual motor-control performance the current social benchmark target. |
 | MineExplorer, MCU, MineStudio, Plancraft | Scalable Minecraft task pools, hidden dependency graphs, task manifests, callback-style reset/record loops, rule/VLM milestone checks, solvable and unsolvable planning cases. | Use as competence gates, task pressure sources, manifest/callback design references, and secondary review criteria. Do not make task success, visual-policy control, or VLM scoring the social contribution. |
+| WAM, world-model, S3AP/Social World Models, WALL-E, Dreamer, MineWorld/Solaris | Consequence prediction, latent/structured state, action-conditioned next-state modeling, and prediction-vs-acting separation. | Make the predictor advisory and typed: physical/material/social deltas in Minecraft, with acting outcome reported separately from prediction quality. |
+| ENPIRE, Codex/Claude SDK loops, SWE-agent, DSPy/GEPA, AI Scientist-style systems | Coding-agent or optimizer loops can propose changes when a locked metric exists. | Use as the method for improving prompts, predictor code, action-skill candidates, scenarios, and report templates. The loop must not own scoring or social truth. |
 | ALEM, Craftax, Multi-Agent Craftax, Melting Pot | Open-ended multi-agent coordination, base vs coordination rewards, partner/social generalization, fast ablation environments. | Separate base Minecraft progress from coordination/social progress; add seed/partner/role generalization. |
 | MineLand, PARTNR, TEACh, CoELA | Limited senses, physical needs, embodied dialogue, heterogeneous capabilities, human-robot style collaboration. | Add controlled social pressure variables: distance-limited communication, needs, asymmetric tools/knowledge, clarification, and recovery. |
 
@@ -137,8 +149,8 @@ The resulting benchmark frame should be:
 
 ```text
 Do not ask whether agents can merely complete a Minecraft task.
-Ask whether a social event changes verified Minecraft state and constrains
-future behavior.
+Ask whether a model predicted how a social event would change Minecraft
+physical/material/social state and constrain future behavior.
 ```
 
 ## NitroGen Boundary
@@ -187,8 +199,8 @@ Local boundary:
 
 ```text
 MineStudio is deep in the visual-policy/MineRL/Malmo layer.
-This repo's active research target is the Actor Turn/Mineflayer/evidence-grounded
-social layer.
+This repo's active research target is the Actor Turn/Mineflayer/advisory-WAM
+social-material layer.
 ```
 
 Use MineStudio for:
@@ -244,8 +256,8 @@ the next layer reviewable.
 
 | Layer | Purpose | Example scenario | Primary score |
 | --- | --- | --- | --- |
-| 0. Competence gate | Verify boring physical ability before social claims. | gather/craft/place/store in a natural seed. | verified action completion, recovery, cost. |
-| 1. Dyadic material claim | Test whether one actor's request/promise changes another actor's physical action. | borrow, lend, use, return, or compensate for a tool. | obligation lifecycle and inventory/container evidence. |
+| 0. Competence gate | Check boring physical ability before social claims. | gather/craft/place/store in a natural seed. | action completion, recovery, cost, and transition rows. |
+| 1. Dyadic material claim | Test whether the predictor anticipates how one actor's request/promise changes another actor's physical/material action. | borrow, lend, use, return, or compensate for a tool. | predicted-vs-observed obligation lifecycle and inventory/container deltas. |
 | 2. Asymmetric knowledge/resource task | Make collaboration necessary without hard-coding a global planner. | one actor knows a recipe or location; another owns material/tool access. | clarification quality, handoff quality, cross-actor dependency. |
 | 3. Weak public affordance | Test light commons without making shared resources the core ideology. | build or maintain a public crafting table, furnace, path marker, chest, or safe waypoint. | public-use event, contribution ledger, misuse/repair. |
 | 4. Mixed-motive pressure | Test conflict, fairness, scarcity, refusal, and repair. | two actors need the same scarce tool/time/station for different LifeGoals. | fairness/efficiency tradeoff, repair, relationship update. |
@@ -263,7 +275,8 @@ Use these as primary outcome families:
 
 | Metric | What it shows | Figure form |
 | --- | --- | --- |
-| Time/cycles to first social consequence | Whether speech caused a verified change in another actor, inventory, storage, place, memory, or relationship. | survival curve or line plot by model. |
+| Transition prediction accuracy | Whether the WAM predicted physical/material/social deltas before action. | calibration plot, per-layer accuracy, or proper-score chart. |
+| Time/cycles to first social-material consequence | Whether speech/action caused an observed change in another actor, inventory, storage, place, memory, or relationship. | survival curve or line plot by model. |
 | Obligation lifecycle completion | request -> accept/promise/refuse -> attempt -> fulfill/block/defer -> later memory/use. | milestone timeline or state-transition Sankey. |
 | Material flow correctness | who had item -> who transferred/used/stored it -> evidence refs. | item-flow graph or inventory delta chart. |
 | Cross-actor dependency | whether one actor's action changed another actor's options or next action. | dependency edge count with evidence confidence. |
@@ -275,7 +288,7 @@ Use these as primary outcome families:
 
 Supporting diagnostics:
 
-- no progress / verified progress / blocked;
+- no progress / checked progress / blocked;
 - repeated action rejection;
 - world-state scan coverage;
 - screenshot evidence;
@@ -284,18 +297,20 @@ Supporting diagnostics:
 ## First Strong Benchmark Candidate
 
 The most defensible first social benchmark should be MindCraft/MineCollab-like,
-but adapted to this repo's natural-world, evidence-backed runtime:
+but adapted to this repo's natural-world, social-material WAM framing:
 
 ```text
 Two actors start in the same natural seed. Actor A has a LifeGoal reason to make
 or use a tool/station. Actor B has either material access, a remembered location,
 or a relevant action skill. The actors must communicate, clarify, transfer or
-reserve material, perform verified Minecraft actions, update obligation/memory
-state, and continue after the immediate task succeeds or fails.
+reserve material, perform Minecraft actions, update obligation/memory state,
+and continue after the immediate task succeeds or fails. The WAM predicts the
+expected physical/material/social deltas before those actions.
 ```
 
 Do not script the full plan. The scenario should create asymmetry and pressure,
-then measure whether the actors create a coherent social trajectory.
+then measure whether predicted deltas and observed deltas reveal a coherent
+social-material trajectory.
 
 Minimum required artifacts:
 
@@ -305,6 +320,7 @@ Minimum required artifacts:
 - action skill verifier output;
 - world-state scan refs for relevant objects;
 - actor memory or relationship update refs;
+- predicted and observed transition deltas;
 - provider usage/cost/latency;
 - cycle screenshots as supporting evidence.
 
@@ -318,9 +334,9 @@ Minimum required artifacts:
    public affordance, weak commons, and theft/misuse.
 4. Build one natural-seed two-actor asymmetric-resource benchmark before adding
    bigger villages.
-5. Make scoring produce paper-style figures around obligation lifecycle,
-   material flow, cross-actor dependency, continuity, and cost-normalized
-   progress.
+5. Make scoring produce paper-style figures around transition prediction
+   accuracy, obligation lifecycle, material flow, cross-actor dependency,
+   continuity, and cost-normalized progress.
 6. Only after that, add three-actor settlement pressure and mixed-motive runs.
 
 ## Paper Positioning
@@ -328,25 +344,25 @@ Minimum required artifacts:
 Candidate title shape:
 
 ```text
-Beyond Task Completion: Evidence-Grounded Social Trajectories for LLM Actors in
-Minecraft
+Advisory Social-Material World Action Models in Wild Minecraft
 ```
 
 Candidate abstract claim:
 
 ```text
-We present a Minecraft runtime and benchmark protocol for evaluating grounded
-social trajectories among LLM-controlled embodied actors. Unlike task-only
-Minecraft benchmarks, our protocol measures whether speech, action, material
-possession, memory, and relationship state remain coherent across natural-world
-cycles. Unlike dialogue-only social simulations, our claims are constrained by
-Mineflayer-verified world, inventory, container, and action-skill evidence.
+We study whether an advisory World Action Model can predict the physical,
+material, and social consequences of embodied Minecraft actions in wild,
+reproducible worlds. Unlike task-only Minecraft benchmarks, the evaluation
+separates acting outcome from predicted-vs-observed social-material deltas.
+Unlike dialogue-only social simulations, the transition targets are grounded in
+Minecraft state changes such as possession, access, obligations, and future
+action opportunities.
 ```
 
 This makes the contribution concrete:
 
-- a runtime substrate;
-- an operational definition of grounded social trajectories;
-- a benchmark ladder;
-- evidence-backed metrics;
-- model comparison under provider cost and latency constraints.
+- an advisory WAM formulation over typed Minecraft/social state;
+- a `social-material-transition/v1` dataset unit;
+- prediction-vs-acting evaluation;
+- a benchmark ladder as measurement apparatus;
+- a coding-agent autoresearch loop as improvement method.

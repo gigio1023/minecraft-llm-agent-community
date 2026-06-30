@@ -101,6 +101,7 @@ Orientation:
 
 Long-term spec:
 
+- `project-docs/Specification/Advisory-Social-Material-WAM.md`
 - `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
 - `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
 - `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
@@ -186,6 +187,10 @@ shape active implementation or public docs navigation:
   `research-archive/2026-06-16/minestudio-implementation-analysis.md`.
 - research-frame notes such as
   `research-archive/2026-06-16/social-wam-research-frame.md`.
+- deep social-WAM literature reviews such as
+  `research-archive/2026-06-16/deep-social-wam-literature-review/`.
+- focused WAM/autoresearch positioning studies such as
+  `research-archive/2026-06-17/sdk-autoresearch-social-wam-positioning/`.
 
 Archived documents preserve context. They are not active implementation
 instructions unless an active spec, architecture doc, or handoff explicitly
@@ -210,8 +215,9 @@ maintainers, but they should not be treated as top-level product direction:
 - `Current-Architecture-And-Implementation-Audit.md`
 
 These documents must remain subordinate to the Soul/LifeGoal social runtime and
-must not make benchmark progress, diamond acquisition, or generic autonomy look
-like the product goal.
+the advisory social-material WAM spine. They must not make benchmark progress,
+diamond acquisition, generic autonomy, verification, screenshots, or evidence
+collection look like the product goal.
 
 ## Cleanup Rules
 

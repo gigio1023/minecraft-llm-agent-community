@@ -1,0 +1,67 @@
+\section{Additional Ablations}
+In this section, we describe additional ablations on design choices for our method, including the use of classifier-free guidance during training, text augmentation strategies, different VAE variants, varying chunk sizes during finetuning, and more. We use programmatic evaluation metrics to compare the performance of the various ablations. 
+
+\subsection{Classifier-Free Guidance During Training}
+We examine the importance of using classifier-free guidance during training by finetuning a model with \textit{no} guidance which does not drop out the goal embedding $z_{\tau_{goal}}$ from the policy's input (i.e., $p_{uncond} = 0.0$) and comparing it to the version which uses guidance ($p_{uncond} = 0.1$). The chunk size is set to the range 15 to 50 and we train each policy for 100M frames. In \Cref{fig:apdx_guidance_ablation}, we compare the performance of using \textit{visual} goals (MineCLIP video embedding) on the no guidance model using conditional scale $\lambda = 0$ and the guidance model using conditional scales $\lambda=0$ and $\lambda = 3$. We observe that while the no guidance model slightly outperforms the guidance model at $\lambda=0$ across a few metrics, the agent with guidance outperforms the no guidance agent by a factor of 2 to 3 times for the inventory collection tasks when we increase the conditional scale to $\lambda = 3$ (which we cannot do for the no guidance model). For the travel distance metric, both of the guidance versions perform similarly to the no guidance version.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/appendix_no_guidance_3_variants.pdf}
+    \caption{\textbf{Ablation on Guidance}. In the ``\textit{no guidance}'' variant, we set $p_{uncond} = 0$, meaning that we do not drop any $z_{\tau_{goal}}$ from the policy's input during training. The ``\textit{guidance}'' variants set $p_{uncond} = 0.1$, dropping 10\% of the time during training. Whereas the ``\textit{no guidance}'' model is only compatible with $\lambda = 0$ at inference, the ``\textit{guidance}'' model can use $\lambda > 0$, allowing for better performance.}
+    \label{fig:apdx_guidance_ablation}
+\end{figure}
+
+\subsection{Text Augmentation}
+% Note: Done on the 50
+During finetuning, instead of using only self-supervision with future MineCLIP video embedding as the goal, we considered using the \textit{text} embeddings from the 2,000 human labeled trajectory segments as goal embeddings, either solely or in addition to the self-supervised video embeddings. In order to more fairly compare with the CVAE prior approach, we augment the human-labeled data with additional text-gameplay pairs generated as described in \Cref{sec:prior}. We implement this experiment by replacing the visual embeddings used for relabeling in \Cref{algo:hindsight} with text embeddings, when available, with a 90\% probability. To experiment with not using visual embeddings at all, we can replace the visual embeddings with zeros in the same way. In \Cref{fig:apdx_text_aug}, we observe that using only the visual embeddings during training, in combination with the CVAE, can outperform using MineCLIP text embeddings directly in the other two baselines. In this experiment, the chunk size is set to the range 15 to 50 and we train each policy for 100M frames. 
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/appendix_text_augmentation_all-prompt-eng-commands.pdf}
+    \caption{\textbf{Ablation on Text Augmentation}. In the ``\textit{text (raw text)}'' ablation, we train the model using only the text labels from human labelled trajectory segments, and directly use the MineCLIP text embedding of the text label as the goal embedding during training and at inference. For the ``\textit{text + visual (raw text)}'' ablation, we use both the visual embedding in self-supervised manner and the text embedding from the human labelled trajectory segments during training and use the MineCLIP text embedding during inference. Even with augmentation, the dataset only contained around 2\% text embeddings. The ``\textit{visual (text VAE)}'' version is as reported in the main method, using the CVAE to convert MineCLIP text embedding to visual embedding during inference. }
+    \label{fig:apdx_text_aug}
+\end{figure}
+
+\subsection{VAE Variants}
+% Note: on the 200: VAE, GPT+VAE, GPT + Offset + VAE
+We study the dataset used to train the CVAE prior model. In \Cref{fig:apdx_vae}, we observe that augmentation helps in some programmatic tasks, including the dirt and seed collection tasks, but slightly hurts the wooden log collection and travel distance metrics. In this experiment, we use the same policy with each CVAE variant and we tune the conditional scale $\lambda$ for each variant. The chunk size is set to the range 15 to 200 and we train the policy for 100M frames. 
+
+\begin{figure}
+    \centering    
+    \includegraphics[width=0.95\textwidth]{figures/appendix_vae_ablation_only_2_variants.pdf}
+    \caption{\textbf{Ablation on VAE Training Data}. ``\textit{Human}'' baseline uses only the 2,000 human-labelled trajectory segments (text-video pairs), as training example for the CVAE prior model. ``\textit{Human + Aug}'' baseline adds additional pairs of text-video examples as described in \Cref{sec:prior_dataset}.  }
+    \label{fig:apdx_vae}
+\end{figure}
+
+\newpage
+\subsection{Chunk Size}
+\label{appx:chunk_size}
+% Note: chunk size on the x-axis, and using the best cond scale
+During finetuning, we compare different goal chunk sizes by varying the \texttt{max\_btwn\_goals=[100,200,300,400]}, while keeping the \texttt{min\_btwn\_goals=15}. See \Cref{algo:hindsight} for more details. A larger \texttt{max\_btwn\_goals} introduces more noise, with actions that led to achieving the further away goal being less correlated to the actions present in that goal chunk. In \Cref{fig:apdx_chunk_size_errorbar}, we observe that the best \texttt{max\_btwn\_goals} chunk size is around 200, and increasing the chunk size beyond that causes a drop in performance. We train each policy for 160M frames and tune the conditional scale for each.
+
+\begin{figure}
+    \centering    \includegraphics[width=0.95\textwidth]{figures/appendix_chunk_size_errorbar.pdf}
+    \caption{\textbf{Ablation on Segment Chunk Size}. We vary the \texttt{max\_btwn\_goals} parameter in \Cref{algo:hindsight}. The performance is roughly the best at around 200, beginning to decline with greater values.}
+    \label{fig:apdx_chunk_size_errorbar}
+\end{figure}
+
+\subsection{Generalization to Novel Text Instructions}
+\label{appendix:gen_to_novel_text}
+
+We train the prior on a dataset of human and GPT-generated instructions designed to be representative of the tasks that appear in our gameplay dataset. Here, we have performed a set of simple generalization experiments to measure the degree to which the prior can generalize to unseen instructions.
+
+\medskip
+\textbf{Instruction Training Set Contamination$~~~$} The ``Text Prompt'' column in \autoref{tab:apdx_text_prompt} shows which of the prompts used in evaluation show up in our training dataset. Among our evaluation instructions, the bolded and italicized instructions show up in the instruction-trajectory dataset. While some instructions do show up, most of the instructions do not show up in our training set (verbatim).
+
+\medskip
+\textbf{Training Set Decontamination$~~~$} To measure the effect on performance of removing a concept from the training set, we ran an experiment where we removed every instruction with the words ``dirt'' or ``dig'' in them and retrained the VAE model. This corresponds to around 10\% of the instructions. As shown in \autoref{fig:gen_to_novel_text}, we found that even without training on the concept of dirt or digging at all, \agentname{} can still be instructed to dig holes and get dirt. This demonstrates clearly that \agentname{} can generalize to unseen text instructions — likely because most of the text-understanding comes from the pretrained MineCLIP model which was trained on a highly diverse dataset of YouTube videos and captions. The prior VAE only needs to learn a mapping between the text and visual MineCLIP embeddings. Note that there is a slight decrease in performance across all tasks likely due to the smaller VAE training set ($\sim$ 10\% less).
+
+\medskip
+The instruction-following capability of \agentname{} is shared between: the policy, which learns to follow instructions in the visual MineCLIP embedding space; the MineCLIP text-encoder, which is trained to align well with the visual embeddings and performs most of the text-understanding; and our prior VAE model, which learns a simple function to translate between text and visual embeddings. This modeling setup lets us fully exploit pretrained models such as MineCLIP to gain impressive language understanding without relying on having our own large datasets or compute.
+
+\begin{figure}
+    \centering    
+    \includegraphics[width=0.5\textwidth]{figures/vae_nodigordirt_rebuttal.pdf}
+    \caption{Even without training the prior on the concept of dirt or digging at all, \agentname{} can still be instructed to dig holes and get dirt. This demonstrates that \agentname{} can generalize to unseen text instructions.}
+    \label{fig:gen_to_novel_text}
+\end{figure}

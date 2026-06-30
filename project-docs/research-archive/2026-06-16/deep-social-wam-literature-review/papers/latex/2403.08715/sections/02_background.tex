@@ -1,0 +1,32 @@
+\section{Background}
+\label{sec:background}
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=8.0cm]{figs/training_data.png}
+    \caption{L: a social task with character profiles. R: An example turn from the perspective of the role-played character. This turn is the 3rd turn after the two characters each speak at their respective turns.}
+    \label{fig:training-data}
+    \vspace{-5mm}
+\end{figure}
+
+\subsection{\sotopia environment}
+\label{subsec:sotopia_environment}
+In this paper, we use \sotopia \citep{sotopia} as the platform for social learning. A \emph{social task} in \sotopia consists of a scenario, two characters' profiles, and their respective private social goals to achieve in an interaction. The combinations of scenarios and social goals cover a wide range of social interactions including negotiation, collaboration, and competition. Given a social task, \sotopia prompts two LLMs to serve as role-play \emph{social agents} and interact with each other through speaking, non-verbal communication, and actions. 
+
+Consider the example shown in Figure~\ref{fig:training-data}, a social agent (the role-played character) in \sotopia makes decisions at its turns (Turn \#3 at this moment) based on the interaction context including (1) the scenario (\textsl{discuss trip plan}), (2) the role-played character (\textsl{Sam})'s profile and goal (\textsl{to convince Mia to join the trip}), (3) the visible information on other character (\textsl{Mia})'s profile, and (4) the communication history (\textsl{Mia declined the initial invitation}).
+The decision consists of two parts: (1) the action type, choosing from \emph{speak}ing an utterance, making a gesture or facial expression as \emph{non-verbal communication}, performing a physical \emph{action}, or \emph{leaving} the conversation, and (2) the action content, e.g. `\textsl{I totally understand!}' as an utterance, `\textsl{raise their eyebrows}' as non-verbal communication, and `\textsl{show Mia some scenery photos}' as an action. 
+
+
+\sotopiaeval \cite{sotopia} provides evaluations of the \emph{social intelligence} of social agents based on seven \emph{social dimensions}. The seven dimensions are: believability (\believability), relationship (\relationship), knowledge (\knowledge), secret (\secret), social rules (\socialrules), financial and material benefits (\financialbenefits), and goal completion (\goalcompletion). The overall score is the average of the seven social dimensions reflecting the overall social intelligence. 
+Each dimension is rated by GPT-4~\citep{openai2023gpt4} and humans on a Likert scale.\footnote{Different dimensions have three types of score ranges: [-10, 0], [-5, 5], and [0, 10].} 
+% \citet{sotopia} show that when evaluating language models with \sotopiaeval, GPT-4 could serve as a proxy of human judgment on these dimensions, and it has a higher correlation and significance than human evaluations. 
+Therefore, following \citep{sotopia}, we not only use GPT-4 to evaluate the social performance of models but also collect human judgment to verify the findings. In this paper, we study how to use GPT-4-based evaluation as a training signal to improve social agents. 
+
+\subsection{Interactive learning}
+This paper focuses on \emph{interactive learning} for improving social intelligence.
+We consider interactive learning as \emph{learning through interactive social conversation with other agents}
+The most common way to implement interactive learning is reinforcement learning (work related to training LLMs with RL will be discussed in \S\ref{sec:rl_llm}). In this paper, we consider two forms of interactive learning: learning from an expert (behavior cloning) and from reinforcement of the model's positive behaviors (self-reinforcement). 
+
+\textit{Behavior cloning} (BC)~\citep{pomerleau1988alvinn, torabi2018behavioral} is a technique that learns from high-quality observational data, specifically from the behavioral trajectories of an expert with strong skills. In the context of social tasks, the trajectories are defined as social interaction data of multi-turn conversations. Due to the challenge of collecting extensive, high-quality human conversation data, we use state-of-the-art (SOTA) models to supply these behavioral trajectories~\citep{wang2023self}, thereby utilizing social intelligence of those models as a proxy for expert input~\citep{gandhi2023understanding}. Specifically, we use GPT-4-based agents as the experts, which achieved the best performance in \sotopia \citep{sotopia}.
+
+\textit{Self-reinforcement} (SR)~\citep{bandura1976self} is an offline reinforcement learning method that generates and evaluates its own interactions for training. The closest implementation of SR to ours is ReST \citep{ReST}, which employs an iterative threshold-based data filtering method and trains on data with higher quality over time. In preliminary experiments, we found that this strategy required careful threshold tuning, but only yielded a marginal improvement, and that threshold-based filtering did not work well for multiple tasks at various difficulty levels. Based on this experience, we propose a ratio-based data filtering method that enables SR without iterations. 
+

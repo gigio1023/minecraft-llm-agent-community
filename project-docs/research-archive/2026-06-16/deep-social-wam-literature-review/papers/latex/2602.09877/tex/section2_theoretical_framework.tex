@@ -1,0 +1,390 @@
+% Section 2: Theoretical Framework (Reordered: Agent first, then Safety)
+% Source: drafts/section2.en.merged.v4.md (Revised)
+
+\section{Theoretical Framework}\label{sec:theoretical-framework}
+
+In this section, we develop a rigorous probabilistic framework for quantifying safety dynamics in self-evolving systems. 
+By formalizing an agent’s learning process as an isolated recursive operator and casting safety criteria as a reference distribution, we derive information-theoretic conditions that necessitate the emergence of alignment drift and coverage shrinkage. 
+This framework furnishes the mathematical formalism required to analyze the erosion of safety under the isolation assumption.
+
+
+% Takeaway box definition (retained from original)
+\newtcolorbox{takeaway}[1][Takeaway]{%
+  colback=blue!5,%
+  colframe=blue!75!black,%
+  title=#1,%
+  fonttitle=\bfseries,%
+  rounded corners,%
+  boxrule=1pt,%
+  left=10pt,%
+  right=10pt,%
+  top=10pt,%
+  bottom=10pt%
+}
+
+\subsection{Semantic Space}\label{sec:2-1-semantic-space}
+
+Prior to defining agents or safety, we first delineate the semantic space within which they operate.
+
+
+\begin{definition}[Semantic Space]\label{def:2-1-semantic-space}
+
+Let the vocabulary be $\mathcal{V}$, where each element is a discrete token (for example, a character, a subword, or a symbol). For any positive integer $n$, let $\mathcal{V}^n$ be the set of sequences of length $n$ made of tokens: 
+
+\[
+\mathcal{V}^n \triangleq \{(v_1,\dots,v_n)\,:\, v_i\in\mathcal{V}\}.
+\]
+
+All possible sequences of all lengths are incorporated into a single discrete semantic space, as outlined below: 
+
+\[
+\mathcal{Z} \triangleq \bigcup_{n\ge 1}\mathcal{V}^n.
+\]
+
+An element $z\in\mathcal{Z}$ denotes a possible output sequence (e.g., a segment of text). We adopt a discrete formalization given that language models generate text in the form of discrete tokens. Consolidating all possible outputs into a single set $\mathcal{Z}$ facilitates the description of the model as a probability distribution over $\mathcal{Z}$.
+
+
+\end{definition}
+
+\subsection{Agentic Models}\label{sec:2-2-agent-model}
+
+In Section 2.1, we delineated the semantic space $\mathcal{Z}$. For the purpose of investigating the dynamics of self-evolution, we first formalize the agent itself. In the present section, the agent is modeled as a parametric policy—specifically, a probability distribution $P_\theta$ over $\mathcal{Z}$. This formulation enables the mathematical characterization of the learning and update processes.
+
+
+\begin{definition}[Parametric Policy]\label{def:2-2-parametric-policy}
+
+We define the agent as a family of parametric probability distributions $P_\theta$, where $\theta\in\mathbb{R}^d$. For any output sequence $z\in\mathcal{Z}$, $P_\theta(z)$ denotes the probability that the model generates $z$, and it satisfies
+
+\[
+P_\theta(z)\ge 0,\qquad \sum_{z\in\mathcal{Z}} P_\theta(z)=1,
+\]
+
+in which $\theta$ determines the model's probability distribution over the entire semantic space. In what follows, we treat the parameter vector $\theta_t$  as the system state at round $t$, and denote the model’s output distribution at this state by $P_{\theta_t}$.
+\end{definition}
+
+\subsection{Probabilistic Formalization of Safety}\label{sec:2-3-probabilistic-formalization-of-safety}
+
+With the agent formalized as a probability distribution $P_\theta$, we require a rigorous analytical framework to assess the compliance of the model's outputs with established safety criteria. 
+Our objective herein is not to enumerate or refine an exhaustive set of safety protocols; instead, we introduce a target distribution that encapsulates human-aligned safety benchmarks, which serves as a canonical reference for subsequent quantitative analyses. 
+In the absence of a unified, universally accepted reference distribution, it becomes impossible to precisely characterize the model's deviation from safety standards across iterative interaction rounds.
+
+% With the agent modeled as a distribution $P_\theta$, we now need a framework for checking whether the model's outputs meet safety standards. Our goal is not to list or refine every safety rule here. Instead, we introduce a target distribution that represents the human safety alignment standard and use it as a reference for later analysis. Without a single shared reference, we cannot precisely describe how the model deviates from the safety standard across rounds.
+
+\begin{definition}[Ground-Truth Safety Distribution]\label{def:2-3-ground-truth-safety-distribution}
+
+We define the target distribution $\pi^\ast(z)$ over $\mathcal{Z}$ as the ideal output distribution under the human safety alignment standard.  
+A ``target distribution'' refers to the probability weight that each output sequence should bear under anthropic safety criteria, and acts as the reference for quantifying alignment in subsequent analyses. 
+Formally,
+
+\[
+\pi^\ast:\mathcal{Z}\to[0,1],\quad \sum_{z\in\mathcal{Z}}\pi^\ast(z)=1.
+\]
+
+Here, $\pi^\ast$ is treated as an implicit distribution: neither its explicit mathematical form nor direct sampling from it are assumed to be tractable. Instead, it functions as a reference against which we characterise the outputs that align with human safety preferences. In subsequent analyses, the divergence between $\pi^\ast$ and the model's inherent distribution is used as a metric to quantify safety alignment error.
+
+% We treat $\pi^\ast$ as an implicit distribution: we do not assume we can write it down explicitly, and we do not assume we can sample from $\pi^\ast$ directly. Its role is to serve as a reference for describing ``what kinds of outputs better match human safety preferences.'' In later analysis, we will use the difference between $\pi^\ast$ and the model distribution as a measure of safety alignment error.
+
+\end{definition}
+
+\begin{assumption}[Safety Support]\label{assump:2-1-safety-support}
+
+Assume that $\pi^\ast$ is not a uniform distribution, and that its probability mass is mainly concentrated on a safe set. More specifically, there exists $\mathcal{S}\subseteq\mathcal{Z}$ such that
+
+\[
+\pi^\ast(\mathcal{S}) \triangleq \sum_{z\in\mathcal{S}}\pi^\ast(z)\ge 1-\varepsilon,
+\]
+
+where $\varepsilon\in(0,1)$ is a small constant.
+
+This assumption encapsulates two fundamental observations. 
+First, humans do not regard all sequences as equally safe, meaning $\pi^\ast$ cannot be a uniform distribution. 
+Second, under human safety criteria, acceptable outputs occupy only a subset of the semantic space, with $\pi^\ast$ concentrating the majority of its probability mass on this set $\mathcal{S}$. 
+In subsequent investigations, we examine whether the model retains sufficient probability mass on $\mathcal{S}$, and whether its divergence from $\pi^\ast$ increases with successive iterations.
+
+
+% This assumption captures two basic facts. First, humans do not view all sequences as equally safe, so $\pi^\ast$ should not be uniform. Second, under the human safety standard, acceptable outputs occupy only part of the semantic space, and $\pi^\ast$ puts most of its probability mass on this set $\mathcal{S}$. Later, we ask whether the model still puts enough probability mass on $\mathcal{S}$, and whether its distance to $\pi^\ast$ grows across iterations.
+
+\end{assumption}
+
+\begin{takeaway}[Takeaway: Formalization of Safety Standards]
+
+We utilize an implicit target distribution $\pi^\ast$ as a safety reference, with the vast majority of its probability mass residing in the safe set $\mathcal{S}$. To monitor the safety drift of the system distribution $P_t$ at round $t$, we evaluate two core aspects:
+
+\begin{enumerate}
+    \item the degree of divergence between $P_t$ and the reference distribution $\pi^\ast$;
+    \item the amount of probability mass that $P_t$ maintains over the safe set $\mathcal{S}$.
+\end{enumerate}
+% We use an implicit target distribution $\pi^\ast$ as a reference for safety. Most of its probability mass lies in a safe set $\mathcal{S}$. Later, we track safety drift by how far $P_t$ moves away from $\pi^\ast$ and how much mass $P_t$ keeps on $\mathcal{S}$.
+\end{takeaway}
+
+% \subsection{Dynamics of Isolated Self-Evolutional Systems}\label{sec:2-4-isolated-recursive-dynamics}
+
+% % In Section 2.1 we defined the semantic space $\mathcal{Z}$. In Section 2.2 we represented an agent as a parameterized distribution $P_\theta$. In Section 2.3 we defined the reference safety distribution $\pi^\ast$. This subsection further formalizes the self-evolution process of a multi-agent community under an isolated setting. The focus here is not to introduce new safety metrics. Instead, we define a clear random update process: how data is generated, how parameters are updated, and whether the update uses the external reference.
+
+% The semantic space $\mathcal{Z}$ is formally defined in Section 2.1, while Section 2.2 characterizes an agent as a parameterized distribution $P_\theta$, and Section 2.3 introduces the reference safety distribution $\pi^\ast$. 
+% Building on these foundational definitions, the present subsection further formalizes the self-evolution dynamics of a multi-agent community in an isolated setting. 
+% Our focus herein is not on the introduction of novel safety metrics, but rather on the formalization of a well-defined stochastic update process: specifying the mechanisms of data generation, parameter updating, and the extent to which external reference distributions inform these updates.
+
+\subsection{Dynamics of Isolated Self-Evolutional Systems}\label{sec:2-4-isolated-recursive-dynamics}
+
+The semantic space $\mathcal{Z}$ is formally defined in Section 2.1, while Section 2.2 characterizes an agent as a parameterized distribution $P_\theta$, and Section 2.3 introduces the reference safety distribution $\pi^\ast$. Building on these foundational definitions, the present subsection further formalizes the self-evolution dynamics of a multi-agent community in an isolated setting. Our focus herein is not on the introduction of novel safety metrics, but rather on the formalization of a well-defined stochastic update process: specifying the mechanisms of data generation, parameter updating, and the extent to which external reference distributions inform these updates.
+
+\subsubsection{Self-Evolution Mechanism}\label{sec:2-4-1-self-evolution-mechanism}
+
+We begin by defining the governing rule for data generation and learning updates within a single round. This rule encapsulates a closed-loop process whereby the system leverages its current population state to generate data, which is subsequently used to update the underlying population state. 
+We thus formalize this iterative process as a self-evolution operator.
+
+\begin{definition}[Self-Evolution Operator]\label{def:2-4-self-evolution-operator}
+
+Consider a system comprising $M$ agents. 
+At round $t$, agent $m$ is characterised by a parameter vector $\vec{\theta}_t^{(m)} \in \mathbb{R}^d$, and a generative distribution $P_{\vec{\theta}_t^{(m)}}$ that governs the probability distribution of its outputs over the set $\mathcal{Z}$. 
+The joint state of the system at round $t$ is defined as:
+
+% Consider a system with $M$ agents. Agent $m$ has parameters $\theta_t^{(m)}\in\mathbb{R}^d$ at round $t$, and a generation distribution $P_{\theta_t^{(m)}}$ governing its output probabilities over $\mathcal{Z}$. Define the joint state of the system at round $t$ as
+
+\[
+\Theta_t \triangleq \bigl(\theta_t^{(1)},\dots,\theta_t^{(M)}\bigr).
+\]
+
+The evolution from round $t$ to round $t+1$ is governed by a stochastic operator $\mathcal{T}$, formally expressed as $\Theta_{t+1} = \mathcal{T}(\Theta_t)$. The term ``stochastic'' here denotes that, even for a fixed $\Theta_t$, $\Theta_{t+1}$ remains subject to variability arising from the randomness inherent in the sampling and training processes. To explicitly delineate the sequence of operations within a single update round, we decompose this transition into two distinct steps: a finite-sampling step and a parameter-update step.
+
+% The evolution from round $t$ to round $t+1$ is given by a random operator $\mathcal{T}$, written as $\Theta_{t+1}=\mathcal{T}(\Theta_t)$. Here, ``random'' means that even given $\Theta_t$, $\Theta_{t+1}$ may still vary due to randomness in sampling and training. To make the order of one update round explicit, we split the evolution into a finite-sampling step and a parameter-update step.
+
+Step 1: Finite-sampling step. Given a weight vector $w=(w_1,\dots,w_M)$ with $w_m\ge 0$ and $\sum_{m=1}^M w_m=1$, the current population state induces a raw mixture distribution as: 
+
+\[
+\bar P_t(z)\triangleq \sum_{m=1}^M w_m P_{\theta_t^{(m)}}(z).
+\]
+
+To cover common self-evolution processes (e.g., exploration, filtering, etc.), we allow the system to employ an internal selection mechanism $a_{\Theta_t}:\mathcal{Z}\to[0,1]$ that depends only on the current state $\Theta_t$. We then define the effective training distribution as follows: 
+
+\[
+P_t(z)\triangleq \frac{a_{\Theta_t}(z)\,\bar P_t(z)}{Z_t}, \quad \text{where } Z_t \triangleq \sum_{z\in\mathcal{Z}} a_{\Theta_t}(z)\,\bar P_t(z).
+\]
+
+The system then generates a dataset of size $N$, $\mathcal{D}_{t+1} = \{z_i\}_{i=1}^N$, by the rule that, given $\Theta_t$,
+
+% The system then generates a dataset of size $N$, $\mathcal{D}_{t+1}=\{z_i\}_{i=1}^N$, by the rule that, given $\Theta_t$,
+
+\[
+z_i\sim P_t,\qquad i=1,\dots,N,
+\]
+
+and $\{z_i\}_{i=1}^N$ are conditionally i.i.d.
+
+Step 2: Parameter update step. 
+After obtaining $\mathcal{D}_{t+1}$, each agent performs a maximum-likelihood update based only on this dataset. For any $m\in\{1,\dots,M\}$, we can achieve
+
+\[
+\theta_{t+1}^{(m)}\in\arg\min_{\theta}\ \frac{1}{N}\sum_{i=1}^{N}\bigl[-\log P_{\theta}(z_i)\bigr].
+\]
+
+The update signal mainly comes from the sample regions supported by the empirical distribution $\mathcal{D}_{t+1}$, while regions absent from $\mathcal{D}_{t+1}$ lack a direct maintenance signal.
+
+\end{definition}
+
+\subsubsection{Markov Property of Isolated Evolution}\label{sec:2-4-2-markov-isolation}
+
+Having defined the self-evolving mechanism, we further formalize the notion of the system being closed with respect to the external reference $\pi^\ast$.
+
+% After defining the self-evolving mechanism, we still need to state what it means for the system to be closed with respect to the external reference $\pi^\ast$.
+
+\begin{definition}[Isolation Condition]\label{def:2-5-isolation-condition}
+
+A system is defined as information-isolated if and only if, given its current joint state $\Theta_t$, its subsequent state $\Theta_{t+1}$ is conditionally independent of the external reference distribution $\pi^\ast$:
+
+% We call a system information-isolated if and only if, given the current joint state $\Theta_t$, the next state $\Theta_{t+1}$ is conditionally independent of the external reference distribution $\pi^\ast$:
+
+\[
+P(\Theta_{t+1}\mid \Theta_t,\pi^\ast)=P(\Theta_{t+1}\mid \Theta_t).
+\]
+
+This isolation condition implies that state updates from round $t$ to $t+1$ no longer incorporate external corrective information derived from $\pi^\ast$. Under the self-evolution mechanism outlined in Section \ref{sec:2-4-1-self-evolution-mechanism}, the generation of $\Theta_{t+1}$ proceeds by first deriving $\mathcal{D}_{t+1}$ from $\Theta_t$, followed by a $\mathcal{D}_{t+1}$-driven update. System evolution thus constitutes a Markov chain:
+
+% This isolation condition means that the update from round $t$ to round $t+1$ no longer introduces external correction information from $\pi^\ast$. Under the mechanism in Section \ref{sec:2-4-1-self-evolution-mechanism}, the generation of $\Theta_{t+1}$ can be viewed as first producing $\mathcal{D}_{t+1}$ from $\Theta_t$, and then updating driven by $\mathcal{D}_{t+1}$. Therefore, the system evolution forms a Markov chain:
+
+\[
+\pi^\ast \to \Theta_0 \to \mathcal{D}_1 \to \Theta_1 \to \cdots \to \mathcal{D}_t \to \Theta_t.
+\]
+
+\end{definition}
+
+\begin{takeaway}[Takeaway: Isolated Self-Evolution]
+We characterize the self-evolution process as an information-isolated Markov chain, where parameter updates are driven exclusively by synthetic data $\mathcal{D}_{t+1}$ sampled from the current system state $\Theta_t$. This isolation establishes a strict information barrier, implying that:
+
+\begin{enumerate}
+    \item the transition to the subsequent state $\Theta_{t+1}$ is conditionally independent of the external safety reference $\pi^\ast$;
+    \item the recursive update process operates without any fresh corrective signals or external supervision beyond the initial state.
+\end{enumerate}
+\end{takeaway}
+
+\subsection{Progressive Drift from Safety distribution in Self-evolution Iterations}
+\label{sec:2-5-thermodynamics-and-information-measures}
+
+In Sections 2.2--2.4, we specify the parametric model family $P_\theta$, the external safety reference distribution $\pi^\ast$, and the isolated recursive update mechanism that induces the round-$t$ training distribution $P_t$.
+To quantify whether the system deviates from the safety standard under isolated recursion, we require (i) computable, information-theoretic measures comparing $P_t$ with $\pi^\ast$, and (ii) a coverage notion that characterizes which $\pi^\ast$-relevant regions remain observable under finite sampling from $P_t$.
+
+\subsubsection{Divergence from Safety Reference and the Internal Entropy of System}
+\label{sec:2-5-1-alignment-error-decomposition}
+
+We first introduce a unified collection of divergence- and entropy-based quantities that will serve as the core instruments for quantifying safety deviation.
+
+\begin{definition}[Divergence and Entropy Measures]
+\label{def:2-6-safety-divergence}
+% (Optional backward-compatibility labels: these will now point to the same definition number.)
+\label{def:2-7-cross-entropy}
+\label{def:2-8-internal-entropy}
+
+For any round-$t$ system distribution $P_t$ and the external safety reference $\pi^\ast$:
+
+\begin{enumerate}
+    \item \textbf{Safety divergence (KL).} Define the KL divergence of the reference distribution relative to the round-$t$ system distribution as
+    \[
+    D_{\mathrm{KL}}\!\left(\pi^\ast \middle\|\, P_t\right)\triangleq \sum_{z\in\mathcal{Z}} \pi^\ast(z)\log\frac{\pi^\ast(z)}{P_t(z)}.
+    \]
+    Since $\pi^\ast$ is treated as an external safety standard, we will use
+    $D_{\mathrm{KL}}\!\left(\pi^\ast \middle\|\, P_t\right)$ as the core measure of safety deviation.
+
+    \item \textbf{Cross-entropy and reference entropy.} We define the cross-entropy between $\pi^\ast$ and $P_t$ as
+    \[
+    H(\pi^\ast,P_t)\triangleq -\sum_{z\in\mathcal{Z}} \pi^\ast(z)\log P_t(z),
+    \]
+    and define the Shannon entropy of $\pi^\ast$ as
+    \[
+    H(\pi^\ast)\triangleq -\sum_{z\in\mathcal{Z}} \pi^\ast(z)\log \pi^\ast(z).
+    \]
+
+    \item \textbf{Internal entropy.} We define the Shannon entropy of the round-$t$ system distribution as
+    \[
+    H(P_t)\triangleq -\sum_{z\in\mathcal{Z}} P_t(z)\log P_t(z).
+    \]
+\end{enumerate}
+
+\end{definition}
+
+\begin{lemma}[Cross-Entropy Decomposition]\label{lem:2-1-cross-entropy-decomposition}
+
+For any round-$t$ system distribution $P_t$, we have
+
+\[
+H(\pi^\ast,P_t)=H(\pi^\ast)+D_{\mathrm{KL}}\!\left(\pi^\ast \middle\|\, P_t\right).
+\]
+
+\begin{proof}
+The proof follows directly from expanding the logarithm terms in the definition of cross-entropy.
+\end{proof}
+\end{lemma}
+
+\begin{lemma}[KL Lower Bound by Safe Mass]\label{lem:2-2-kl-lower-bound-by-safe-mass}
+
+Under the safe set $\mathcal{S}\subseteq\mathcal{Z}$ given in Assumption \ref{assump:2-1-safety-support}, let $p\triangleq \pi^\ast(\mathcal{S})$ and $q\triangleq P_t(\mathcal{S})$. Then for any round-$t$ system distribution $P_t$, we have
+
+\[
+D_{\mathrm{KL}}\!\left(\pi^\ast \middle\|\, P_t\right)\ \ge\ p\log\frac{p}{q}+(1-p)\log\frac{1-p}{1-q}.
+\]
+
+\begin{proof}
+This follows from the data processing inequality by grouping states into $\mathcal{S}$ and $\mathcal{S}^c$.
+\end{proof}
+\end{lemma}
+
+\begin{lemma}[KL Decomposition by Safe Set]\label{lem:2-5-kl-decomposition-by-safe-set}
+
+Let $p\triangleq \pi^\ast(\mathcal{S})$ and $q_t\triangleq P_t(\mathcal{S})$. We have the decomposition identity
+
+\[
+D_{\mathrm{KL}}\!\left(\pi^\ast \middle\|\, P_t\right)=D_{\mathrm{KL}}\!\left((p,1-p)\,\middle\|\,(q_t,1-q_t)\right) + p\,D_{\mathrm{KL}}\!\left(\pi^\ast_{\mathcal{S}} \middle\|\, P^{\mathcal{S}}_t\right)+ (1-p)\,D_{\mathrm{KL}}\!\left(\pi^\ast_{\mathcal{S}^c} \middle\|\, P^{\mathcal{S}^c}_t\right).
+\]
+
+This decomposition shows that divergence arises from both mass mismatch (first term) and shape distortion within the safe set (second term).
+\end{lemma}
+
+\begin{lemma}[Information Monotonicity under Isolation]\label{lem:2-3-information-monotonicity-under-isolation}
+
+If the isolation condition in Definition \ref{def:2-5-isolation-condition} holds, then $(\pi^\ast,\Theta_t,\Theta_{t+1})$ forms a Markov chain $\pi^\ast \to \Theta_t \to \Theta_{t+1}$. Consequently, the mutual information satisfies
+
+\[
+I(\pi^\ast;\Theta_{t+1})\le I(\pi^\ast;\Theta_t).
+\]
+
+\begin{proof}
+This is a direct application of the data processing inequality to the Markov chain established in Definition \ref{def:2-5-isolation-condition}.
+\end{proof}
+\end{lemma}
+
+\subsubsection{Coverage Shrinkage and Safety Deviation under Self-Evolving}
+\label{sec:2-6-coverage-loss-and-safety-deviation-under-recursive-training}
+
+This subsection provides a logic chain from ``unseen regions under finite sampling'' to ``a decline in safe mass.''
+Under the isolation condition (Definition \ref{def:2-5-isolation-condition}), at each round the system samples from $P_t$ to obtain $\mathcal{D}_{t+1}$.
+
+\begin{definition}[Visible Region and Coverage]\label{def:2-9-visible-region-and-coverage}
+
+Given a threshold $\tau\in(0,1)$, we define the visible region and coverage at round $t$ as
+
+\[
+\mathcal{C}_t(\tau)\triangleq \{z\in\mathcal{Z}: P_t(z)\ge \tau\},\qquad \mathrm{Cov}_t(\tau)\triangleq \pi^\ast(\mathcal{C}_t(\tau)).
+\]
+\end{definition}
+
+\begin{lemma}[Absence Probability Bound from Finite Sampling]\label{lem:2-4-absence-probability-bound-from-finite-sampling}
+
+At round $t$, with dataset $\mathcal{D}_{t+1}$ of size $N$, for any set $\mathcal{A}\subseteq\mathcal{Z}$, we can achieve
+
+\[
+\mathbb{P}\bigl(\mathcal{D}_{t+1}\cap \mathcal{A}=\varnothing\bigr)
+=(1-P_t(\mathcal{A}))^N
+\le \exp\!\bigl(-N P_t(\mathcal{A})\bigr).
+\]
+
+When $N P_t(\mathcal{A})\le O(1)$, this probability is significant, meaning regions with low probability are likely to be entirely absent from the training data.
+\end{lemma}
+
+\begin{observation}[No Maintenance Signal for Missing Samples]\label{obs:2-1-no-maintenance-signal-for-missing-samples}
+
+If a set $\mathcal{A}$ is completely absent in this round (i.e., $\mathcal{D}_{t+1}\cap\mathcal{A}=\varnothing$), then the maximum-likelihood update contains no term that directly maintains the likelihood on $\mathcal{A}$.
+\end{observation}
+
+\begin{assumption}[Locality of Maintenance]\label{assump:2-2-locality-of-maintenance}
+
+We assume there exists a neighborhood operator $\mathcal{N}(\cdot)$ and a constant $\eta\in(0,1)$ such that if
+
+\[
+\mathcal{D}_{t+1}\cap \mathcal{N}(\mathcal{A})=\varnothing,
+\]
+
+then after this update, $\mathcal{A}$ satisfies a no-gain upper bound:
+
+\[
+\mathbb{E}\!\left[P_{t+1}(\mathcal{A})\ \big|\ \Theta_t,\ \mathcal{D}_{t+1}\cap \mathcal{N}(\mathcal{A})=\varnothing\right] \le (1-\eta)\,P_t(\mathcal{A}) + r_N.
+\]
+\end{assumption}
+
+\begin{theorem}[From Coverage Shrinkage to Divergence Growth]\label{thm:2-1-from-coverage-loss-to-divergence-growth}
+
+Consider a stage where there exists a set $\mathcal{A}\subseteq \mathcal{S}$ such that $\pi^\ast(\mathcal{A})\ge\delta$ but $P_t(\mathcal{N}(\mathcal{A}))\le c/N$. By Lemma~\ref{lem:2-3-information-monotonicity-under-isolation}, $\mathcal{N}(\mathcal{A})$ will be frequently absent from $\mathcal{D}_{t+1}$. Under Assumption~\ref{assump:2-2-locality-of-maintenance}, $P_t(\mathcal{A})$ faces systematic decay pressure.
+
+This decay leads to divergence growth via two paths:
+1.  \textbf{Unsafe leakage:} If mass flows to $\mathcal{S}^c$, $q_t=P_t(\mathcal{S})$ decreases. By Lemma~\ref{lem:2-2-kl-lower-bound-by-safe-mass}, the lower bound on $D_{\mathrm{KL}}\!\left(\pi^\ast \middle\|\, P_t\right)$ increases.
+2.  \textbf{Safe-mode collapse:} If mass remains in $\mathcal{S}$ but concentrates on a subset, the conditional shape $P^{\mathcal{S}}_t$ deviates from $\pi^\ast_{\mathcal{S}}$. By Lemma~\ref{lem:2-4-absence-probability-bound-from-finite-sampling}, this increases the term $p\,D_{\mathrm{KL}}\!\left(\pi^\ast_{\mathcal{S}} \middle\|\, P^{\mathcal{S}}_t\right)$.
+
+\end{theorem}
+
+\begin{corollary}[Typical Outcome of Isolated Self-Evolution]\label{cor:2-1-typical-outcome-of-isolated-self-evolution}
+
+Under the isolation condition, if recursive training enters a distribution-concentration stage where parts of the safe set $\mathcal{S}$ fall to the $O(1/N)$ level, these regions will lack maintenance signals. This leads to a reduction in safe mass or to a collapse within the safe set, both of which increase the safety divergence. Thus, isolated self-evolution typically moves toward the degradation of the safety distribution.
+
+\end{corollary}
+
+\begin{takeaway}[Takeaway: The safety distribution of an isolated self-evolving system tends to drift.]
+Finite sampling creates coverage blind spots, depriving rare safe regions of maintenance signals. As self-evolution proceeds, the safe probability mass $P_t(\mathcal{S})$ diminishes, representing the system's progressive ``forgetting'' of safety constraints. Conversely, the safety divergence $D_{\mathrm{KL}}$ accumulates, driving the system's distribution further away from human values.
+
+\noindent \textbf{Visual Illustration.} As illustrated in Figure~\ref{section2_drift}, this dynamic manifests as the system distribution (colored ridges) progressively \textbf{decouples} from the safety ground truth (gray surface) and \textbf{collapses} into a narrow, misaligned mode over time ($t=0 \to 100$).
+\end{takeaway}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=12cm]{image/section2_drift.png}
+\caption{Illustration of distribution drift under isolated self-evolving. The gray surface indicates the safety ground-truth distribution $\pi^\ast$.}
+\label{section2_drift}
+\end{figure}

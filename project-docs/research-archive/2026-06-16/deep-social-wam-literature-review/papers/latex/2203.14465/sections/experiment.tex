@@ -1,0 +1,206 @@
+% \vspace{-10px}
+\section{Experiments}\label{experimentssection}
+\vspace{-7px}
+For our experiments, we focus on arithmetic, commonsense reasoning, and grade school math to demonstrate STaR's breadth. In particular, for arithmetic, we follow a setup inspired by \citet{nye2021show}. For commonsense question-answering we follow \citet{xie2021explanation, wei2022chain} and use CommonsenseQA (CQA), a widely used multiple-choice dataset for this domain \citep{talmor2019commonsenseqa}. For grade school math, we use GSM8K from \citet{cobbe2021training}.
+\vspace{-4px}
+\subsection{Experimental Protocol} \label{expproto}
+\vspace{-4px}
+We used GPT-J as our base language model, and the fine-tuning script from the GPT-J repository \citep{mesh-transformer-jax}. We chose GPT-J, a 6B-parameter model, because the checkpoint and fine-tuning code are publicly available \citep{mesh-transformer-jax}, and the model is large enough to generate rationales of non-trivial quality to be bootstrapped from. More hyperparameter details about GPT-J and our fine-tuning are included in Appendix~\ref{hyperparameters}. 
+Following the default setting of~\citet{mesh-transformer-jax}, we perform a 100-step learning rate warmup, from which point we use a constant learning rate. Unless stated otherwise, we start with $40$ training steps at the first outer loop, and increase the number of fine-tuning training steps by $20\%$ with each outer loop. In general, we found that training more slowly at the beginning ultimately benefits model performance. We expect that further improvement is possible via a thorough hyperparameter search---we leave this to future work due to computational constraints.
+
+For arithmetic problems, we first generate a dataset of 50,000 randomly sampled questions (uniformly over the digit lengths) in the format introduced by~\citet{nye2021show}. For each outer loop iteration on arithmetic, we sample 10,000 problems from the dataset. We use 10 random few-shot rationale examples for each digit for its corresponding few-shot prompt.
+For each of the $9,741$ questions in the training set of CommonsenseQA, we add the question to the few-shot rationale prompt, and prompt the model to generate the rationale and answer for that question.
+For few shot prompting on CQA, we start with the same 10 questions as used in \citet{wei2022chain}, with the rationales modified slightly to fix an incorrect answer and to more explicitly reference relevant knowledge. We include these modified prompts in Appendix~\ref{modifiedprompts}\footnote{Based on \citet{min2022rethinking}, this is unlikely to meaningfully affect \citeauthor{wei2022chain}'s few-shot performance.}. These prompts serve as our complete set of explanations. We run STaR until we see performance saturate, and we report the best results. 
+
+When performing rationalization, we find that the choice to include or omit few-shot prompts on outer-loop iterations after the first iteration does not have a substantial impact on the method's ultimate performance. However, there are some nuances which we discuss further in Section~\ref{fewshotprompting}, leading us to use few-shot prompts unless stated otherwise. 
+\subsection{Datasets}
+\paragraph{Arithmetic}
+
+\begin{wrapfigure}{r}{0.3\textwidth} \vspace{-37px}
+{
+\small
+\begin{verbatim}
+Input:
+6 2 4 + 2 5 9
+Target:
+<scratch>
+6 2 4 + 2 5 9 , C: 0
+2 + 5 , 3  C: 1
+6 + 2 , 8 3  C: 0
+, 8 8 3  C: 0
+0 8 8 3 
+</scratch>
+8 8 3
+\end{verbatim}
+}\vspace{-5pt}
+\caption{A visualization of a 3-digit arithmetic problem with a scratchpad. C corresponds to the carry from the previous digit's summation.}
+\vspace{-10pt}
+\label{fig:examplescratchpad}
+\end{wrapfigure}
+
+The arithmetic task is to calculate the sum of two $n$-digit integers. We generate the dataset based on the descriptions in~\citet{nye2021show} and visualize an example scratchpad in Figure~\ref{fig:examplescratchpad}. Everything up to and including ``\texttt{Target:}'' is given as part of a prompt, and the model is asked to generate the scratchpad (start/end indicated by ``\texttt{<scratch>}'') and the final answer, as in \citet{nye2021show}. Each line of the scratchpad corresponds to the summation of each pair of digits from the final digit to the first digit, the accumulating final digits of the answer, and a carry digit corresponding to whether the previous pair summed to at least 10. We include few-shot prompts for 1 to 5 digits. When performing rationalization, we include the correct answer after ``\texttt{Target}'' and query the model to produce the scratchpad and then reproduce the correct answer following the scratchpad.
+
+\paragraph{CommonsenseQA}
+\label{commonsensedataset}
+The multiple-choice commonsense reasoning task, CommonsenseQA \citep{talmor2019commonsenseqa} (CQA), is constructed from  ConceptNet, a semantic graph of concepts and their relationships with over a million nodes \citep{speer2016conceptnet}. \citeauthor{talmor2019commonsenseqa} identified a set of ``target'' concepts in ConceptNet for each question, where the target concepts share a semantic relationship to one ``source'' concept. Then each question is crowdsourced to allow a reader to identify one target concept, while mentioning the source concept. In addition, two distractor answers are added. The dataset has 12,247 questions, each with five choices, with 9,741 in the train set, 1,221 in the dev set, and 1,285 in the (withheld) test set. 
+
+Corresponding to the broad variety of ConceptNet, CQA contains a diverse set of questions which require commonsense reasoning ability building off of standard world knowledge, where human performance is 89\% \citep{talmor2019commonsenseqa}. Many have pointed out that CQA contains a number of biases, along several dimensions including gender \citep{rajani2019explain}. We discuss how this may impact our method in Appendix~\ref{biasexplanation}. There are also many typos and questions which are fundamentally ambiguous\footnote{For example, ``Billy bought coffee and waited for his wife to arrive from  France.  Where might he have been?'' includes airport and train station as options. The correct answer, perhaps surprisingly, is train station.}. We use it despite these issues as it is a general question-answering dataset relying on both common world knowledge and simple reasoning, which serves as a good test-bed for our method.
+
+\paragraph{Grade School Math (GSM8K)}
+\label{gsmdataset}
+We also evaluate on the Grade School Math (GSM8K) dataset, which contains 7,473 train and 1,319 test examples of grade-school-level word problems \citep{cobbe2021training}. These math problems are posed in natural language and require two to eight calculation steps to arrive at a final answer. This dataset combines the skills needed for arithmetic and commonsense reasoning.
+\vspace{-5px}
+
+\subsection{Symbolic Reasoning: Results on Arithmetic} \label{arithmeticresults}
+
+The accuracies of the model across digits $1$-$5$ over each iteration of the outer loop are plotted in Figure~\ref{fig:digitschange}. After running STaR for 16 iterations, the overall accuracy is $89.5\%$. For reference, a baseline trained on 10,000 examples without rationales for 5,000 steps attains $76.3\%$ accuracy.
+Notably, few-shot accuracy on arithmetic problems is very low, even with rationales: accuracy on 2-digit addition is less than $1\%$, and accuracy on more digits close to zero. 
+
+
+\begin{figure}
+\centering
+\hspace{-40px}
+\begin{subfigure}{.46\textwidth}
+  \centering
+    {
+    \small
+\hspace{3px}\includegraphics[width=\textwidth]{figures/reasoningdigits.pdf}\vspace{-2px} 
+\caption{Without rationalization}\vspace{-2px}
+}
+\end{subfigure}
+\begin{subfigure}{.46\textwidth}
+  \centering
+    {
+\hspace{3px}\includegraphics[width=\textwidth]{figures/rationalizedigits.pdf}\vspace{-2px}
+\caption{With rationalization}\vspace{-2px}
+}
+\end{subfigure}
+\hspace{-40px}
+\caption{A visualization of the accuracy of $n$-digit summation with each iteration of STaR with and without rationalization for arithmetic. Each series corresponds to the accuracy of summing two $n$-digit numbers. 
+}
+\vspace{-15px}
+\label{fig:digitschange}
+\end{figure}
+
+\begin{wrapfigure}{r}{0.46\textwidth}
+\vspace{-20px}
+{
+\centering
+\hspace{3px}\includegraphics[width=0.46\textwidth]{figures/extended_rationalization.pdf}\vspace{-2px} 
+}\vspace{-10px}
+\caption{We introduce additional digits to STaR with rationalization at the 20$^{th}$ iteration.}
+\label{fig:additionaldigits}
+\vspace{-10px}
+\end{wrapfigure}
+
+With rationalization, the accuracy is able to improve especially quickly.
+After one fine-tuning iteration on the model's generated scratchpads, 2-digit addition improves to $32\%$ from less than 1\%.
+Without rationalization, the performance improvement is stage-wise: the model generally has poor performance on the $n$-digit sum until it has good performance on the $(n-1)$-digit sum. With rationalization, the model can learn many lengths at once, though not with equal accuracy. 
+Rationalization allows many problems to be solved few-shot, so we start STaR training with 300 steps (note, doing so without rationalization causes overfitting on $1$-digit addition), and increase training by 20 steps per iteration. 
+
+We also perform an experiment where we continue pre-training STaR with rationalization with additional digits, starting before the 20th iteration, while keeping the total number of training examples fixed at each iteration. We find that not only does this appear to quickly improve performance on the initial set of digits, but when evaluated on 9 and 10 digit examples, never seen during training, the model successfully solves many of these out-of-distribution problems. As visualized in Figure~\ref{fig:additionaldigits}, the introduction of these digits appears to make the training less stable, but the exact cause is unclear.
+
+\vspace{-5px}\subsection{Natural Language Reasoning: Commonsense Question Answering}\label{commonsenseqaresults}
+\vspace{-4px}
+
+The CommonsesenseQA (CQA) setting introduces several new challenges. In the arithmetic task, an incorrect scratchpad in the reasoning step, and to a lesser degree in the rationalization step, was extremely likely to result in an incorrect answer. On the other hand, CQA problems are 5-way multiple choice questions. Thus, one will get the right answer at random approximately 20\% of the time, regardless of the quality of reasoning. Moreover, some simple heuristics (e.g. semantic similarity) can meaningfully improve this to $\approx$30\% without any reasoning, as shown by~\citeauthor{talmor2019commonsenseqa}. 
+
+We evaluate this dataset as described in the experimental protocol and compare to several baselines.
+The first baseline is to finetune GPT-J to directly output the final answer, which we call ``GPT-J Finetuned''. We also compare to GPT-3 finetuned to directly predict the final answer from \citet{xu2021human}, and a 137B parameter Lambda model few-shot prompted with chain-of-thought (CoT) rationales from \citet{wei2022chain}.
+
+We found that, as shown in Table~\ref{tab:maintable}, STaR without rationalization outperformed GPT-J fine-tuned directly on the final answer for the entire dataset, despite training on less of the data. The inclusion of rationalization improved this performance to $72.5\%$, far closer to the $73\%$ of the 30$\times$ larger GPT-3. As expected, we also see STaR surpassed the few-shot baselines, including the much-larger 137B LaMDA model \citep{thoppilan2022LaMDA,wei2022chain}. We expect accuracy would be further improved if we applied STaR to a model with higher few-shot performance.
+\paragraph{Case Study} Note that it is harder to judge the rationale quality: for arithmetic, one can compare them to the ground truth rationales, but for CQA the evaluation is necessarily qualitative. For this reason, we include a case study in Figure~\ref{fig:exampleresult}. We observe that the rationales provided are generally coherent and of a similar structure to the few-shot rationales. We make the following two observations:\vspace{-5px}
+\begin{enumerate}
+    \itemsep0em 
+    \item After training with STaR, we see the model was able to generate reasonable rationales that solve new problems, which explains part of the observed performance gain.
+    \item We also see that there were many instances in which STaR improved the quality of rationales over those generated in a few-shot manner.  
+\end{enumerate}\vspace{-5px}
+\begin{table}[]
+\caption{We evaluate several baselines, including a few-shot GPT-J evaluation both with and without scratchpads, a GPT-J baseline finetuned to directly predict the answer, and STaR with and without rationalization applied to GPT-J. We use CoT to denote non-STaR models outputting rationales, and Direct to indicate those directly predicting the final answer. Note the final STaR model is trained on 78.2\% of the training dataset with rationale generation, and an additional 8.5\% from rationalization.}
+\centering
+\resizebox{0.8\textwidth}{!}{%
+\begin{tabular}{lcc}
+                                         & CQA Dev Set Accuracy (\%) & Train Data Used (\%)   \\ \cline{2-3} 
+\textit{GPT-3 Direct Finetuned \citep{xu2021human}} & \textit{73.0}      & 100                       \\ \hline
+Few-shot Direct GPT-J                           & 20.9               & $\sim$0                   \\
+Few-shot CoT GPT-J  \footnotemark               & 36.6               & $\sim$0                   \\
+Few-shot CoT LaMDA 137B~\citep{wei2022chain}& 55.6               & $\sim$0                   \\
+GPT-J Direct Finetuned                          & 60.0               & 100                       \\
+STaR without rationalization             & 68.8               & 69.7                      \\
+STaR with rationalization                      & \textbf{72.5}      & 86.7 \\ \hline
+\end{tabular}%
+}
+\vspace{8px}
+\label{tab:maintable}
+\vspace{-22px}
+\end{table}
+\footnotetext{We use the same few-shot rationales as described in Section~\ref{expproto} - namely fixing typos and improving clarity.}
+
+\paragraph{Human Evaluation} \label{qualitative}
+Based on the observation that STaR may improve reasoning quality for problems even when they were initially answered correctly via few-shot prompting, we performed a preliminary qualitative analysis. We randomly selected 50 rationales generated from few-shot CoT and STaR-generated rationales on questions which they both answered correctly, as well as human-generated rationales for these problems from \citeauthor{rajani2019explain}. We then presented a random subset of 10 questions and rationales to each of 20 crowdworkers on Prolific \citep{palan2018prolific} with the rationales in a randomized order, asking them to rank the rationales based on which they felt best justified the answer. The participants were 30\% more likely to rank the STaR-generated rationales higher than the few-shot rationales ($p=.039$). This indicates that, as mentioned in the case study, STaR can improve the quality of rationale generation.
+
+We also found that the participants were 74\% more likely to prefer the STaR-generated rationales over the human-generated rationales ($p$ < $.001$). To be clear, we do not believe that this indicates human-level rationale-generation performance. Instead, we feel that it speaks to the difficulty of eliciting high-quality rationales. We reproduce the test prompts in Appendix~\ref{humantext} and elaborate on the limitations of the crowdsourced explanations dataset. 
+
+\paragraph{Failure Cases} Finally, we found a variety of interesting failure cases, many of which corresponded to standard logical fallacies. For example, the model often made statements related to the topic of the question but which were not actually arguments for why the answer should be true. Sometimes, the model claimed the question implied the answer as an argument, without explaining why. Other times, especially early in training, the model answered as if it has knowledge about a particular individual, instead of making a general statement - e.g. ``the king's castle is a place where he feels safe'' instead of ``castles are places where kings feel safe.'' We provide examples and analyze errors in Appendix~\ref{errorpatterns}.
+
+
+
+\paragraph{Few-shot  Prompt Training}
+Including few-shot prompts during fine-tuning~\citep{wei2021finetuned} appears to have a meaningful performance benefit (60.9\% to 68.8\% without rationalization, 69.9\% to 72.5\% with rationalization). Thus, we generally suggest its use for at least some portion of the training, though we discuss some caveats in Section~\ref{fewshotprompting}.
+
+\begin{table}[]
+\caption{We find that STaR substantially improves GSM8K performance over the baselines, despite training on only 25.0\% of the data for the model without rationalization, and 28.7\% of the dataset (with 0.5\% from rationalization) for the model with rationalization.}
+\centering
+\resizebox{0.8 \textwidth}{!}{%
+\begin{tabular}{lcc}
+                                         & GSM8K Test Accuracy (\%) & Train Data Used (\%)  
+\\ \hline
+Few-shot Direct GPT-J                           & 3.0               & $\sim$0                   \\
+Few-shot CoT GPT-J              & 3.1               & $\sim$0                   \\
+GPT-J Direct Finetuned                          & 5.8               & 100                       \\
+STaR without rationalization             & 10.1               & 25.0                      \\
+STaR with rationalization                                & \textbf{10.7}      & 28.7 \\ \hline
+\end{tabular}%
+}
+\vspace{-10px}
+\label{tab:gsmtable}
+\end{table}
+
+\begin{wrapfigure}{r}{0.47\textwidth}
+\vspace{-20px}
+{
+\centering
+\includegraphics[width=0.47\textwidth]{figures/counts_heatmap.pdf}
+}\vspace{-10px}
+\caption{ A comparison of the number of calculator steps generated by the model in order to solve examples in the training set relative to the number of steps used in the ground truth.}
+\label{fig:calculationcorrelation}
+\vspace{-20px}
+\end{wrapfigure}
+
+\vspace{-5px}
+\subsection{Mathematical Reasoning in Language: Grade School Math}\label{gsm8k}
+
+We again find on GSM8K that STaR substantially improves performance beyond few-shot with rationales or training to directly predict the answers (without rationales), shown in Table~\ref{tab:gsmtable} and include the few-shot prompt in Appendix~\ref{gsm8kprompts}. We observe that on this task, the use of rationalization does not substantially improve performance. Note that, in training, it was necessary to cap the number of training steps at the 30th iterations (after 7912 steps), to prevent the training process from becoming prohibitively long. The results were reached after 36 iterations for STaR without rationalization and an additional 10 iterations with rationalization.
+
+Most often, the number of calculation steps generated by the model matches the number of steps taken by humans (generally between 53\% and 57\% agreement across all iterations). We visualize this explicitly in Figure~\ref{fig:calculationcorrelation}. We see that when the ground truth and model disagree on the number of calculation steps, the model typically uses fewer. Sometimes this is because the model skips steps, but occasionally it finds different solutions. We show an example in Appendix~\ref{gsm8ksolutions}, where the model disregards redundant information and solves a 7-step problem in a single step.
+
+
+\vspace{-8px}
+\section{Discussion and Challenges} \label{challenges}
+\paragraph{The Impact of Rationalization}
+An essential question is exactly what role rationalization plays.
+Intuitively, rationalization allows a model to reverse-engineer a solution, or provides a heuristic for identifying whether each step makes the conclusion more likely. This parallels real-world problems where the final result is known, but challenging to derive a good justification.
+From a mathematical perspective, while rationale generation samples rationales from the distribution $p(r \mid x)$ provided by our model $M$, rationalization conditions on the answer, letting us access an alternative distribution $p(r \mid x, y)$ which may be a better search space for rationales. Then rationalization could be framed as an off-policy estimate of the objective in Equation~\ref{eq:rl}, sampling from the hint-augmented model as a proposal distribution. Future work should establish more connections between rationalization and these RL objectives, and examine more generally when and why rationalization improves learning. 
+
+In addition, due to the low sampling temperature, the outputs without rationalization correspond to the examples where the model is most confident in its answer. This results in these examples providing a weaker gradient signal than the rationalization examples, at least in the first iteration. Since we retrain from the initial pre-trained model every time we run a fine-tuning iteration, the degree of this effect is also difficult to measure directly. 
+Finally, we must point out that the method to add the ``hint'' does not follow immediately from the question and answer and in some contexts providing it may be nontrivial. An exploration of the various impacts of different hinting techniques and their generality is an avenue for future work.
+
+\paragraph{Temperature}
+One intuitive alternative to rationalization, if one seeks to expand the training dataset, is more and higher-temperature sampling. However, in practice, we found that this is counterproductive. In general, it substantially increases the likelihood of a correct answer despite incorrect reasoning, and training on bad or irrelevant reasoning prevents generalization. This is particularly clear in more structured tasks, like arithmetic, where the scratchpads that the model learns to produce with a higher-temperature sampling approach diverge into meaninglessness and cause the model to stagnate. Overall, we found that higher temperatures as an alternative to rationalization (e.g. $0.5$ or $0.7$) consistently led to models worse than models with reasoning alone. In addition, as text generation by large language models is sequential (i.e. one cannot produce a token without producing the preceding token), generating text is a bottleneck and this is computationally far less efficient than rationalization. For example, generating 10 sample outputs is approximately 10 times slower than generating one sample output. However, one potentially valuable way to leverage multiple samples would be to use the method proposed in \citet{wang2022selfconsist}, using the majority-vote result of multiple high-temperature scratchpads as a ground truth against which we compare a low-temperature scratchpad. This may allow one to apply STaR to a dataset of only questions, without answers.
+
+
+\paragraph{Few-shot Prompting}
+\label{fewshotprompting}
+A noteworthy phenomenon is that the inclusion of few-shot prompting during sampling seems to dramatically reduce ``drift'' where later rationales become increasingly dissimilar from the initial few-shot set of rationales. One benefit of this is that the model may be less constrained by the quality and difficulty of the initial rationales, theoretically allowing it to generalize more. One potentially negative consequence is that the style of the rationales may less-closely match the original prompting style. Another benefit is in terms of computational resources - a shorter prompt length allows for a shorter sequence length when sampling. Technically, the point in training at which we ``disable'' few-shot prompts is another hyperparameter which we could tune, but we leave this to future work. In addition, by leaving prompts out after the initial outer-loop iteration, the model tends to perform gradually worse at rationalization as it trains for longer periods of time. As a result, it may be necessary to include some hints during training for long periods of time with this approach. 
+
+Ultimately, the choice to include few-shot prompts in later iterations of training appears to depend on the use-case: when the goal is consistent adherence to a particular prompt style, which may benefit explainability, include few-shot prompts in sampling; when the goal is a faster training loop, one may remove them. Moreover, it is possible that with other datasets or larger models there is an impact on performance, so we encourage this to be generally treated as a hyperparameter. 

@@ -1,0 +1,661 @@
+{
+\captionsetup{type=figure}
+\captionof{figure}{Trajectory for instance \texttt{psf\_\_requests-2317}.}
+\begin{issuebox}[psf\_\_requests-2317]We're currently solving the following issue within our repository. Here's the issue text:
+
+ISSUE:
+
+method = builtin\_str(method) problem
+
+In requests/sessions.py is a command:
+
+
+
+method = builtin\_str(method)
+
+Converts method from
+
+b’GET’
+
+to
+
+"b'GET’"
+
+
+
+Which is the literal string, no longer a binary string.  When requests tries to use the method "b'GET’”, it gets a 404 Not Found response.
+
+
+
+I am using python3.4 and python-neutronclient (2.3.9) with requests (2.4.3).  neutronclient is broken because it uses this "args = utils.safe\_encode\_list(args)" command which converts all the values to binary string, including method.
+
+
+
+I'm not sure if this is a bug with neutronclient or a bug with requests, but I'm starting here.  Seems if requests handled the method value being a binary string, we wouldn't have any problem.
+
+
+
+Also, I tried in python2.6 and this bug doesn't exist there. Some difference between 2.6 and 3.4 makes this not work right.
+
+
+
+
+
+
+
+
+
+
+
+INSTRUCTIONS: (31 lines)
+
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+(Open file: n/a)
+(Current directory: /psf__requests)
+bash-\$
+\end{CodeVerbatim}
+\end{issuebox}
+\begin{agentbox}[psf\_\_requests-2317]
+To address the issue, we first need to replicate the behavior described. The issue mentions that the `builtin\_str` function in `requests/sessions.py` is converting a binary string method like `b'GET'` into the literal string `''b'GET'''`, which is incorrect. We should start by locating the `sessions.py` file within the `requests` library to examine the code around the `builtin\_str` function call.
+
+
+
+Let's begin by finding the `sessions.py` file in the current repository.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+find_file "sessions.py"
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+Found 2 matches for "sessions.py" in /psf__requests:
+/psf__requests/build/lib/requests/sessions.py
+/psf__requests/requests/sessions.py
+
+(Open file: n/a)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+We have found two matches for `sessions.py`. The one in the `build/lib/requests` directory is likely a build artifact, and the one we're interested in is probably `/psf\_\_requests/requests/sessions.py`. Let's open this file to inspect the code around the `builtin\_str` function call.
+
+
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+open requests/sessions.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /psf__requests/requests/sessions.py (671 lines total)]
+1:# -*- coding: utf-8 -*-
+2:
+3:"""
+4:requests.session
+5:~~~~~~~~~~~~~~~~
+6:
+7:This module provides a Session object to manage and persist settings across
+8:requests (cookies, auth, proxies).
+9:
+10:"""
+11:import os
+12:from collections import Mapping
+13:from datetime import datetime
+14:
+15:from .auth import _basic_auth_str
+16:from .compat import cookielib, OrderedDict, urljoin, urlparse, builtin_str
+17:from .cookies import (
+18:    cookiejar_from_dict, extract_cookies_to_jar, RequestsCookieJar, merge_cookies)
+19:from .models import Request, PreparedRequest, DEFAULT_REDIRECT_LIMIT
+20:from .hooks import default_hooks, dispatch_hook
+21:from .utils import to_key_val_list, default_headers, to_native_string
+22:from .exceptions import (
+23:    TooManyRedirects, InvalidSchema, ChunkedEncodingError, ContentDecodingError)
+24:from .structures import CaseInsensitiveDict
+25:
+26:from .adapters import HTTPAdapter
+27:
+28:from .utils import (
+29:    requote_uri, get_environ_proxies, get_netrc_auth, should_bypass_proxies,
+30:    get_auth_from_url
+31:)
+32:
+33:from .status_codes import codes
+34:
+35:# formerly defined here, reexposed here for backward compatibility
+36:from .models import REDIRECT_STATI
+37:
+38:
+39:def merge_setting(request_setting, session_setting, dict_class=OrderedDict):
+40:    """
+41:    Determines appropriate setting for a given request, taking into account the
+42:    explicit setting on that request, and the setting in the session. If a
+43:    setting is a dictionary, they will be merged together using `dict_class`
+44:    """
+45:
+46:    if session_setting is None:
+47:        return request_setting
+48:
+49:    if request_setting is None:
+50:        return session_setting
+51:
+52:    # Bypass if not a dictionary (e.g. verify)
+53:    if not (
+54:            isinstance(session_setting, Mapping) and
+55:            isinstance(request_setting, Mapping)
+56:    ):
+57:        return request_setting
+58:
+59:    merged_setting = dict_class(to_key_val_list(session_setting))
+60:    merged_setting.update(to_key_val_list(request_setting))
+61:
+62:    # Remove keys that are set to None.
+63:    for (k, v) in request_setting.items():
+64:        if v is None:
+65:            del merged_setting[k]
+66:
+67:    merged_setting = dict((k, v) for (k, v) in merged_setting.items() if v is not None)
+68:
+69:    return merged_setting
+70:
+71:
+72:def merge_hooks(request_hooks, session_hooks, dict_class=OrderedDict):
+73:    """
+74:    Properly merges both requests and session hooks.
+75:
+76:    This is necessary because when request_hooks == {'response': []}, the
+77:    merge breaks Session hooks entirely.
+78:    """
+79:    if session_hooks is None or session_hooks.get('response') == []:
+80:        return request_hooks
+81:
+82:    if request_hooks is None or request_hooks.get('response') == []:
+83:        return session_hooks
+84:
+85:    return merge_setting(request_hooks, session_hooks, dict_class)
+86:
+87:
+88:class SessionRedirectMixin(object):
+89:    def resolve_redirects(self, resp, req, stream=False, timeout=None,
+90:                          verify=True, cert=None, proxies=None):
+91:        """Receives a Response. Returns a generator of Responses."""
+92:
+93:        i = 0
+94:        hist = [] # keep track of history
+95:
+96:        while resp.is_redirect:
+97:            prepared_request = req.copy()
+98:
+99:            if i > 0:
+100:                # Update history and keep track of redirects.
+(571 more lines below)
+
+(Open file: n/a)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+The `sessions.py` file is now open, but the `builtin\_str` function call is not visible in the first 100 lines of the file. Since we don't have the exact line number where the `builtin\_str` function is called, we'll need to search within the file for it.
+
+
+
+Let's use the `search\_file` command to find the usage of `builtin\_str` within `sessions.py`.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+search_file "builtin_str"
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+Found 2 matches for "builtin_str" in /psf__requests/requests/sessions.py:
+Line 16:from .compat import cookielib, OrderedDict, urljoin, urlparse, builtin_str
+Line 428:        method = builtin_str(method)
+End of matches for "builtin_str" in /psf__requests/requests/sessions.py
+
+(Open file: /psf__requests/requests/sessions.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+We have found two occurrences of `builtin\_str` in `sessions.py`. The second occurrence on line 428 is where the method is being converted to a string. We should inspect this line to understand the context and see how we can address the issue.
+
+
+
+Let's navigate to line 428 in `sessions.py` to see the relevant code.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+goto 428
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /psf__requests/requests/sessions.py (671 lines total)]
+(412 more lines above)
+413:            data before giving up, as a float, or a (`connect timeout, read
+414:            timeout <user/advanced.html#timeouts>`_) tuple.
+415:        :type timeout: float or tuple
+416:        :param allow_redirects: (optional) Set to True by default.
+417:        :type allow_redirects: bool
+418:        :param proxies: (optional) Dictionary mapping protocol to the URL of
+419:            the proxy.
+420:        :param stream: (optional) whether to immediately download the response
+421:            content. Defaults to ``False``.
+422:        :param verify: (optional) if ``True``, the SSL cert will be verified.
+423:            A CA_BUNDLE path can also be provided.
+424:        :param cert: (optional) if String, path to ssl client cert file (.pem).
+425:            If Tuple, ('cert', 'key') pair.
+426:        """
+427:
+428:        method = builtin_str(method)
+429:
+430:        # Create the Request.
+431:        req = Request(
+432:            method = method.upper(),
+433:            url = url,
+434:            headers = headers,
+435:            files = files,
+436:            data = data or {},
+437:            json = json,
+438:            params = params or {},
+439:            auth = auth,
+440:            cookies = cookies,
+441:            hooks = hooks,
+442:        )
+443:        prep = self.prepare_request(req)
+444:
+445:        proxies = proxies or {}
+446:
+447:        settings = self.merge_environment_settings(
+448:            prep.url, proxies, stream, verify, cert
+449:        )
+450:
+451:        # Send the request.
+452:        send_kwargs = {
+453:            'timeout': timeout,
+454:            'allow_redirects': allow_redirects,
+455:        }
+456:        send_kwargs.update(settings)
+457:        resp = self.send(prep, **send_kwargs)
+458:
+459:        return resp
+460:
+461:    def get(self, url, **kwargs):
+462:        """Sends a GET request. Returns :class:`Response` object.
+463:
+464:        :param url: URL for the new :class:`Request` object.
+465:        :param \*\*kwargs: Optional arguments that ``request`` takes.
+466:        """
+467:
+468:        kwargs.setdefault('allow_redirects', True)
+469:        return self.request('GET', url, **kwargs)
+470:
+471:    def options(self, url, **kwargs):
+472:        """Sends a OPTIONS request. Returns :class:`Response` object.
+473:
+474:        :param url: URL for the new :class:`Request` object.
+475:        :param \*\*kwargs: Optional arguments that ``request`` takes.
+476:        """
+477:
+478:        kwargs.setdefault('allow_redirects', True)
+479:        return self.request('OPTIONS', url, **kwargs)
+480:
+481:    def head(self, url, **kwargs):
+482:        """Sends a HEAD request. Returns :class:`Response` object.
+483:
+484:        :param url: URL for the new :class:`Request` object.
+485:        :param \*\*kwargs: Optional arguments that ``request`` takes.
+486:        """
+487:
+488:        kwargs.setdefault('allow_redirects', False)
+489:        return self.request('HEAD', url, **kwargs)
+490:
+491:    def post(self, url, data=None, json=None, **kwargs):
+492:        """Sends a POST request. Returns :class:`Response` object.
+493:
+494:        :param url: URL for the new :class:`Request` object.
+495:        :param data: (optional) Dictionary, bytes, or file-like object to send in the body of the :class:`Request`.
+496:        :param json: (optional) json to send in the body of the :class:`Request`.
+497:        :param \*\*kwargs: Optional arguments that ``request`` takes.
+498:        """
+499:
+500:        return self.request('POST', url, data=data, json=json, **kwargs)
+501:
+502:    def put(self, url, data=None, **kwargs):
+503:        """Sends a PUT request. Returns :class:`Response` object.
+504:
+505:        :param url: URL for the new :class:`Request` object.
+506:        :param data: (optional) Dictionary, bytes, or file-like object to send in the body of the :class:`Request`.
+507:        :param \*\*kwargs: Optional arguments that ``request`` takes.
+508:        """
+509:
+510:        return self.request('PUT', url, data=data, **kwargs)
+511:
+512:    def patch(self, url, data=None, **kwargs):
+(159 more lines below)
+
+(Open file: /psf__requests/requests/sessions.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+We are now looking at the section of the `sessions.py` file where the `builtin\_str` function is used to convert the `method` variable. According to the issue, this conversion is causing a problem when the `method` is a binary string because it's being converted to a literal string that includes the binary prefix `b'...'`.
+
+
+
+To address this issue, we need to ensure that the `method` variable is correctly converted to a string without the binary prefix. This might involve checking the type of the `method` variable and handling binary strings differently from regular strings.
+
+
+
+Let's edit the line to add a check that ensures binary strings are decoded to regular strings before being passed to `builtin\_str`.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+edit 428:428
+        # Ensure method is a string, decode if it's a binary string
+        if isinstance(method, bytes):
+            method = method.decode('ascii')
+        method = builtin_str(method)
+end_of_edit
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /psf__requests/requests/sessions.py (674 lines total)]
+(377 more lines above)
+378:    def request(self, method, url,
+379:        params=None,
+380:        data=None,
+381:        headers=None,
+382:        cookies=None,
+383:        files=None,
+384:        auth=None,
+385:        timeout=None,
+386:        allow_redirects=True,
+387:        proxies=None,
+388:        hooks=None,
+389:        stream=None,
+390:        verify=None,
+391:        cert=None,
+392:        json=None):
+393:        """Constructs a :class:`Request <Request>`, prepares it and sends it.
+394:        Returns :class:`Response <Response>` object.
+395:
+396:        :param method: method for the new :class:`Request` object.
+397:        :param url: URL for the new :class:`Request` object.
+398:        :param params: (optional) Dictionary or bytes to be sent in the query
+399:            string for the :class:`Request`.
+400:        :param data: (optional) Dictionary or bytes to send in the body of the
+401:            :class:`Request`.
+402:        :param json: (optional) json to send in the body of the
+403:            :class:`Request`.
+404:        :param headers: (optional) Dictionary of HTTP Headers to send with the
+405:            :class:`Request`.
+406:        :param cookies: (optional) Dict or CookieJar object to send with the
+407:            :class:`Request`.
+408:        :param files: (optional) Dictionary of ``'filename': file-like-objects``
+409:            for multipart encoding upload.
+410:        :param auth: (optional) Auth tuple or callable to enable
+411:            Basic/Digest/Custom HTTP Auth.
+412:        :param timeout: (optional) How long to wait for the server to send
+413:            data before giving up, as a float, or a (`connect timeout, read
+414:            timeout <user/advanced.html#timeouts>`_) tuple.
+415:        :type timeout: float or tuple
+416:        :param allow_redirects: (optional) Set to True by default.
+417:        :type allow_redirects: bool
+418:        :param proxies: (optional) Dictionary mapping protocol to the URL of
+419:            the proxy.
+420:        :param stream: (optional) whether to immediately download the response
+421:            content. Defaults to ``False``.
+422:        :param verify: (optional) if ``True``, the SSL cert will be verified.
+423:            A CA_BUNDLE path can also be provided.
+424:        :param cert: (optional) if String, path to ssl client cert file (.pem).
+425:            If Tuple, ('cert', 'key') pair.
+426:        """
+427:
+428:        # Ensure method is a string, decode if it's a binary string
+429:        if isinstance(method, bytes):
+430:            method = method.decode('ascii')
+431:        method = builtin_str(method)
+432:
+433:        # Create the Request.
+434:        req = Request(
+435:            method = method.upper(),
+436:            url = url,
+437:            headers = headers,
+438:            files = files,
+439:            data = data or {},
+440:            json = json,
+441:            params = params or {},
+442:            auth = auth,
+443:            cookies = cookies,
+444:            hooks = hooks,
+445:        )
+446:        prep = self.prepare_request(req)
+447:
+448:        proxies = proxies or {}
+449:
+450:        settings = self.merge_environment_settings(
+451:            prep.url, proxies, stream, verify, cert
+452:        )
+453:
+454:        # Send the request.
+455:        send_kwargs = {
+456:            'timeout': timeout,
+457:            'allow_redirects': allow_redirects,
+458:        }
+459:        send_kwargs.update(settings)
+460:        resp = self.send(prep, **send_kwargs)
+461:
+462:        return resp
+463:
+464:    def get(self, url, **kwargs):
+465:        """Sends a GET request. Returns :class:`Response` object.
+466:
+467:        :param url: URL for the new :class:`Request` object.
+468:        :param \*\*kwargs: Optional arguments that ``request`` takes.
+469:        """
+470:
+471:        kwargs.setdefault('allow_redirects', True)
+472:        return self.request('GET', url, **kwargs)
+473:
+474:    def options(self, url, **kwargs):
+475:        """Sends a OPTIONS request. Returns :class:`Response` object.
+476:
+477:        :param url: URL for the new :class:`Request` object.
+(197 more lines below)
+File updated. Please review the changes and make sure they are correct (correct indentation, no duplicate lines, etc). Edit the file again if necessary.
+
+(Open file: /psf__requests/requests/sessions.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+The edit has been made to decode binary strings before converting them to a string with `builtin\_str`. This should prevent the issue where a binary string like `b'GET'` is incorrectly converted to the literal string `''b'GET'''`.
+
+
+
+To verify that this change resolves the issue, we should create a script that replicates the problem as described. We'll write a script that uses the `requests` library to make a request with a binary method and check if it now handles the method correctly.
+
+
+
+Let's create a new file called `reproduce\_issue.py` to test the fix.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+create reproduce_issue.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /psf__requests/reproduce_issue.py (1 lines total)]
+1:
+
+(Open file: /psf__requests/requests/sessions.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+Now that we have created the `reproduce\_issue.py` file, let's write a script that attempts to send a request with a binary method string, which should now be handled correctly due to our fix in `sessions.py`.
+
+
+
+We'll write a simple script that imports the `requests` library, sets a binary method, and tries to make a request to a test URL.
+
+
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+edit 1:1
+import requests
+
+# Define a binary method string
+method = b'GET'
+
+# Test URL (example)
+url = 'https://httpbin.org/get'
+
+# Attempt to send a request with a binary method
+response = requests.request(method, url)
+
+# Print the response status code
+print('Response status code:', response.status_code)
+
+# Print a success message if the script completes
+print("Script completed successfully, no errors.")
+end_of_edit
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+[File: /psf__requests/reproduce_issue.py (16 lines total)]
+1:import requests
+2:
+3:# Define a binary method string
+4:method = b'GET'
+5:
+6:# Test URL (example)
+7:url = 'https://httpbin.org/get'
+8:
+9:# Attempt to send a request with a binary method
+10:response = requests.request(method, url)
+11:
+12:# Print the response status code
+13:print('Response status code:', response.status_code)
+14:
+15:# Print a success message if the script completes
+16:print("Script completed successfully, no errors.")
+File updated. Please review the changes and make sure they are correct (correct indentation, no duplicate lines, etc). Edit the file again if necessary.
+
+(Open file: /psf__requests/reproduce_issue.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+The script has been written and should now attempt to send a request using a binary method string. This will help us verify if the issue has been resolved by the changes we made to `sessions.py`.
+
+
+
+Let's run the script to see if it executes successfully without encountering the issue described.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+python reproduce_issue.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+Response status code: 200
+Script completed successfully, no errors.
+
+(Open file: /psf__requests/reproduce_issue.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+The script ran successfully and received a 200 OK response, which indicates that the issue with handling binary method strings has been resolved. The `requests` library is now correctly processing the binary string `b'GET'` as a valid HTTP method.
+
+
+
+Since the fix appears to be working, we can clean up by removing the `reproduce\_issue.py` script, as it is no longer needed. After that, we can submit our changes to the code base.
+
+
+
+Let's remove the `reproduce\_issue.py` file.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+rm reproduce_issue.py
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]\begin{Verbatim}[breaklines=true, breakanywhere=true]
+
+(Open file: /psf__requests/reproduce_issue.py)
+(Current directory: /psf__requests)
+bash-$
+\end{Verbatim}
+\end{observationbox}
+\begin{agentbox}[psf\_\_requests-2317]
+The `reproduce\_issue.py` file has been successfully removed. Now that we have verified the fix and cleaned up the test script, we can proceed to submit our changes to the code base.
+
+
+
+Let's submit the changes using the `submit` command.
+
+\hrulefill
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+submit
+\end{CodeVerbatim}
+\end{agentbox}
+\begin{observationbox}[psf\_\_requests-2317]
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+diff --git a/requests/sessions.py b/requests/sessions.py
+index d701ff2e..4829747d 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -425,6 +425,9 @@ class Session(SessionRedirectMixin):
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
++        # Ensure method is a string, decode if it's a binary string
++        if isinstance(method, bytes):
++            method = method.decode('ascii')
+         method = builtin_str(method)
+ 
+         # Create the Request.
+
+(Open file: /psf__requests/reproduce_issue.py)
+(Current directory: /psf__requests)
+bash-\$
+\end{CodeVerbatim}
+\end{observationbox}
+
+\begin{goldpatchbox}[psf\_\_requests-2317]
+\begin{CodeVerbatim}[breaklines=true, breakanywhere=true]
+diff --git a/requests/sessions.py b/requests/sessions.py
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -13,7 +13,7 @@
+ from datetime import datetime
+ 
+ from .auth import _basic_auth_str
+-from .compat import cookielib, OrderedDict, urljoin, urlparse, builtin_str
++from .compat import cookielib, OrderedDict, urljoin, urlparse
+ from .cookies import (
+     cookiejar_from_dict, extract_cookies_to_jar, RequestsCookieJar, merge_cookies)
+ from .models import Request, PreparedRequest, DEFAULT_REDIRECT_LIMIT
+@@ -425,7 +425,7 @@ def request(self, method, url,
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
+-        method = builtin_str(method)
++        method = to_native_string(method)
+ 
+         # Create the Request.
+         req = Request(
+\end{CodeVerbatim}
+\end{goldpatchbox}
+}

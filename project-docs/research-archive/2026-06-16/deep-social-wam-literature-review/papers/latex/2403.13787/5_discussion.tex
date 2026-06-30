@@ -1,0 +1,75 @@
+\section{Limitations \& Broader Impacts}
+\label{sec:limitation_impact}
+
+\paragraph{Limitations}
+The RewardBench benchmark is limited by a couple of factors. First, we lack human preference data and instead, except for specific subsets, have to rely on semi-automatic ways of obtaining chosen-rejected pairs, which we then manually validate. We also note that the formats in certain domains, such as the reasoning domain, might potentially include spurious correlations leading to possible biases in humans and models.
+Another unresolved question is whether and how the benchmark results correlate with downstream training. Lastly, there might be a chance of possible data contamination, in cases where models are (wrongly) directly trained on alpacaeval or MTBench data.
+
+%TODO
+%lack of human data
+%biased formats in reasoning category (human vs. gpt4)
+%lack of correlation with downstream training
+%potential contamination via people training on alpacaeval/mt bench
+
+\paragraph{Broader Impacts}
+This work does expose potentially offensive and or sensitive text to users through the rejected samples of the Safety section of the benchmark.
+Therefore users should use this data at their own risk.
+Given the preexisting prompts from other benchmarks, we are not worried about eliciting personally identifiable information. 
+
+\section{Discussions}
+\label{sec:discussion}
+
+\paragraph{Evaluating Length Bias} Given the results showing length bias in RLHF and reward models~\citep{singhal2023long}, we designed~\name~so that the chosen responses are either a similar length or shorter than the rejected responses.
+For example, the \texttt{AlpacaEval Length} subset is designed to differentiate between other \texttt{Chat} subsets by having notably different models capabilities with the same average length (results in Tab.~\ref{table:eval_sets_chat}).
+In this case, the results are lower than other easy chat subsets, but 90\% plus accuracy is achieved by over 10 models -- far above random for most models.
+Though, more detailed statistical tests are needed to fully understand this, as this only tests the reward models' abilities to discern information without the help of length as a proxy. 
+More details on the length distributions of~\name~are found in Appendix~\ref{appndx:length}.
+
+
+\paragraph{DPO Models vs Classifiers}
+Since DPO-trained LLMs are implicit reward models largely used for their generative abilities, the question of how they compare to RMs trained as classifiers is unstudied.
+There are currently more DPO models released to the public, partially due to DPO requiring notably fewer computational resources among other factors such as existing implementations and relevant datasets. 
+We see that the results on \name{} flatter the recent DPO methods, except for the \texttt{Prior Sets} section. 
+For how the DPO reward is computed, see Sec.~\ref{sec:back}. 
+
+The same inference code of popular DPO training implementations can easily be used for evaluation as an RM by not propagating gradients through the models. 
+The simplest implementations requires more GPU memory to run evaluation of DPO-trained models given the two models needed to compute the reward, but this can be avoided by computing the probabilities over the policy and base models sequentially.
+Though, some of the released DPO models do not clearly document which reference model is used in training (e.g. if it is a base model or a model obtained via supervised fine-tuning), which can result in unclear benchmarking.\footnote{Examples include \texttt{Mixtral-8x7B-Instruct-v0.1} or the Qwen chat models, which just say ``trained with DPO,'' yet they achieve solid performance.} 
+When a reference model is unavailable or compute is constrained, an alternative approach in such cases would be to obtain a reference free reward: $\pi(y_1|x) > \pi(y_2|x)$, which could be normalized using different approaches.
+Without normalization, the loss has a length penalty by summing over probabilities of each token which are all negative numbers.
+We will explore the impacts of reference free inference in future work.
+
+We also experimented%\footnote{Accidentally.}
+ with using the ``wrong'' reference model, i.e. a similar but different base model, and found that this reduced the DPO trained RM performance to similar levels as the random baseline.
+
+\input{tables/dpo_ref_free}
+
+There is still a lot that is unknown about the best practices of training RMs: trained with DPO they are regularized by KL distance, but the classifiers are not. 
+Additionally, a common practice for training RMs via classification is to train for 1 epoch~\citep{ouyang2022training}, while DPO models are usually trained for more than 1 epoch~\citep{tunstall2023zephyr,ivison2023camels}. 
+Other future work ideas therefore include analyzing the role of the training hyperparameters in DPO training and RM classification performance (such as Beta KL regularization on generated text, number of training epochs, etc.). 
+
+\input{tables/generative}
+\paragraph{Generative Reward Modeling}
+An alternate to classifier based reward models, which are discriminative~\citep{ng2001discriminative}, is to use generations from a language model to create a judgement between two answers~\citep{zheng2023judging}\footnote{We believe that using generations should be called \textit{generative reward modeling} when the judgements are used to curate a reward signal for training.
+The general application of this technology is LLM-as-a-judge.}.
+Given LLM-as-a-judge's prevalent use for evaluation, recent works have emerged using LLMs as feedback mechanisms very similar to reward models.
+Some works have fine-tuned models specifically for the task of rating or choosing responses from LLMs~\citep{Jiang2023TIGERScoreTB, kim2023prometheus, zhu2023judgelm}.
+Others use the policy LM itself as a generative reward model via prompting it to behave as a judge~\citep{yuan2024self,li2023generative}.
+% Other work has proposed generative reward modeling~\citep{li2023generative}-- using a generative language model to provide scores via output tokens.
+While similar to the reward computation of DPO models, this mode of score calculation often involves specific prompting per-model and more computation per sample, such as explaining reasoning before or after the score.
+Results are shown in Tab.~\ref{table:generative} where there is a substantial variation among existing open and closed models.
+Note, the best classifier RMs outperform the best generative reward models.
+% Given these differences, we decided not to include them in the~\name~leaderboard, but they are worth exploring in future work.
+% \nol{TODO finaliaze  and comment}
+
+\paragraph{Values Represented in Reward Models}
+Reward models inhabit an important normative role in the RLHF process being the primary artifact where human preferences or values are encoded in the final policy.
+The \name~infrastructure enables asking basic questions when studying reward models such as \emph{whose} or \emph{which} values are embedded as the sense of reward~\citep{lambert2023history}.
+Initial work is studying this question for LLMs broadly, such as measuring representation~\citep{durmus2023towards,ryan2024unintended} or moral foundations of LMs~\citep{abdulhai2023moral}, but this work should be extended to reward models. 
+This can involve the study of different base models which RMs are trained from, tweaking fine-tuning techniques, if synthetic datasets amplify bias in RMs as well~\citep{wyllie2024fairness}, and datasets.
+
+\paragraph{Safety In or After RLHF}
+An emerging trend in LLMs is the shift from chat systems being only a model to being a system of models, with small models used as classifiers for tasks such as safety~\citep{mozes2023agile}.
+If some LLMs or RMs are designed to be used with additional safety classifiers after the fact, evaluating them on~\name~may not be a fair comparison.
+For systems such as this, each classifier for a specific task should be evaluated on the sections it controls. 
+The most common area where this is handled is safety, where a small reward model can be used to permit or block all outputs from a larger generating model.

@@ -1,0 +1,32 @@
+\section{Experimental Setup}
+\label{sec:experiments}
+\textbf{Datasets.}
+We primarily evaluate on the SWE-bench dataset, which includes \num{2294} task instances from \num{12} different repositories of popular Python packages~\citep{jimenez2024swebench}.
+We report our main agent results on the full SWE-bench test set and ablations and analysis on the SWE-bench Lite test set, unless otherwise specified.
+SWE-bench Lite is a canonical subset of \num{300} instances from SWE-bench that focus on evaluating self-contained functional bug fixes.
+We also test SWE-agent's basic code editing abilities with HumanEvalFix, a short-form code debugging benchmark~\citep{muennighoff2023octopack}.
+
+\textbf{Models.}
+All results, ablations, and analyses are based on two leading LMs, GPT-4 Turbo (\texttt{gpt-4-1106-preview})~\citep{openai2023gpt4} and Claude 3 Opus (\texttt{claude-3-opus-20240229})~\citep{chiang2024chatbot}.
+We experimented with a number of additional closed and open source models, including Llama 3\footnote{https://github.com/meta-llama/llama3} and DeepSeek Coder~\citep{deepseek-coder}, but found their performance in the agent setting to be subpar.
+Many LMs' context window is too small, such as Llama 3's context window of \num{8}k.
+GPT-4 Turbo and Claude 3 Opus have \num{128}k and \num{200}k token context windows, respectively,\footnote{Token counts for different models are not directly comparable since they use different tokenizers.} which provides sufficient room for the LM to interact for several turns after being fed the system prompt, issue description, and optionally, a demonstration.
+
+\textbf{Baselines.}
+We compare SWE-agent to two baselines.
+The first setting is the non-interactive, retrieval-augmented generation (RAG) baselines established in \citet{jimenez2024swebench}.
+Here, a BM25 retrieval system retrieves the most relevant codebase files using the issue as the query; given these files, the model is asked to directly generate a patch file that resolves the issue.
+
+The second setting, called Shell-only, is adapted from the interactive coding framework introduced in \citet{yang2023intercode}.
+Following the InterCode environment, this baseline system asks the LM to resolve the issue by interacting with a shell process on Linux.
+Like SWE-agent, model prediction is generated automatically based on the final state of the codebase after interaction.
+
+\textbf{Metrics.} We report \textbf{\% Resolved} or \textbf{pass$@$\num{1}} as the main metric, which is the proportion of instances for which all tests pass successfully after the model generated patch is applied to the repository \citep{jimenez2024swebench}.
+We also report the \textbf{\$ Avg. Cost} metric, the API inference cost incurred by SWE-agent averaged over all successfully resolved instances.
+% \kilian{Simplify/clarify: ``the API inference cost incurred by SWE-agent averaged over all successfully resolved instances''. And I'd perhaps add a footnote ``averaging the cost over all instances (rather than just the successfully resolved ones) would introduce a strong correlation with the maximum per-instance budget''}
+Due to budget constraints, we set the per-instance budget to \$4;
+if a run exceeded this budget, existing edits were submitted automatically.
+
+\textbf{Configuration search.}
+During the design process of SWE-agent, we arrived at the final ACI design through qualitative analysis of system behavior on a small set of hand-picked examples from the development split of SWE-bench.
+For the remaining hyperparameter choices, we performed a sweep over the window size, history processing, and decoding temperature, shown in \S\ref{appx:analyses:hyperparameter_sweep}.

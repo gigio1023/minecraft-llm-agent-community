@@ -1,0 +1,116 @@
+\section{Qualitative Examples}
+
+\subsection{Code Execution}
+We show 5 examples from the code execution task that GPT-4 (\texttt{gpt-4-1106-preview}) still struggles to execute, even with CoT.
+
+% \begin{lstlisting}[language=python]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Mistake 1}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+def countWays(nums: List[int]) -> int:
+    nums.sort()
+    n = len(nums)
+    ans = 0
+    for i in range(n + 1):
+        if i and nums[i-1] >= i: continue
+        if i < n and nums[i] <= i: continue
+        ans += 1
+    return ans
+assert countWays(nums = [6, 0, 3, 3, 6, 7, 2, 7]) == 3
+# GPT-4 + CoT Outputs: 1, 2, 4, 5
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+
+% \begin{lstlisting}[language=python]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Mistake 2}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+def minimumCoins(prices: List[int]) -> int:
+    
+    @cache
+    def dfs(i, free_until):
+        if i >= len(prices):
+            return 0
+        
+        res = prices[i] + dfs(i + 1, min(len(prices) - 1, i + i + 1))
+        
+        if free_until >= i:
+            res = min(res, dfs(i + 1, free_until))
+            
+        return res
+        
+    dfs.cache_clear()
+    return dfs(0, -1)
+assert minimumCoins(prices = [3, 1, 2]) == 4
+# GPT-4 + CoT Outputs: 1, 3, 5, 6
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+
+% \begin{lstlisting}[language=python]
+% def vowel(ch): return ch.lower() in 'aeiou'
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Mistake 3}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+def sortVowels(s: str) -> str:
+    q = deque(sorted((ch for ch in s if vowel(ch))))
+    res = []
+    for ch in s:
+        if vowel(ch):
+            res.append(q.popleft())
+        else:
+            res.append(ch)
+    return ''.join(res)
+assert sortVowels(s = 'lEetcOde') == 'lEOtcede'
+# GPT-4 + CoT Outputs: "leetecode", "lEetecOde", "leetcede", "leetcEde", "leetcOde"
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+
+% \begin{lstlisting}[language=python]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Mistake 4}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+def relocateMarbles(nums: List[int], moveFrom: List[int], moveTo: List[int]) -> List[int]:
+    
+    nums = sorted(list(set(nums)))
+    dd = {}
+    for item in nums:
+        dd[item] = 1
+    for a,b in zip(moveFrom, moveTo):
+        del dd[a]
+        dd[b] = 1
+    ll = dd.keys()
+    return sorted(ll)
+assert relocateMarbles(nums = [1, 6, 7, 8], moveFrom = [1, 7, 2], moveTo = [2, 9, 5]) == [5, 6, 8, 9]
+# GPT-4 + CoT Outputs: [2, 6, 8, 9], [2, 5, 6, 8, 9], KeyError
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}
+
+% \begin{lstlisting}[language=python]
+\begin{figure*}[h!]
+\centering
+\begin{tcolorbox}[enhanced,size=small,colback=black!5!white,colframe=RoyalBlue,flip title={interior hidden},title={Mistake 5}]
+\begin{lstlisting}[label={lst:execution-example-filtered-1}, captionpos=b, breaklines=true, language=Python]
+def minimumSum(nums: List[int]) -> int:
+    left, right, ans = [inf], [inf], inf
+    for num in nums:
+        left.append(min(left[-1], num))
+    for num in nums[::-1]:
+        right.append(min(right[-1], num))
+    right.reverse()
+    for i, num in enumerate(nums):
+        if left[i] < num and right[i + 1] < num:
+            ans = min(ans, num + left[i] + right[i + 1])
+    return ans if ans < inf else -1
+assert minimumSum(nums = [6, 5, 4, 3, 4, 5]) == -1
+# GPT-4 + CoT Outputs: 10, 11, 12
+\end{lstlisting}
+\end{tcolorbox}
+\end{figure*}

@@ -1,0 +1,123 @@
+
+\section{AlphaResearch}
+
+
+
+
+\subsection{Overview}
+
+
+% \ac{It is important to clearly mention what is novel about AlphaResearch in this paragraph and position it against existing work.}
+AlphaResearch accelerates algorithm discovery process by continuously optimizing the research outcome from the dual reward that synergizes rigorous program verification and a real-world peer review environment. 
+As shown in \autoref{fig:overview}, given initial idea $i_0$ and program $p_0$, AlphaResearch runs the program $p_0$ with execution, producing $r_0$, which represents the initial overall rating. The triplet $(i_0, p_0, r_0)$ will be fed to AlphaResearch for subsequent processing, including newer idea generation, code implementation, and program-based execution. When reaching a point where execution output $r_n$ surpasses the previous rating, AlphaResearch will save the triplet $(i_{best}, p_{best}, r_{best})$ as the best record. We repeat the process until $r_{best}$ surpasses the best-of-human score, or the maximum round is reached. The resulting trajectory is denoted as $\tau = i_0p_0r_0...i_{n-1}p_{n-1}r_{n-1}i_{n}p_{n}r_{n}$, where $n$ is the total rounds.
+
+
+\subsection{Actions}    
+\paragraph{New Idea Generation.} For each step $k$, AlphaResearch start with generating a new idea $i_k$ based on a sampled previous step  $(i_{t}, p_{t}, r_{t})$ from previous trajectory $\tau_{k-1}=i_0p_0r_0...i_{k-1}p_{k-1}r_{k-1}$. This process can be denoted as:
+\begin{equation}
+i_k\thicksim\mathbb{P}_\mathcal{A}(\cdot|i_{t}\oplus p_{t}\oplus r_{t})
+\end{equation}
+where $\oplus$ means concatenation, $t$ is the sampled step from trajectory $\tau_{i-1}$ and $\mathbb{P}_\mathcal{A}(·)$ indicates random sampling. We use a reward model to select high-quality ideas overall. If $\mathcal{RM}(i_n)$ outputs a negative score, we cease the subsequent actions in this round.
+
+\paragraph{Program-based Verification.}
+After obtain the fresh idea, AlphaResearch generates new program $p_k$ based on the previous implementation $p_t$ and new idea $i_k$ next:
+\begin{equation}
+p_k\thicksim\mathbb{P}_{\mathcal{A}}(\cdot|p_t \oplus i_k)
+\end{equation}
+and yield the evaluation result $r_k$ by verifying $p_k$ with code executor $r_k\leftarrow\mathcal{E}(p_k)$. Then, we update the trajectory $\tau_k$ with the newly generated idea $i_k$, program $p_k$ and result $r_k$:
+\begin{equation}
+\tau_k\leftarrow\tau_{k-1}\oplus i_k\oplus p_k\oplus r_k
+\end{equation}
+We repeat the above interaction process until $k$ reaches the maximum rounds $n$ and get the best result $(i_{best}, p_{best}, r_{best})$ as final output.
+
+\begin{algorithm}[t]
+\small
+\caption{AlphaResearch}
+\label{alg:inference}
+\textbf{Require:} initial idea $i_0$, initial program $p_0$, initial result $r_0$, model $\mathcal{A}$, evaluation program $\mathcal{E}(\cdot)$, maximum iteration rounds $n$, 
+\begin{algorithmic}[1]
+\State $\tau_0 \leftarrow (i_0, p_0, r_0)$, $r_{best}=0$ \Comment{Initialization}
+\For{$k=1$ to $n$ do}
+\State $(i_t, p_t, r_t) \sim \mathbb{P}(\cdot|\tau_{k-1})$ \Comment{States Sampling}
+\State $i_k\thicksim\mathbb{P}_\mathcal{A}(\cdot|i_{t}\oplus p_{t}\oplus r_{t})$ \Comment{New Idea Generation (Eq. 1)}
+\If{$\mathcal{RM}(i_k)$ < threshold} 
+\State \textbf{continue} \Comment{Reward Model for New Idea}
+\EndIf
+\State $p_k\thicksim\mathbb{P}_{\mathcal{A}}(\cdot|p_t \oplus i_k)$ \Comment{Program Generation (Eq. 2)}
+\State $r_k\leftarrow\mathcal{E}(p_k)$ \Comment{Program-based Execution}
+\If{$r_k$ $>$ $r_{best}$}
+\State $(i_{best}, p_{best}, r_{best})$ = $(i_{k}, p_{k}, r_{k})$
+\EndIf
+\State $\tau_k\leftarrow\tau_{k-1}\oplus i_k\oplus p_k\oplus r_k$ \Comment{Trajectory Update (Eq. 3)}
+\EndFor
+\State \textbf{return} $(i_{best}, p_{best}, r_{best})$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Environment}
+
+\subsubsection{Reward from Real-world Research Records}
+\label{sec:rm}
+Existing autonomous idea generation process suffers from a trade-off where highly novel research ideas may lack feasibility \citep{guo2025ideabench, si2025ideation}. To address this gap and ensure the feasibility of idea candidates, we train a reward model with ideas from real-world peer-review information to simulate the real-world peer-review environment.
+
+\begin{wraptable}{r}{0.47\columnwidth}
+\centering
+\vspace{1.0\baselineskip}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l|c|c}
+\toprule
+\textbf{Split} & \textbf{Train} & \textbf{Test} \\
+\midrule
+\textbf{Data Source} & ICLR & ICLR \\
+\textbf{Range of Date} & 2017$\sim$2024 & 2025 \\
+\textbf{Environment Nums} & 24,445 & 100 \\
+\textbf{Start Date} & 2016-11 & 2024-10 \\
+\textbf{End Date} & 2023-12 & 2024-12 \\
+\bottomrule
+\end{tabular}
+\caption{Dataset for reward model training. We use the end of author-reviewer rebuttal period as the latest knowledge date.}
+\label{tab:rmd}
+\end{wraptable}
+
+\paragraph{Dataset for reward model.} 
+To train RM to identify good ideas, we collect all ICLR peer review records from 2017 to 2024 as our training set. We sample a subset of ICLR 2025 records as a test set, where the dates of train and test are disjoint, which prevents knowledge contamination between the train and test split. We also select Qwen2.5-7B-Instruct\footnote{Its release date \texttt{2024-09} is earlier than the ICLR 2025 author-reviewer rebuttal period \texttt{2024-10}.} as our base model.
+For each record, we extract the abstract part as RM input and wrap the average peer-review overall ratings with \texttt{\textbackslash boxed\{\}} as RM output. We fine-tune the model with RM pairs, yielding the AlphaResearch-RM-7B model. 
+
+
+\paragraph{RM threshold.}
+To simplify the RM evaluation, we binarize the RM output score according to the ICLR Reviewer Guide, where overall rating $> 5.5$ records are regarded as a positive score and $\leq 5.5$ records are negative. We do not treat the RM threshold as a hyperparameter in this work, as the score carries real-world interpretability where it corresponds to the midpoint between the acceptance and rejection scores at ICLR.
+We compute the binary classification accuracy and evaluate three models (GPT-5, Qwen2.5-Coder-Instruct, and AlphaResearch-RM-7B) on the AlphaResearch-RM test set. 
+
+
+\begin{wraptable}{r}{0.47\columnwidth}
+  \centering
+ % \yilun{also report human annotator performance? (might be close to our model)}
+   \label{tab:rm-res}
+  \begin{tabular}{l|cl}
+  \toprule
+  \textbf{Reward Model} & \textbf{Cutoff} & \textbf{Acc} \\
+  \midrule
+  Random (theoretical) & - & 50.0\% \\
+  Human Annotator & - & 65.0\% \\
+  \midrule
+  % Deepseek-V3-0324 & 2025-03 & 39.0\% \\
+    GPT-5 (medium) & 2025-08 & 53.0\% \\
+  Qwen2.5-7B-Instruct & 2024-09 & 37.0\% \\
+  AlphaResearch-RM-7B & 2024-09 & 72.0\% \\
+  \bottomrule
+  \end{tabular}
+\caption{Evaluation results of different RMs. We use the more recent date between the model release date and the dataset cutoff as the latest date.}
+\end{wraptable}
+
+\paragraph{Can LLMs identify good ideas?} To establish a human annotator baseline, we select 3 researchers with relevant backgrounds who have published papers and served as a reviewer on their assigned topics.
+\autoref{tab:rm-res} presents the evaluation results that eliminate the knowledge contamination, highlighting the following observations: (1) Both GPT-5 and Qwen2.5-7B-Instruct achieve lower than 60\% accuracy when identifying the good ideas from ICLR 2025 records.
+(2) After being fine-tuned with ideas from previous ICLR peer-review information, AlphaResearch-RM-7B demonstrates 72\%
+% (>50\%, above the accuracy of random prediction) 
+binary classification accuracy on unseen ICLR 2025 ideas, significantly outperforming baseline models and human annotators. 
+Based on these observations, we use the fine-tuned AlphaResearch-RM-7B as the final RM to simulate a real-world peer-review environment and filter out good ideas generated by AlphaResearch.
+
+\subsubsection{Reward from Program-based Execution}
+We construct an automatic evaluation process with a code executor where each new program $p_k$ generated by AlphaResearch will be captured and evaluated. 
+The evaluation program $\mathcal{E}(\cdot)$ includes two modules: (i) \textbf{Verification} module that validates whether $p_k$ conforms to the problem constraints. (ii) \textbf{Measurement} module that output the score $r_k$ of program performance.
+The program output $r_k$ will be injected into the idea generation prompt (if sampled), thereby participating in the optimization process for fresh ideas. These programs and results are stored in a candidate pool, where the primary goal is to optimally resurface previously explored ideas in future generations. The verifiable reward by code executor significantly simplifies the action spaces of AlphaResearch, thereby enhancing the efficiency of the discovery process. 

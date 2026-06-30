@@ -1,0 +1,64 @@
+\section{Experiments}
+\label{sec:experiments}
+
+We evaluate DreamerV2 on the well-established Atari benchmark with sticky actions, comparing to four strong model-free algorithms. DreamerV2 outperforms the four model-free algorithms in all scenarios. For an extensive comparison, we report four scores according to four aggregation protocols and give a recommendation for meaningfully aggregating scores across games going forward. We also ablate the importance of discrete representations in the world model. Our implementation of DreamerV2 reaches 200M environment steps in under 10 days, while using only a single NVIDIA V100 GPU and a single environment instance. During the 200M environment steps, DreamerV2 learns its policy from 468B compact states imagined under the model, which is 10,000$\times$ more than the 50M inputs received from the real environment after action repeat. Refer to the project website for videos, the source code, and training curves in JSON format.\footnote{\url{https://danijar.com/dreamerv2}}
+
+\paragraph{Experimental setup}
+
+We select the 55 games that prior works in the literature from different research labs tend to agree on \citep{mnih2016a3c,brockman2016gym,hessel2018rainbow,castro2018dopamine,badia2020agent57} and recommend this set of games for evaluation going forward. We follow the evaluation protocol of \citet{machado2018atariprotocol} with 200M environment steps, action repeat of 4, a time limit of 108,000 steps per episode that correspond to 30 minutes of game play, no access to life information, full action space, and sticky actions. Because the world model integrates information over time, DreamerV2 does not use frame stacking. The experiments use a single-task setup where a separate agent is trained for each game. Moreover, each agent uses only a single environment instance. We compare the algorithms based on both human gamer and human world record normalization \citep{toromanoff2019atarirecords}.
+
+\paragraph{Model-free baselines}
+
+We compare the learning curves and final scores of DreamerV2 to four model-free algorithms, IQN \citep{dabney2018iqn}, Rainbow \citep{hessel2018rainbow}, C51 \citep{bellemare2017c51}, and DQN \citep{mnih2015dqn}. We use the scores of these agents provided by the Dopamine framework \citep{castro2018dopamine} that use sticky actions. These may differ from the reported results in the papers that introduce these algorithms in the deterministic Atari setup. The training time of Rainbow was reported at 10 days on a single GPU and using one environment instance.
+
+\subsection{Atari Performance}
+
+\input{figures/agg/figure}
+\input{tables/agg}
+
+The performance curves of DreamerV2 and four standard model-free algorithms are visualized in \cref{fig:agg}. The final scores at 200M environment steps are shown in \cref{tab:agg} and the scores on individual games are included in \cref{tab:sep}. There are different approaches for aggregating the scores across the 55 games and we show that this choice can have a substantial impact on the relative performance between algorithms. To extensively compare DreamerV2 to the model-free algorithms, we consider the following four aggregation approaches:
+
+\begin{itemize}
+\itempar{Gamer Median} Atari scores are commonly normalized based on a random policy and a professional gamer, averaged over seeds, and the median over tasks is reported \citep{mnih2015dqn,mnih2016a3c}. However, if almost half of the scores would be zero, the median would not be affected. Thus, we argue that median scores are not reflective of the robustness of an algorithm and results in wasted computational resources for games that will not affect the score.
+\itempar{Gamer Mean} Compared to the task median, the task mean considers all tasks. However, the gamer performed poorly on a small number of games, such as Crazy Climber, James Bond, and Video Pinball. This makes it easy for algorithms to achieve a high normalized score on these few games, which then dominate the task mean so it is not informative of overall performance.
+\itempar{Record Mean} Instead of normalizing based on the professional gamer, \citet{toromanoff2019atarirecords} suggest to normalize based on the registered human world record of each game. This partially addresses the outlier problem but the mean is still dominated by games where the algorithms easily achieve superhuman performance.
+\itempar{Clipped Record Mean} To overcome these limitations, we recommend normalizing by the human world record and then clipping the scores to not exceed a value of 1, so that performance above the record does not further increase the score. The result is a robust measure of algorithm performance on the Atari suite that considers performance across all games.
+\end{itemize}
+
+From \cref{fig:agg} and \cref{tab:agg}, we see that the different aggregation approaches let us examine agent performance from different angles. Interestingly, Rainbow clearly outperforms IQN in the first aggregation method but IQN clearly outperforms Rainbow in the remaining setups. DreamerV2 outperforms the model-free agents in all four metrics, with the largest margin in record normalized mean performance. Despite this, we recommend clipped record normalized mean as the most meaningful aggregation method, as it considers all tasks to a similar degree without being dominated by a small number of outlier scores. In \cref{tab:agg}, we also include DreamerV2 with schedules that anneal the actor entropy loss scale and actor gradient mixing over the course of training, which further increases the gamer median score of DreamerV2.
+
+\paragraph{Individual games}
+
+The scores on individual Atari games at 200M environment steps are included in \cref{tab:sep}, alongside the model-free algorithms and the baselines of random play, human gamer, and human world record. We filled in reasonable values for the 2 out of 55 games that have no registered world record. \cref{fig:vs} compares the score differences between DreamerV2 and each model-free algorithm for the individual games. DreamerV2 achieves comparable or higher performance on most games except for Video Pinball. We hypothesize that the reconstruction loss of the world model does not encourage learning a meaningful latent representation because the most important object in the game, the ball, occupies only a single pixel. One the other hand, DreamerV2 achieves the strongest improvements over the model-free agents on the games James Bond, Up N Down, and Assault.
+
+\input{figures/abl/figure}
+
+\raggedbottom\pagebreak  % TODO
+
+\subsection{Ablation Study}
+
+\input{tables/abl}
+
+To understand which ingredients of DreamerV2 are responsible for its success, we conduct an extensive ablation study. We compare equipping the world model with categorical latents, as in DreamerV2, to Gaussian latents, as in DreamerV1. Moreover, we study the importance of KL balancing. Finally, we investigate the importance of gradients from image reconstruction and reward prediction for learning the model representations, by stopping one of the two gradient signals before entering the model states. The results of the ablation study are summarized in \cref{fig:abl} and \cref{tab:abl}. Refer to the appendix for the score curves of the individual tasks.
+
+\paragraph{Categorical latents}
+
+Categorical latent variables outperform than Gaussian latent variables on 42 tasks, achieve lower performance on 8 tasks, and are tied on 5 tasks. We define a tie as being within $5\%$ of another. While we do not know the reason why the categorical variables are beneficial, we state several hypotheses that can be investigated in future work:
+\begin{itemize}
+\item A categorical prior can perfectly fit the aggregate posterior, because a mixture of categoricals is again a categorical. In contrast, a Gaussian prior cannot match a mixture of Gaussian posteriors, which could make it difficult to predict multi-modal changes between one image and the next.
+\item The level of sparsity enforced by a vector of categorical latent variables could be beneficial for generalization. Flattening the sample from the 32 categorical with 32 classes each results in a sparse binary vector of length 1024 with 32 active bits.
+\item Despite common intuition, categorical variables may be easier to optimize than Gaussian variables, possibly because the straight-through gradient estimator ignores a term that would otherwise scale the gradient. This could reduce exploding and vanishing gradients.
+\item Categorical variables could be a better inductive bias than unimodal continuous latent variables for modeling the non-smooth aspects of Atari games, such as when entering a new room, or when collected items or defeated enemies disappear from the image.
+\end{itemize}
+
+\paragraph{KL balancing}
+
+KL balancing outperforms the standard KL regularizer on 44 tasks, achieves lower performance on 6 tasks, and is tied on 5 tasks. Learning accurate prior dynamics of the world model is critical because it is used for imagining latent state trajectories using policy optimization. By scaling up the prior cross entropy relative to the posterior entropy, the world model is encouraged to minimize the KL by improving its prior dynamics toward the more informed posteriors, as opposed to reducing the KL by increasing the posterior entropy. KL balancing may also be beneficial for probabilistic models with learned priors beyond world models.
+
+\paragraph{Model gradients}
+
+Stopping the image gradients increases performance on 3 tasks, decreases performance on 51 tasks, and is tied on 1 task. The world model of DreamerV2 thus heavily relies on the learning signal provided by the high-dimensional images. Stopping the reward gradients increases performance on 15 tasks, decreases performance on 22 tasks, and is tied on 18 tasks. \Cref{fig:tasks-repr} further shows that the difference in scores is small. In contrast to MuZero, DreamerV2 thus learns general representations of the environment state from image information  alone. Stopping reward gradients improved performance on a number of tasks, suggesting that the representations that are not specific to previously experienced rewards may generalize better to unseen situations.
+
+\paragraph{Policy gradients}
+
+Using only Reinforce gradients to optimize the policy increases performance on 18 tasks, decreases performance on 24 tasks, and is tied on 13 tasks. This shows that DreamerV2 relies mostly on Reinforce gradients to learn the policy. However, mixing Reinforce and straight-through gradients yields a substantial improvement on James Bond and Seaquest, leading to a higher gamer normalized task mean score. Using only straight-through gradients to optimize the policy increases performance on 5 tasks, decreases performance on 44 tasks, and is tied on 6 tasks. We conjecture that straight-through gradients alone are not well suited for policy optimization because of their bias.

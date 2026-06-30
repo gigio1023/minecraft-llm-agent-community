@@ -1,0 +1,31 @@
+\section{Reinforcement learning objectives}
+\label{appendix:rl_actor_critic}
+
+In what follows, we note $\x_t$, $r_t$ and $d_t$ the observations, rewards, and boolean episode terminations predicted by our world model. We note $H$ the imagination horizon, $V_\phi$ the value network, $\pi_\phi$ the policy network, and $a_t$ the actions taken by the policy within the world model. 
+
+We use $\lambda$-returns to balance bias and variance as the regression target for the value network. Given an imagined trajectory of length $H$, we can define the $\lambda$-return recursively as follows,
+
+\begin{equation}
+\Lambda_t = 
+\begin{cases}
+    r_t + \gamma (1 - d_t) \Big[ (1 - \lambda) V_\phi(\x_{t+1}) + \lambda \Lambda_{t+1} \Big]   & \text{if}\quad t < H \\
+    V_\phi(\x_H)                                                                                            & \text{if}\quad t = H. \\
+\end{cases}
+\end{equation}
+
+The value network $V_\phi$ is trained to minimize $\mathcal{L}_V(\phi)$, the expected squared difference with $\lambda$-returns over imagined trajectories,
+
+\begin{equation}
+\mathcal{L}_V(\phi) = \mathbb{E}_{\pi_\phi} \left[ \sum_{t=0}^{H-1} \big( V_\phi(\x_t) - \mathrm{sg} ( \Lambda_t ) \big)^2 \right],
+\end{equation}
+
+where $\operatorname{sg}(\cdot)$ denotes the gradient stopping operation, meaning that the target is a constant in the gradient-based optimization, as classically established in the literature \citep{mnih2015dqn,hafner2021mastering,iris2023}.
+
+As we can generate large amounts of on-policy trajectories in imagination, we use a simple \textsc{reinforce} objective to train the policy, with the value $V_\phi(\x_t)$ as a baseline to reduce the variance of the gradients \citep{sutton2018reinforcement}. The policy is trained to minimize the following objective, combining \textsc{reinforce} and a weighted entropy maximization objective to maintain sufficient exploration,
+
+\begin{equation}
+\mathcal{L}_\pi(\phi) = - \mathbb{E}_{\pi_\phi} \left[ \sum_{t=0}^{H-1} \log\left(\pi_\phi\left(a_t \mid \x_{\le t}\right)\right) \operatorname{sg}\left(\Lambda_t - V_\phi\left(\x_t\right)\right) + \eta \operatorname{\mathcal{H}}\left(\pi_\phi \left(a_t \mid \x_{\le t} \right) \right)\right].
+\end{equation}
+
+\vspace{1cm}
+

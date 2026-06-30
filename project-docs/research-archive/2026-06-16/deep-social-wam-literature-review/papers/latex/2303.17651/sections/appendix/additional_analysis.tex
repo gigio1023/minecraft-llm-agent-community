@@ -1,0 +1,110 @@
+\section{Additional Analysis}
+\label{sec:additionalanalysis}
+
+\input{sections/comparison_bar}
+
+
+
+
+\subsection{Using Oracle Feedback}
+\label{selfcorrect-math-comparison}
+We experimented with \textit{Oracle Feedback} following~\citet{Welleck2022SelfCorrect}.
+This method uses correctness information to guide model refinement, only progressing to \itermod stage if the current answer is incorrect. 
+This adjustment notably enhanced performance in the Math Reasoning task, with GPT-3 improving by 4.8\% and GPT-4 by 0.7\%~\Cref{tab:results_gsm_oracle}.
+This indicates the potential of external signals to optimize model performance in particular tasks.
+
+
+
+\begin{table}[t!]
+\centering
+
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lrlrlrl}
+\toprule
+& \multicolumn{2}{c}{\gptt} & \multicolumn{2}{c}{\chatgpt} & \multicolumn{2}{c}{\gptf} \\ %
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Task  & Base & \small{+$\ours$} & Base & \small{+$\ours$} & Base & \small{+$\ours$} \\ 
+\midrule
+\gsm & \textbf{64.1} & \textbf{64.1} (0) & 74.8 & \textbf{75.0} ($\uparrow$0.2) & 92.9 & \textbf{93.1} ($\uparrow$0.2) \\
+\gsm (Oracle) & 64.06 & \textbf{68.9} ($\uparrow$4.8) & 74.8 & \textbf{76.2} ($\uparrow$1.4) & 92.9 & \textbf{93.8} ($\uparrow$0.7) \\
+\bottomrule
+\end{tabular}
+\caption{\ours results on \gsm using \gptt, \chatgpt, and \gptf as base \llm with Oracle feedback.}
+\label{tab:results_gsm_oracle}
+\end{table}
+
+
+
+
+
+
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+Iteration & Acronym & Pronunciation & Pron. (5) & Spell. (5) & Rel. (5) & Pos. Con. (5) & Total (25) \\
+\midrule
+1 & USTACCSF & us-tacks-eff & 1 & 1 & 5 & 3 & 11 \\
+2 & TACC-SIM & tacks-sim & 4 & 4 & 5 & 3 & 17 \\
+3 & TACCSF & tacks-eff & 1 & 2 & 5 & 3 & 12 \\
+4 & TACC-SIMF & tack-simf & 4 & 4 & 5 & 3 & 17 \\
+\bottomrule
+\end{tabular}
+\caption{Acronym generation results across iterations, showcasing how improvements in certain aspects (e.g., pronunciation and spelling) can be accompanied by losses in others, leading to fluctuating overall performance in multi-aspect feedback tasks like \acrogen. }
+\label{tab:acronym:fluc}
+\end{table}
+
+
+\paragraph{Non-monotonic increase in output quality for acronym generation} For tasks with multi-aspect feedback like \acrogen, the output quality can fluctuate during the iterative process, improving on one aspect while losing out on another~(\Cref{tab:acronym:fluc}). To address this, \ours's feedback  generates explicit numerical scores to capture the different aspects of output quality. This allows for a more balanced evaluation of outputs and the selection of the most appropriate one. The algorithm selects the best output based on the maximum score across all iterations, as described in \Cref{alg:ours}~(line 8). A similar selection is possible for other tasks like \gsm and \sentxfer, while we observe that output quality increases monotonically with iterations.
+
+
+\paragraph{Feedback and Refinement Error Analysis for Response Generation}
+
+
+\begin{table}[]
+\centering
+\begin{tabular}{llp{3.7cm}p{4.2cm}}
+\toprule
+\textbf{Error Type} & \textbf{Occurrence} & \textbf{Feedback} & \textbf{Refinement} \\
+\midrule
+Incorrect feedback        & 25\%               & Informative: The response provides some encouragement and reassurance, and additional information. 3/3  & Response: That's hilarious! Don't worry, I'm sure you'll do much better when you take History next semester. Are you looking forward to it?  \\
+\hline
+Generic feedback          & 30\%               & Specific: The response is not specific and does not provide any details or examples. 1/3 & Response: It's understandable, I'm sure you'll do much better when you take History next semester. Maybe you can use your knowledge of Christopher Columbus to ace your next test! Are you looking forward to it?  \\
+\hline
+Incorrect Scoring         & 10\%               & Informative: The response provides a supportive and understanding message, which is informative to the user. 2/3  & Response: I'm sorry to hear… when Christopher Columbus didn't even fight in the Civil War! I'm sure you'll do much better…. Are you looking forward to it? \\
+\hline
+\end{tabular}
+\caption{Error analysis for \responsegen: When the feedback is not useful, a large majority is not specific or incorrect.}
+\label{tab:feedback_error_response}
+\end{table}
+
+
+\begin{table}[]
+\centering
+\begin{tabular}{llp{3.5cm}p{3.5cm}}
+\toprule
+\textbf{Error Type} & \textbf{Occurrence} & \textbf{Feedback} & \textbf{Refinement} \\
+\midrule
+Not-Robust                    & 10\%                & Specific: The response is specific and provides specific details or examples. 3/3 & Response: That's pretty funny! It's understandable that you didn't do well on the test. I'm sure you'll do much better when you take History next semester  \\
+\hline
+Ignores feedback              & 25\%                & Informative: The response doesn’t provide any new information. 1/3  & Response: That's so kind and generous of you! I would love to hear more about the podcasts you enjoy. Do you have any favorites you can recommend? \\
+\hline
+Introduces new problem        & 20\%                & Informative: 3/3 & Response: That would be a disaster! Luckily, my coworkers know better than to drink while they work. New Informative score: 2/3 \\
+\midrule
+\hline
+Robust to bad feedback  & 60\%                & Informative: The response does not provide any information. 1/3  & Response: Wow, 25 people! That must have been an amazing experience. Can you tell me more about why that particular trip to Australia was so special for you?  \\
+\hline
+\end{tabular}
+\caption{On the \responsegen task, \ours can ignore good feedback but in a majority of cases, it is robust to bad feedback and ignores bad feedback.}
+\label{tab:refinement_error_response}
+\end{table}
+
+
+
+We perform a detailed error analysis of \ours feedback and refinement process for \responsegen, which we summarize in Tables \Cref{tab:feedback_error_response} and \Cref{tab:refinement_error_response}.
+
+\Cref{tab:feedback_error_response} reports the occurrence of different types of errors in our sample, which includes Incorrect Feedback (25\%), Generic Feedback (30\%), and Incorrect Scoring (10\%). We provide representative examples of the system's responses and refinements for each error type. These errors highlight potential areas for improving our feedback handling mechanism, particularly in the interpretation and understanding of user inputs.
+
+\Cref{tab:refinement_error_response} breaks down errors found in the refinement stage of \ours. Errors include:  not being robust (10\%), ignoring feedback (25\%), and introducing a new problem (20\%). We demonstrate how the model handles a variety of feedback types, how robust it is under different circumstances, and how often it inadvertently introduces new issues. 60\% of the times, the model is robust to incorrect or generic feedback. These insights can guide us in enhancing the model's refinement capabilities, especially in providing accurate and specific responses.

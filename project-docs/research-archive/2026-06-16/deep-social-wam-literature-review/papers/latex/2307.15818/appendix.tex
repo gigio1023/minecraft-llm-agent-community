@@ -1,0 +1,307 @@
+\clearpage
+\appendix
+
+\section{Contributions}
+\label{sec:contributions}
+\begin{itemize}
+    \item \textbf{Training and Evaluations (designing and executing procedures for training models, evaluating models in simulation and the real world, running ablations for algorithm design choices)}: Yevgen Chebotar, Krzysztof Choromanski, Tianli Ding, Danny Driess, Avinava Dubey, Pete Florence, Chuyuan Fu, Montse Gonzalez Arenas, Keerthana Gopalakrishnan, Kehang Han, Alexander Herzog, Brian Ichter, Alex Irpan, Isabel Leal, Lisa Lee, Yao Lu, Henryk Michalewski, Igor Mordatch, Karl Pertsch, Michael Ryoo, Anikait Singh, Quan Vuong, Ayzaan Wahid, Paul Wohlhart, Fei Xia, Ted Xiao, and Tianhe Yu.
+    \item \textbf{Network Architecture (designing and implementing model network modules, working on tokenization of actions, enabling inference of the model networks during experiments)}: Yevgen Chebotar, Xi Chen, Krzysztof Choromanski, Danny Driess, Pete Florence, Keerthana Gopalakrishnan, Kehang Han, Karol Hausman, Brian Ichter, Alex Irpan, Isabel Leal, Lisa Lee, Henryk Michalewski, Igor Mordatch, Kanishka Rao, Michael Ryoo, Anikait Singh, Quan Vuong, Ayzaan Wahid, Jialin Wu, Fei Xia, Ted Xiao, and Tianhe Yu.
+    \item \textbf{Data Collection (collecting data on real robots, running real robot evaluations, executing operations required for running real robots)}: Noah Brown, Justice Carbajal, Tianli Ding, Krista Reymann, Grecia Salazar, Pierre Sermanet, Jaspiar Singh, Huong Tran, Stefan Welker, and Sichun Xu.
+    \item \textbf{Leadership (leading the project efforts, managing the project staff, advising on project directions)}: Yevgen Chebotar, Chelsea Finn, Karol Hausman, Brian Ichter, Sergey Levine, Yao Lu, Igor Mordatch, Kanishka Rao, Pannag Sanketi, Radu Soricut, Vincent Vanhoucke, and Tianhe Yu.
+    \item \textbf{Paper (working on the paper manuscript, designing paper visualizations and figures)}: Yevgen Chebotar, Danny Driess, Chelsea Finn, Pete Florence, Karol Hausman, Brian Ichter, Lisa Lee, Sergey Levine, Igor Mordatch, Karl Pertsch, Quan Vuong, Fei Xia, Ted Xiao, and Tianhe Yu.
+    \item \textbf{Infrastructure (working on infrastructure and code base backbone needed for training models, running experiments, storing and accessing data)}: Anthony Brohan, Yevgen Chebotar, Danny Driess, Kehang Han, Jasmine Hsu, Brian Ichter, Alex Irpan, Nikhil Joshi, Ryan Julian, Dmitry Kalashnikov, Yuheng Kuang, Isabel Leal, Lisa Lee, Tsang-Wei Edward Lee, Yao Lu, Igor Mordatch, Quan Vuong, Ayzaan Wahid, Fei Xia, Ted Xiao, Peng Xu, and Tianhe Yu.
+\end{itemize}
+\section{Datasets}
+\label{sec:app_data}
+
+The vision-language datasets are based on the dataset mixtures from~\citet{chen2023pali} and~\citet{driess2023palm}. The bulk of this data consists of the WebLI dataset, which is around 10B image-text pairs across 109 languages, filtered to the top 10\% scoring cross-modal similarity examples to give 1B training examples. Many other captioning and vision question answering datasets are included as well, and more info on the dataset mixtures can be found in~\citet{chen2023pali} for \methodname-PaLI-X, and~\citet{driess2023palm} for \methodname-PaLM-E. When co-fine-tuning \methodname-PaLI-X, we do not use the Episodic WebLI dataset described by~\citet{chen2023palix}.
+
+The robotics dataset is based on the dataset from~\citet{brohan2022rt}. This consists of demonstration episodes collected with a mobile manipulation robot. Each demonstration is annotated with a natural language instruction from one of seven skills: "Pick \texttt{Object}", "Move \texttt{Object} Near \texttt{Object}", "Place \texttt{Object} Upright", "Knock \texttt{Object} Over", "Open \texttt{Drawer}", "Close \texttt{Drawer}", "Place \texttt{Object} into \texttt{Receptacle}", and "Pick \texttt{Object} from \texttt{Receptacle} and place on the counter". Further details can be found in~\citet{brohan2022rt}.
+
+\methodname-PaLI-X weights the robotics dataset such that it makes up about 50\% of the training mixture for co-fine-tuning. \methodname-PaLM-E weights the robotics dataset to be about 66\% of the training mixture.
+
+For the results on Language-Table in Table~\ref{table:sim-langtable}, our model is trained on the Language-Table datasets from~\citet{lynch2022interactive}. Our model is co-fine-tuned on several prediction tasks: (1) predict the action, given two consecutive image frames and a text instruction; (2) predict the instruction, given image frames; (3) predict the robot arm position, given image frames; (4) predict the number of timesteps between given image frames; and (5) predict whether the task was successful, given image frames and the instruction.
+
+\section{Baselines}
+\label{sec:app_baselines}
+We compare our method to multiple state-of-the-art baselines that challenge different aspects of our method. All of the baselines use the exact same robotic data. 
+
+\begin{itemize}
+    \item \textbf{RT-1}: Robotics Transformer 1~\cite{brohan2022rt} is a transformer-based model that achieved state-of-the-art performance on a similar suite of tasks when it was published. The model does not use VLM-based pre-training so it provides an important data point demonstrating whether VLM-based pre-training matters.
+    \item \textbf{VC-1}: VC-1~\cite{majumdar2023vc1} is a visual foundation model that uses pre-trained visual representations specifically designed for robotics tasks. We use pre-trained representations from the VC-1 ViT-L model. Since VC-1 does not include language conditioning, we add this by separately embedding the language command via Universal Sentence Encoder~\cite{kona2018cer} to enable comparison to our method. In particular, we concatenate the resulting language embedding tokens to the image tokens produced by VC-1, and pass the concatenated token sequences through token learner~\cite{ryoo2021tokenlearner}. The token sequences produced by token learner are then consumed by an RT-1 decoder-only transformer model to predict robot action tokens. We train the VC-1 baseline end-to-end and unfreeze the VC-1 weights during training, since this led to far better results than using frozen VC-1 weights.
+    \item \textbf{R3M}: R3M~\cite{nair2022r3m} is a similar method to VC-1 in that R3M uses pre-trained visual-language representations to improve policy training. In this case the authors use Ego4D dataset~\cite{grauman2022ego4d} of human activities to learn the representation that is used by the policy. Both VC-1 and R3M test different state-of-the-art representation learning methods as an alternative to using a VLM. To obtain a language-conditioned policy from the R3M pretrained representation, we follow the same procedure as described above for VC-1, except we use the R3M ResNet50 model to obtain the image tokens, and unfreeze it during training.
+    \item \textbf{MOO}: MOO~\cite{stone2023open} is an object-centric approach, where a VLM is first used to specify the object of interest in a form of a single, colored pixel in the original image. This pixel-modified image is then trained with an end-to-end policy to accomplish a set of manipulation tasks. This baseline corresponds to a situation where a VLM is used as a separate module that enhances perception but its representations are not used for policy learning.
+\end{itemize}
+
+\section{VLMs for RT-2}
+\label{sec:app_vlm}
+
+The PaLI-X model architecture consists of a ViT-22B~\cite{dehghani2023scaling} to process images, which can accept sequences of $n$ images, leading to $n \times k$ tokens per image, where $k$ is the number of patches per image. The image tokens passing over a projection layer is then consumed by an encoder-decoder backbone of 32B parameters and 50 layers, similar to UL2~\cite{tay2023ul2}, which jointly processes text and images as embeddings to generate output tokens in an auto-regressive manner. The text input usually consists of the type of task and any additional context (e.g., "Generate caption in $\langle$lang$\rangle$" for captioning tasks or "Answer in $\langle$lang$\rangle$: {question}" for VQA tasks).
+
+The PaLI-3B model trained on Language-Table (Table~\ref{table:sim-langtable}) uses a smaller ViT-G/14~\citep{zhai2022scaling} (2B parameters) to process images, and UL2-3B~\citep{tay2023ul2} for the encoder-decoder network.
+
+The PaLM-E model is based on a decoder-only LLM that projects robot data such as images and text into the language token space and outputs text such as high-level plans. In the case of the used PaLM-E-12B, the visual model used to project images to the language embedding space is a ViT-4B~\cite{chen2023pali}. The concatenation of continuous variables to textual input allows PaLM-E to be fully multimodal, accepting a wide variety of inputs such as multiple sensor modalities, object-centric representations, scene representations and object entity referrals.
+
+\section{Training Details}
+\label{sec:training_details}
+
+We perform co-fine-tuning on pre-trained models from the PaLI-X~\citep{chen2023palix} 5B \& 55B model, PaLI~\citep{chen2023pali} 3B model and the PaLM-E~\citep{driess2023palm} 12B model. For \methodname-PaLI-X-55B, we use learning rate 1e-3 and batch size 2048 and co-fine-tune the model for 80K gradient steps whereas for \methodname-PaLI-X-5B, we use the same learning rate and batch size and co-fine-tune the model for 270K gradient steps. For \methodname-PaLM-E-12B, we use learning rate 4e-4 and batch size 512 to co-fine-tune the model for 1M gradient steps. Both models are trained with the next token prediction objective, which corresponds to the behavior cloning loss in robot learning. For RT-2-PaLI-3B model used for Language-Table results in Table~\ref{table:sim-langtable}, we use learning rate 1e-3 and batch size 128 to co-fine-tune the model for 300K gradient steps.
+
+\section{Evaluation Details}
+
+\subsection{Evaluation Scenarios}
+For studying the emergent capabilities of \methodname in a quantitative manner, we study various challenging semantic evaluation scenarios that aim to measure capabilities such as reasoning, symbol understanding, and human recognition. A visual overview of a subset of these scenes is provided in Figure \ref{fig:quant_eval_collage}, and the full list of instructions used for quantiative evalution is shown in Table \ref{tab:all_abcd_tasks}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/quant_eval_collage_dm.pdf}
+    \caption{An overview of some of the evaluation scenarios used to study the emergent capabilities of \methodname. They focus on three broad categories, which are (a) reasoning, (b) symbol understanding, and (c) human recognition. The visualized instructions are a subset of the full instructions, which are listed in Appendix \ref{sec:app_eval_instr}.
+    }
+    \label{fig:quant_eval_collage}
+\end{figure}
+
+\subsection{Evaluation Instructions}
+\label{sec:app_eval_instr}
+
+Table~\ref{tab:all_unseen_instructions} lists natural language instructions used in model evaluations for unseen objects, backgrounds, and environments. Each instruction was run between 1-5 times, depending on the number of total instructions in that evaluation set.
+Table~\ref{tab:all_abcd_tasks} lists natural language instructions used to evaluate quantitative emergent evals. Each instruction was run 5 times.
+
+\begin{table}[ht]
+\small
+\begin{center}
+\begin{tabular}{p{0.15\textwidth}p{0.65\textwidth}}
+\toprule
+\textbf{Task Group} & \textbf{Tasks} \\
+\midrule
+Unseen Objects (Easy) & pick banana, move banana near coke can, move orange can near banana, pick oreo, move oreo near apple, move redbull can near oreo, pick pear, pick coconut water, move pear near coconut water, move pepsi can near pear \\
+\midrule
+Unseen Objects (Hard) & pick cold brew can, pick large orange plate, pick chew toy, pick large tennis ball, pick bird ornament, pick fish toy, pick ginger lemon kombucha, pick egg separator, pick wrist watch, pick green sprite can, pick blue microfiber cloth, pick yellow pear, pick pretzel chip bag, pick disinfectant wipes, pick pineapple hint water, pick green cup, pick pickle snack, pick small blue plate, pick small orange rolling pin, pick octopus toy, pick catnip toy \\
+\midrule
+Unseen Backgrounds (Easy) & pick green jalapeno chip bag, pick orange can, pick pepsi can, pick 7up can, pick apple, pick blue chip bag, pick orange, pick 7up can, move orange near sink, pick coke can, pick sponge, pick rxbar blueberry \\
+\midrule
+Unseen Backgrounds (Hard) & pick wrist watch, pick egg separator, pick green sprite can, pick blue microfiber cloth, pick yellow pear, pick pretzel chip bag, pick disinfectant wipes, pick pineapple hint water, pick green cup, pick pickle snack, pick small blue plate, pick small orange rolling pin, pick octopus toy, pick catnip toy, pick swedish fish bag, pick large green rolling pin, pick black sunglasses \\
+\midrule
+Unseen Environments (Easy) &
+    pick coke can,
+            pick apple,
+            pick rxbar blueberry,
+            move apple near coke can,
+            move rxbar blueberry near apple,
+            move coke can near rxbar blueberry,
+            pick blue plastic bottle,
+            pick sponge,
+            pick blue chip bag,
+            move sponge near blue plastic bottle,
+            move blue chip bag near sponge,
+            move blue plastic bottle near blue chip bag,
+            move coke can near white mug,
+            move sponge near white mug,
+            move coke can near yellow bowl,
+            move sponge near yellow bowl,
+            move coke can near green cloth,
+            move sponge near green cloth,
+            move coke can near plate,
+            move sponge near plate,
+            move coke can near spoon,
+            move sponge near spoon,
+            move coke can near orange cup,
+            move sponge near orange cup,
+            pick white mug,
+            pick yellow bowl,
+            pick green cloth,
+            move white mug near sponge,
+            move yellow bowl near sponge,
+            move green cloth near sponge,
+            pick plate,
+            pick spoon,
+            pick orange cup,
+            move plate near sponge,
+            move spoon near sponge,
+            move orange cup near sponge,
+            put coke can into sink,
+            drop coke can into sink,
+            push coke can into sink,
+            put sponge into sink,
+            drop sponge into sink,
+            push sponge into sink,
+            put green cloth into sink,
+            drop green cloth into sink,
+            push green cloth into sink \\
+\midrule
+Unseen Environments (Hard) & pick coke can, pick apple, pick rxbar blueberry, move apple near coke can, move rxbar blueberry near apple, move coke can near rxbar blueberry, move coke can near stapler, move apple near stapler, move coke can near keyboard, move apple near keyboard, move coke can near tissue box, move apple near tissue box, move coke can near papers, move apple near papers, move coke can near mouse, move apple near mouse, move coke can near book, move apple near book, pick marker, pick stapler, pick mouse, move marker near apple, move stapler near apple, move mouse near apple, push coke can to the left, push coke can to the right, push sponge to the left, push sponge to the right, push tissue box to the left, push tissue box to the right, point at coke can, point at sponge, point at tissue box \\
+\bottomrule
+\end{tabular}
+\caption{Natural language instructions used for evaluations testing controlled distribution shifts along the dimension of novel objects, novel environments, and novel backgrounds. For each category, we introduce evaluation settings with smaller distribution shifts as well as larger distribution shifts. A visualization of these scenarios if shown in Figure \ref{fig:generalization_evals}.}
+\label{tab:all_unseen_instructions}
+\end{center}
+\end{table}
+
+\begin{table}[H]
+\small
+\begin{center}
+\begin{tabular}{p{0.2\textwidth}p{0.65\textwidth}}
+\toprule
+\textbf{Task Group} & \textbf{Tasks} \\
+\midrule
+Symbol Understanding: Symbol 1 & move coke can near X,
+move coke can near 3,
+move coke can near Y \\
+\midrule
+Symbol Understanding: Symbol 2 & move apple to tree,
+move apple to duck,
+move apple to apple,
+move apple to matching card \\
+\midrule
+Symbol Understanding: Symbol 3 & put coke can close to dog,
+push coke can on top of heart,
+place coke can above star \\
+\midrule
+Reasoning: Math & move banana to 2,
+move banna near the sum of two plus one,
+move banana near the answer of three times two,
+move banana near the smallest number \\
+\midrule
+Reasoning: Logos & move cup to google,
+move cup to android,
+move cup to youtube,
+move cup to a search engine,
+move cup to a phone \\
+\midrule
+Reasoning: Nutrition & get me a healthy snack,
+pick a healthy drink,
+pick up a sweet drink,
+move the healthy snack to the healthy drink,
+pick up a salty snack \\
+\midrule
+Reasoning: Color and Multilingual & move apple to cup with same color,
+move apple to cup with different color,
+move green chips to matching color cup,
+move apple to vaso verde,
+Bewegen Sie den Apfel in die rote Tasse,
+move green chips to vaso rojo,
+mueve la manzana al vaso verde,
+déplacer les frites verts dans la tasse rouge \\
+\midrule
+Person Recognition: Celebrities & move coke can to taylor swift,
+move coke can to tom cruise,
+move coke can to snoop dog \\
+\midrule
+Person Recognition: CelebA & move coke can to person with glasses,
+move coke can to the man with white hair,
+move coke can to the brunette lady \\
+\bottomrule
+\end{tabular}
+\caption{Natural language instructions used for quantitative emergent evalutions.}
+\label{tab:all_abcd_tasks}
+\end{center}
+\end{table}
+
+\section{Example Failure Cases}\label{sec:failure-cases}
+
+In Fig.~\ref{fig:lang-table-real-fail} we provide examples of a notable type of failure case in the Language Table setting, with the \methodname model not generalizing to {\em{unseen object dynamics}}. In these cases, although the model is able to correctly attend to the language instruction and move to the first correct object, it is not able to control the challenging dynamics of these objects, which are significantly different than the small set of block objects that have been seen in this environment \cite{lynch2022interactive}.  Then pen simply rolls off the table (Fig.~\ref{fig:lang-table-real-fail}, left), while the banana's center-of-mass is far from where the robot makes contact (Fig.~\ref{fig:lang-table-real-fail}, right).  We note that pushing dynamics are notoriously difficult to predict and control \cite{yu2016more}.  We hypothesize that greater generalization in robot-environment interaction dynamics may be possible by further scaling the datasets across diverse environments and objects -- for example, in this case, datasets that include similar types of more diverse pushing dynamics \cite{dasari2019robonet}.
+
+In addition, despite \methodname's promising performance on real world manipulation tasks in qualitative and quantitative emergent evaluations, we still find numerous notable failure cases. For example, with the current training dataset composition and training method, \methodname seemed to perform poorly at:
+\begin{itemize}
+    \item Grasping objects by specific parts, such as the handle
+    \item Novel motions beyond what was seen in the robot data, such as wiping with a towel or tool use
+    \item Dexterous or precise motions, such as folding a towel
+    \item Extended reasoning requiring multiple layers of indirection 
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/LangTable-R2-fail.pdf}
+    \caption{Qualitative example failure cases in the real-world failing to generalize to {\em{unseen object dynamics}}.}
+    \label{fig:lang-table-real-fail}
+\end{figure}
+
+\section{Quantitative Experimental Results}
+\label{sec:app_quant}
+
+\subsection{Overall Performance, for Section \ref{sec:quant}}
+\label{sec:app_overall}
+
+Table~\ref{table:main_baselines} lists our quantitative overall evaluation results. We find that \methodname performs as well or better than baselines on seen tasks and significantly outperforms baselines on generalization to unseen objects, backgrounds, and environments.
+
+\begin{table}[H]
+        \centering
+        \scriptsize
+        \begin{tabular}{@{}lcccccccccc@{}}
+        \toprule
+        Model & Seen Tasks & \multicolumn{2}{c}{Unseen Objects} & \multicolumn{2}{c}{Unseen Backgrounds} & \multicolumn{2}{c}{Unseen Environments} & Unseen Average \\
+        \cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8}
+        \multicolumn{2}{c}{} & Easy & Hard & Easy & Hard & Easy & Hard\\
+        \midrule
+        R3M~\citep{nair2022r3m} & 45  & 32 & 14 & 13 & 9 & 0 & 2 & 12\\
+        VC-1~\citep{majumdar2023vc1} & 63 & 34 & 10 & 13 & 3 & 0 & 0 & 10\\
+        RT-1~\citep{brohan2022rt} & \textbf{92} & 31 & 43 & 71 & 9 & 26 & 14 & 32\\
+        MOO~\citep{stone2023open} & 75 & 58 & 48 & 38 & 41 & 19 & 3 & 35\\
+        \methodname-PaLI-X-55B (ours) & \textbf{91} & \textbf{70} & \textbf{62} & \textbf{96} & \textbf{48} & \textbf{63} & \textbf{35} & \textbf{62}\\
+        \methodname-PaLM-E-12B\tablefootnote{The original pre-training data mixture used in PaLM-E-12B (as described in~\cite{driess2023palm}) includes robot images for high-level VQA planning tasks that can be similar to images encountered in generalization scenarios. However, none of those training examples include low-level actions that are evaluated in this experiment.} (ours) & \textbf{93} & \textbf{84} & \textbf{76} & \textbf{75} & \textbf{71} & \textbf{36} & \textbf{33} & \textbf{62}
+        \\
+        \bottomrule
+        \end{tabular}
+        \vspace{0.5em}
+        \caption{Overall performance of two instantiations of \methodname and baselines across seen training tasks as well as unseen evaluations measuring generalization to novel objects, novel backgrounds, and novel environments.}
+        \label{table:main_baselines}
+\end{table}
+
+\subsection{Emergent Evaluation, for Section \ref{sec:emergent}}
+\label{sec:app_emergent}
+Table~\ref{table:emergent} lists all of our quantitative emergent evaluation results. We find that \methodname performs 2x to 3x better than RT-1 on these new instructions, without any additional robotic demonstrations. This showcases how our method allows us to leverage capabilities from pretraining on web-scale vision-language datasets.
+
+\begin{table}[H]
+        \centering
+        \resizebox{\columnwidth}{!}{\begin{tabular}{@{}lccccccccccccccccc@{}}
+        \toprule
+        Model & \multicolumn{4}{c}{Symbol Understanding} & \multicolumn{5}{c}{Reasoning} & \multicolumn{3}{c}{Person Recognition} & Average \\
+        \cmidrule(lr){2-5} \cmidrule(lr){6-10} \cmidrule(lr){11-13}
+         & Symbol 1 & Symbol 2 & Symbol 3 & Average & Math & Logos & Nutrition & Color/Multilingual & Average & Celebrities & CelebA & Average &\\
+        \midrule
+        VC-1~\citep{majumdar2023vc1} & 7 & 25 & 0 & 11 & 0 & 8 & 20 & 13 & 10 & 20 & 7 & 13 & 11 \\
+        RT-1~\citep{brohan2022rt} & 27 & 20 & 0 & 16 & 5 & 0 & 32 & 28 & 16 & 20 & 20 & 20 & 17 \\
+        \methodname-PaLI-X-55B (ours) & \textbf{93} & \textbf{60} & \textbf{93} & \textbf{82} & 25 & 52 & \textbf{48} & \textbf{58} & \textbf{46} & \textbf{53} & \textbf{53} & \textbf{53} & \textbf{60} \\
+        \methodname-PaLM-E-12B (ours) & 67 & 20 & 20 & 36 & \textbf{35} & \textbf{56} & 44 & 35 & 43 & 33 & \textbf{53} & 43 & 40
+        \\
+        \bottomrule
+        \end{tabular}}
+        \vspace{0.5em}
+        \caption{Performance of \methodname and baselines on quantitative emergent evaluations.}
+        \label{table:emergent}
+\end{table}
+
+\subsection{Size and Training Ablations, for Section \ref{sec:ablations}}
+\label{sec:app_ablations}
+Table~\ref{table:ablations} details quantitative results for ablations across model size and training approach. Across each, we see that model size plays an important role in performance and that co-fine-tuning outperforms fine-tuning, which outperforms training from scratch.
+
+\begin{table}[H]
+        \centering
+        \scriptsize
+        \begin{tabular}{@{}lccccccccccc@{}}
+        \toprule
+        Model & Size & Training & \multicolumn{2}{c}{Unseen Objects} & \multicolumn{2}{c}{Unseen Backgrounds} & \multicolumn{2}{c}{Unseen Environments} & Average \\
+        \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+        \multicolumn{3}{c}{} & Easy & Hard & Easy & Hard & Easy & Hard \\
+        \midrule
+        \methodname-PaLI-X & 5B  & from scratch & 0 & 10 & 46 & 0 & 0 & 0 & 9 \\
+        \methodname-PaLI-X & 5B  & fine-tuning & 24 & 38 & 79 & 50 & 36 & 23 & 42 \\
+        \methodname-PaLI-X & 5B  & co-fine-tuning & 60 & 38 & 67 & 29 & 44 & 24 & 44 \\
+        \methodname-PaLI-X & 55B  & fine-tuning & 60 & 62 & 75 & 38 & 57 & 19 & 52\\
+        \methodname-PaLI-X & 55B  & co-fine-tuning & 70 & 62 & 96 & 48 & 63 & 35 & 63\\
+        \bottomrule
+        \end{tabular}
+        \vspace{0.5em}
+        \caption{Ablations of \methodname showcasing the impact of parameter count and training strategy on generalization.}
+        \label{table:ablations}
+\end{table}
+
+\section{Additional Chain-Of-Thought Reasoning Results}
+\label{sec:app_cot}
+We present additional examples of chain-of-thought reasoning rollouts accomplished with \methodname-PaLM-E, as described in Sec.~\ref{sec:cot}, in Figure~\ref{fig:cot_filmstrip}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/rt2_filmstrip.pdf}
+    \caption{Additional examples of RT-2 with chain-of-thought reasoning}
+    \label{fig:cot_filmstrip}
+\end{figure}

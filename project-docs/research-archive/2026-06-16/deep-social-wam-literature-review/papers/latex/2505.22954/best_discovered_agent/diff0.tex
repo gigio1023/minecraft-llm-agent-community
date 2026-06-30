@@ -1,0 +1,230 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/coding_agent.py b/coding_agent.py
+index 2cd395a..9a2cc2f 100644
+--- a/coding_agent.py
++++ b/coding_agent.py
+@@ -4,6 +4,7 @@ import logging
+ from logging.handlers import RotatingFileHandler
+ import os
+ import threading
++import re
+ 
+ from llm_withtools import CLAUDE_MODEL, OPENAI_MODEL, chat_with_agent
+ from utils.eval_utils import get_report_score, msg_history_to_report, score_tie_breaker
+@@ -63,6 +64,42 @@ def safe_log(message, level=logging.INFO):
+     else:
+         print(f"Warning: No logger found for thread {threading.get_ident()}")
+ 
++def is_patch_valid(patch_str):
++    """
++    Parse the patch to check if any non-test source files are modified.
++    Returns (bool, str) tuple: (is_valid, reason)
++    """
++    if not patch_str or patch_str.isspace():
++        return False, "Empty patch"
++    
++    # Parse the patch to find modified files
++    modified_files = []
++    diff_header_pattern = re.compile(r'^\+\+\+ b/(.+)$', re.MULTILINE)
++    for match in diff_header_pattern.finditer(patch_str):
++        filepath = match.group(1)
++        if filepath != '/dev/null':  # Skip deleted files
++            modified_files.append(filepath)
++    
++    if not modified_files:
++        return False, "No files modified"
++        
++    # Check if any non-test files are modified
++    test_patterns = (
++        lambda f: f.startswith('tests/'),
++        lambda f: f.startswith('test_'),
++        lambda f: f.endswith('_test.py')
++    )
++    
++    source_files = [
++        f for f in modified_files 
++        if not any(pattern(f) for pattern in test_patterns)
++    ]
++    
++    if not source_files:
++        return False, "Only test files were modified"
++    
++    return True, "Valid patch with source file modifications"
++
+ class AgenticSystem:
+     def __init__(
+             self,
+@@ -73,6 +110,7 @@ class AgenticSystem:
+             test_description=None,
+             self_improve=False,
+             instance_id=None,
++            max_retries=3,
+         ):
+         self.problem_statement = problem_statement
+         self.git_tempdir = git_tempdir
+@@ -82,6 +120,7 @@ class AgenticSystem:
+         self.self_improve = self_improve
+         self.instance_id = instance_id if not self_improve else 'dgm'
+         self.code_model = CLAUDE_MODEL
++        self.max_retries = max_retries
+ 
+         # Initialize logger and store it in thread-local storage
+         self.logger = setup_logger(chat_history_file)
+@@ -153,7 +192,7 @@ Your task is to run the regression tests in the {self.git_tempdir} directory to
+         """
+         The forward function for the AgenticSystem.
+         """
+-        instruction = f"""I have uploaded a Python code repository in the directory {self.git_tempdir}. Help solve the following problem.
++        base_instruction = f"""I have uploaded a Python code repository in the directory {self.git_tempdir}. Help solve the following problem.
+ 
+ <problem_description>
+ {self.problem_statement}
+@@ -165,7 +204,39 @@ Your task is to run the regression tests in the {self.git_tempdir} directory to
+ 
+ Your task is to make changes to the files in the {self.git_tempdir} directory to address the <problem_description>. I have already taken care of the required dependencies.
+ """
+-        new_msg_history = chat_with_agent(instruction, model=self.code_model, msg_history=[], logging=safe_log)
++
++        retry_count = 0
++        while retry_count < self.max_retries:
++            safe_log(f"\n=== Attempt {retry_count + 1} of {self.max_retries} ===")
++            
++            # Reset to base commit before each attempt
++            if retry_count > 0:
++                reset_to_commit(self.git_tempdir, self.base_commit)
++            
++            # Add retry context to instruction if this is a retry attempt
++            instruction = base_instruction
++            if retry_count > 0:
++                instruction += f"""\nNOTE: Previous attempt(s) failed because they either produced empty patches or only modified test files. 
++Please ensure your solution includes changes to the main source code files, not just test files."""
++
++            # Run the agent
++            new_msg_history = chat_with_agent(instruction, model=self.code_model, msg_history=[], logging=safe_log)
++            
++            # Check the patch
++            patch = self.get_current_edits()
++            is_valid, reason = is_patch_valid(patch)
++            
++            if is_valid:
++                safe_log(f"Valid patch generated: {reason}")
++                break
++            else:
++                safe_log(f"Invalid patch: {reason}")
++                if retry_count < self.max_retries - 1:
++                    safe_log("Retrying with a new attempt...")
++                else:
++                    safe_log("Maximum retries reached. Unable to generate a valid patch.")
++            
++            retry_count += 1
+ 
+ def main():
+     parser = argparse.ArgumentParser(description='Process repository with an agentic system.')
+@@ -177,6 +248,7 @@ def main():
+     parser.add_argument('--test_description', default=None, required=False, help='Description of how to test the repository')
+     parser.add_argument('--self_improve', default=False, action='store_true', help='Whether to self-improve the repository or solving swe')
+     parser.add_argument('--instance_id', default=None, help='Instance ID for SWE issue')
++    parser.add_argument('--max_retries', type=int, default=3, help='Maximum number of patch generation attempts')
+     args = parser.parse_args()
+ 
+     # Process the repository
+@@ -188,6 +260,7 @@ def main():
+         test_description=args.test_description,
+         self_improve=args.self_improve,
+         instance_id=args.instance_id,
++        max_retries=args.max_retries,
+     )
+ 
+     # Run the agentic system to try to solve the problem
+@@ -200,4 +273,4 @@ def main():
+         f.write(model_patch)
+ 
+ if __name__ == "__main__":
+-    main()
++    main()
+\ No newline at end of file
+diff --git a/tests/test_patch_validator.py b/tests/test_patch_validator.py
+new file mode 100644
+index 0000000..5689f7d
+--- /dev/null
++++ b/tests/test_patch_validator.py
+@@ -0,0 +1,77 @@
++import pytest
++from coding_agent import is_patch_valid
++
++def test_empty_patch():
++    # Test empty patch
++    is_valid, reason = is_patch_valid("")
++    assert not is_valid
++    assert reason == "Empty patch"
++
++    # Test whitespace-only patch
++    is_valid, reason = is_patch_valid("   \n   ")
++    assert not is_valid
++    assert reason == "Empty patch"
++
++def test_test_only_patch():
++    patch = """
++diff --git a/tests/test_edit_tool.py b/tests/test_edit_tool.py
++index abc123..def456 100644
++--- a/tests/test_edit_tool.py
+++++ b/tests/test_edit_tool.py
++@@ -10,6 +10,8 @@ def test_something():
++     assert True
+++    assert 1 == 1
++"""
++    is_valid, reason = is_patch_valid(patch)
++    assert not is_valid
++    assert reason == "Only test files were modified"
++
++def test_source_file_patch():
++    patch = """
++diff --git a/tools/edit.py b/tools/edit.py
++index abc123..def456 100644
++--- a/tools/edit.py
+++++ b/tools/edit.py
++@@ -10,6 +10,8 @@ class Editor:
++     def edit(self):
++         pass
+++        return True
++"""
++    is_valid, reason = is_patch_valid(patch)
++    assert is_valid
++    assert reason == "Valid patch with source file modifications"
++
++def test_mixed_files_patch():
++    patch = """
++diff --git a/tools/edit.py b/tools/edit.py
++index abc123..def456 100644
++--- a/tools/edit.py
+++++ b/tools/edit.py
++@@ -10,6 +10,8 @@ class Editor:
++     def edit(self):
++         pass
+++        return True
++
++diff --git a/tests/test_edit.py b/tests/test_edit.py
++index abc123..def456 100644
++--- a/tests/test_edit.py
+++++ b/tests/test_edit.py
++@@ -10,6 +10,8 @@ def test_something():
++     assert True
+++    assert 1 == 1
++"""
++    is_valid, reason = is_patch_valid(patch)
++    assert is_valid
++    assert reason == "Valid patch with source file modifications"
++
++def test_no_files_modified():
++    patch = """
++diff --git a/nonexistent.py b/nonexistent.py
++deleted file mode 100644
++index abc123..0000000
++--- a/nonexistent.py
+++++ /dev/null
++"""
++    is_valid, reason = is_patch_valid(patch)
++    assert not is_valid
++    assert reason == "No files modified"
+\ No newline at end of file
+\end{lstlisting}

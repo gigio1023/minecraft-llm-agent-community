@@ -1,0 +1,149 @@
+\section{Empirical Study}
+
+
+
+\input{tex/rq1}
+
+\input{tex/rq2}
+
+\subsection{RQ3: Patterns of Patch Differences Leading to Behavioral Discrepancies}
+Behavioral discrepancies revealed by generated differentiating tests provide evidence for assessing the correctness of plausible patches.
+%
+This RQ aims to investigate the patterns of the differences between patches that lead to behavioral discrepancies.
+The answer to this RQ can help us better understand the cause of the observed behavioral discrepancies and 
+provide insights into developing more robust issue-solving tools. 
+
+\noindent \textbf{Approach:}
+We sample 77 (30\%) of the suspicious patches detected in RQ2 for investigation and manually derive a taxonomy of patch difference patterns leading to behavioral discrepancies.
+%
+
+To analyze such patch difference patterns, we need to identify the commonalities and differences between each suspicious patch and its oracle patch.
+However, this comparison is non-trivial, because the two patches tend to have divergent syntactical implementations.
+To address this, we introduce the concept of atomic semantic changes (called, \emph{sem-changes} for brevity).
+Sem-changes refer to a set of code line edits in a patch that alter program execution behaviors by adding or modifying a specific behavior
+(e.g., handling errors under certain conditions, processing specific input types or special cases, or implementing the algorithm to compute a value), 
+as opposed to purely structural or syntactical changes. 
+These sem-changes directly impact whether and how the patch addresses the requirements of the targeted issue. 
+Sem-changes that add or modify the same behavior (maybe in different ways and may not be semantically equivalent) are manually aligned between the suspicious patch and the oracle patch, providing a foundation for identifying the key patch differences that lead to the observed behavioral discrepancies. 
+Figure \ref{fig:rq3_example_atomic} illustrates an example of aligned sem-changes. 
+In this case, the two diff hunks in the generated and oracle patches form two sem-changes that modify the same behavior, i.e., when the variable \verb|arg| is of type \verb|tuple|, an extra comma is added before the closing parenthesis at the end of the returned string. 
+Thus they are aligned although these edits are syntactically different and occur at different positions.
+
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.95\linewidth]{img/rq3_example_1.pdf}
+    \vspace{-0.3 cm}
+    \caption{Example of aligned sem-changes (sympy-23262)}
+    \label{fig:rq3_example_atomic}
+    \vspace{-0.3 cm}
+\end{figure*}
+
+
+
+The first author (A1) performs the labeling process.
+For any case with uncertain categories, A1 discusses with another author (A2) and reaches a consensus as the final result.
+Specifically, for each suspicious patch, we first read it and its corresponding oracle patch, making our best effort to understand how this two patches try to solve the issue based on their context in the repository.  
+Then, we extract sem-changes in the two patches that add or modify the same program behavior and align them.
+%
+It is possible that a sem-change in one patch does not align with any sem-change in another, i.e., it is unaligned. 
+If there is no alignment established between the patches, the patch difference pattern is classified as \ding{182} 
+\textit{No Alignment}.
+Otherwise, we further review the differentiating tests of this suspicious patch and the different testing outputs under the two patches, 
+and then determines which sem-change directly leads to the observed behavioral discrepancies.
+We refer to such change as \emph{root change}.
+Based on the root change, the patch difference is classified into one of the three categories: \ding{183} \textit{Supplementary Sem-Change}, \ding{184} \textit{Absent Sem-Change}, and  \ding{185} \textit{Divergent Implementations of Sem-Change}.
+We further manually analyze the patches under the category of Supplementary Sem-changes, 
+and classify them into subcategories based on the program behavior that the root change is adding or modifying.
+Theoretically, there can be cases where the observed behavioral discrepancies are attributed to hybrid patch difference patterns.
+However, we do not observe such cases in the sampled suspicious patches, 
+possibly because the generated plausible patches typically correspond to issues that are not very complex. 
+Therefore, we exclude hybrid patterns from our discussion.
+
+
+
+
+
+
+\begin{figure*}[t]
+    \centering
+    
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.95\linewidth]{img/rq3_example_2.pdf}
+        \vspace{-0.1cm}
+        \subcaption{No alignment (django-12858)}
+        \label{fig:rq3_example_very_different}
+    \end{subfigure}
+    
+    \vspace{0.2cm}  %
+    
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.95\linewidth]{img/rq3_example_3.pdf}
+        \vspace{-0.1cm}
+        \subcaption{Supplementary sem-change (sympy-14711)}
+        \label{fig:rq3_supplementary}
+    \end{subfigure}
+    
+    \vspace{0.2cm}  %
+    
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \includegraphics[width=0.95\linewidth]{img/rq3_example_4.pdf}
+        \vspace{-0.1cm}
+        \subcaption{Absent sem-change (matplotlib-22719)}
+        \label{fig:rq3_absent}
+    \end{subfigure}
+    
+    \vspace{-0.3cm}
+    \caption{Three examples of patch difference patterns}
+    \label{fig:rq3_examples}
+    \vspace{-0.3cm}
+\end{figure*}
+
+\input{tex/tables/rq3_taxonomy}
+
+\noindent \textbf{Results:}
+Table \ref{tab:rq3_taxonomy} presents our derived taxonomy of patch difference patterns. We elaborate on each pattern as follows:
+
+\ding{182} \textit{No Alignment (20.8\%).} This pattern refers to the cases where there is no alignment of automatic semantic changes between the suspicious and oracle patches.
+Figure \ref{fig:rq3_example_very_different} illustrates an example.
+In this example, the suspicious patch changes the base class of \verb|IsNull| and adds a new class member, 
+while the oracle patch modifies the condition under which an error should be appended to the \verb|errors| list. 
+The two changes are not aligned.
+
+\ding{183} \textit{Supplementary Sem-Change (27.3\%):} This pattern refers to the cases where an unaligned Sem-change in the suspicious patch directly leads to the observed behavioral discrepancies.
+%
+In other words, the suspicious patch alters the program behavior in a way that the oracle patch does not.
+Figure \ref{fig:rq3_supplementary} illustrates an example, where the change of handling input 0 in \verb|_check_vector| does not align with any change in the oracle patch. 
+%
+This category is further divided into two subcategories: 
+\emph{Explicitly Handling More Possible Situations (16.9\%)}, where a behavior added only in the generated patch leads to the observed behavioral discrepancies (e.g., explicitly handling inputs of special cases, extra safety checks); 
+and \emph{Supplementary Change of Application Logics (10.4\%)}, where a behavior modified only in the generated patch leads to the observed behavioral discrepancies (e.g., modifying the algorithm to calculate a value, which stays unchanged under the oracle patch). 
+
+
+\ding{184} \textit{Absent Sem-Change (5.2\%).} This is the opposite of the second category, where an unaligned sem-change in the oracle patch directly leads to the observed behavioral discrepancies.
+Figure \ref{fig:rq3_absent} presents an example.
+In this example, the sem-changes of preventing deprecation warning when \verb|values| is empty in function \verb|convert| are aligned,
+while an unaligned change in oracle patch which modifies another function \verb|update| is not found in the suspicious patch. 
+
+\ding{185} \textit{Divergent Implementations of Sem-Change (46.8\%).} In this case, different implementations of aligned sem-changes directly lead to the observed behavioral discrepancies. 
+Figure \ref{fig:rq3_example_atomic} illustrates an example.
+In this case, the left sem-change only adds the comma when the \verb|arg| is not empty, while the right one always adds the comma. 
+Note that the upper part of the oracle patch is for refactoring, and thus is not a sem-change. 
+
+We can see from Table~\ref{tab:rq3_taxonomy} that behavioral differences between suspicious and oracle patches are often due to \emph{Divergent Implementations of Sem-Change} (46.8\%) and due to \emph{Supplementary Sem-Change} (27.3\%).
+Interestingly, there are much more suspicious patches in \emph{Supplementary Sem-Change} than in \emph{Absent Sem-Change} (27.3\% v.s. 5.2\%).
+This suggests that suspicious patches tend to introduce additional changes rather than omitting necessary changes. 
+In addition, 
+16.9\% of the suspicious patches in \emph{Supplementary Sem-Change} add extra behaviors to explicitly handle more possible situations. 
+Although these additional behaviors could make the suspicious patch more robust, they could also be unnecessary, violate user requirements, or even introduce new defects.
+
+\vskip 1mm
+\noindent \fbox{
+	\parbox{0.95\linewidth}{\textbf{Answers to RQ3:} Behavioral differences between suspicious and oracle patches are often due to similar, but divergent implementations (46.8\%) and due to suspicious patches contain more semantic changes than the oracle patches. There are much more cases where the suspicious patches introduce supplementary semantic changes than those with absent semantic changes (27.3\% vs. 5.2\%). }
+}
+
+
+\input{tex/rq4}

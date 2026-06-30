@@ -1,0 +1,84 @@
+\section{\textsc{diamond} algorithm}
+\label{app:algorithm}
+
+We summarize the overall training procedure of \textsc{diamond} in Algorithm \ref{alg:diamond} below. We denote as $\mathcal{D}$ the replay dataset where the agent stores data collected from the real environment, and other notations are introduced in previous sections or are self-explanatory.
+
+\begin{algorithm}[H]
+\caption{\textsc{diamond}}
+\label{alg:diamond}
+\DontPrintSemicolon
+
+\SetKwProg{Proc}{Procedure}{:}{}
+\SetKwFunction{FTrain}{training\_loop}
+\SetKwFunction{FCollect}{collect\_experience}
+\SetKwFunction{FUpdateDiffusionModel}{update\_diffusion\_model}
+\SetKwFunction{FUpdateRewardEndModel}{update\_reward\_end\_model}
+\SetKwFunction{FUpdateActorCritic}{update\_actor\_critic}
+
+
+\Proc{\FTrain{}}
+{
+    \For{epochs}{
+        \texttt{collect\_experience(}\textit{steps\_collect}\texttt{)} \;
+        \For{steps\_diffusion\_model}{
+            \texttt{update\_diffusion\_model()} \; 
+        }
+        \For{steps\_reward\_end\_model}{
+            \texttt{update\_reward\_end\_model()} \; 
+        }
+        \For{steps\_actor\_critic}{
+            \texttt{update\_actor\_critic()} \; 
+        }
+    }
+}
+
+\Proc{\FCollect{$n$}}
+{
+    $\x_0^0 \gets \texttt{env.reset()}$ \;
+    \For{$t = 0$ \KwTo $n - 1$}{
+        Sample $a_t \sim \pi_\phi(a_t \mid \x_t^0)$ \;
+        $\x_{t+1}^0, r_t, d_t \gets \texttt{env.step(}a_t\texttt{)}$ \;
+        $\mathcal{D} \gets \mathcal{D} \cup \{ \x_t^0, a_t, r_t, d_t \} $ \;
+        \If{$d_t = 1$}{
+            $\x_{t+1}^0 \gets \texttt{env.reset()}$ \;
+        }
+    }
+}
+
+\Proc{\FUpdateDiffusionModel{}}
+{
+    Sample sequence $ ( \x_{t-L+1}^0, a_{t-L+1}, \dots, \x_t^0, a_t, \x_{t+1}^0 ) \sim \mathcal{D} $ \;
+    Sample $\log(\sigma) \sim \mathcal{N}(P_{mean}, P_{std}^2)$ \tcp*[f]{log-normal sigma distribution from EDM} \;
+    Define $\tau := \sigma$\tcp*[f]{default identity schedule from EDM} \;
+    Sample $\x_{t+1}^\tau \sim \mathcal{N}(\x_{t+1}^0, \sigma^2 \mathbf{I})$ \tcp*[f]{Add independent Gaussian noise} \;
+    Compute $\hat{\x}_{t+1}^0 = \mathbf{D}_\theta(\x_{t+1}^\tau, \tau, \x_{t-L+1}^0, a_{t-L+1}, \dots, \x_t^0, a_t)$ \;
+    Compute reconstruction loss $\mathcal{L}(\theta) = \Vert \hat{\x}_{t+1}^0 - \x_{t+1}^0 \Vert^2$ \;
+    Update $\mathbf{D}_\theta$ \;
+}
+
+\Proc{\FUpdateRewardEndModel{}}
+{
+    Sample indexes $\mathcal{I} \coloneqq \{t, \dots, t+L+H-1 \}$ \tcp*[f]{burn-in + imagination horizon} \;
+    Sample sequence $ ( \x_i^0, a_i, r_i, d_i )_{i \in \mathcal{I}} \sim \mathcal{D} $ \;
+    Initialize $h = c = 0$ \tcp*[f]{LSTM hidden and cell states}\;  
+    \For{$i \in \mathcal{I}$}{
+        Compute $\hat{r}_i, \hat{d}_i, h, c = R_\psi(\x_i, a_i, h, c)$ \;
+    }
+    Compute $\mathcal{L}(\psi) = \sum_{i \in \mathcal{I}} \mathrm{CE}(\hat{r}_i, \mathrm{sign}(r_i)) + \mathrm{CE}(\hat{d}_i, d_i)$ \tcp*[f]{CE: cross-entropy loss} \;
+    Update $R_\psi$ \;
+}
+
+\Proc{\FUpdateActorCritic{}}
+{
+    Sample initial buffer $( \x_{t-L+1}^0, a_{t-L+1}, \dots, \x_t^0) \sim \mathcal{D} $ \;
+    Burn-in buffer with $R_\psi$, $\pi_\phi$ and $V_\phi$ to initialize LSTM states \;
+    \For{$i=t$ \KwTo $t + H - 1$}{
+        Sample  $a_i \sim \pi_\phi(a_i \mid \x_i^0)$ \;
+        Sample reward $r_i$ and termination $d_i$ with $ R_\psi$ \;
+        Sample next observation $\x_{i+1}^0$ by simulating reverse diffusion process with $\mathbf{D}_\theta$ \;
+    }
+    Compute $ V_\phi(\x_i) $ for $i = t, \dots, t + H$ \;
+    Compute RL losses $\mathcal{L}_V(\phi)$ and $\mathcal{L}_\pi(\phi)$ \;
+    Update $\pi_\phi$ and $V_\phi$ \;
+}
+\end{algorithm}

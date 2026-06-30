@@ -6,6 +6,10 @@ Use `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
 `Actor-Episode-And-Actor-Turn-Architecture.md`, and
 `Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md` for current runtime
 authority.
+For the active research framing, use
+`../Specification/Advisory-Social-Material-WAM.md`. This page's evidence and
+verification language is historical implementation hygiene, not the project's
+research contribution.
 Date: 2026-05-24
 Search token: `CURRENT_ARCHITECTURE_IMPLEMENTATION_AUDIT`
 
@@ -88,10 +92,23 @@ live matrix above.
 
 ## Architecture In One Sentence
 
-The current system is an evidence-first Minecraft runtime where an actor may
+At this dated snapshot, the system was a Minecraft runtime where an actor could
 choose goals through a provider, but only runtime-owned primitives and
-actor-owned action skills can touch the world, and every meaningful claim must
-be grounded in current-run evidence artifacts.
+actor-owned action skills could touch the world, and every meaningful claim had
+to be grounded in current-run artifacts.
+
+The current research direction builds on that baseline by collecting
+social-material transition rows:
+
+```text
+state_before + actor frame + candidate action
+-> advisory predicted_delta
+-> runtime execution
+-> observed physical/material/social delta
+```
+
+Runtime verification remains required engineering hygiene. It should not be
+presented as a novel benchmark contribution.
 
 ## Runtime Authority Model
 
@@ -119,9 +136,10 @@ The canonical runtime-loop contract is:
 3. Ask the provider for a bounded proposal.
 4. Validate the proposal against runtime-owned action skill and primitive gates.
 5. Execute one bounded primitive or an action skill execution unit.
-6. Verify from current-run tool evidence.
-7. Persist transcript, evidence, provider input/output snapshots, memory, and
-   judgments.
+6. Check the outcome from current-run tool evidence.
+7. Persist transcript, evidence, provider input/output snapshots, memory,
+   judgments, and, where the advisory WAM path is active, predicted-vs-observed
+   transition rows.
 
 The general action loop implements this shape in `probe/src/runtime/agentLoop.ts`.
 It supports `place_block` and `build_pattern` as optional installed tool
@@ -370,7 +388,7 @@ It writes per-tool evidence and derives progress verifier status from tool
 statuses. It now also records action-skill postcondition results for owned
 action-skill bundles. The social-cycle bridge is intentionally smaller than the
 full matrix runner, but it covers the settlement-critical contracts:
-crafting-table placement, starter shelter verification, storage contribution,
+crafting-table placement, starter shelter outcome checks, storage contribution,
 crafting, gathering, mining, runtime observe/remember, and social handoff
 evidence.
 
@@ -607,11 +625,14 @@ evaluator is in place. The 14/14 live action skill matrix is now in place.
 
 ## Bottom Line
 
-The architecture is on the right path. The current repo has the core pieces that
-modern embodied-agent work keeps converging on: bounded action interfaces,
-environment feedback, skill ownership, memory, and evidence-first verification.
+The architecture snapshot was on the right path for its date. The repo already
+had core pieces that modern embodied-agent work keeps converging on: bounded
+action interfaces, environment feedback, action-skill ownership, memory, and
+runtime outcome checks.
 
-The main weakness is not model capability. The main weakness is that settlement
-state is still too implicit, and social-cycle action skill execution is not yet
-as verifier-aware as the action skill probe matrix. Fixing those two issues is
-more important than expanding the provider's raw authority.
+Under the current direction, the main weakness is not only model capability.
+The repo must turn those checked action outcomes into a dataset for predicting
+social-material consequences. Settlement state, material claims, obligations,
+and relationship-relevant changes should become explicit observed deltas, while
+the advisory predictor's guesses are scored separately from whether the actor
+physically succeeded.

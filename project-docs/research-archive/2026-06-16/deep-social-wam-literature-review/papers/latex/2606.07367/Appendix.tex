@@ -1,0 +1,479 @@
+\newpage
+\appendix
+
+\section*{Limitations}
+Q-Evolve has several limitations worth noting. The retrospective reward signals depend on structured environment feedback and may require task-specific adaptation; for instance, the repetition penalty is meaningful only in environments where repeated observations reliably indicate stagnation. The self-evolving loop relies on greedy rollouts for data collection, which reduces trajectory diversity over iterations and can cause the policy to converge to locally optimal but suboptimal behaviors. Finally, while the in-distribution constraint stabilizes learning within each iteration, distribution shift accumulates across iterations as the policy evolves, and the current framework does not explicitly correct for this cross-iteration drift.
+
+
+
+
+\section{Analysis of Design Choices}
+
+\subsection{Retrospective reward design.}
+The auxiliary reward values are set according to three principles that govern their interaction with the primary task signal: (i)~\emph{small magnitude} relative to the extrinsic reward, so that policy learning prioritizes task completion rather than penalty avoidance; (ii)~\emph{non-dominance in cumulative return}, ensuring that auxiliary signals shape rather than override the episodic reward; and (iii)~\emph{severity-based ordering}, where failure types are ranked by their impact on task execution---format errors invalidate the action protocol entirely and carry the highest penalty, non-executable actions violate environmental constraints and receive a moderate penalty, and repeated or no-op actions indicate ineffective exploration with the lowest penalty.
+These considerations yield $(r^{\text{fmt}}, r^{\text{inv}}, r^{\text{repeat}}) = (-0.3, -0.2, -0.1)$.
+
+Table~\ref{tab:sensitivity} evaluates the robustness of these choices on ALFWorld.
+Performance is stable across alternative reward scales (\textbf{RR-alt}), but deteriorates substantially when the format penalty is inflated to $r^{\text{fmt}}=-1$ (\textbf{RR-high-fmt}), as it begins to dominate the cumulative return and undermines the task-level signal.
+For weighted IQL, both the temporal and success terms contribute positively; the temporal term has a larger effect on unseen tasks, where reliable value propagation is especially important for generalization.
+
+
+
+\subsection{Analysis of Retrospective Rewards in Advantage Estimation}
+\label{app:gae_analysis}
+
+We formally justify why $r^{\text{aux}}$ is excluded from the GAE used for policy optimization. Let $V$ be the value function trained under the full shaped reward $r^{\text{env}} + r^{\text{aux}}$, and let $A_t^{\text{env}}$, $A_t^{\text{full}}$ denote the GAE advantages computed with $r^{\text{env}}$ and $r^{\text{env}} + r^{\text{aux}}$, respectively.
+
+\begin{proposition}
+\label{prop:gae_decomp}
+For all $0 \le t \le T-1$,
+\[
+A_t^{\text{full}} - A_t^{\text{env}} = \sum_{l=0}^{T-t-1} (\gamma\lambda)^l\, r^{\text{aux}}_{t+1+l}.
+\]
+\end{proposition}
+\begin{proof}
+The GAE recursion with $A_T = 0$ unrolls to $A_t = \sum_{l=0}^{T-t-1}(\gamma\lambda)^l \delta_{t+l}$, where $\delta_t = r_{t+1} + \gamma V(s_{t+1}) - V(s_t)$. Since $V$ is the same in both cases, the TD residuals differ only by $\delta_t^{\text{full}} - \delta_t^{\text{env}} = r^{\text{aux}}_{t+1}$. Subtracting the two expansions gives the result.
+\end{proof}
+
+Proposition~\ref{prop:gae_decomp} shows that including $r^{\text{aux}}$ in GAE directly adds a discounted auxiliary-return term to the policy-side advantage target. To see why this changes the policy objective, consider first the case $\lambda = 1$: GAE reduces to the Monte Carlo advantage, giving $A_t^{\text{env}} = \sum_{l \geq 0} \gamma^l r^{\text{env}}_{t+1+l} - V(s_t)$ (where the $V$-terms telescope and $V(s_T)=0$). Using only $r^{\text{env}}$ therefore keeps the policy update aligned with the original environment-return objective $J^{\text{env}}(\pi) = \mathbb{E}_\pi[\sum_t \gamma^t r^{\text{env}}_t]$ and does not change the optimal policy. For $\lambda < 1$, GAE no longer equals the Monte Carlo return exactly, but it still defines an environment-reward $\lambda$-return surrogate; the key identity $A_t^{\text{full}} - A_t^{\text{env}} = \sum_{l=0}^{T-t-1}(\gamma\lambda)^l r^{\text{aux}}_{t+1+l}$ remains exact, and excluding $r^{\text{aux}}$ keeps policy learning aligned with this environment-reward surrogate alone. This is corroborated empirically in Table~\ref{tab:process_reward_choice}.
+
+
+
+\subsection{Weighted IQL design.}
+The step-weight $w_t$ in Eq.~\ref{eq:iql_v} incorporates two complementary terms.
+The temporal term assigns larger weights to later transitions, which have shorter remaining bootstrap horizons and thus more reliable TD targets under sparse rewards.
+The success term upweights trajectories with non-zero episodic rewards: under extreme reward sparsity, successful rollouts constitute a small but disproportionately informative subset, and without reweighting, critic learning would be dominated by the abundant low-signal failure trajectories.
+
+
+\subsection{Memory cost.}
+Beyond environment interactions, Q-Evolve also incurs lower training and inference overhead: during policy optimization, only the policy and reference models are loaded (two models), matching the memory footprint of GRPO, since the critic's advantages are pre-computed offline and need not be retained.
+At inference time, Q-Evolve requires no additional critic evaluation, whereas QLASS performs multi-candidate scoring per step, adding non-trivial inference cost.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Sensitivity analysis on AlfWorld (single iteration). \textbf{Bold}: best result.}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcc}
+\toprule
+Variant & Seen & Unseen \\
+\midrule
+w/o RR                    & 83.6 & 82.7 \\
+RR-alt $(-0.1,-0.05,-0.03)$  & 85.7 & 84.3 \\
+RR-high-fmt $(-1,-0.2,-0.1)$ & 69.3 & 64.2 \\
+\midrule
+w/o W-IQL                 & 83.6 & 76.1 \\
+W-IQL w/o temporal term   & 83.6 & 79.1 \\
+W-IQL w/o success term    & 85.0 & 83.6 \\
+\midrule
+\textbf{Q-Evolve}         & \textbf{87.9} & \textbf{86.6} \\
+\bottomrule
+\end{tabular}
+\label{tab:sensitivity}
+\end{table}
+
+\section{Implementation Details}
+\subsection{Prompts in Experiments}
+\label{app:prompts}
+We list all the prompts used in our experiments in Figure~\ref{fig:gen_alfworld} (AlfWorld), Figure~\ref{fig:gen_sciworld} (SciWorld) and Figure~\ref{fig:gen_webshop} (Webshop).
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+\node[
+  draw,
+  rounded corners,
+  text width=\dimexpr\linewidth-24pt\relax,
+  align=flush center,
+  inner sep=12pt,
+  fill=lightgray!40
+]{
+\begin{minipage}{\linewidth}
+\footnotesize
+Interact with a household to solve a task. Imagine you are an intelligent agent in a household environment and your target is to perform actions to complete the task goal. At the beginning of your interactions, you will be given the detailed description of the current environment and your goal to accomplish.
+
+For each of your turns, you will be given the observation from the last turn. You should first think about the current condition and plan your future actions, and then output your action in this turn. Your output must strictly follow this format:\\
+Thought: your thoughts.\\
+Action: your next action.\\
+
+\medskip
+The available actions are:
+\begin{enumerate}\itemsep0pt
+  \item go to \texttt{\{recep\}}
+  \item take \texttt{\{obj\}} from \texttt{\{recep\}}
+  \item put \texttt{\{obj\}} in/on \texttt{\{recep\}}
+  \item open \texttt{\{recep\}}
+  \item close \texttt{\{recep\}}
+  \item toggle \texttt{\{obj\}} \texttt{\{recep\}}
+  \item clean \texttt{\{obj\}} with \texttt{\{recep\}}
+  \item heat \texttt{\{obj\}} with \texttt{\{recep\}}
+  \item cool \texttt{\{obj\}} with \texttt{\{recep\}}
+\end{enumerate}
+where \texttt{\{obj\}} and \texttt{\{recep\}} correspond to objects and receptacles.\\
+After each turn, the environment will give you immediate feedback based on which you plan your next few steps. If the environment outputs \texttt{"Nothing happened"}, that means the previous action is invalid and you should try more options.
+
+\medskip
+Your response should use the following format:\\
+Thought: \texttt{\textless your thoughts\textgreater}\\
+Action: \texttt{\textless your next action\textgreater}\\
+\end{minipage}
+};
+\end{tikzpicture}
+
+\caption{The instruction prompt provided to the language agent on AlfWorld.}
+\label{fig:gen_alfworld}
+\end{figure}
+
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\node[
+  draw,
+  rounded corners,
+  text width=\dimexpr\linewidth-24pt\relax,
+  align=flush center,
+  inner sep=12pt,
+  fill=lightgray!40
+]{
+\begin{minipage}{\linewidth}
+\footnotesize
+You are a helpful assistant to do some scientific experiment in an environment. \\
+In the environment, there are several rooms: kitchen, foundry, workshop, bathroom, outside, living room, bedroom, greenhouse, art studio, hallway \\
+You should explore the environment and find the items you need to complete the experiment. \\
+You can teleport to any room in one step. \\
+All containers in the environment have already been opened, you can directly get items from the containers. \\ \\
+The available actions are:\\
+open OBJ: open a container\\
+close OBJ: close a container\\
+activate OBJ: activate a device\\
+deactivate OBJ: deactivate a device\\
+connect OBJ to OBJ: connect electrical components\\
+disconnect OBJ: disconnect electrical components\\
+use OBJ [on OBJ]: use a device/item\\
+look around: describe the current room\\
+examine OBJ: describe an object in detail\\
+look at OBJ: describe a container's contents\\
+read OBJ: read a note or book\\
+move OBJ to OBJ: move an object to a container\\
+pick up OBJ: move an object to the inventory\\
+pour OBJ into OBJ: pour a liquid into a container\\
+mix OBJ: chemically mix a container\\
+teleport to LOC: teleport to a specific room\\
+focus on OBJ: signal intent on a task object\\
+wait: task no action for 10 steps\\
+wait1: task no action for a step \\
+\medskip
+Your response should use the following format:\\\\
+Thought: \texttt{\textless your thoughts\textgreater}\\
+Action: \texttt{\textless your next action\textgreater}\\
+\end{minipage}
+};
+\end{tikzpicture}
+
+\caption{The instruction prompt provided to the language agent on SciWorld.}
+\label{fig:gen_sciworld}
+\end{figure}
+
+
+
+\begin{figure}[t]
+    \begin{tikzpicture}
+    \node [draw, rounded corners,
+         text width=\linewidth-24pt,    % <---
+         align=flush center, 
+         inner sep=12 pt,
+         fill=lightgray!40,
+    ]%
+    {
+    \begin{minipage}{1\linewidth}
+    \footnotesize{
+You are web shopping. 
+
+I will give you instructions about what to do. 
+
+You have to follow the instructions.
+
+Every round I will give you an observation and alist of available actions, you have to respond anaction based on the state and instruction.
+
+You can use search action if search is available.
+
+You can click one of the buttons in clickables.
+
+An action should be of the following structure:
+
+\textbf{search[keywords]}
+
+\textbf{click[value]}
+
+If the action is not valid, perform nothing.Keywords in search are up to you, but the valuein click must be a value in the list of available actions.Remember that your keywords in search shouldbe carefully designed.Your response should use the following format:Thought: I think ...Action: click[something]
+ }\\
+\end{minipage}
+};
+\end{tikzpicture}
+\caption{
+The instruction prompt provided to language agent on WebShop.
+}
+\label{fig:gen_webshop}
+\end{figure}
+
+
+\subsection{Critic Model Structure}
+
+\label{sec:critic}
+\paragraph{Critic Model.}
+We parameterize the critic with a single pretrained LLM backbone and route computation through lightweight LoRA adapters to predict both the state value $V(s)$ and the state--action value $Q(s,a)$. This shared-backbone design preserves a common representation while enabling head-specific specialization, avoiding the overhead of maintaining separate LLMs for $V$ and $Q$.
+
+Let $f_\theta$ denote the pretrained LLM. Given a tokenized input $x$, it produces hidden states
+$H = f_\theta(x)\in\mathbb{R}^{B\times T\times d}$.
+We attach two LoRA adapters: a \emph{value adapter} $\phi_v$ and a \emph{Q adapter} $\phi_q$.
+For each forward pass, we activate the corresponding adapter:
+\begin{equation}
+H^{(v)} = f_{\theta,\phi_v}(x), \qquad
+H^{(q)} = f_{\theta,\phi_q}(x).
+\label{eq:adapter-routing}
+\end{equation}
+
+
+The input to the critic is a trajectory formatted as a multi-turn chat transcript (user observations and assistant actions) and then tokenized into a single sequence $x=(x_1,\dots,x_T)$ using the same chat template as the policy.
+We tokenize the \emph{full} trajectory once to obtain the token ids, and for each step $t$ we additionally tokenize three \emph{prefixes} of the transcript: (i) the prefix ending at the current observation (state prefix), (ii) the prefix ending after the agent action is appended (state--action prefix), and (iii) the prefix ending at the next observation (next-state prefix).
+The lengths of these three tokenized prefixes define their end-token indices $p_t^{(s)}, p_t^{(sa)}, p_t^{(s')}$ (i.e., the last token positions of each prefix in the full sequence).
+
+Given hidden states $H^{(v)}=f_{\theta,\phi_v}(x)$ and $H^{(q)}=f_{\theta,\phi_q}(x)$, we represent each segment by the hidden state at its end position (last-token pooling):
+\[
+h_t^{(s)} = H^{(v)}_{p_t^{(s)}}, \quad
+h_t^{(sa)} = H^{(q)}_{p_t^{(sa)}}, \quad
+h_t^{(s')} = H^{(v)}_{p_t^{(s')}}.
+\]
+In practice, we can sample multiple steps from the same trajectory (e.g., $K$ steps) and gather the corresponding hidden states in one forward pass; these pooled vectors are then fed into small MLP heads to produce $V(s)$, $V(s')$, and Double-$Q(s,a)$ predictions.
+
+\paragraph{Prediction heads.}
+On top of the routed hidden states, we use lightweight heads to produce scalar predictions.
+For each step, we first pool the routed hidden states at the precomputed end-token positions, obtaining vectors $h_t^{(s)}$, $h_t^{(sa)}$, and $h_t^{(s')}$.
+We then apply one value head $g_v$ and two Q heads $g_{q_1}, g_{q_2}$ for Double Q-learning:
+\begin{equation}
+\begin{aligned}
+V(s_t) \; &=\; g_v\!\left(h_t^{(s)}\right), \\
+Q_1(s_t,a_t) \; &=\; g_{q_1}\!\left(h_t^{(sa)}\right), \\
+Q_2(s_t,a_t) \; &=\; g_{q_2}\!\left(h_t^{(sa)}\right).
+\end{aligned}
+\label{eq:critic-heads}
+\end{equation}
+
+
+\paragraph{Delayed $Q$ network.}
+For stable target estimation in Bellman-style backups, we maintain a delayed (target) $Q$ network that mirrors the on-training $Q$ branch.
+It shares the same backbone $f_\theta$ but uses a separate set of EMA parameters $(\bar\phi_q,\bar g_{q_1}, \bar g_{q_2})$.
+Concretely, the delayed branch routes the input through the target $Q$ adapter
+\begin{equation}
+\bar H^{(q)} = f_{\theta,\bar\phi_q}(x),
+\label{eq:delayed-q-routing}
+\end{equation}
+pools the end-of-action representation $\bar h_t^{(sa)}$ in the same way as the online branch, and predicts target Double-$Q$ values:
+\begin{equation}
+\bar Q_1(s_t,a_t)=\bar g_{q_1}\!\left(\bar h_t^{(sa)}\right), \qquad
+\bar Q_2(s_t,a_t)=\bar g_{q_2}\!\left(\bar h_t^{(sa)}\right).
+\label{eq:delayed-q-heads}
+\end{equation}
+The target parameters are updated by an exponential moving average of the online $Q$ parameters:
+\begin{equation}
+\begin{aligned}
+\bar\phi_q &\leftarrow (1-\lambda_{\text{EMA}})\,\bar\phi_q + \lambda_{\text{EMA}}\,\phi_q,\\
+\bar g_{q_1} &\leftarrow (1-\lambda_{\text{EMA}})\,\bar g_{q_1} + \lambda_{\text{EMA}}\, g_{q_1},\\
+\bar g_{q_2} &\leftarrow (1-\lambda_{\text{EMA}})\,\bar g_{q_2} + \lambda_{\text{EMA}}\, g_{q_2}.
+\end{aligned}
+\label{eq:ema-delayed-q}
+\end{equation}
+We apply this soft update every $K$ optimization steps; in our implementation, we set $K=2$ and $\lambda_{\text{EMA}}=0.005$ for both the $Q$ heads and the $Q$ adapter.
+
+
+
+\paragraph{Optimization with step weights and Double-$Q$.}
+Each sampled step $t$ is associated with a nonnegative weight $w_t$ (stored in the offline dataset), which upweights more informative steps (e.g., later steps or decisive transitions).
+We train the critic with \emph{Double-$Q$}: two separate heads $Q_1$ and $Q_2$ are learned in parallel on the same representation $h_t^{(sa)}$ and the same TD target. 
+Concretely, for a transition $(s_t,a_t,r_t,s_{t+1},d_t)$ we compute the bootstrap target using the value branch,
+\[
+y_t \;=\; r_t + \gamma(1-d_t)\,V(s_{t+1}),
+\]
+and regress both heads to this target with a weighted squared loss:
+\[
+\mathcal{L}_Q \;=\; \sum_t w_t\Big[(Q_1(s_t,a_t)-y_t)^2 + (Q_2(s_t,a_t)-y_t)^2\Big].
+\]
+Using two $Q$ heads helps reduce overestimation and improves stability: when fitting the value function, we form a conservative target from the delayed (EMA) $Q$ network by taking the minimum of the two target heads,
+\[
+\bar Q(s_t,a_t) \;=\; \min\!\big(\bar Q_1(s_t,a_t),\,\bar Q_2(s_t,a_t)\big),
+\]
+and update $V$ via a (weighted) expectile regression toward $\bar Q$:
+\[
+\mathcal{L}_V \;=\; \sum_t w_t\,\ell_{\mathrm{exp}}\!\big(\bar Q(s_t,a_t)-V(s_t)\big).
+\]
+The delayed $Q$ network is not optimized by gradient descent; instead, its adapter and heads are updated by EMA from the on-training $Q$ parameters every $K$ steps.
+
+
+\begin{algorithm}[t]
+\small
+\caption{Critic optimization with Double-$Q$, delayed $Q$ (EMA), and step weights}
+\label{alg:critic-opt}
+\DontPrintSemicolon
+\KwIn{Offline trajectory tokens; per-step indices $p_t^{(s)},p_t^{(sa)},p_t^{(s')}$ and weights $w_t$; discount $\gamma$; expectile $m$; EMA rate $\lambda_{\text{EMA}}$; update period $K$.}
+
+Initialize online params $(\phi_v,g_v)$ and $(\phi_q,g_{q_1},g_{q_2})$\;
+Set target params $(\bar\phi_q,\bar g_{q_1},\bar g_{q_2}) \leftarrow (\phi_q,g_{q_1},g_{q_2})$\;
+
+\For{$n=1,2,\dots$}{
+    Sample a trajectory and select $K$ steps $\{t_k\}_{k=1}^K$ with weights $\{w_{t_k}\}$\; \\
+    Build a token prefix $x$ truncated to the longest selected next-state prefix\;\\
+    Compute $H^{(v)}=f_{\theta,\phi_v}(x)$ and $H^{(q)}=f_{\theta,\phi_q}(x)$\;\\
+    Gather $h^{(s)}_{t_k}=H^{(v)}_{p_{t_k}^{(s)}},\; h^{(sa)}_{t_k}=H^{(q)}_{p_{t_k}^{(sa)}},\; h^{(s')}_{t_k}=H^{(v)}_{p_{t_k}^{(s')}}$\;
+
+    \eIf(\tcp*[f]{update $Q$}){$n$ is a $Q$-update step}{
+        $V'_{t_k} \leftarrow g_v\!\left(h^{(s')}_{t_k}\right)$\;,
+        $y_{t_k} \leftarrow r_{t_k} + \gamma(1-d_{t_k})V'_{t_k}$\;\\
+        $Q_{1,t_k} \leftarrow g_{q_1}\!\left(h^{(sa)}_{t_k}\right)$\;,
+        $Q_{2,t_k} \leftarrow g_{q_2}\!\left(h^{(sa)}_{t_k}\right)$\;\\
+        $\mathcal{L}_Q \leftarrow \sum_{k=1}^{K} w_{t_k}\Big[(Q_{1,t_k}-y_{t_k})^2 + (Q_{2,t_k}-y_{t_k})^2\Big]$\;\\
+        Update $(\phi_q,g_{q_1},g_{q_2})$ by descending $\nabla \mathcal{L}_Q$\;\\
+    }{ \tcp*[f]{update $V$} \\
+        $V_{t_k} \leftarrow g_v\!\left(h^{(s)}_{t_k}\right)$\;\\
+        Compute $\bar H^{(q)}=f_{\theta,\bar\phi_q}(x)$ and gather $\bar h^{(sa)}_{t_k}=\bar H^{(q)}_{p_{t_k}^{(sa)}}$\;\\
+        $\bar Q_{1,t_k} \leftarrow \bar g_{q_1}\!\left(\bar h^{(sa)}_{t_k}\right)$\;,
+        $\bar Q_{2,t_k} \leftarrow \bar g_{q_2}\!\left(\bar h^{(sa)}_{t_k}\right)$\;\\
+        $\bar Q_{t_k} \leftarrow \min(\bar Q_{1,t_k},\bar Q_{2,t_k})$\;\\
+        $\mathcal{L}_V \leftarrow \sum_{k=1}^{K} w_{t_k}\,\ell_{\mathrm{exp}}\!\left(\bar Q_{t_k}-V_{t_k}\right)$\;\\
+        Update $(\phi_v,g_v)$ by descending $\nabla \mathcal{L}_V$\;\\
+    }
+
+    \If{$n \bmod K = 0$}{
+        $(\bar\phi_q,\bar g_{q_1},\bar g_{q_2}) \leftarrow (1-\lambda_{\text{EMA}})(\bar\phi_q,\bar g_{q_1},\bar g_{q_2}) + \lambda_{\text{EMA}}(\phi_q,g_{q_1},g_{q_2})$\;
+    }
+}
+\end{algorithm}
+\begin{table}[t]
+\centering
+% \small
+\caption{Rewards for penalty.}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{cccc}
+\toprule
+\textbf{Task} & $r^{\text{fmt}}$ & $r^{\text{inv}}$ & $r^{\text{repeat}}$ \\
+\midrule
+\textbf{AlfWorld} & $-0.3$ & $-0.2$  & $-0.1$  \\
+\textbf{WebShop} & $-0.3$ & $0$  & $0$  \\
+\textbf{SciWorld}           & $-0.3$ & $-0.2$ & $-0.1$ \\
+\bottomrule
+\end{tabular}
+\label{tab:rews}
+\end{table}
+
+\subsection{Hyperparameters}
+\label{app:hyper-param}
+We summarize the hyperparameters used across all stages in this section. All hyperparameters leveraged in our method are in the Table~\ref{tab:hyper-param} and  Table~\ref{tab:hyper-param2}.  
+\begin{table}[t]
+\centering
+\small
+\caption{\textbf{Hyperparameters.}}
+\label{tab:hyperparams}
+\begin{tabular}{l r}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Batch size & dynamic \\
+Number of policy training epochs & 3 \\
+Number of critic training epochs & 20 \\
+Weight decay & 0.0 \\
+Warmup ratio & 0.03 \\
+SFT learning rate & 1e-5 \\
+LR scheduler type & Cosine \\
+Model max length & 4096 \\
+Discount factor $\gamma$ & 0.95 \\
+Discount factor $\lambda$ in GAE & 0.95 \\
+Maximum episode length on WebShop & 10 \\
+Maximum episode length on SciWorld & 24 \\
+Maximum episode length on ALFWorld & 30 \\
+Sampled trajectory number for self-training & 3 \\
+Exploration temperature & 2.0 \\
+\bottomrule
+\end{tabular}
+\label{tab:hyper-param}
+\end{table}
+
+\begin{table}
+\centering
+% \small
+\caption{Ablation study on hyper-parameters $\epsilon_{\text{low}}$ and $\epsilon_{\text{high}}$ on AlfWorld. Best in each split is in \textbf{bold}.}
+\label{tab:eps_ablation_alfworld}
+\begin{tabular}{cc|cc}
+\toprule
+$\epsilon_{\text{low}}$ & $\epsilon_{\text{high}}$ & Seen & Unseen \\
+\midrule
+% 0.2 & 0.2 & \multirow{7}{*}{0.7} & 77.9 & 78.4 \\
+0.2 & 0.2 &   77.9 & 78.4 \\
+0.4 & 0.2 &  74.3 & 77.6 \\
+0.2 & 0.4 & 75.7 & 81.3 \\
+0.4 & 0.4 &  80.7 & 85.1 \\
+0.8 & 0.4 &  \textbf{87.9} & \textbf{86.6} \\
+0.4 & 0.8 &  81.4 & 83.6 \\
+0.8 & 0.8 &  86.4 & 85.8 \\
+% \midrule
+% \multirow{3}{*}{0.8} & \multirow{3}{*}{0.4} & 0.5 &  86.4 & 85.8 \\
+%                      &                      & 0.7 & \textbf{87.9} & \textbf{86.6} \\
+%                      &                      & 1.0 & 84.3 & 85.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table*}
+\centering
+\small
+\caption{Hyper-parameters for Iteration 1 vs Iteration 2.}
+\label{tab:iter_key_hparams}
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Hyper-parameter} & \textbf{Iter 1} & \textbf{Iter 2} \\
+\midrule
+Environment & \texttt{AlfWorld} / \texttt{SciWorld} / \texttt{WebShop} & \texttt{AlfWorld} / \texttt{SciWorld} / \texttt{WebShop} \\
+Token length (max) & 3600/4096/4096 & 3600/4096/4096 \\
+Learning rate for Policy Learning & 1e-5/5e-6/5e-6 & 5e-6/5e-6/5e-6 \\
+Learning rate for Critic Learning & 1e-5/1e-5/1e-5 & 1e-5/5e-6/5e-6 \\
+
+Epochs for Policy Learning & 3/2/2 & 2/2/2 \\
+Epochs for Critic Learning & 20/20/20 & 2/2/2 \\
+Steps for old policy backup & no/50/200 & 200/200/200  \\
+\bottomrule
+\end{tabular}
+\label{tab:hyper-param2}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\caption{Dataset statistics. ``Test (Seen)'' and ``Test (Unseen)'' indicate evaluation scenarios. ``Ave. Steps'' is the average interaction steps.}
+\begin{tabular}{lcccc}
+\toprule
+ \textbf{Task} & \textbf{Train} &  \textbf{Test (Seen)} &  \textbf{Test (Unseen)} & \textbf{Ave. Steps} \\
+\midrule
+WebShop      & 1938 & 200 & -   & 4.9 \\
+ScienceWorld & 1483 & 194 & 241 & 14.4 \\
+ALFWorld     & 3321 & 140 & 134 & 10.1 \\
+\bottomrule
+\end{tabular}
+\label{tab:tasks}
+\end{table}
+
+The hyperparameters of the reward penalty are shown in Table~\ref{tab:rews}. In general, we impose a stronger penalty on action--think format errors than on invalid-but-parsable actions, since the former violates the interaction protocol and typically prevents any meaningful environment transition, whereas the latter reflects a semantically infeasible choice under a valid protocol. We additionally penalize non-meaningful actions when the observation remains unchanged after executing an action, which encourages exploration and discourages ineffective interactions; we exclude cases where no-op behavior is part of the environment design (e.g., the \texttt{wait} action in SciWorld, and unchanged observations in WebShop). 
+
+
+
+\subsection{Additional Experiments.}
+\label{app:additional_results}
+\textbf{Ablation study on Hyper-parameter $\epsilon_{\text{low}}$ and $\epsilon_{\text{high}}$ on Alfworld.}
+As shown in Table~\ref{tab:eps_ablation_alfworld}, larger clipping thresholds allow more aggressive policy updates. When $\epsilon$ is small, varying $\epsilon_{\text{low}}$ and $\epsilon_{\text{high}}$ has only a mild effect, since the update magnitude is tightly constrained. As $\epsilon$ increases, using a larger $\epsilon_{\text{low}}$ becomes more beneficial: it enables stronger down-weighting of known incorrect actions, which reduces overfitting to suboptimal behaviors and leads to better generalization on the Unseen split.
+
+
+\subsection{Runtime Analysis}
+All experiments were conducted on a single node with 4$\times$H100 GPUs.
+In our pipeline, behavior cloning takes approximately 5 minutes per epoch, critic training takes about 1 hour per epoch, and policy learning takes around 15 minutes per epoch.
+Overall, the runtime is dominated by critic training, while the policy learning and behavior cloning stages are comparatively lightweight.

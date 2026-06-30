@@ -1,0 +1,69 @@
+% $\tau^{2}$ Bench \citep{barres2025tau2benchevaluatingconversationalagents} is a text-based, long-horizon agent environment designed to evaluate conversational agents operating in a dual-control environment where both an AI agent and a simulated user interact with a shared, dynamic world via tool calls rather than mere text generation.
+$\tau^{2}$ Bench \citep{barres2025tau2benchevaluatingconversationalagents} is a text-based, long-horizon agent environment designed to evaluate the customer service ability of an LLM-based agent in a dual-control environment, where both the agent and user can make use of tool calls to act in a shared, dynamic environment.
+% A $\tau^{2}$ Bench task is modeled as a partially observable decision process, requiring the agent to coordinate multi-turn tool use and communication while tracking evolving environment state.
+A $\tau^{2}$ Bench task, in practice, requires the agent to communicate with the user to gather information, make tool-calls, and adapt to the evolving environment state (\eg{} users making tool-calls).
+Tasks spans across domains such as telecom, retail, and airline support, creating diverse multi-step interactions that challenge agents to plan, adapt, and coordinate with the user.
+% In particular, solving $\tau^{2}$ Bench tasks requires reasoning about how tool invocations affect future states and user outcomes, making it well suited for evaluating an agent’s ability to build and leverage an internal model of tool use and world dynamics.
+In particular, solving $\tau^{2}$ Bench tasks requires reasoning about which tool to use (\eg{} what information or actions each tool provides) as well as modeling user intent and behavior.
+This makes $\tau^{2}$ Bench suitable for evaluating the tool/user understanding and modeling ability of an LLM-based agent.
+
+\subsection{\wmrlshort{} Training Setup}
+\label{subsec:tau2_wmrl_setup}
+% Dataset size
+To collect training data for \wmrlshort{} (and \wmsftshort{}), we use the target model (Qwen3-8B) to rollout $N_{\mathrm{total}}=6$ trajectories per training task. Specifically, since $\tau^{2}$ Bench has limited training samples (178 tasks in the training split), we performed rollout with $N=3$ using GPT-4.1 as the user simulator and $N=3$ using Qwen3-235B-A22B-Instruct as the user simulator to promote diversity.
+We then converted all rollouts to triplets of $\left\langle s_{\le t}, a_t, s_{t+1} \right\rangle$.
+To prevent the model from memorizing database values in the tool responses (e.g.,\{"customer\_id": "abc123", "full\_name": "John Doe"\}), we masked these values by converting them to the corresponding OpenAPI schema (e.g., \{"type": "object", "properties": \{"customer\_id": \{"type": "string"\}, "full\_name": \{"type": "string"\}\}\}).
+Similarly, to prevent memorization of user details, we also provide basic user information available to the user simulator (e.g., ``I am John Doe. My phone number is 123-456-7890.'') in the prompt.
+We do not provide information regarding the user's intent in the world model learning prompts.
+We present an example in \Cref{tab:tau2_wmrl_prompt} and \Cref{tab:tau2_wmsft_prompt}.
+Then, we follow \Cref{subsec:alfworld_wmrl_setup} to subsample ``too easy'' triplets with $\tau_d=0.15,\tau_{\mathrm{easy}}=0.0$ and obtained 5,578 triplets for training.
+We set $p = 0.1$ to subsample these ``too easy'' training samples, so that the final dataset retains mostly medium-to-hard examples while preserving sufficient dataset diversity.
+An overview of hyperparameter heuristics/intuitions is show in \Cref{tab:rwml_hyperparams}.
+In total, $\sim$60\% of the $s_{t+1}$ are tool-use responses and $\sim$40\% are user responses.
+
+% reward model
+For $r^{\textrm{WM}}$ during training, we use Qwen3-Embedding-8B \citep{zhang2025qwen3embeddingadvancingtext} similar to \Cref{subsec:alfworld_wmrl_setup}.
+% However, since tool-use responses are generally structured outputs, we find using rouge-score \citep{lin-2004-rouge} more effective for trial-and-error learning in RL.
+However, since tool-use responses are generally structured outputs, we find using rouge-score \citep{lin-2004-rouge} is more effective at capturing these structures and any missing keys/values.
+Our final reward function in $\tau^{2}$ Bench is defined as:
+
+\[
+r^{\mathrm{WM}}(\hat{s}_{t+1}, s_{t+1}) = \begin{cases}
+1.0, & \text{if } d(\hat{s}_{t+1}, s_{t+1}) < \tau_{d} \text{ and } s_{t+1} \text{is a user response}, \\
+\textrm{round(rouge($\hat{s}_{t+1}, s_{t+1}$), 0.2)}, & \text{if } s_{t+1} \text{ is a tool-use response}, \\
+0.0, & \text{otherwise}.
+\end{cases}
+\]
+with $\tau_{d}=0.4$ as user responses are highly non-deterministic, and round($\cdot$, 0.2) is used to promote better training stability.
+For \wmrlshort{}, we train over 2 epochs using a learning rate of 1e-6, batch size of 32, and group size of 16 with 4xB200 GPUs.
+For \wmsftshort{}, we train over 2 epochs using a learning rate of 2e-6 and an effective batch size of 32 over 4xB200 GPUs.
+
+
+\subsection{Policy RL Training Setup}
+\label{subsec:tau2_policy_rl_setup}
+We extend the codebase from \Cref{subsec:alfworld_policy_rl_setup} to allow for multi-turn rollouts with $tau^{2}$ Bench.
+We use the official prompts from $tau^{2}$ Bench for both training and evaluation.
+However, since the official setting requires using GPT-4.1 as user simulator, to save cost we use the open-source Qwen3-235B-A22B-Instruct as user simulator during \policyrl{}.
+During \policyrl{}, we use a maximum step of 30 and $\gamma=1.0$ to propagate terminal task success rewards to every turn in the trajectory.
+All \policyrl{} runs are trained with GRPO over 200 steps with a group size of 8 on 8xB200 GPUs. Average training time is 5 days.
+
+
+\input{floats/tau2_gpt4.1}
+\subsection{Additional Evaluation Results}
+\label{subsec:tau2_additional_eval}
+
+To augment our evaluation in \Cref{tbl:main_rl_result} and \Cref{tbl:main_rl_result_w_expert}, we additionally evaluate our models using the official setting with GPT-4.1 as user simulator and a maximum step of 100.
+Since GPT-4.1 is expensive, we evaluate the representative models in each category of \Cref{tbl:main_rl_result} and \Cref{tbl:main_rl_result_w_expert}.
+We present the results in \Cref{tbl:tau2_gpt41}.
+In general, we find our method surpasses all training methods that does not use experts/strong LLMs; and is competitive compared to methods that use experts/strong LLMs.
+
+\subsection{Other Training Setup}
+\label{subsec:tau2_other_setup}
+% Expert data: since no expert trajectory annotations are available, we collect ``expert'' rollouts using rejection sampling with a strong LLM.
+\distill{}, \IWM{}, and \ICRIT{} requires expert rollouts for training. However, since $\tau^{2}$ Bench does not provide expert trajectory annotations, we collect ``expert'' rollouts using rejection sampling with a strong LLM.
+Specifically, we use Qwen3-235B-A22B-Thinking-2507 and perform rollouts with $N_{\mathrm{total}}=6$, with $N=3$ using GPT-4.1 as user simulator and $N=3$ using Qwen3-235B-A22B-Instruct (same as \Cref{subsec:tau2_wmrl_setup}).
+We then only keep rollouts that successfully solved the tasks as expert rollouts.
+For reflection data in \ICRIT{}, we follow the same procedure as ALFWorld (\Cref{subsec:alfworld_wmrl_setup}). Similar to ALFWorld, due to the weak performance of the target model on the benchmark, we use GPT-4.1 instead of Qwen3-8B to generate reflection data.
+All training is done on 8xB200 GPUs.
+
+% critic data method

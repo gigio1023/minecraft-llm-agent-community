@@ -1,0 +1,586 @@
+\label{sec:eval}
+
+Comprehensively evaluating WAMs requires assessing both the fidelity of predicted future states and the effectiveness of generated actions—and ideally, the causal alignment between the two. In practice, however, no established protocol jointly evaluates these interdependent components. Existing work instead adopts a decoupled paradigm, assessing world modeling capability and action policy capability through separate, module-specific metrics. Following this prevailing convention, we structure our review along these two complementary axes: (1) \textbf{World Modeling Capability} (\autoref{sec:eval_world}), which examines the physical integrity and structural consistency of synthesized transitions, and (2) \textbf{Action Policy Capability} (\autoref{sec:eval_action}), which measures the effectiveness of generated actions in fulfilling embodied tasks.
+
+
+
+\subsection{How to Evaluate World Modeling Capability?}
+
+\label{sec:eval_world}
+
+
+Evaluating the world modeling component of a WAM differs fundamentally from assessing conventional video generation. Beyond surface-level visual realism, a world action model is expected to faithfully capture the underlying dynamics of the environment and preserve actionable information. Accordingly, we categorize the current evaluation of world modeling capability into three parallel aspects: \textbf{Visual Fidelity} (\autoref{sec:eval_world_visual}), which assesses the quality and temporal consistency of the visual interface; \textbf{Physical Commonsense} (\autoref{sec:eval_world_physical}), which examines the adherence to fundamental material and mechanical laws; and \textbf{Action Plausibility} (\autoref{sec:eval_world_action}), which measures whether the synthesized transitions contain sufficient information to be translated back into executable control signals.
+
+
+\subsubsection{Visual Fidelity}
+\label{sec:eval_world_visual}
+Visual Fidelity remains the most basic layer in evaluating world action models, since physically plausible reasoning or action extraction becomes unreliable when generated videos suffer from severe artifacts, temporal inconsistency, or poor condition following. In practice, recent works typically combine low-level reconstruction metrics, perceptual similarity metrics, semantic alignment signals, and distribution-level realism metrics to assess video quality from multiple perspectives.
+
+At the pixel level, \textbf{PSNR} (Eq.~\ref{eq:psnr}) measures reconstruction fidelity through the logarithmic ratio between the maximum signal value and the mean squared error, while \textbf{SSIM}, as shown in Eq.~\ref{eq:ssim}, evaluates structural similarity by comparing luminance, contrast, and structural information~\citep{ssim}. 
+
+\begin{equation}
+\label{eq:psnr}
+\mathrm{PSNR}(x,y)=10\log\left(\frac{\mathrm{MAX}^2}{\mathrm{MSE}(x,y)}\right).
+\end{equation}
+
+\begin{equation}
+\label{eq:ssim}
+\mathrm{SSIM}(x,y)=\frac{(2\mu_x\mu_y+C_1)(2\sigma_{xy}+C_2)}{(\mu_x^2+\mu_y^2+C_1)(\sigma_x^2+\sigma_y^2+C_2)}.
+\end{equation}
+
+To go beyond low-level statistics, many recent works further introduce feature-based perceptual or semantic similarity metrics. \textbf{LPIPS} (Eq.~\ref{eq:lpips}) measures perceptual similarity in a deep feature space by extracting multi-layer features, normalizing them channel-wise, applying channel-wise weighting, averaging distances over spatial locations, and summing across layers; it is widely adopted in video generation and world-model evaluation~\citep{lpips}. \textbf{DreamSim} (Eq.~\ref{eq:dreamsim}) provides a human-aligned perceptual similarity signal trained on human judgments over image triplets, where each triplet contains a reference image and two candidate images and annotators select which candidate is more perceptually similar to the reference; this makes it useful for evaluating whether generated content remains perceptually similar to the reference in terms of object layout, identity, and scene semantics~\citep{fu2023dreamsim}. Some works also use \textbf{DINO}-based feature similarity, as shown in Eq.~\ref{eq:dino}, as a semantic or instance-level alignment signal, since self-supervised visual representations tend to preserve object identity and scene semantics more robustly than pixel-level distances~\citep{oquab2023dinov2}.
+
+\begin{equation}
+\label{eq:lpips}
+\mathrm{LPIPS}(x,y)
+=
+\sum_{l}
+\frac{1}{H_l W_l}
+\sum_{h,w}
+\left\|
+w_l \odot
+\bigl(
+\hat f_l(x)_{hw} - \hat f_l(y)_{hw}
+\bigr)
+\right\|_2^2.
+\end{equation}
+where $\hat f_l(\cdot)_{hw}$ denotes the channel-normalized deep feature at spatial location $(h,w)$ from layer $l$, and $w_l$ is a learned channel-wise weight vector.
+
+\begin{equation}
+\label{eq:dreamsim}
+\mathrm{DreamSim}(x,y) = 1 - \| E(x) - E(y) \|_2.
+\end{equation}
+where $E(\cdot)$ is the fused embedding.
+
+\begin{equation}
+\label{eq:dino}
+\mathrm{DINO}(g_t, r_t) = \frac{\langle f(g_t), f(r_t) \rangle}{\|f(g_t)\|_2 \, \|f(r_t)\|_2}.
+\end{equation}
+where $f(\cdot)$ denotes the DINOv2 encoder.
+
+At the distribution level, \textbf{FVD} (Eq.~\ref{eq:fvd}) is one of the most widely used metrics for video generation. Instead of comparing individual samples frame by frame, FVD computes the Fr\'echet distance between the distributions of real and generated videos in a pretrained video feature space, thereby reflecting overall realism and temporal dynamics at the dataset level~\citep{unterthiner2018fvd}. 
+
+\begin{equation}
+\label{eq:fvd}
+\mathrm{FVD}
+= \|\mu_r - \mu_g\|_2^2
++ \mathrm{Tr}\!\left(\Sigma_r + \Sigma_g 
+- 2\left(\Sigma_r\Sigma_g\right)^{1/2}\right).
+\end{equation}
+
+Overall, video quality evaluation in world action models usually relies on a combination of \textbf{PSNR/SSIM} for low-level fidelity, \textbf{LPIPS/DreamSim/DINO similarity} for perceptual and semantic consistency, and \textbf{FVD} for distribution-level realism and temporal quality.
+\begin{table*}[!h]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\caption{Summary of world modeling evaluation metrics and benchmarks.}
+\label{tab:wam_eval_benchmarks}
+
+\begin{adjustbox}{width=\textwidth}
+\begin{threeparttable}
+\begin{tabular}{
+>{\RaggedRight\arraybackslash}p{2.6cm}
+c
+>{\RaggedRight\arraybackslash}p{5.2cm}
+>{\RaggedRight\arraybackslash}p{4.4cm}
+}
+\toprule
+\textbf{Name} & \textbf{Year} & \textbf{Evaluation Focus} & \textbf{Metric / Implementation} \\
+\midrule
+
+\rowcolor{gray!12}
+\multicolumn{4}{l}{\textbf{Visual Fidelity}} \\
+PSNR & -- & Pixel-level reconstruction fidelity & Log ratio between maximum signal value and MSE \\
+
+SSIM \cite{ssim} & 2004 & Structural similarity in luminance, contrast, and structure & Structural similarity index \\
+
+LPIPS \cite{lpips} & 2018 & Deep perceptual similarity & Weighted distance in deep feature space \\
+
+DreamSim \cite{fu2023dreamsim} & 2023 & Human-aligned perceptual similarity & Similarity in fused embedding space trained on human triplet judgments \\
+
+DINO \cite{oquab2023dinov2} & 2023 & Semantic / instance-level alignment & Cosine similarity in DINOv2 feature space \\
+
+FVD \cite{unterthiner2018fvd} & 2018 & Distribution-level realism and temporal quality & Fr\'echet distance in pretrained video feature space \\
+
+\midrule
+
+\rowcolor{gray!12}
+\multicolumn{4}{l}{\textbf{Object Dynamics}} \\
+VideoPhy \cite{bansal2024videophy} & 2024 & Physical interaction scenarios including solid-solid, solid-fluid, and fluid-fluid interactions; object continuity and physical plausibility & Binary human annotations on semantic adherence and physical commonsense \\
+
+PhyGenBench \cite{meng2024phygenbench} & 2024 & Physical commonsense alignment in generated videos & PhyGenEval with key physical phenomena detection, physics order verification, and overall naturalness \\
+
+VBench-2.0 \cite{zheng2025vbench} & 2025 & Physics and commonsense violations, including mechanical, thermal, and material state changes, and abnormal entity behavior & Video-based multi-question answering for Physics; clip-level abnormal-entity detector for Commonsense \\
+
+WorldModelBench \cite{li2025worldmodelbench} & 2025 & Physics adherence in long-horizon generated world dynamics & Five binary physical-law checks with human annotations and a fine-tuned VLM-based automatic judger \\
+
+Physics-IQ \cite{motamed2026physicsiq} & 2026 & Future evolution of real-world physical events from conditioning frames & Spatial IoU, Spatiotemporal IoU, Weighted Spatial IoU, MSE \\
+
+\midrule
+
+\rowcolor{gray!12}
+\multicolumn{4}{l}{\textbf{Motion and Trajectory Plausibility}} \\
+WorldScore \cite{duan2025worldscoreunifiedevaluationbenchmark} & 2025 & Controllability, quality, and dynamics; dynamics includes motion accuracy, motion magnitude, and motion smoothness & Optical-flow-based motion magnitude; smoothness via comparison to interpolated references \\
+
+EWMBench \cite{yue2025ewmbench} & 2025 & Motion correctness and trajectory consistency in embodied world models & EEF trajectory metrics: HSD, nDTW, DYN \\
+
+\midrule
+
+\rowcolor{gray!12}
+\multicolumn{4}{l}{\textbf{Action Plausibility}} \\
+WorldSimBench \cite{qin2024worldsimbenchvideogenerationmodels} & 2024 & Whether generated situation-aware videos preserve control-relevant information for downstream manipulation & Implicit Manipulative Evaluation \\
+
+Wow, wo, val! \cite{fan2026wow} & 2026 & Whether generated videos can be translated back into executable actions & IDM Turing Test with downstream real-world execution success \\
+
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{adjustbox}
+\end{table*}
+
+% scene consistency?
+
+\subsubsection{Physical Commonsense}
+\label{sec:eval_world_physical}
+While video quality measures whether a generated video is visually convincing, \textbf{physical commonsense} addresses a deeper question: whether the generated world behaves in a physically plausible way. Existing evaluations in this direction can be organized into two representative categories: \textbf{object dynamics} and \textbf{trajectory plausibility}.
+
+
+\paragraph{Object Dynamics}
+Object dynamics concerns whether generated videos preserve object continuity over time while also modeling physically grounded interactions and temporally coherent event evolution. This includes not only whether entities remain stable across frames, but also whether contacts, collisions, state changes, and their causal ordering unfold in plausible ways. Such capabilities are central to world models, which must represent how objects persist and evolve under physical constraints rather than merely produce visually realistic frames.
+
+A representative early benchmark is \textbf{VideoPhy}~\citep{bansal2024videophy}, which evaluates text-to-video generation under physical interaction scenarios including solid-solid, solid-fluid, and fluid-fluid interactions. It relies on binary human annotations on semantic adherence and physical commonsense, making it effective for identifying obvious failures in physical plausibility. 
+
+More targeted physical evaluation is provided by \textbf{PhyGenBench}~\citep{meng2024phygenbench}, which introduces physical commonsense alignment and measures it primarily through \textbf{PhyGenEval}, an automated evaluation framework built on VLMs and LLMs rather than human scoring alone. Specifically, PhyGenEval decomposes evaluation into key physical phenomena detection, physics order verification, and overall naturalness, while human annotators are used mainly to validate the metric by measuring its correlation with human judgments. 
+
+\textbf{VBench-2.0}~\citep{zheng2025vbench} includes the physics dimension that evaluates whether generated videos obey real-world physical principles, including mechanical, thermal, and material state changes, mainly through video-based multi-question answering. Commonsense is evaluated with a specialized clip-level abnormal-entity detector rather than standard VQA. The detector checks whether a clip contains anomalies such as sudden merging, splitting, appearing, or disappearing, and assigns a binary score at the video level.
+
+Another relevant benchmark is \textbf{WorldModelBench}~\citep{li2025worldmodelbench}. Its physics adherence score is defined with respect to five binary physical-law checks, including Newton’s first law, conservation of mass and solid mechanics, fluid mechanics, impenetrability, and gravitation. The benchmark first collects human annotations over these criteria, and then uses the resulting labels to fine-tune a VLM-based automatic judger.
+
+Another important benchmark is \textbf{Physics-IQ}~\citep{motamed2026physicsiq}, which tests whether video generative models can predict the future evolution of real-world physical events from conditioning video frames. Unlike text-based physical benchmarks, it uses real videos and evaluates physical understanding with motion- and fidelity-based metrics, including Spatial IoU, Spatiotemporal IoU, Weighted Spatial IoU, and MSE.
+
+\paragraph{Motion and Trajectory Plausibility}
+Motion and trajectory plausibility evaluates whether the motion of objects or agents in generated videos is coherent, smooth, condition-aligned, and physically reasonable over time. Compared with object-centric physical dynamics, this aspect emphasizes long-horizon motion quality and whether generated trajectories evolve in a controllable and temporally stable manner.
+
+A representative benchmark is \textbf{WorldScore}~\citep{duan2025worldscoreunifiedevaluationbenchmark}, which evaluates world generation from the perspectives of controllability, quality, and dynamics. Its dynamics dimension is further decomposed into motion accuracy, motion magnitude, and motion smoothness. In particular, motion magnitude is measured by estimating optical flow between consecutive frames, while motion smoothness is designed to capture temporal jittering through comparison against smooth interpolated references. 
+
+A more trajectory-specific benchmark is \textbf{EWMBench}~\citep{yue2025ewmbench}, which evaluates embodied world models along visual scene consistency, motion correctness, and semantic alignment. To assess motion correctness, it explicitly uses end-effector (EEF) trajectories as the evaluation target and introduces trajectory consistency metrics including HSD, nDTW, and DYN, which respectively measure spatial deviation, spatiotemporal alignment, and motion dynamics such as velocity and acceleration.
+
+
+
+Overall, this category evaluates not only whether objects move, but whether they move in ways that are temporally stable, physically grounded, and consistent with control or task intent.
+
+Taken together, physical commonsense evaluation in world action models goes beyond whether videos are visually realistic. It tests whether generated worlds preserve stable object identity, whether interactions unfold according to causal and material constraints, and whether object motion remains plausible over time.
+
+
+\subsubsection{Action Plausibility}
+\label{sec:eval_world_action}
+The final and most distinctive aspect in evaluating world action models is \textbf{action plausibility}. If video quality asks whether the generated world looks realistic, and physical commonsense asks whether it behaves plausibly, action plausibility asks whether the generated video preserves sufficient action-relevant information to support control inference and downstream execution.
+
+An early benchmark in this direction is \textbf{WorldSimBench}~\citep{qin2024worldsimbenchvideogenerationmodels}, which introduces Implicit Manipulative Evaluation in addition to explicit perceptual assessment. Rather than judging generated videos only by visual quality, it evaluates whether a generated situation-aware video can be accurately translated into the correct control signals in dynamic embodied environments.
+
+This perspective is further strengthened in \textbf{Wow, wo, val!}~\citep{fan2026wow}, which introduces the \textbf{Inverse Dynamics Modeling (IDM) Turing Test}. In this setting, an IDM is applied to generated videos to infer the underlying action sequence, and the resulting actions are evaluated by real-world execution success. Their results show that many visually convincing models collapse to nearly zero success under this test. This finding highlights a key gap between visually plausible video generation and executable robot behavior, and establishes action plausibility as a distinct evaluation axis beyond appearance and physical realism.
+
+
+
+
+In summary, the evaluation of world action models for video generation can be structured into three complementary dimensions: \textbf{video quality}, \textbf{physical commonsense}, and \textbf{action plausibility}. Video quality ensures that generated videos are visually faithful and perceptually consistent; physical commonsense evaluates whether the generated world respects object continuity, interaction dynamics, and plausible motion; and action plausibility examines whether generated videos preserve sufficient action information to support downstream control and execution.
+
+
+% ------- End of 6.2 -------
+
+
+\subsection{How to evaluate Action Policy?}
+\label{sec:eval_action}
+
+While world modeling evaluation focuses on the fidelity of synthesized transitions, \textbf{action policy evaluation} targets the \textit{policy capability}—specifically the model's ability to generate precise, robust, and generalizable control signals across diverse scenarios. As WAMs transition from passive video generation to active robotic control, the systematic assessment of these policies has emerged as a core research priority. 
+As summarized in \autoref{tab:benchmark_compare}, we conduct a systematic review of over 40 mainstream benchmarks proposed from 2019 to 2026, covering key design dimensions including simulation environment setup, sensor modality configuration, demonstration dataset scale, and multi-dimensional evaluation metrics. Broadly, existing benchmarks can be categorized into five groups based on robot morphology and manipulation scenarios: (1) \textbf{General Manipulation} (\autoref{sec:bench_general}), (2) \textbf{Bimanual and Humanoid Manipulation} (\autoref{sec:bench_bimanual}), (3) \textbf{Mobile Manipulation} (\autoref{sec:bench_mobile}), (4) \textbf{Contact-rich and Deformable Object Manipulation} (\autoref{sec:bench_contact}), and (5) \textbf{Real-Robot Evaluation} (\autoref{sec:bench_real}).
+
+
+\subsubsection{General Manipulation Benchmarks}
+\label{sec:bench_general}
+General manipulation is currently the most widely covered direction among benchmarks and
+constitutes the main body of the action policy evaluation ecosystem.
+
+Early benchmarks established the foundational framework for multi-task manipulation evaluation. \textbf{MetaWorld}~\cite{yu2019metaworld} and \textbf{RLBench}~\cite{RLBench} provided 50 and 100 manipulation tasks respectively, laying the groundwork for standardized multi-task policy comparison. Subsequent work shifted toward offline imitation learning: \textbf{Robomimic}~\cite{mandlekar2021robomimic} systematically investigated what design decisions matter when learning from human demonstrations, while \textbf{Franka Kitchen}~\cite{gupta2019relay} offered an early testbed for sequential task execution. Building on these foundations, \textbf{LIBERO}~\cite{LIBERO} introduced a more comprehensive evaluation suite spanning four dimensions—generalization, long-horizon tasks, lifelong learning, and language understanding—across 130 tasks, representing one of the earliest attempts to assess manipulation policies along multiple axes simultaneously.
+
+As data-driven paradigms matured, benchmark scale expanded substantially in terms of object diversity, task count, and trajectory volume. The \textbf{ManiSkill} series exemplifies this trend: from 100+ objects and 30K+ trajectories in ManiSkill~\cite{mu2021maniskill}, to 2,144 objects across 20 tasks in \textbf{ManiSkill2}~\cite{ManiSkill2}, to 10K+ objects and 62 tasks with data scalability as an explicit evaluation dimension in \textbf{ManiSkill3}~\cite{tao2024maniskill3}. \textbf{RoboCasa}~\cite{RoboCasa} further pushed this frontier with 2,509 objects, 100 tasks, and 100K+ trajectories across 4+ robot platforms. Complementing these simulation-centric efforts, \textbf{RoboVerse}~\cite{geng2025roboverse} introduced a unified cross-simulator framework via MetaSim, aggregating 276 tasks and 500K+ trajectories while explicitly studying the relationship between data scale and policy performance across multiple simulators. Together, these works reframed the central benchmark question from \textit{can a policy complete a task} to \textit{how does data scale affect policy capability}.
+
+Unlike earlier benchmarks that evaluated generalization along limited axes, \textbf{COLOSSEUM}~\cite{pumacay2024colosseum} and \textbf{LIBERO-plus}~\cite{fei2025liberoplus} broadened the scope by systematically introducing multi-dimensional visual and environmental perturbations to assess policy robustness~\cite{zhou2025liberopro, wang2026liberox}. Going further, task-level generalization has emerged as a demanding evaluation target: \textbf{AGNOSTOS}~\cite{zhou2025agnostos} introduced a two-level cross-task zero-shot generalization protocol, with Level-1 covering tasks sharing partial similarity with seen tasks and Level-2 targeting entirely novel scenarios requiring stronger generalization. \textbf{GemBench}~\cite{garcia2025gembench} introduced four progressively challenging generalization levels—from novel placements and rigid objects to articulated objects and long-horizon task combinations—providing the most structured assessment of language-conditioned generalization to date.
+
+Beyond these directions, other researchers have explored additional evaluation dimensions. On language-conditioned manipulation, benchmarks such as~\cite{VIMA-Bench, zheng2022vlmbench} explored multimodal prompt generalization, while \textbf{CALVIN}~\cite{mees2022calvin} pioneered natural language guidance in long-horizon evaluation using approximately 24 hours of teleoperated play data. On long-horizon manipualtion, subsequent benchmarks~\cite{gao2025genmanip, zhang2024vlabench} pushed evaluation toward multi-step task chains requiring semantic, spatial, and commonsense reasoning, exposing limitations that single-step benchmarks cannot reveal. On Sim-to-Real transferability, \textbf{SimplerEnv}~\cite{li2024simplerenv} reproduced real-world manipulation scenarios from the Bridgev2 dataset within SAPIEN simulation, offering a quantifiable reference for the reality gap; \textbf{PolaRiS}~\cite{jain2025polaris} leveraged Gaussian Splatting to convert short video scans of real scenes into interactive simulation environments, demonstrating strong correlation with real-world policy performance and marking a shift in benchmark design from constructing synthetic tasks to reconstructing real scenes.  On memory, \textbf{RoboMME}~\cite{dai2026robomme} constructed 16 manipulation tasks spanning four cognitive memory dimensions—temporal, spatial, object, and procedural—targeting policy performance in history-dependent scenarios where information from earlier steps is necessary for successful execution.
+
+
+
+
+\subsubsection{Bimanual and Humanoid Form Benchmarks}
+\label{sec:bench_bimanual}
+
+This category of benchmarks targets two types of embodiment: bimanual robots centered on
+coordinated dual-arm operation, and humanoid robots with full-body motion capability. Both
+present significantly higher action space dimensionality, motion constraints, and task
+complexity compared to single-arm manipulation, placing higher demands on the coordinated
+planning ability of action policies.
+
+\textbf{RoboTwin}~\cite{RoboTwin} uses the Aloha-AgileX dual-arm platform as its
+carrier and builds an evaluation environment on SAPIEN/ManiSkill3, focusing on long-horizon
+task chain execution under bimanual coordination.
+\textbf{BiGym}~\cite{chernyadev2024bigym} is based on the Unitree H1 platform and provides
+40 mobile bimanual manipulation tasks in household scenarios in MuJoCo, covering diverse
+manipulation scenes from simple target reaching to complex kitchen cleaning, and provides
+human teleoperation demonstration data for each task to support evaluation of imitation and
+reinforcement learning algorithms. \textbf{HumanoidBench}~\cite{sferrazza2024humanoidbench}
+is also based on Unitree H1, equipped with bilateral Shadow-Hand dexterous hands and
+full-body tactile sensing (448 tactile sensing points in total), and provides 27 tasks in
+MuJoCo, covering 15 whole-body manipulation tasks (e.g., moving cargo, using tools, playing
+basketball) and 12 locomotion tasks (e.g., walking, running, obstacle crossing), making it
+currently one of the richest humanoid robot benchmarks in terms of sensor modality
+configuration. \textbf{HumanoidGen}~\cite{li2025humanoidgen} is similarly based on the
+Unitree platform and supports joint evaluation of generalization ability, long-horizon
+manipulation, and dexterity in SAPIEN with 200K+ trajectories at large scale, while
+systematically exploring the impact of data scale on humanoid robot policy learning.
+
+
+
+% ============================================================
+%  Required packages (add to your preamble if not already there)
+% ============================================================
+% \usepackage[most]{tcolorbox}
+% \usepackage{xcolor}
+
+% ============================================================
+%  Color definitions  (muted / low-saturation palette)
+% ============================================================
+\definecolor{tagG}{HTML}{C8DFF0}       % Generalization   – steel blue
+\definecolor{tagMT}{HTML}{C5E0D4}      % Multi-task       – sage green
+\definecolor{tagLH}{HTML}{F5DEB3}      % Long-horizon     – wheat
+\definecolor{tagLang}{HTML}{D8C9E8}    % Language         – lavender
+\definecolor{tagRob}{HTML}{F2C4C4}     % Robustness       – rose
+\definecolor{tagDS}{HTML}{C9DFC9}      % Data Scaling     – mint
+\definecolor{tagS}{HTML}{FFE4B5}     % Sim-to-Real      – moccasin
+\definecolor{tagDex}{HTML}{B5D5E8}     % Dexterity        – sky blue
+\definecolor{tagMem}{HTML}{E8D5B5}     % Memory           – peach
+\definecolor{tagLL}{HTML}{D4C5B5}      % Lifelong         – warm grey
+
+% ============================================================
+%  Tag command  \focustag{bgcolor}{text}
+%  Small rounded box, tiny font, no border
+% ============================================================
+\newtcbox{\focustag}[1][]{
+  on line,
+  arc=2.5pt,
+  colback=#1,
+  colframe=#1,        % frame same as background → invisible border
+  boxsep=0pt,
+  left=2.5pt, right=2.5pt,
+  top=1pt,   bottom=1pt,
+  boxrule=0pt,
+  fontupper=\scriptsize\sffamily,
+  nobeforeafter,
+}
+
+% Convenience macros for each tag  (\def avoids \newcommand eating [..] as optional arg)
+\def\tagG    {\focustag[tagG]{G}}
+\def\tagMT   {\focustag[tagMT]{MT}}
+\def\tagLH   {\focustag[tagLH]{LH}}
+\def\tagLang {\focustag[tagLang]{Lang}}
+\def\tagRob  {\focustag[tagRob]{Rob}}
+\def\tagDS   {\focustag[tagDS]{DS}}
+\def\tagS  {\focustag[tagS]{S2R}}
+\def\tagDex  {\focustag[tagDex]{Dex}}
+\def\tagMem  {\focustag[tagMem]{Mem}}
+\def\tagLL   {\focustag[tagLL]{LL}}
+
+% ============================================================
+%  Helper: stack tags with a tiny gap so they wrap gracefully
+% ============================================================
+\newcommand{\tspace}{\hspace{1.5pt}}
+
+% ============================================================
+%  Table
+% ============================================================
+\begin{table}[!t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.08}
+\caption{Summary of evaluation benchmarks for action policy.
+\textbf{Obs.} denotes observation modalities: RGB, Pose, D (depth),
+S (segmentation), PC (point clouds), T (tactile), N (Normal Vector).
+\textbf{Eval.\ Focus tags:}
+\tagG~Generalization,
+\tagMT~Multi-task,
+\tagLH~Long-horizon,
+\tagLang~Language,
+% \tagRob~Robustness,
+\tagDS~Data Scaling,
+\tagS~Sim-to-Real,
+\tagDex~Dexterity,
+\tagMem~Memory,
+\tagLL~Lifelong.}
+\label{tab:benchmark_compare}
+
+\begin{adjustbox}{width=\columnwidth}
+\begin{threeparttable}
+\begin{tabular}{
+l l l l l
+>{\RaggedRight\arraybackslash}p{1.25cm}
+>{\RaggedRight\arraybackslash}p{1.95cm}
+l
+l
+}
+\toprule
+\textbf{Name} & \textbf{Year} & \textbf{Obj.} & \textbf{Tasks} & \textbf{traj.}
+& \textbf{Obs.} & \textbf{Robots} & \textbf{Simulator}
+& \textbf{Eval. Focus} \\
+\midrule
+
+% ── General Manipulation ────────────────────────────────────
+\rowcolor{gray!12}
+\multicolumn{9}{l}{\textbf{General Manipulation}} \\
+
+MetaWorld~\cite{yu2019metaworld}
+  & 2019 & 80   & 50   & -     & Pose      & Sawyer          & MuJoCo
+  & \tagMT \\
+
+RLBench~\cite{RLBench}
+  & 2020 & 28   & 100  & -     & RGB, D, S & Franka Panda    & CoppeliaSim
+  & \tagG\tspace\tagMT \\
+
+Robomimic~\cite{mandlekar2021robomimic}
+  & 2021 & 15   & 8    & 6K    & RGB, D    & Franka Panda    & MuJoCo
+  & – \\
+
+Franka Kitchen~\cite{gupta2019relay}
+  & 2020 & 10   & 7    & 513   & Pose      & Franka Panda    & MuJoCo
+  & \tagLH \\
+
+CALVIN~\cite{mees2022calvin}
+  & 2021 & 28   & 34   & 20K+  & RGB, D    & Franka Panda    & PyBullet
+  & \tagLH \\
+
+ManiSkill~\cite{mu2021maniskill}
+  & 2021 & 100+ & 4    & 30K+  & RGB, D, S & Franka Panda    & SAPIEN
+  & \tagG \\
+
+ManiSkill2~\cite{ManiSkill2}
+  & 2023 & 2144 & 20   & 30K+  & RGB, D, S & Franka Panda    & SAPIEN
+  & \tagMT \\
+
+ManiSkill3~\cite{tao2024maniskill3}
+  & 2025 & 10K+ & 62   & -     & RGB, D, S & Franka Panda    & SAPIEN
+  & \tagDS\tspace\tagMT \\
+
+VIMA-Bench~\cite{VIMA-Bench}
+  & 2023 & 100+ & 17   & 600K+ & RGB, D, S & UE5             & PyBullet/Ravens
+  & \tagLang \\
+
+VLMbench~\cite{zheng2022vlmbench}
+  & 2024 & 22   & 8    & 6K+   & RGB, D, S & Franka Panda    & CoppeliaSim/RLBench
+  & \tagLang \\
+
+ARNOLD~\cite{gong2023arnold}
+  & 2023 & 40   & 8    & 10K+  & RGB, D, S & Franka Panda    & IsaacSim
+  & \tagG \\
+
+LIBERO~\cite{LIBERO}
+  & 2023 & 67   & 130  & 6.5K  & RGB, D    & Franka Panda    & MuJoCo/robosuite
+  & \tagLL \\
+
+Libero-plus~\cite{fei2025liberoplus}
+  & 2025 & -    & 10030 & 20K+ & RGB, D    & Franka Panda    & MuJoCo
+  & \tagG \\
+
+Libero-pro~\cite{zhou2025liberopro}
+  & 2025 & -    & -    & -     & RGB, D    & Franka Panda    & MuJoCo
+  & \tagG \\
+
+Libero-x~\cite{wang2026liberox}
+  & 2026 & 60+  & 600  & 2520  & RGB, D    & Franka Panda    & MuJoCo
+  & \tagG \\
+
+COLOSSEUM~\cite{pumacay2024colosseum}
+  & 2024 & -    & 20   & 2K    & RGB, D    & Franka Panda    & CoppeliaSim/RLBench
+  & \tagG \\
+
+GemBench~\cite{garcia2025gembench}
+  & 2025 & 20+  & 60   & -     & RGB, D    & Franka Panda    & CoppeliaSim
+  & \tagG \\
+
+AGNOSTOS~\cite{zhou2025agnostos}
+  & 2025 & -    & 41   & 3.6K  & RGB, D, S & Franka Panda    & CoppeliaSim/RLBench
+  & \tagG \\
+
+SimplerEnv~\cite{li2024simplerenv}
+  & 2024 & -    & -    & - & RGB, D & Google Robot, WidowX & SAPIEN
+  & \tagS \\
+
+RoboCasa~\cite{RoboCasa}
+  & 2024 & 2509 & 100  & 100K+ & RGB, D    & 4+              & MuJoCo/robosuite
+  & \tagLH \\
+
+GenManip~\cite{gao2025genmanip}
+  & 2025 & 10   & 200  & -     & RGB, D, S & Franka Panda    & IsaacSim
+  & \tagG \\
+
+VLABench~\cite{zhang2024vlabench}
+  & 2024 & 2000+ & 100 & 5K    & RGB, D    & Franka Panda    & MuJoCo
+  & \tagLang \\
+
+RoboVerse~\cite{geng2025roboverse}
+  & 2025 & 5.5K & 276  & 500K  & RGB, D    & 5               & MetaSim
+  & \tagS\tspace\tagDS\tspace\tagMT \\
+
+RoboSuite~\cite{robosuite}
+  & 2020 & 20   & 9    & 12K   & RGB, D    & 10              & MuJoCo
+  & \tagMT \\
+
+RoboEval~\cite{wang2025roboeval}
+  & 2025 & -    & 8    & 3K+   & RGB, D    & Franka Panda    & –
+  & \tagG\tspace\tagDex \\
+
+RoboMME~\cite{dai2026robomme}
+  & 2026 & -    & 16   & 1600  & RGB, D, S & Franka Panda    & ManiSkill3
+  & \tagMem \\
+
+RoboLab~\cite{yang2026robolab}
+  & 2026 & -    & 120  & -     & RGB, D    & Franka Panda    & IsaacSim
+  & – \\
+
+PolaRiS~\cite{jain2025polaris}
+  & 2025 & -    & -    & \textasciitilde350 & RGB, D & Franka Panda & IsaacSim
+  & \tagS \\
+
+\midrule
+
+% ── Arms and Humanoid ───────────────────────────────────────
+\rowcolor{gray!12}
+\multicolumn{9}{l}{\textbf{Arms and Humanoid Form}} \\
+
+RoboTwin~\cite{RoboTwin}
+  & 2025 & 10+ & -  & 320   & RGB, D, S & Aloha-AgileX             & SAPIEN/ManiSkill3
+  & \tagMT\tspace\tagDex \\
+
+BiGym~\cite{chernyadev2024bigym}
+  & 2024 & 10+ & 40 & 2K    & RGB, D    & Unitree H1               & MuJoCo
+  & \tagMT\tspace\tagDex \\
+
+HumanoidBench~\cite{sferrazza2024humanoidbench}
+  & 2024 & 15  & 27 & 45K+  & RGB, D, T & Unitree H1 + Shadow-Hand & MuJoCo
+  & \tagMT\tspace\tagDex \\
+
+HumanoidGen~\cite{li2025humanoidgen}
+  & 2025 & -   & 20 & 200K+ & RGB, D    & Unitree                  & SAPIEN
+  & \tagDS\tspace\tagDex \\
+
+\midrule
+
+% ── Mobile Manipulation ─────────────────────────────────────
+\rowcolor{gray!12}
+\multicolumn{9}{l}{\textbf{Mobile Manipulation}} \\
+
+HomeRobot~\cite{yenamandra2023homerobot}
+  & 2023 & 7892  & 12  & -      & RGB, D    & Hello Robot Stretch        & AI Habitat
+  & \tagG\tspace\tagS \\
+
+ManipulaTHOR~\cite{ehsani2021manipulathor}
+  & 2021 & 2.6K+ & 28  & 12.8K+ & RGB, D, N & Kinova Gen3 on Mobile Base & Unity/AI2-THOR
+  & \tagG \\
+
+BEHAVIOR-1K~\cite{li2023behavior1k}
+  & 2023 & 5215  & 1K  & 230K+  & RGB, D    & Mobile Manipulator         & OmniGibson
+  & \tagG\tspace\tagLH \\
+
+\midrule
+
+% ── Contact and Deformation ─────────────────────────────────
+\rowcolor{gray!12}
+\multicolumn{9}{l}{\textbf{Contact and Deformation Manipulation}} \\
+
+SoftGym~\cite{lin2021softgym}
+  & 2021 & 4 & 10 & 10K+ & RGB, D, P & Sawyer, Franka      & NVIDIA FleX
+  & \tagDex \\
+
+PlasticineLab~\cite{huang2021plasticinelab}
+  & 2021 & 1 & 10 & 1.2K & RGB, D, P & Rigid End-Effector  & Taichi+DiffTaichi
+  & \tagDex \\
+
+DaXBench~\cite{chen2023daxbench}
+  & 2023 & 4 & 9  & 9K+  & RGB, D, P & –                   & DaX
+  & \tagDex \\
+
+TacSL~\cite{akinola2024tacsl}
+  & 2025 & - & 3  & -    & RGB, D, T & Franka Panda        & Isaac Gym
+  & \tagS\tspace\tagDex \\
+
+ManiFeel~\cite{xu2025manifeel}
+  & 2025 & - & 6  & -    & RGB, D, T & Franka Panda        & Isaac Sim/TacSL
+  & \tagS\tspace\tagDex \\
+
+\midrule
+
+% ── Real Device ─────────────────────────────────────────────
+\rowcolor{gray!12}
+\multicolumn{9}{l}{\textbf{Real Device}} \\
+
+RoboArena~\cite{atreya2025roboarena}
+  & 2025 & - & -  & -     & RGB, D & Franka Panda                  & –
+  & \tagG \\
+
+RoboChallenge~\cite{yakefu2025robochallenge}
+  & 2026 & - & 30 & -     & RGB, D & 4                             & –
+  & \tagMT \\
+
+Maniparena~\cite{sun2026maniparena}
+  & 2026 & - & 20 & 10812 & RGB, D & X2Robot, Quanta X1            & –
+  & \tagG\tspace\tagLH \\
+
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{adjustbox}
+\end{table}
+
+
+\subsubsection{Mobile Manipulation Benchmarks}
+\label{sec:bench_mobile}
+Mobile manipulation jointly considers navigation and manipulation capabilities, requiring
+action policies to have perception, planning, and dynamic execution ability across scenes,
+posing higher comprehensive challenges to policy performance.
+
+\textbf{ManipulaTHOR}~\cite{ehsani2021manipulathor} uses Kinova Gen3 as the robotic arm
+within the AI2-THOR environment, evaluating visually guided manipulation and scene
+generalization on a mobile platform across 28 tasks.
+\textbf{HomeRobot}~\cite{yenamandra2023homerobot} uses Hello Robot Stretch as the platform
+and builds open-vocabulary mobile manipulation evaluation in household scenarios in AI
+Habitat, focusing on navigation and grasping coordination under arbitrary objects and
+arbitrary scenes, with dual evaluation capability in both simulation and real robots.
+\textbf{BEHAVIOR-1K}~\cite{li2023behavior1k} covers 1,000 daily living tasks and explores
+Sim-to-Real transfer in OmniGibson, supporting physical simulation of rigid bodies,
+deformable objects, and liquids, making it one of the broadest and most realistic benchmarks
+in the mobile manipulation domain to date in terms of task coverage.
+
+\subsubsection{Contact and Deformation Manipulation Benchmarks}
+\label{sec:bench_contact}
+Contact and deformation manipulation breaks from the traditional rigid-body assumption, requiring Action Policies to perceive and precisely control the deformation process of compliant objects. It represents one of the most challenging directions in manipulation policy evaluation, placing the most stringent demands on physical modeling. Based on the physical characteristics of the manipulated objects and the sensory modalities employed, existing benchmarks in this category can be divided into two groups.
+
+The first group focuses on macroscopic deformable object manipulation, where the central challenge lies in physically modeling and visually guiding the control of objects that undergo large-scale deformation, such as cloth, liquids, and plastically deformable materials. \textbf{SoftGym}~\cite{lin2021softgym} and \textbf{PlasticineLab}~\cite{huang2021plasticinelab}, built respectively on the NVIDIA FleX and Taichi physics engines, construct evaluation environments for tasks such as cloth folding, liquid pouring, and plasticine shaping, assessing dexterous control capability using purely visual inputs. Building on this, \textbf{DaXBench}~\cite{chen2023daxbench} provides 9 deformable object manipulation tasks within the DaX framework, further broadening the range of material types and deformation modes available for evaluation.
+
+The second group shifts toward contact-aware fine manipulation, where the core challenge is no longer the large-scale deformation of objects, but rather the real-time perception and feedback control of complex contact states — precisely the blind spot of purely vision-based approaches. \textbf{TacSL}~\cite{akinola2024tacsl} and \textbf{ManiFeel}~\cite{xu2025manifeel} formally introduce tactile sensing as an evaluation modality, constructing tactile-driven manipulation benchmarks on Isaac Gym and Isaac Sim/TacSL respectively, with Sim-to-Real transfer of tactile signals as a central evaluation objective.This shift signals a broader paradigm transition in the field — from vision-dominated perception toward vision-tactile fusion
+
+\subsubsection{Real-Robot Benchmarks}
+\label{sec:bench_real}
+Simulation benchmarks provide efficient and reproducible evaluation conditions, but the
+inherent gap between simulation and real environments makes it difficult to accurately
+predict policy performance during real-world deployment. For this reason, some works
+directly build evaluation benchmarks on real robot platforms to provide evaluation
+conclusions with greater practical significance.
+
+\textbf{RoboArena}~\cite{atreya2025roboarena} designs open evaluation scenarios for real
+devices, focusing on policy generalization ability in real environments.
+\textbf{RoboChallenge}~\cite{yakefu2025robochallenge} covers 30 multi-task real
+manipulation scenarios and supports horizontal comparison evaluation on 4 robot platforms.
+\textbf{Maniparena}~\cite{sun2026maniparena} uses the X2Robot and Quanta X1 dual platforms
+as carriers, collects 10,812 real robot manipulation trajectories, and covers three
+evaluation dimensions of generalization, long-horizon tasks, and multi-task, making it
+currently the largest real-device manipulation benchmark in terms of scale. 

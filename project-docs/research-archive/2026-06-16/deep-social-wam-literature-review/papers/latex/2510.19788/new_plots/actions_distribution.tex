@@ -1,0 +1,107 @@
+% Auto-generated PGFPlots template — grouped vertical bars (ggplot-like)
+% Ensure required packages when included standalone in lint/preview
+\makeatletter
+\@ifundefined{pgfplotsversion}{\RequirePackage{pgfplots}}{}
+\@ifundefined{pgfplotstableread}{\RequirePackage{pgfplotstable}}{}
+\makeatother
+% Data: new_plots/data/score_by_task_type_mean_wide.csv
+\begingroup
+% ------- configurable knobs -------
+% overall size (avoid digits in macro names)
+\newcommand{\PerfTaskPlotWidth}{.82\linewidth}
+\newcommand{\PerfTaskPlotHeight}{5em}
+% typography
+\newcommand{\PerfTaskFont}{\scriptsize}
+\newcommand{\PerfTaskXFont}{\tiny}
+% bar geometry
+\setlength{\PerfTaskBarWidth}{4pt}
+\setlength{\PerfTaskBarSep}{4.4pt} % reduce shift to avoid overlap across groups
+% margins
+\newcommand{\PerfTaskEnlargeX}{0.1}
+\newcommand{\PerfTaskEnlargeY}{0.04}
+% ---------------------------------
+
+% color palette provided centrally in main.tex: PerfClaude, PerfGemini, PerfHuman, PerfOThree, PerfAutumnSim
+
+% load combined mean+SEM table (wide)
+\pgfplotstableread[col sep=comma]{new_plots/data/action_fractions_by_agent.csv}{\perftablesrc}
+
+\tikzsetnextfilename{actions_distribution}
+\begin{tikzpicture}[baseline={(current axis.south)}]
+      \tikzpicturedependsonfile{new_plots/actions_distribution.tex}
+      \begin{axis}[
+                  % title={Mean Score by Task Type and Agent},
+                  ylabel={Action Distribution},
+                  tick label style={font=\PerfTaskFont},
+                  xticklabel style={font=\PerfTaskXFont, rotate=20, anchor=east},
+                  xtick=data,
+                  % modern, ggplot-like styling
+                  grid=none,
+                  axis background/.style={fill=PlotBackground},
+                  clip=true,
+                  axis lines=left,
+                  axis line style={draw=none},
+                  x axis line style={draw=none},
+                  axis y line*=left,
+                  y axis line style={draw=black, -, xshift=0pt},
+                  tick style={draw=none},
+                  ytick style={draw=black, xshift=-1pt},
+                  yticklabel style={xshift=-1pt},
+                  ytick pos=left,
+                  tick align=outside,
+                  legend style={font=\PerfTaskFont, draw=none, fill=none, at={(0.98,0.98)}, anchor=north east},
+                  legend image code/.code={\draw[#1,draw=none] (0cm,-0.08cm) rectangle (0.28cm,0.08cm);},
+                  % legend has four columns
+                  legend columns=4,
+                  label style={font=\PerfTaskFont},
+                  title style={font=\PerfTaskFont},
+                  scale only axis=true,
+                  width=\PerfTaskPlotWidth,
+                  height=\PerfTaskPlotHeight,
+                  ymin=0,
+                  ymax=1,
+                  ytick distance=1,
+                  unbounded coords=discard,
+                  symbolic x coords={o3, claude-4-sonnet, gemini-2.5-pro, gemini-2.5-flash, qwen3-235b-a22b-thinking-2507, human},
+                  bar width=\PerfTaskBarWidth,
+                  enlarge x limits=\PerfTaskEnlargeX,
+                  enlarge y limits=false,
+            ]
+            % grouped vertical bars per task type with error bars (SEM)
+            % frac_clicks,frac_arrows,frac_resets,frac_noops
+            % Center 4 bars: shifts are -1.5, -0.5, +0.5, +1.5 times PerfTaskBarSep
+            \addplot+[ybar, bar shift=\dimexpr-1.5\PerfTaskBarSep\relax, draw=none, fill=PerfClicks, mark=none,
+                  error bars/.cd, y dir=both, y explicit,
+                  error bar style={draw=black!40, line width=0.5pt, xshift=-1.5\PerfTaskBarSep},
+                  error mark=|,
+                  error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=-1.5\PerfTaskBarSep}]
+            table [x={agent}, y={frac_clicks}, y error=sem_clicks,
+                        row predicate/.code={\edef\tempa{\thisrow{agent}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+            \addplot+[ybar, bar shift=\dimexpr-0.5\PerfTaskBarSep\relax, draw=none, fill=PerfArrows, mark=none,
+                  error bars/.cd, y dir=both, y explicit,
+                  error bar style={draw=black!40, line width=0.5pt, xshift=-0.5\PerfTaskBarSep},
+                  error mark=|,
+                  error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=-0.5\PerfTaskBarSep}]
+            table [x={agent}, y={frac_arrows}, y error=sem_arrows,
+                        row predicate/.code={\edef\tempa{\thisrow{agent}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+            \addplot+[ybar, bar shift=\dimexpr+0.5\PerfTaskBarSep\relax, draw=none, fill=PerfResets, mark=none,
+                  error bars/.cd, y dir=both, y explicit,
+                  error bar style={draw=black!40, line width=0.5pt, xshift=0.5\PerfTaskBarSep},
+                  error mark=|,
+                  error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=0.5\PerfTaskBarSep}]
+            table [x={agent}, y={frac_resets}, y error=sem_resets,
+                        row predicate/.code={\edef\tempa{\thisrow{agent}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+            \addplot+[ybar, bar shift=\dimexpr+1.5\PerfTaskBarSep\relax, draw=none, fill=PerfNoops, mark=none,
+                  error bars/.cd, y dir=both, y explicit,
+                  error bar style={draw=black!40, line width=0.5pt, xshift=1.5\PerfTaskBarSep},
+                  error mark=|,
+                  error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=1.5\PerfTaskBarSep}]
+            table [x={agent}, y={frac_noops}, y error=sem_noops,
+                        row predicate/.code={\edef\tempa{\thisrow{agent}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+            \addlegendimage{ybar,ybar legend, draw=none, fill={PerfClicks}}\addlegendentry{clicks}
+            \addlegendimage{ybar,ybar legend, draw=none, fill={PerfArrows}}\addlegendentry{arrows}
+            \addlegendimage{ybar,ybar legend, draw=none, fill={PerfResets}}\addlegendentry{resets}
+            \addlegendimage{ybar,ybar legend, draw=none, fill={PerfNoops}}\addlegendentry{no-ops}
+      \end{axis}
+\end{tikzpicture}
+\endgroup

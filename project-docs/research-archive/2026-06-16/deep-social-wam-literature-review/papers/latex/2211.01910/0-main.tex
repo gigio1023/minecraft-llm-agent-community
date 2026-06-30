@@ -1,0 +1,150 @@
+% \PassOptionsToPackage{usenames, dvipsnames}{color}
+\documentclass{article} % For LaTeX2e
+\usepackage[dvipsnames]{xcolor} % load before iclr to avoid option clash
+\usepackage{iclr2023_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+\input{macros.tex}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+% \usepackage{xcolor}         % colors
+% \usepackage[usenames,dvipsnames]{color} % colors
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amssymb}% http://ctan.org/pkg/amssymb
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\usepackage{adjustbox}
+\usepackage{enumitem}
+\usepackage{setspace} % for \onehalfspacing and \singlespacing macros
+\usepackage{etoolbox}
+\usepackage{cleveref}
+\usepackage{xspace} % For space after algname
+\usepackage{wrapfig} % For wrapping text around figures
+\usepackage{array}
+\usepackage{calc}
+\usepackage[symbol]{footmisc}
+\usepackage[bb=dsserif]{mathalpha}
+
+\AtBeginEnvironment{quote}{\par\singlespacing\small}
+
+\renewcommand{\paragraph}[1]{\textbf{#1}\hspace{0.8em}}
+
+\newif\ifworkshop
+\workshopfalse
+\ifworkshop
+  \newcommand{\workshoponly}[1]{#1}
+  \newcommand{\workshopexclude}[1]{}
+\else
+  \newcommand{\workshoponly}[1]{}
+  \newcommand{\workshopexclude}[1]{#1}
+\fi
+
+\title{Large Language Models are Human-Level Prompt Engineers}
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\author{Yongchao Zhou$^{1,2,*}$, Andrei Ioan Muresanu$^{2,3,*}$, Ziwen Han$^{1,2,*}$, Keiran Paster$^{1,2}$, \\\textbf{Silviu Pitis$^{1,2}$, Harris Chan$^{1,2}$, Jimmy Ba$^{1,2}$} \\
+$^1$University of Toronto\quad $^2$Vector Institute\quad $^3$University of Waterloo\quad $^*$Equal contribution\\
+\texttt{\{yczhou,hanziwen,keirp,spitis,hchan,jba\}@cs.toronto.edu}\\
+\texttt{\{andrei.muresanu\}@uwaterloo.ca}
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\usepackage{subfiles} % Best loaded last in the preamble
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+\maketitle
+% \vspace{-2cm}
+% {
+% \begin{center}
+% \renewcommand*{\thefootnote}{\fnsymbol{footnote}}
+% \footnotetext{\llap{\textsuperscript{*}}{\ Equal contribution. Corresponding email: \texttt{yczhou@cs.toronto.edu}}}
+% \bf \small 
+% \mbox{Yongchao Zhou$^{*,1,2}$}\quad\quad
+% \mbox{Andrei Ioan Muresanu$^{*,2,3}$}\quad\quad
+% \mbox{Ziwen Han$^{*,1,2}$}\quad\quad
+% \mbox{Keiran Paster$^{1,2}$}\quad\quad\\[4pt]
+% \mbox{Silviu Pitis$^{1,2}$}\quad\quad
+% \mbox{Harris Chan$^{1,2}$}\quad\quad
+% \mbox{Jimmy Ba$^{1,2}$}
+% \end{center}
+% }
+% \begin{center}\small
+% $^1$University of Toronto\quad $^2$Vector Institute\quad $^3$University of Waterloo
+% \end{center}
+% andrei.muresanu@uwaterloo.ca, ziwen.han@mail.utoronto.ca, spitis@cs.toronto.edu, hchan@cs.toronto.edu, keirp@cs.toronto.edu, jba@cs.toronto.edu
+\renewcommand*{\thefootnote}{\arabic{footnote}}
+\setcounter{footnote}{0}
+
+\begin{abstract}
+By conditioning on natural language instructions, large language models (LLMs) have displayed impressive capabilities as general-purpose computers. However, task performance depends significantly on the quality of the prompt used to steer the model, and most effective prompts have been handcrafted by humans. Inspired by classical program synthesis and the human approach to prompt engineering, we propose \textit{Automatic Prompt Engineer}\footnote{We define ``prompt engineering'' as optimizing the language in a prompt in order to elicit the best possible performance. Notably, this does not include prompts that chain multiple LLM queries together or give the LLM access to external tools.} (APE) for automatic instruction generation and selection. In our method, we treat the instruction as the ``program,'' optimized by searching over a pool of instruction candidates proposed by an LLM in order to maximize a chosen score function. To evaluate the quality of the selected instruction, we evaluate the zero-shot performance of another LLM following the selected instruction. Extensive experiments show that our automatically generated instructions outperform the prior LLM baseline by a large margin and achieve better or comparable performance to the instructions generated by human annotators on 24/24 Instruction Induction tasks and 17/21 curated BIG-Bench tasks. We conduct extensive qualitative and quantitative analyses to explore the performance of APE. We show that APE-engineered prompts are able to improve few-shot learning performance (by simply prepending them to standard in-context learning prompts), find better zero-shot chain-of-thought prompts, as well as steer models toward truthfulness and/or informativeness. 
+%Please check out our webpage at \url{https://sites.google.com/view/automatic-prompt-engineer}
+\footnote{\ Our code is available at \url{https://github.com/keirp/automatic_prompt_engineer}.}
+\end{abstract}
+
+\input{1-introduction}
+\input{2-relatedwork}
+\input{3-method}
+\input{4-result}
+\input{5-ablation}
+
+\section{Conclusion}
+Large language models can be seen as general-purpose computers that execute programs specified by natural language prompts. We automate the prompt engineering process by formulating it as a black-box optimization problem, which we propose to solve using efficient search algorithms guided by LLMs. Our method achieves human-level performance on various tasks with minimum human inputs. As recent LLMs demonstrate an impressive ability to follow human instruction, we expect many future models, including those for formal program synthesis, to have a natural language interface. This work builds the foundation to control and steer generative artificial intelligence.
+
+\subsubsection*{Acknowledgments}
+We would like to thank Or Honovich and Michael Zhang for their help and valuable feedback. JB was supported by NSERC Grant [2020-06904], CIFAR AI Chairs program, Google Research Scholar Program and Amazon Research Award. KP was supported by NSERC PGS-D. SP was supported by NSERC CGS-D. HC was supported by NSERC CGS-D and RBC Graduate Fellowship. Resources used in preparing this research were provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute for Artificial Intelligence.
+
+\bibliography{iclr2023_conference}
+\bibliographystyle{iclr/iclr2023_conference}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+
+\section{Prompt Engineering in the Wild}\label{appdx_wild_prompt_engineering}
+Large models with natural language interfaces, including models for text generation and image synthesis, have seen an increasing amount of public usage in recent years. As finding the right prompt can be difficult for humans, a number of guides on prompt engineering as well as tools to aid in prompt discovery have been developed. Among others, see, for example: 
+
+\newcommand{\hscale}[1]{\scalebox{0.7}[1]{#1}}
+\begin{itemize}[leftmargin=*]\footnotesize
+    \item \hscale{\url{https://blog.andrewcantino.com/blog/2021/04/21/prompt-engineering-tips-and-tricks/}}
+    \item \hscale{\url{https://techcrunch.com/2022/07/29/a-startup-is-charging-1-99-for-strings-of-text-to-feed-to-dall-e-2/}}
+    \item \hscale{\url{https://news.ycombinator.com/item?id=32943224}}
+    % \item \hscale{\url{https://github.com/krea-ai/open-prompts}}
+    \item \hscale{\url{https://promptomania.com/stable-diffusion-prompt-builder/}}
+    \item \hscale{\url{https://huggingface.co/spaces/Gustavosta/MagicPrompt-Stable-Diffusion}}
+\end{itemize}
+
+In this paper we apply APE to generate effective instructions for steering LLMs, but the general framework Algorithm \ref{alg:ape} could be applied to steer other models with natural language interfaces so long as an appropriate proposal method and scoring function can be designed. 
+
+\input{appendix/1-implementation}
+\input{appendix/2-additional_res}
+\input{appendix/3-costanalysis}
+\input{appendix/2-generated_instruction}
+\input{appendix/4-visualization}
+
+\end{document}

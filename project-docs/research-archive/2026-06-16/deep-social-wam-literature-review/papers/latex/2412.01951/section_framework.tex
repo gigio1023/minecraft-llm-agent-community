@@ -1,0 +1,155 @@
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+To understand why our sharpening objective is meaningful as a solution
+concept for autoregressive language models, we observe
+that when the response
+$y=(y_1,\ldots,y_H)\in\cY=\cV^{H}$ is a sequence of tokens, our objective
+\cref{eq:sharpening} sharpens
+toward the \emph{sequence-level} arg-max response. Computing the
+sequence-level arg-max for response for a language model, i.e.,
+\begin{align}
+  \label{eq:inference_time}
+\argmax_{y_{1:H}}\piref(y_{1:H}\mid{}x)
+\end{align}
+is non-trivial and in general computationally intractable
+\dfc{cite}. It is natural to imagine that sequence-level arg-max decoding might have
+better performance on difficult reasoning tasks compared to more naive
+decoding strategies such as \emph{greedy decoding} (which computes
+$y_h=\argmax_{y_h\in\cV}\piref(y_h\mid{}y_{1:h-1},x)$) or beam search
+\dfc{cite}. Our first result gives a stylized example where this is
+indeed the case.
+    \begin{example}[Benefits of sequence-level arg-max decoding]
+      \label{ex:greedy}
+      \dfc{Insufficiency of greedy decoding:
+        \begin{itemize}
+        \item First state simple/intuitive example with a couple actions/$H=2$.
+        \item Then state more generic construction.
+        \end{itemize}
+      }
+      \akcomment{Motivating example is when $\piref$ is a KL regularized optimal policy in some MDP. Then sampling from $\piref$ and greedy decoding might not be as good as MAP.}
+    \end{example}
+
+    \paragraph{Inference-time sharpening as a skyline}
+Our discussion above highlights that inference-time computation
+of the sequence-level arg-max response for $\piref$---or,
+\emph{inference-time sharpening}---is a skyline for
+the performance of any sharpening algorithm, and suggests that at
+least in theory, this can lead to meaningful benefits. To validate
+this empirically, we evaluate the performance of inference-time
+sharpening for two stylized, yet challenging, reasoning tasks, \gametwentyfour \citep{yao2024tree} and
+\stargraph \citep{bachmann2024pitfalls}.
+
+Since exactly computing the sequence-level arg-max is intractable, we
+implement inference-time sharpening by appealing to \BestofN sampling
+\citet{stiennon2020learning,touvron2023llama,gao2023scaling,yang2024asymptotics}:
+Given a prompt $x\in\cX$, we draw $N$ respones
+$y_1,\ldots,y_n\sim\piref(\cdot\mid{}x)$, and return the response
+$\yhat=\argmax_{y_i}\log\piref(y_i\mid{}x)$. The following proposition
+shows that this scheme succeeds in computing an approximate arg-max
+response whenever $\piref$ has sufficient coverage. To state the
+result, let us define
+$\Ystar(x)\ldef{}\argmax_{y\in\cY}\piref(y\mid{}x)$; we interpret
+$\Ystar(x)\subset\cY$ as a set in order to accommodate non-unique
+maximizers, but we will use the notation $\ystar(x)$ to indicate a
+unique maximizer when it exists (i.e.,
+$\Ystar(x)=\crl{\ystar(x)}$ in this case).
+  \begin{proposition}[Inference-time \BestofN]
+    \label{prop:bestofn_inference}
+    Let a prompt $x\in\cX$ be given. For any $\deltafail\in(0,1)$ and $\gamma\in[0,1)$, as long as
+    \begin{align}
+      N \geq \frac{\log(\deltafail^{-1})}{\piref(\Ystar(x)\mid{}x)},
+    \end{align}
+    inference-time \BestofN sampling produces a response
+    $
+    \yhat \in \Ystar(x)$ with probability at least $1-\deltaf$.
+  \end{proposition}
+
+\paragraph{Empirical results}
+  
+  \cref{fig:validation} displays our findings for \gametwentyfour and
+  \stargraph. We find that when $\piref$ is a pre-trained language
+  model \dfc{details?}, inference-time \bestofn sampling with
+  $\log\piref$ as the verifier leads to a
+  meaningful increase in success probability for both tasks compared
+  to greedy decoding and beam search. This suggests that sharpening is
+  indeed a meaningful solution concept.
+
+
+\dfc{Add footnote: If we say sharpening without qualification, we refer to training time}
+
+
+
+
+
+    
+    
+
+    
+
+
+
+
+
+    
+            
+    
+
+    \paragraph{Training-time sharpening as amortized inference}
+
+    Given the results above, we can view sharpening in the sense
+    of our objective in \cref{eq:sharpening} as a form of
+    \emph{amortized inference}. By expending extra
+    computation at training time (through self-training), we aim to obtain a sharpened policy
+    $\pihat$ that can compete with inference-time \BestofN sampling
+    without having to expend inference-time computation.
+
+
+    
+
+\begin{remark}[Connection to maximum a-posteriori inference]
+\dfc{Add references/explanation for connection to MAP/inference
+  results in TCS here. Connect to diversity/diffusivity of the model
+  a-la large language monkeys.}
+
+\end{remark}
+
+
+  
+
+
+\section{Sharpening Algorithms for Self-Improvement}
+\label{sec:algorithms}
+
+  \dfc{
+    \begin{itemize}
+  \item In the remainder of the paper, we will analyze two natural
+    algorithms for this task, \bestofnalg and \rlhfalg...
+  \item Sketch here that asymptotically/with no errors, both algos
+    converge to sharpened policy.
+  \item What happens with errors/finite samples? What are the
+    tradeoffs? In the remainder of
+    the paper...
+  \end{itemize}
+}
+
+\subsection{Self-Improvement through SFT: \bestofnalg}
+
+\subsection{Self-Improvement through RLHF: \rlhfalg}
+
+
+  

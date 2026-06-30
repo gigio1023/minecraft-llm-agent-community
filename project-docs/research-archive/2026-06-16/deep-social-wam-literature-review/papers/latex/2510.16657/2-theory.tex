@@ -1,0 +1,87 @@
+\section{Modeling Verifier-Based Synthetic Retraining: the Linear Regression Case}\label{sec:linear}
+
+In this section, we formalize our model of iterative retraining with verified synthetic data, coined \emph{verifier-based synthetic retraining} for convenience. Following recent works in this space \citep{dohmatob2024model,gerstgrasser2024model,garg2025preventing,zhusynthesize}, we focus on the foundational linear regression setting where the objective is to estimate a high-dimensional coefficient vector $\theta^\star$ in the following linear model
+\[
+y = x^{\top} \theta^\star + \xi,
+\]
+where $\xi \sim \mathcal{N}(0, \sigma^2)$, $x \in \mathbb{R}^p$, and $\theta^\star \in \mathbb{R}^p$ is the unknown parameter of interest. We use the standard Mean Squared Error (MSE), i.e., $\text{MSE}(\hat{\theta}) = \E_{\xi} \|\hat{\theta} - \theta^\star\|^2$, to evaluate estimators.
+
+\paragraph{Modeling the verifier and data filtering rule.}  Suppose we have access to a verifier that possesses prior knowledge of $\theta^\star$, modeled by a knowledge set. Specifically,  the verifier's knowledge is described by a spherical ball:
+\[
+B_r(\theta_c) := \bigl\{\, \theta \in \mathbb{R}^p : \|\theta - \theta_c\| \leq r \,\bigr\},
+\]
+with fixed center $\theta_c$ and radius $r$.  We assume this knowledge set indeed contains the true parameter, i.e.,  $\theta^\star \in B_r(\theta_c)$, but  the true parameter $\theta^\star$ is unknown.  The verifier does not reveal $\theta_c$ or $r$ directly (see modeling motivations below). Instead, it  only provides binary feedback indicating whether a given (real or synthetic) data point $(x_i, y_i)$ is consistent with the knowledge $\theta^\star \in B_r(\theta_c)$ or not. Specifically, the verifier outputs \emph{Yes} if
+\begin{align}
+|y_i - x_i^{\top} \theta_c| \leq r \|x_i\| + \sigma_c, \label{equ:linear:verify_condition}
+\end{align}
+and \emph{No} otherwise. Here $\sigma_c$ is a  constant related to the verifier's capability.  This \emph{filtering rule} is motivated by the following bound on expected errors: 
+$
+\E\bigl[\,|y_i - x_i^{\top}\theta_c|\,\bigr] = \E\bigl[\,|x_i^{\top}(\theta^\star - \theta_c) + \xi_i|\,\bigr] \leq r\|x_i\| + \E|\xi_i| = r\|x_i\| + \sqrt{\tfrac{2}{\pi}}\sigma.
+$
+Since the true $\sigma$ might be unknown in practice, $\sigma_c$ serves as an estimate of the true $\sigma$. %\hf{Do our theory require $\sigma_c = \sigma$ in order to work? }
+
+We refer to $\Delta = \|\theta^\star - \theta_c\|$ as the \emph{bias} of the verifier, whereas  $r$ captures the \emph{selectivity} of the verifier --  the smaller $r$ is, less likely the verifier  accepts a data point $(x_i, y_i)$.  The verifier only needs to  provide Yes/No answers based on the above selection rule in   \eqref{equ:linear:verify_condition}, but does not  needs    to know the parameter  $\theta_c, r$ of the knowledge set.   The motivation of this modeling primarily comes from practice, as explained below. 
+
+  
+\paragraph{Motivation of binary feedback from verifiers.}    
+We adopt the  binary feedback  from verifiers mainly for practical reasons.   
+In practice, eliciting simple yes/no feedback is far less noisy and more cost-effective than asking verifiers to directly specify $\theta_c$ or $r$. Indeed, in real applications verifiers may not even know these quantities explicitly, which would correspond to model parameters if the verifier is a stronger teacher model or how the human reasons if the verifier is a human.  This model choice   is also aligned with the  widely adopted comparison-based feedback in reinforcement learning from human feedback (RLHF) \citep{ouyang2022training}. Such binary feedback has become a standard approach in preference alignment for large language models, where LLM raters and human evaluators provide pairwise or accept/reject judgments that effectively guide learning at scale \citep{wettigqurating}. Although simple, our theory and empirical evaluations both show that this \emph{single bit} of information for each sample can successfully be injected into the retraining process to improve models. 
+
+
+\paragraph{Synthetic Retraining with Verifier-based Filtering}
+
+We begin with an initial set of real data $(X^0, Y^0)$, where $X^0 \in \mathbb{R}^{n_0 \times p}$ and $Y^0 \in \mathbb{R}^{n_0}$.  
+The initial estimator $\hat{\theta}^0$ is obtained via Ordinary Least Squares (OLS) \footnote{For ease of presentation, we assume Rank$(X^0)=p$. If Rank$(X^0)<p$, all our results are equally applicable by working in the subspace of $X^0$. }
+$
+\hat{\theta}^0 = ({X^{0}}^\top X^0)^{-1} {X^0}^\top Y^0. \label{equ:linear:theta0}
+$
+We then proceed with iterative synthetic retraining via the \emph{generate--verify--retrain} procedure outlined in Figure~\ref{fig:pipeline}, the rigorous retraining Scheme~\ref{scheme:linear_retraining} and Algorithm~\ref{alg:linear_retraining} are provided in Appendix~\ref{app:linear}.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=14mm, >=Stealth,
+  midbox/.style={rectangle, rounded corners, draw, align=center,
+                 minimum height=8mm, text width=20mm, inner sep=2mm, font=\footnotesize},
+  endbox/.style={rectangle, rounded corners, draw, align=center,
+                 minimum height=8mm, text width=10mm, inner sep=2mm, font=\footnotesize}
+]
+\footnotesize
+\node[endbox] (theta) {$\hat{\theta}^k$};
+\node[midbox, right=of theta] (xy) {$(X^{k+1},\, Y^{k+1})$};
+\node[midbox, right=of xy] (xyv) {$({X^{k+1}}',\, {Y^{k+1}}')$};
+\node[endbox, right=of xyv] (theta2) {$\hat{\theta}^{k+1}$};
+
+\draw[->] (theta) -- node[midway, above] {Generate} (xy);
+\draw[->] (xy) -- node[midway, above] {Verify} (xyv);
+\draw[->] (xyv) -- node[midway, above] {Retrain} (theta2);
+\end{tikzpicture}
+\caption{Generate-Verify-Retrain pipeline.}
+\label{fig:pipeline}
+\end{figure}
+
+Since learning proceeds through the conditional $Y^k \mid X^k$, synthetic retraining requires specifying the covariate design $X^k$; labels $Y^k$ are then generated conditionally via the model under verifier constraints.
+In principle, one could construct $X^k$ arbitrarily; however, for mathematical clarity, below we describe a targeted though arguably natural design. 
+In particular, we choose to align the synthetic covariates with a fixed orthonormal set $\{v_1,\dots,v_p\}$ and construct $X^k$ in a block-structured form by repeating each $v_j^\top$ as rows:
+\label{equ:linear:block_design}
+\begin{align}
+X^k = (\,
+\underbrace{v_1, \ldots}_{\text{copies of } v_1},\;
+\underbrace{v_2, \ldots}_{\text{copies of } v_2},\;
+\ldots,\;
+\underbrace{v_p, \ldots}_{\text{copies of } v_p}
+\,)^\top.
+\end{align}
+After verifier filtering, each orthogonal direction $v_j$ retains exactly $n_k$ samples with 
+$
+n_0 \;\leq\; pn_1 \;\leq\; pn_2 \;\leq\; \cdots.
+$
+
+Notably, the estimation of parameter $\hat{\theta}^{k+1}$ using only synthetic data from the model with $\hat{\theta}^{k}$, though with filtering, leads to a Markovian transition   $\hat{\theta}^k \mapsto \hat{\theta}^{k+1}$. The above block design essentially helps ``diagonalize''  the transition operator $\hat{\theta}^k \mapsto \hat{\theta}^{k+1}$.  
+The conceptual benefit of this covariance design choice is that we remove the rotational variability that arbitrary designs would introduce across iterations and decouple the dynamics along orthogonal directions.
+In practice,  this design mirrors curating data along approximately orthogonal latent spaces or topics (e.g., topical axes like politics, sports, mathematics).
+However, the choice of covariant $X^k$ is not unique:   alternatives (e.g., canonical basis, isotropic random directions) can yield similar qualitative conclusions, with potentially different constants or rates.
+We expect our theoretical insights to generalize to any reasonable design of the covariant $X^k$, though the rigorous proofs may be less tractable for some designs.
+
+
+

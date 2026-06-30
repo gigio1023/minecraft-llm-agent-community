@@ -1,0 +1,49 @@
+We describe the experimental setup in this section.
+First, we provide the common setup across the scenarios, followed by the scenario-specific setups in Section~\ref{subsec:scenario_specific_setup}.
+
+\vspace{2pt}
+\noindent \textbf{Models.} 
+We evaluate $52$ models across various sizes, ranging from $1.3$B to $70$B, including base models, instruction models, and both open and closed models. 
+%As we consider zero-shot evaluations for some scenarios, we only use instruction-tuned models.
+Our experiments include models from different classes, such as \gpts{} (\gptthreefiveturbo{}, \gptfour{}, \gptfourturbo{},\gptfouro{}), \claudes{} (\claudeinstantone{}, \claudetwo{}, \claudethrees{}), \geminis{}(\geminipro{}, \geminiflash{}), \mistral{} among closed-access and \llamas{}(\llamabaselist{}, \llamainslist{}), \deepseeks{} (\deepseekcodebaseBList{}, \deepseekcodeBList{}), \cllamas{} (\cllamaBList{}, \cllamabaseBList{}), \starcodertwo{} (\sctwobaseBList{}), \codeqwen{} among open.
+Additionally, we also include fine-tuned models \phind{} from \cllamabaseB{34}, and \magicoders{} (\magicoderBLit{}) from \cllamabaseB{7} and \deepseekbaseB{6.7}.
+See Appendix~\ref{app:subsec:models} for a complete list of models and estimated cutoff dates. %\nj{update}
+
+\vspace{2pt}
+\noindent \textbf{Evaluation Metrics.}
+We use the \passmetric{1}~\citep{kulal2019spoc,chen2021evaluating} metric for our evaluations. 
+Specifically, we generate $10$ candidate answers for each problem either using API or using \smalltextsc{vLLM}~\citep{kwon2023efficient}.
+We use nucleus sampling with temperature $0.2$ and top\_p $0.95$ and calculate the fraction of programs or answers that are correct. 
+For the code generation and self-repair scenarios, we use tests to verify the correctness of the programs. For these scenarios, programs must pass all tests to be considered correct.
+For the code execution scenario, we use an execution-based correctness metric between the generated output and the ground truth output. For the test output prediction scenario, we parse the generated response to extract the answer and use equivalence checks for grading as specified in Section~\ref{sec:tasks}.
+%We use test cases for checking correctness of the program outputs (code generation and self repair scenarios) and object equivalence for the object outputs (code execution and test output prediction scenarios).
+
+\subsection{Scenario-specific setup}
+\label{subsec:scenario_specific_setup}
+The setup for each scenario is presented below.
+Note that the base models are only used in the code generation scenario since they do not easily follow the format for the other scenarios.
+
+\vspace{2pt}
+\noindent \textbf{Code Generation.} 
+For the instruction-tuned models, we use a zero-shot prompt and follow the approach of \citet{hendrycks2021measuring} by adding appropriate instructions to generate solutions in either functional or stdin format.
+For the base models, we use a constant one-shot example, with a separate example provided for problems that accept stdin input and for problems that accept functional output.
+Section~\ref{appendix:codegen-prompts} shows the high-level zero-shot prompt used.
+%We make necessary adjustments to system messages across models.
+
+\vspace{2pt}
+\noindent \textbf{Self Repair.} 
+Similar to prior work~\cite{olausson2023demystifying}, we use the programs generated during the code generation scenario 
+along with the corresponding error feedback to build the zero-shot prompt for the self-repair scenario.
+The type of error feedback includes syntax errors, runtime errors, wrong answers, and time-limit errors, as applicable.
+Section~\ref{appendix:repair-prompts} provides the pseudo-code for computing the error feedback and the corresponding prompt.
+
+\vspace{2pt}
+\noindent \textbf{Code Execution.} 
+We use few-shot prompts for the code execution scenario, both with and without chain-of-thought prompting (\chainot{}). 
+Particularly, we use a 2-shot prompt without \chainot{} and a 1-shot prompt with \chainot{} with manually detailed steps.
+The prompts are detailed in Section~\ref{appendix:code-execution-prompts}.
+
+\vspace{1pt}
+\noindent \textbf{Test Output Prediction.} 
+We use a zero-shot prompt that queries the model to complete assertions, given the problem, function signature, and test input. 
+We provide the prompt in Section~\ref{appendix:test-pred-prompts}.

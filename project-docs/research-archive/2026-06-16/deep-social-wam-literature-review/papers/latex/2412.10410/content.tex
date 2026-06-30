@@ -1,0 +1,349 @@
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/groot.png}
+    \caption{By feeding a mixture of demonstrations and some multimodal labels, we learn \agent, a human-aligned agent capable of understanding multimodal instructions and adaptable to various environments, ranging from video games to robot manipulation, including Atari, Minecraft, Language Table, and Simpler Env. }
+    \label{fig:groot}
+\end{figure}
+
+
+\section{Introduction}
+
+Developing policies that can follow multimodal instructions to solve open-ended tasks in open-world environments is a long-standing challenge in robotics and AI research. 
+With the advancement of large-scale pretraining \citep{gpt3, vpt, rt-1}, the research paradigm for instruction-following policies has shifted from reinforcement learning to supervised learning. In a supervised learning approach, researchers collect large amounts of demonstration data and annotate each demonstration with multimodal instructions—such as videos \citep{oneshot, bcz}, texts \citep{rt-x, language_table}, and episode returns \citep{dt}—using hindsight relabeling. 
+In theory, the instruction-following capability of such policies improves as the dataset grows. However, annotating demonstrations with high-quality multimodal labels is prohibitively expensive, making it challenging to scale these methods in practice. 
+
+Another line of work \citep{planplay, opal, groot1} avoids the need for additional human annotations by learning from demonstration-only data in a self-supervised manner. These approaches leverage latent variable generative models \citep{vae} to jointly learn an encoder and a latent-conditioned policy. The resulting policy is capable of completing multiple tasks specified by a reference video \citep{groot1}. While a reference video is generally expressive enough to represent various tasks, the inherent ambiguity in videos can lead to a learned latent space that is misaligned with human intention. 
+For example, the encoder module may capture the dynamics between adjacent frames in a video, thereby learning a latent representation of the action sequence—a process we refer to as “mechanical imitation.” While this latent space accurately reconstructs the target action sequence, the resulting latent representation is difficult for human users to leverage during policy deployment. Another potential issue is “posterior collapse,” where the latent space collapses to a single point and loses its influence over the policy during inference. We attribute this mismatch between training and inference to the absence of direct supervision for aligning the latent space with human intention. As illustrated in Figure \ref{fig:problem}, an ideal controllable latent-induced policy space must strike a balance between these two extremes. 
+
+We present \agent (refer to Figure \ref{fig:groot}), a multimodal instructable agent developed using a latent variable model under weak supervision. To unify the training pipeline, we encode instructions from all modalities as distributions over the latent space. The training objectives consist of two key components: (1) \textbf{constrained self-imitating}, which utilizes large amounts of unlabeled demonstrations to enable the latent-conditioned policy to learn diverse behaviors; and (2) \textbf{human intention alignment}, which uses relatively small sets of multimodal labels to align the latent space with human intentions. Specifically, we apply the maximum log-likelihood method in the latent space for alignment. The underlying principle is that the latent embedding encoded by multimodal labels should also be sampled from the distribution learned from the corresponding video. Our approach is both general and flexible, as demonstrated through evaluations across four diverse environments—ranging from video games to robotic manipulation—including Atari Games \citep{atari}, Minecraft \citep{malmo}, Language Table \cite{language_table}, and Simpler Env \citep{simpler_env}. These experiments highlight \agent’s robust ability to follow multimodal instructions, with extensive tests showing that scaling up either unlabeled or labeled demonstrations further enhances performance. 
+
+% This paper presents \agent, a multimodal instructable agent developed on a latent variable model from weak supervision. We encode instructions from all modalities as distributions over the latent space to unify the training pipeline. 
+% The training objectives consist of two components: (1) constrained self-imitating, which leverages large amounts of unlabeled demonstrations to help the latent-conditioned policy learn rich behaviors; (2) human intention alignment, a process that leverages relatively small multimodal labels to help align the latent space with human intention. 
+% Specifically, we explicitly apply the maximum log-likelihood method in the latent space to ensure that the latent variables encoded by a multimodal label can be sampled from the distribution encoded by the corresponding video. We demonstrated that our method is general and flexible. We evaluated it across four representative environments, ranging from video games to robotic manipulation, including Atari Games \citep{atari}, Minecraft \citep{malmo}, Language Table \cite{language_table}, and Simpler Env \citep{simpler_env}, demonstrating its robust capability to follow multimodal instructions. Extensive experiments show that scaling up unlabeled or labeled demonstrations can improve performance. 
+
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/problem.pdf}
+\end{center}
+\vspace{-0.2cm}
+\caption{
+\textbf{The ELBO Objective of the VAE and Latent Space Spectrum.}
+We define a spectrum based on $R = \frac{BC}{BC + KL}$, where  $R = 0$  corresponds to “mechanical imitation” and  $R = 1$  to “posterior collapse.” At low  $R$, latent vector $z$ directly outputs action sequences without considering observations ( $BC \to 0$ ). As  $R$  increases,  $z$  represents high-level task information, such as specific object interactions. At $R = 1$, $z$ provides no beneficial information for decision-making. 
+% \textbf{The ELBO objective of the VAE presents infinite latent spaces along the Pareto frontier.} We construct a spectrum based on the value of $R = \frac{BC}{BC + KL}$, where the solutions at both ends represent two opposing characteristics: “mechanical imitation” (corresponding to $R = 0$) and “posterior collapse” ($R = 1$). We demonstrate that when $R$ is small, the latent space vector $z$ may represent an action sequence directly output during policy inference without considering the actual environmental observations, with $BC$ approaching $0$. As $R$ increases, the vector $z$ in the latent space may correspond to a rough behavior trajectory. Further increasing $R$ may result in the latent space vectors representing interactions with specific objects. When $R = 1$, the latent space representation provides no beneficial information for decision-making within the policy. 
+} \label{fig:problem}
+\end{figure*}
+
+
+\section{Background and Problems}
+\label{sec:problem}
+
+\subsection{Latent Variable Models Enable Controllable Behavior Generation}
+In recent years, the GPT series \citep{gpt1, gpt2, gpt3} has demonstrated impressive capabilities in controllable text generation. Its success can be attributed to self-supervised pretraining and the advantageous properties of natural language. A natural language paragraph contains rich dependencies between sentences. For instance, the title of an article sets the central theme for its body, and the response in a question-answer or dialogue is highly correlated with the preceding text. This characteristic enables large language models, trained via next-token prediction, to achieve controllable text generation through prompts during inference. 
+Unfortunately, such strong correlations do not exist between low-level actions. A desired behavior may not have a necessary preceding trajectory segment. Thus, it isn't easy to prompt a pre-trained policy model to generate a desired behavior. Instead, the generation of actions depends on an underlying latent intention variable. A natural approach is to employ latent variable generative models to jointly model trajectory data and the latent variables that drive them, allowing for controllable behavior generation by manipulating the latent variables during inference. 
+Next, we will elaborate on how latent variable models model trajectory data. 
+
+As a classic latent variable generative model, Variational Autoencoder (VAE, \cite{vae}) has been widely used in fields such as image generation and text generation. With the development of the offline pretraining paradigm, recent years have seen an increasing number of works utilizing VAE to model trajectory data. Typically, its architectures consist of three components: a posterior encoder, a prior encoder, and a policy decoder. The posterior encoder, $q(z | \tau)$, encodes a specific behavioral trajectory $\tau = (\mathbf{o}_{1:N}, \mathbf{a}_{1:N})$ and generates a posterior distribution over the latent space. When the action sequence can be accurately inferred from the observation sequence \citep{vpt, eccvpt}—i.e., when the inverse dynamics model of the environment $p_{\text{IDM}}(\mathbf{a}_{1:N} | \mathbf{o}_{1:N})$ is easily learned—the action sequence can be excluded from the posterior's input \citep{groot1}, thus reducing the distribution condition to $\mathbf{o}_{1:N}$. The prior encoder, $p(z | \mathbf{o}_{1:k})$, generates a distribution over the latent space based on the history of observations, where $k$ denotes the length of the observation window. When $k = 0$, the prior distribution is independent of historical observations and is typically assumed to follow a standard normal distribution $\mathcal{N}(0; 1)$. The decoder, $\pi (\mathbf{a}_t | \mathbf{o}_{1:t}, z)$, is generally a latent-conditioned policy that takes in the environment’s observations along with a specific latent variable to predict the next action to be executed. According to variational inference theory, we can optimize the VAE’s modeling capabilities by maximizing the Evidence Lower Bound (ELBO)
+\begin{equation}
+    \mathcal{L}_{\text{ELBO}} = \mathbb{E}_{z \sim q(z | \mathbf{o}_{1:N})} \left[ \sum_{t=k}^{N} - \log \pi(\mathbf{a}_t | \mathbf{o}_{1:t}, z) \right] + D_{\text{KL}} ( q(z | \mathbf{o}_{1:N}) \parallel p(z | \mathbf{o}_{\le k})). 
+\end{equation}
+
+
+There are generally three main objectives for using VAE to model trajectory data: (1) \textbf{Modeling multimodal behaviors} \citep{latent_plan, mees2022matters}: For instance, when trajectory data is collected from different individuals, the variations in action sequences across different behavior modes can be substantial. Directly applying a naive behavior cloning algorithm may result in poor modeling performance. Introducing an additional latent variable to differentiate between behavior modes can help mitigate conflicts between them during training. (2) \textbf{Skill discovery} \citep{xu2023xskill, boost_rl_2}: Complex trajectory data is often composed of various skills. A VAE can abstract action sequences in a self-supervised manner, enabling skill reuse in downstream tasks, such as accelerating the exploration process in reinforcement learning \citep{boost_rl_1, opal}. (3) \textbf{Following reference videos to complete open-ended tasks} (also known as one-shot demonstration learning, \cite{groot1}): This approach aims to leverage the learned posterior encoder to recognize the underlying intention behind a reference video and encode it as a latent, which can then drive a policy to complete the specified task in a novel deployment. 
+It points to a way to pre-train instruction-following policies using unlabeled trajectory data. We primarily focus on the third objective in the following paragraphs. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/problem2.png}
+\end{center}
+\vspace{-0.2cm}
+\caption{
+\textbf{Comparison of Policies with Different Latent Spaces.}
+The reference video depicts digging for diamonds. A policy that mechanically imitates the trajectory falls into lava, while one aligned with human intention avoids lava and successfully reaches the diamonds. 
+% \textbf{Comparison of policies with different latent spaces in interpreting a reference video.} The reference video shows a player digging straight ahead to find diamonds. In an environment with lava, a policy that mechanically imitates the trajectory from the video would fall into the lava and die. However, a policy aligned with human intention would avoid the lava and dig around it to reach the diamonds. 
+} \label{fig:problem2}
+\end{figure*}
+
+
+\subsection{Modeling Behaviors with VAE Leads to Ambiguous Latent Space}
+Several studies on VAE \citep{vae-latent-space-1, vae-latent-space-2} have pointed out that the Pareto frontier of the ELBO contains an infinite number of solutions for the latent space, a phenomenon we refer to as \textbf{latent space ambiguity}. To facilitate understanding, we provide an informal illustration in Figure \ref{fig:problem}, which shows several possible latent spaces when a VAE is used to model behaviors, all having similar ELBO values. We differentiate these latent spaces using the ratio $R = \frac{BC}{BC + KL}$, where $R = 0$ and $R = 1$ represent two extremes of the latent space. When $R$ approaches $0$, the latent condition contains much information, nearly dictating every action of the policy’s behavior. We refer to this as \textbf{mechanical imitation}, where the VAE effectively degenerates into an Autoencoder (AE). Conversely, when $R$ approaches $1$, the latent loses its ability to control the policy’s output, a phenomenon known as \textbf{posterior collapse} \citep{collapse-1, collapse-2}, in which the VAE reduces to an Auto-regressive (AR) model. Intuitively, as $R$ increases, the information encoded in the latent space becomes more high-level, and the policy relies more on environmental feedback (observations) to make decisions that align with the dataset’s distribution. On the other hand, when $R$ is smaller, the policy tends to down-weight the environment’s observations. 
+
+Not all latent spaces effectively support following a reference video. As shown in Figure \ref{fig:problem2}, the gap between the environment state in the reference video and during policy deployment requires the posterior encoder to extract intentions independent of environmental dynamics. For instance, in the Minecraft task “mining a diamond underground,” a reference video may show a player walking forward and mining a diamond. If the latent encodes only the trajectory sketch, the policy might fail by colliding with obstacles in the deployment environment. This mismatch occurs because humans interpret the video as “mining the diamond” rather than copying specific actions. Aligning the latent space with human intentions is critical for improving policy steerability. 
+
+\section{Aligning Policy Learners with Weak Supervision}
+We explore the development of instructable agents based on latent variable models. To avoid ``latent space ambiguity'', we introduce human intention knowledge into the generative pretraining process of the policy model to assist in shaping the latent space. As multimodal labels associated with demonstrations carry rich human intention details, we propose a weakly supervised policy learning algorithm to leverage large amounts of unlabeled demonstration data to learn the latent space while using a small amount of multimodal labeled data to align the latent space with human intention. Ultimately, this enables instructions from all modalities to be unified within the same latent space. Next, we will elaborate on the dataset collection, training pipeline, and inference procedure. 
+
+\paragraph{Dataset Collection} We can collect two types of training data from the web: a large set of unlabeled demonstrations $\mathcal{D}_{\text{dem}} = \{(\mathbf{o}_{1:N}, \mathbf{a}_{1:N})\}$ and a relatively small set of annotated demonstrations $\mathcal{D}_{\text{lab}} = \{(\mathbf{o}_{1:N}, \mathbf{a}_{1:N}, \mathbf{w}_{1:M})\}$, where $\mathbf{o}$ is the image observation provided by the environment, $\mathbf{a}$ is the action taken by the policy, $\mathbf{w}$ is the word token, $N$ is the length of a demonstration, $M$ is the length of an annotation sentence.
+The annotation sentence can be multimodal, such as a language sentence (with $M \ge 1$) or a scaler of the episode return (with $M=1$), which explains the behavior or outcome of the demonstration from a human's perspective. 
+Since the annotation data is expensive to collect, we have $|\mathcal{D}_{\text{lab}}| \ll |\mathcal{D}_{\text{dem}}|$. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/pipeline.pdf}
+\end{center}
+\caption{
+\textbf{Pipeline for Constructing a Training Batch for \agent.}
+Each batch includes two sample types: (1) demonstration-only samples for learning a latent-conditioned policy (\emph{Constrained Self-Imitating}); and (2) labeled samples (text or expected returns) for aligning the latent space with human intentions (\emph{Human Intention Alignment}). The sample ratio varies by dataset distribution. 
+} \label{fig:pipeline}
+\end{figure*}
+
+\paragraph{Training Pipeline} Our goal is to learn a shared latent space $\mathcal{Z}$, per-modal instruction encoders $e(z | c)$, and a latent-conditioned policy $\pi(\mathbf{a}_t|\mathbf{o}_{\le t}, z)$. 
+Leveraging past observations is essential for a policy to make decisions in a partially observable environment such as Minecraft \citep{malmo}. 
+We call the learned policy model \agent, whose training pipeline is shown in Figure \ref{fig:pipeline}. 
+For an unlabeled demonstration $(\mathbf{o}_{1:N}, \mathbf{a}_{1:N})$, we use the encoder module to produce a prior distribution $e(z | \mathbf{o}_{1})$ and a posterior distribution $e(z | \mathbf{o}_{1:N})$. Using the reparameterization trick \citep{vae}, we sample the latent $z$ from the posterior distribution $e(z|\mathbf{o}_{1:N})$ and train the policy model, conditioned on $z$ and $\mathbf{o}_{1:t}$, to reconstruct the entire action sequence causally. To limit the information presented in the latent space, we introduce an auxiliary KL divergence term in the objective:
+\begin{equation}
+    \mathcal{L}_{\text{dem}}(\mathbf{o}, \mathbf{a}) = \mathbb{E}_{z \sim e(z | \mathbf{o}_{1:N})} \left[ \sum_{t=1}^{N} -\log \pi(\mathbf{a}_t | \mathbf{o}_{1:t}, z) \right] + \beta_1 D_{\text{KL}}(e(z|\mathbf{o}_{1:N}) \parallel e(z | \mathbf{o}_{1})).
+\end{equation}
+This allows the model to leverage demonstration-only data to enhance the complexity of the latent space, a process we refer to as ``constrained self-imitating.'' 
+For a labeled demonstration $(\mathbf{o}_{1:N}, \mathbf{a}_{1:N}, \mathbf{w}_{1:M})$, we pass the label $\mathbf{w}_{1:M}$ through the encoder module to obtain a latent distribution and train the policy model to reconstruct the action sequence based on the latent $z$ sampled from this distribution $e(z | \mathbf{w}_{1:M})$. This allows human knowledge to be modeled in the latent space. Further, to make the encoder understand demonstration $\mathbf{o}_{1:N}$ just like humans, we introduce an auxiliary MLE term: maximize the log-likelihood of $e(z|\mathbf{o}_{1:N})$ given the latent $z$ sampled from $e(z|\mathbf{w}_{1:M})$. Unlike the prior behavior cloning term, the aligning term can be quickly calculated in closed form. This process is referred to as ``human intention alignment'': 
+\begin{equation}
+    \mathcal{L}_{\text{lab}}(\mathbf{o}, \mathbf{a}, \mathbf{w}) = \mathbb{E}_{z \sim e(z|\mathbf{w}_{1:M})} \left[ \sum_{t=1}^{N} -\log \pi(\mathbf{a}_t | \mathbf{o}_{1:t}, z) \right] - \beta_2 
+    \mathbb{E}_{z \sim \text{sg}[e(z|\mathbf{w}_{1:M})]} \left[\log e(z|\mathbf{o}_{1:N}) \right], 
+    % D_{\text{KL}}(\text{sg}\left[e(z | w_{1:M})\right] \parallel e(z|o_{1:N})), 
+\end{equation}
+where $\text{sg}[\cdot]$ denotes stop gradient operation. The MLE-based alignment objective ensures that the latent sampled from the label-conditioned distribution $e(z|w_{1:M})$ can also be sampled from its video-conditioned distribution $e(z|o_{1:N})$. 
+The final loss function combines the two objectives:
+\begin{equation}
+    \mathcal{L}(\mathcal{D}_{\text{dem}}, \mathcal{D}_{\text{lab}}) = \mathbb{E}_{(\mathbf{o}, \mathbf{a}) \sim \mathcal{D}_{\text{dem}}} \left[ \mathcal{L}_{\text{dem}}(\mathbf{o}, \mathbf{a}) \right] + \mathbb{E}_{(\mathbf{o}, \mathbf{a}, \mathbf{w}) \sim \mathcal{D}_{\text{lab}}} \left[ \mathcal{L}_{\text{lab}}(\mathbf{o}, \mathbf{a}, \mathbf{w}) \right]. 
+\end{equation} 
+Specific implementation details, such as the model design choice, can be found in the Appendix \ref{appendix:implementation}. 
+
+\paragraph{Inference Procedure} \agent supports two types of instructions during inference: (1) visual-based instruction – the user can either retrieve a demonstration from the dataset as a reference video or manually record a reference video to serve as the condition for the policy; (2) label-based instruction – the user can input a text sentence or specify an expected return as the condition (depending on the label modality used during the model’s training). We tested them in the following experiments. 
+
+
+\section{Capabilities and Analysis}
+\label{sec:experiments}
+
+We aim to address the following questions: (1) How does \agent perform in open-world video games and robotic manipulation? (2) Can \agent follow instructions beyond language and video? (3) What insights can be gained from visualizing the learned latent space? (4) How does \agent scale with labeled and unlabeled trajectories? (5) What is the impact of backbone initialization on performance? (6) How do language and video losses influence performance? 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures/dataset.png}
+\end{center}
+\vspace{-0.2cm}
+\caption{
+\textbf{Diverse visual environments used in the experiments.} We test our \agent on both video games (simple Atari games and the complex Minecraft game) and robotic manipulation environments (Language Table and Simpler Env). Minecraft is a partially observable open-ended environment, while others are fully observable. 
+} \label{fig:dataset}
+\end{figure*}
+
+\paragraph{Environment and Benchmarks} 
+We conduct experiments across four types of representative environments: classical 2D game-playing benchmarks on Atari \citep{atari}, 3D open-world gameplaying benchmarks on Minecraft \citep{malmo,mcu}, and Robotics benchmarks on Language Table simulator \citep{language_table} and Simpler Env simulator\citep{simpler_env}, illustrated in Figure \ref{fig:dataset}. 
+These four simulators are used to evaluate whether \agent can be effectively steered by returns \citep{dt,dqn}, reference videos \citep{groot1,bcz}, and textual instructions \citep{rt-1,rt-2}. 
+
+
+\begin{table}[]
+\footnotesize
+\setlength{\tabcolsep}{2.6 mm}
+\centering
+\caption{
+    \textbf{Results on the Open-World Minecraft Benchmark.}
+    This benchmark includes 8 task families and 100 tasks. Each task is evaluated 30 times across three seeds, and the average success rate is calculated per task family. For example, Combat (16) indicates 16 tasks in the Combat family.
+}  \label{tab:minecraft}
+\renewcommand{\arraystretch}{1.0}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+\multirow{2}{*}{\textbf{Methods}} & \multirow{2}{*}{\textbf{Prompt}} & \textbf{Combat} & \textbf{Hunt} & \textbf{Ride} & \textbf{Breed} & \textbf{Craft} & \textbf{Mine} & \textbf{Interact} & \textbf{Plant} \\
+                         &                          & (16)    & (10) & (4)  & (8)   & (20)  & (20) & (10)     & (12)  \\ \midrule
+VPT              & N/A & $11_{\pm 3}$                    & $20_{\pm4}$                  & $7_{\pm2}$                 & $2_{\pm0}$                 & $4_{\pm1}$                   & $7_{\pm2}$                  & $21_{\pm 6}$                      & $22_{\pm 7}$                   \\
+STEVE-1          & lang & $12_{\pm 3}$                    & $9_{\pm 2}$                  & $\mathbf{54}_{\pm 8}$                 & $4_{\pm 2}$                 & $5_{\pm 2}$                   & $6_{\pm 3}$                  & $53_{\pm 9}$                      & $33_{\pm 8}$                   \\
+STEVE-1          & visual & $15_{\pm 4}$                    & $10_{\pm 3}$                  & $38_{\pm 9}$                 & $6_{\pm 2}$                 & $6_{\pm 2}$                   & $10_{\pm 4}$                  & $40_{\pm 8}$                      & $43_{\pm 7}$                   \\
+GROOT-1          & visual & $18_{\pm 5}$                    & $28_{\pm 8}$                  & $26_{\pm 6}$                 & $12_{\pm 3}$                 & $15_{\pm 4}$                   & $22_{\pm 7}$                  & $57_{\pm 8}$                      & $75_{\pm 6}$                   \\ \midrule
+GROOT-2          & lang & $\mathbf{40}_{\pm 7}$                    & $43_{\pm 5}$                  & $46_{\pm 6}$                 & $\mathbf{22}_{\pm 6}$                 & $18_{\pm 3}$                   & $\mathbf{37}_{\pm 5}$                  & $55_{\pm 4}$                      & $75_{\pm 9}$                   \\
+GROOT-2          & visual & $37_{\pm 4}$                    & $\mathbf{48}_{\pm 7}$                  & $51_{\pm 4}$                 & $20_{\pm 4}$                 & $\mathbf{27}_{\pm 3}$                   & $36_{\pm 7}$                  & $\mathbf{63}_{\pm 6}$                      & $\mathbf{77}_{\pm 7}$                   \\ \bottomrule
+\end{tabular}
+\end{adjustbox}
+% \vspace{-1 em}
+\end{table}
+
+\paragraph{Results on the Open-World Minecraft Benchmark}
+To evaluate policy models in Minecraft, we used the contractor dataset from \citet{vpt}, containing 160M frames. According to the meta information, labeled trajectories account for approximately $35\%$ of the total data. We extended the Minecraft SkillForge Benchmark \citep{groot1} from 30 to 100 tasks, grouped into eight families: Combat, Hunt, Ride, Breed, Craft, Mine, Interact, and Plant. Details are in the Appendix \ref{appendix:minecraft}. 
+We compared \agent with three baselines: (1) VPT \citep{vpt}, a foundational model trained on YouTube data via imitation learning, lacking instruction-following; (2) STEVE-1 \citep{steve1}, which supports text and future image-conditioned instructions; and (3) GROOT-1 \citep{groot1}, a self-supervised model using reference videos as instructions. 
+Key findings from Table \ref{tab:minecraft} are as follows: (1) \agent (visual) consistently outperforms GROOT-1 across all task categories, with particularly notable gains in mob interaction tasks like Combat and Hunt. Comparing trajectories on Hunt, GROOT-1 mechanically repeats “attack” actions, while \agent actively tracks objects, showing that text data enhances object-centric understanding and better aligns with human intentions. (2) \agent (text) performs similarly to \agent (visual) across most tasks, demonstrating that language and visual modalities share task knowledge. This enables the model to leverage both modalities for improved task completion. 
+This highlights the advantage of combining multimodal data for better alignment with human intentions and improved policy performance.
+
+
+\begin{table}[t]
+\footnotesize
+\setlength{\tabcolsep}{1.3 mm}
+\centering
+\caption{
+    \textbf{Results on the Language Table Benchmark.}
+    We reported success rates (in \%) within 200 steps for each instruction modality, averaging over 250 rollouts. Results are averaged over 3 seeds with mean and stderr. ``-’’ indicates missing data. The percentages in parentheses indicate the proportion of labels used. 
+}  \label{tab:language-table}
+\renewcommand{\arraystretch}{1.0}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{@{}lcccccccc@{}}
+\toprule
+ \multirow{2}{*}{\textbf{Task Family}}     & \multicolumn{1}{c}{\textbf{BC-Zero}} & \multicolumn{1}{c}{\textbf{LAVA}} & \multicolumn{1}{c}{\textbf{RT-1}} & \multicolumn{1}{c}{\textbf{GROOT-1}} & \multicolumn{2}{c}{\textbf{GROOT-2} ($50\%$)} & \multicolumn{2}{c}{\textbf{GROOT-2} ($100\%$)}   \\ \cmidrule(l){2-9} 
+                                 & \multicolumn{1}{c}{\textbf{lang}} & \multicolumn{1}{c}{\textbf{lang}} & \multicolumn{1}{c}{\textbf{lang}} & \multicolumn{1}{c}{\textbf{visual}} & \multicolumn{1}{c}{\textbf{lang}} & \multicolumn{1}{c}{\textbf{visual}} &
+                                 \multicolumn{1}{c}{\textbf{lang}} & \multicolumn{1}{c}{\textbf{visual}} \\ \midrule
+block to block              & - & $\mathbf{90}_{\pm 2}$ & - & $8_{\pm 2}$  & $84_{\pm 9}$           & $78_{\pm 9}$ & $86_{\pm 8}$ & $82_{\pm 7}$ \\
+block to absolute loc       & - & $72_{\pm 4}$ & - & $10_{\pm 3}$ & $70_{\pm 8}$           & $68_{\pm 8}$ & $\mathbf{76}_{\pm 6}$ & $70_{\pm 8}$ \\
+block to block relative loc & - & $72_{\pm 3}$          & - & $4_{\pm 1}$  & $74_{\pm 9}$  & $64_{\pm 7}$ & $\mathbf{76}_{\pm 8}$ & $62_{\pm 6}$   \\
+block to relative loc       & - & $64_{\pm 4}$          & - & $8_{\pm 2}$  & $82_{\pm 5}$  & $78_{\pm 6}$ & $\mathbf{84}_{\pm 6}$ & $80_{\pm 4}$   \\
+separate two blocks         & - & $94_{\pm 2}$          & - & $12_{\pm 2}$ & $98_{\pm 1}$  & $96_{\pm 2}$ & $\mathbf{98}_{\pm 0}$ & $98_{\pm 0}$   \\ \midrule
+\textbf{Overall}            & $72_{\pm 3}$ & $78_{\pm 4}$  & $74_{\pm 13}$ & $8_{\pm 2}$ & $82_{\pm 8}$ & $76_{\pm 7}$ & $\mathbf{84}_{\pm 6}$ & $78_{\pm 8}$      \\ \bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+
+\paragraph{Results on the Language Table benchmark} To assess \agent's multimodal instruction following capabilities in the context of Robotic Table Manipulation, we utilized the Google Language Table as our testing platform and compared it with methods such as \text{LAVA} \citep{language_table}, \text{RT-1} \citep{rt-1}, \text{GROOT-1} \citep{groot1}. We utilize a dataset provided by \cite{language_table} comprising 100M trajectories. We removed the text labels from half of the trajectories in the dataset, creating a $1:1$ ratio of labeled to unlabeled trajectories. Given that the Language Table environment comes with five task families, all of which are instructed solely through language, we curated five reference videos for each task with relatively clear intentions to evaluate the model's ability to comprehend video instructions. Detailed specifics are provided in the appendix \ref{appendix:language-table}. 
+The experimental results are shown in the Table \ref{tab:language-table}. We observed that: (1) \agent leads by an absolute success rate of $4\%$ following text-based instructions compared, likely due to \agent's more refined model architecture design. We mark the results of RT-2 in gray here, as it uses significantly more training data than ours. (2) The performance of \agent in following video instructions dropped by approximately $6\%$ compared to text instructions, possibly due to the ambiguity of the reference videos, where a ``block to block'' type video could be interpreted as a ``block to relative location'' type task. (3) \text{GROOT-1} struggled to understand the intentions conveyed by the reference videos. We observed that \text{GROOT-1} imitated a reference video's trajectory sketch rather than their colors and shapes. This further underscores the importance of introducing language annotations for some trajectory data as a crucial method to align with human intentions. 
+
+
+\begin{table}[]
+\footnotesize
+\centering
+\caption{
+    \textbf{Results on the Simpler Env Benchmark.} We report the success rate (in \%) of the video-instruction and language-instruction following for each model on 3 task families. The percentages in parentheses indicate the proportion of labels used. 
+}  \label{tab:simpler-env}
+\renewcommand{\arraystretch}{1.0}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+{\multirow{2}{*}{\textbf{Methods}}} & \multirow{2}{*}{\textbf{Prompt}} & \multicolumn{4}{c}{\textbf{Pick Coke Can}}  & \multicolumn{1}{c}{\textbf{Move Near}} & \multicolumn{3}{c}{\textbf{Open/Close Drawer}}                                          \\ \cmidrule(l){3-10} 
+\multicolumn{1}{c}{}                        & & \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}\textbf{H-Pose}\end{tabular}} & \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}\textbf{V-Pose}\end{tabular}} & \multicolumn{1}{c}{\textbf{S-Pose}} & \multicolumn{1}{c}{\textbf{Avg}} & \multicolumn{1}{c}{\textbf{Avg}}   & \multicolumn{1}{c}{\textbf{Open}} & \multicolumn{1}{c}{\textbf{Close}} & \multicolumn{1}{c}{\textbf{Avg}}      \\ \midrule
+RT-1-X           & lang  & $\mathbf{57}$ & $\mathbf{20}$ & $\mathbf{70}$ & $\mathbf{49}$ & $32$ & $7$ & $\mathbf{52}$  & $29$   \\
+% \textcolor{Gray}{RT-2-X}           & \textcolor{Gray}{lang}                           & \textcolor{Gray}{82}                                                                              & \textcolor{Gray}{75}                                                                            & \textcolor{Gray}{89}                           & \textcolor{Gray}{82}                          & \textcolor{Gray}{79}                            & \textcolor{Gray}{33}                       & \textcolor{Gray}{37}                        & \textcolor{Gray}{35}                          \\
+Octo-base         & lang    & $5$  & $0$  & $1$  & $1$  & $3$  & $0$  & $2$  & $1$ \\ 
+\multirow{2}{*}{GROOT-2 ($50\%$)}  & visual  & $42$ & $18$ & $52$ & $37$ & $35$ & $\mathbf{29}$ & $30$ & $30$ \\
+                  & lang    & $52$ & $20$  & $50$ & $41$ & $42$ & $27$ & $33$ & $30$ \\
+\multirow{2}{*}{GROOT-2 ($100\%$)} & visual  & $40$ & $22$ & $47$ & $36$ & $35$ & $27$ & $33$ & $30$ \\
+                  & lang    & $53$ & $\mathbf{23}$  & $52$ & $42$ & $\mathbf{45}$ & $27$ & $35$ & $\mathbf{31}$ \\ \bottomrule
+\end{tabular}
+\end{adjustbox}
+\vspace{-1.0 em}
+\end{table}
+
+\paragraph{Results on the Simpler Env Benchmark} We utilized the Simpler Env \citep{simpler_env} simulation of the Google Robot environment to evaluate the policy's capability in controlling complex robotic arms. \agent is trained on the OpenX dataset \citep{openx}. We erased the text labels from half of the dataset’s trajectories, achieving a 1:1 balance between labeled and unlabeled data. We evaluated three types of tasks: \textit{Pick Coke Can}, \textit{Move Near}, and \textit{Open/Close Drawer}. Following \cite{simpler_env, rt-2}, we set up multiple variants for each task. For instance, the \textit{Pick Coke Can} task involved three different poses for the Coke can; in the \textit{Move Near} task, the layout and types of objects varied; and in the \textit{Open/Close Drawer} task, the drawer had three layers from top to bottom. We compared \agent with baseline methods such as RT-1 \citep{rt-1}, and Octo \citep{octo}. Among these, RT-1-X is an efficient language-conditioned transformer-based policy trained on the entire OpenX \citep{openx} dataset, which can be considered the performance boundary that \agent can achieve. As shown in Table \ref{tab:simpler-env}, we found that \agent (lang) and \agent (visual) achieved comparable performance to the RT-1-X model across all three tasks. This indicates that our method retains language control capabilities and imbues the policy with equivalent visual instruction control abilities. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures/atari-ablation.png}
+\end{center}
+\caption{
+\textbf{Comparison of Weakly Supervised (WSL) and Self-Supervised (SSL) Learning on 4 Atari Games.}
+Policies are evaluated under return and reference video conditions. For return conditioning, normalized returns are input into the encoder, while for video conditioning, videos with similar returns (error $< 0.05$) are used. 
+}
+% \vspace{-1 em}
+\label{fig:wsl-ablation}
+\end{figure*}
+
+\noindent \textbf{Can \agent Follow Instructions Beyond Language and Video, Like Episode Returns?}
+
+We evaluated \agent’s steerability and performance on four Atari games (Breakout, Demon Attack, Hero, and Name This Game). Datasets from \citet{atari_dataset}, containing approximately $10$M frames per game, were used. Episode returns were normalized to $\mu=0, \sigma=1$. 
+
+For training, we constructed a dataset with $30\%$ labeled trajectories (returns) and $70\%$ unlabeled data. Using this dataset, we trained \text{GROOT (wsl)} (weakly supervised learning). For comparison, \text{GROOT (ssl)} was trained on the same dataset without return labels in a fully self-supervised manner. Both models were jointly trained across the four games. 
+During inference, we evaluated policy performance in following reference videos sampled from the test set with normalized returns $\{-1, 0, +1\}$, using $20$ samples per category. Results (Figure \ref{fig:wsl-ablation}) show: (1) \text{GROOT (ssl)} can recognize behavioral quality in reference videos, constructing a rough intention space even without labeled guidance. (2) Labeled data significantly improved \text{GROOT (wsl)}’s ability to understand video instructions, with the greatest gains in Hero and Name This Game. 
+We also evaluated \text{GROOT (wsl)} on return-style instructions with normalized rewards $\{-1, 0, +1\}$. The similarity between video and reward-conditioned performance suggests the video encoder and reward encoder share the same intention space. 
+The Atari experiments aim to evaluate \agent’s performance on modalities beyond language and video, rather than maximizing scores, distinguishing it from traditional offline RL methods. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures/atari-visual.png}
+\end{center}
+\caption{
+\textbf{t-SNE Visualization of Learned Latent Spaces on Four Atari Games.}
+The first row shows results under self-supervised learning, while the second row displays \agent’s performance under weakly supervised learning. Points represent reference videos, with shapes indicating games and colors denoting episode returns. The first four columns compare individual games, and the last column shows a mixed-game comparison. 
+% \vspace{-2 em}
+}\label{fig:atari-visual}
+\end{figure*}
+
+\noindent \textbf{What Does the Visualization of the Learned Latent Space Reveal?}
+
+We applied t-SNE to visualize embeddings from randomly sampled reference videos. Each point in Figure \ref{fig:atari-visual} represents a unique video, with shapes denoting game environments and colors indicating episode returns. The first row illustrates results for \text{GROOT (ssl)}, where videos in Breakout, Demon Attack, and Name This Game are classified into two categories based on episode return magnitudes, suggesting that the self-supervised algorithm distinguishes only significant score differences. In contrast, \text{GROOT (ssl)} shows poor clustering and limited steerability in the Hero game. 
+The second row shows results for \text{GROOT (wsl)}, which captures continuous variations in video behavior quality across all games. As shown in the fifth column, embeddings from different environments follow a continuous pattern aligned with reward labels, indicating a shared latent space that promotes cross-environment knowledge transfer. 
+
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures/mc-ablation.png}
+\end{center}
+\caption{
+\textbf{Performance Comparison on Unlabeled Demonstrations.}
+Human-normalized task scores are averaged over 20 rollouts across 5 Minecraft tasks to evaluate the agent’s reference-video following ability. 
+} \label{fig:mc-ablation}
+% \vspace{-2.0 em}
+\end{figure*}
+
+\noindent \textbf{How Does Scaling Up Unlabeled Trajectories Impact Performance?}
+
+We trained four GROOT-2 variants with $0\%$, $25\%$, $50\%$, and $100\%$ unlabeled data in Minecraft. Performance was tested on five Minecraft tasks (Chop Tree, Hunt Animals, Combat Enemies, Open Chest, Climb Mountain) and scored relative to skilled human players. For example, if a human collects $20.0$ logs in 600 steps and GROOT-2 collects $15.0$, the score is $0.75$. Results (Figure \ref{fig:mc-ablation}) show consistent improvement with more unlabeled data, with the $100\%$ variant achieving a $5\times$ gain in the Climb Mountain task over the $0\%$ version. It is worth noting that the Climb Mountain and Open Chest tasks do not have language instructions in the training set. 
+
+\noindent \textbf{How Does Scaling Up Labeled Trajectories Impact Performance?}
+
+\begin{wrapfigure}{r}{0.36\textwidth} 
+    \centering
+    \vspace{-1.5 em}
+    \includegraphics[width=0.36\textwidth]{figures/scale_labels.png} 
+    \caption{
+    \textbf{Ablation Study on Labeled Trajectories in the Language Table.}} \label{fig:scale_label}
+    \vspace{-1.0 em}
+\end{wrapfigure}
+To evaluate the impact of labeled trajectory proportions in the training set on the instruction-following capabilities of \agent, we conducted experiments on the Language Table benchmark. The total number of trajectories remained constant across different dataset configurations, with only the proportion of trajectories containing text labels varying. Figure \ref{fig:scale_label} reports the success rate achieved by \agent conditioned on language. At low labeled data proportions $(0\%-25\%)$, the success rate rapidly increased from $10\%$ to $65\%$, indicating that labeled data significantly influences model performance. However, as the labeled data proportion increased to $50\%-80\%$, the success rate plateaued, rising slightly from $82\%$ to $83\%$, demonstrating diminishing marginal gains from additional labeled data. Therefore, under resource constraints, a labeled data proportion of $50\%$ may represent the optimal balance between performance and cost. 
+
+\noindent \textbf{How Does Backbone Initialization Affect Performance?}
+
+We evaluated different initializations for ViT (random, ImageNet, CLIP) and BERT (random, BERT, CLIP) on the Language Table Benchmark. For randomly initialized models, both backbones were unfrozen during training. According to Table \ref{tab:ablation-backbone}, CLIP initialization yielded the best results for ViT, followed by ImageNet, with minimal difference between them, while random initialization performed worst. For BERT, CLIP and standard BERT initialization performed similarly, both surpassing random initialization. 
+Initializing vision and language encoders with CLIP parameters improves policy performance and reduces training time. 
+
+
+\noindent 
+\begin{minipage}[t]{0.55\textwidth} 
+\footnotesize
+\centering
+\setlength{\tabcolsep}{0.9 mm}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Backbone}     & ViT           & ViT           & ViT/BERT    & BERT          & BERT         \\ \midrule
+\textbf{Weights}      & -        & ImageNet      & CLIP        & -        & BERT     \\
+\textbf{SR (in \%)} & $76_{\pm 10}$ & $80_{\pm 11}$ & $\mathbf{82}_{\pm 8}$ & $79_{\pm 12}$ & $81_{\pm 8}$ \\ \bottomrule
+\end{tabular}
+\captionof{table}{Ablation study on the backbone initialization.} \label{tab:ablation-backbone}
+\end{minipage}%
+\hfill 
+\begin{minipage}[t]{0.45\textwidth} 
+\footnotesize
+\centering
+\setlength{\tabcolsep}{0.9 mm}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Variants}    & $-\mathcal{L}_{\text{lab}}$ & baseline                    & $-\mathcal{L}_\text{dem}$ & baseline                    \\ \midrule
+\textbf{Prompt} & vision                                        & vision                      & lang                                          & lang                        \\
+\textbf{SR (in \%)}      & $10_{\pm 2}$                   & $\mathbf{76}_{\pm 7}$ & $12_{\pm 3}$    & $\mathbf{82}_{\pm 8}$ \\ \bottomrule
+\end{tabular}
+
+\captionof{table}{Ablation on $\mathcal{L}_{\text{lab}}$ and $\mathcal{L}_{\text{dem}}$ objectives. } \label{tab:ablation-objectives}
+\end{minipage}
+
+
+
+\noindent \textbf{How Does Language and Video Losses Impact Performance?}
+
+The $\mathcal{L}_\text{lab}$ loss significantly enhances the model’s understanding of reference videos, as observed in the Language Table environment. We compared a variant without $\mathcal{L}_\text{lab}$ loss to the full GROOT-2 model, both trained on the same scale of the Language Table dataset, and tested their ability to follow reference videos using standard evaluation scripts. As shown in Table \ref{tab:ablation-objectives}, the variant without $\mathcal{L}_\text{lab}$ loss failed to complete any tasks. Further analysis of its output videos revealed that it mechanically mimicked the arm movement trajectories in the reference videos, completely ignoring object colors and shapes, which is inconsistent with human understanding of the reference videos. 
+
+The $\mathcal{L}_\text{dem}$ loss is indispensable in the GROOT-2 architecture. Removing $\mathcal{L}_\text{dem}$ causes the pipeline to degrade into an autoencoder when processing unlabeled data. Without constraints on the latent encoding, the model tends to learn the video encoder as an inverse dynamics model, encoding low-level action sequences in latent z instead of high-level task information, thereby significantly reducing the behavior cloning loss. Additionally, Table \ref{tab:ablation-objectives} show that removing $\mathcal{L}_\text{dem}$ causes the language encoder’s latent z to collapse, leading to a dramatic drop in task success rates. 
+
+\section{Related Works}
+\label{sec:related}
+
+\paragraph{Learning Policies Across Diverse Domains}
+Developing policies for sequential control tasks in real and virtual environments poses significant challenges. Research spans domains such as robotic manipulation \citep{metaworld, language_table}, video games \citep{atari, minerl}, and embodied navigation \citep{vlnbert, habitat, leo}, with approaches categorized into reinforcement learning (RL) and imitation learning (IL) based on reward function reliance. 
+For video games with dense rewards (e.g., ALE platform \citep{atari}), online RL algorithms can achieve superhuman performance \citep{dqn, agent57} but suffer from low efficiency, risky interactions, and limited generalization. These challenges restrict their applicability to physical \citep{rt-x} or embodied environments \citep{minerl}, where rewards and cheap interactions are unavailable. IL, as a supervised learning paradigm, addresses these issues through batch efficiency and scalability with large datasets, leveraging Transformer architectures \citep{tr-1, tr-2, bcz}. 
+The RT-X series \citep{rt-1, rt-2, rt-x} advances robotic manipulation by training Transformers on large expert demonstration datasets, achieving strong zero-shot generalization. Similarly, \cite{vpt} developed a Transformer-based policy for Minecraft using internet-scale gameplay data, solving the diamond challenge. Building on this, \cite{udrl} frames RL as supervised learning, while \cite{dt, mgdt} introduce “decision transformers” to model joint distributions of rewards, states, and actions from offline data, highlighting the potential for unified policy learning within Transformers.
+
+\paragraph{Learning Policies to Follow Instructions}
+Enabling policies to follow instructions is key to building general-purpose agents. A common approach involves using language annotations from offline demonstrations to train language-conditioned policies \citep{iii, rt-1, gato, worldmc, leo, sima, deps, jarvis-1}, leveraging the compositionality of natural language for generalization. However, obtaining high-quality annotations is costly. 
+An alternative uses anticipated outcomes as instructions. \cite{zson} trained an image-goal conditioned navigation policy via hindsight relabeling (HER) \citep{her} and aligned goal spaces with text. Similarly, \cite{steve1} used this strategy for open-ended tasks in Minecraft. Generative latent variable models offer another solution, using label-free demonstrations to train plan-conditioned policies \citep{lmp, opal}. Extending this, \cite{groot1} applied a posterior encoder to interpret reference videos in Minecraft. 
+Policy learning with weak supervision remains less explored. \cite{lcil} proposed a shared latent space conditioned on language and HER-generated goal images, while \cite{bcz} replaced goal images with video labels under full supervision. 
+\cite{vid2robot} trained robots using human videos as task representations but required extensive paired video-trajectory data. \cite{grif} combined labeled and unlabeled trajectories, aligning start-goal pairs with language via contrastive learning, effective for Table Manipulation but limited in handling complex tasks or generalizing to partially observable environments like Minecraft. 
+
+
+\section{Conclusions, Limitations and Future Works}
+\label{sec:conclusion}
+This paper investigates the joint learning of a latent intention space and a multimodal instruction-following policy under weak supervision. We identify the “latent space ambiguity” issue in latent variable generative models when handling text-free trajectory data, arising from the absence of direct human guidance in shaping the latent space. To address this, we propose a weakly supervised algorithm for training \agent. Evaluations across four diverse environments, from video games to robotic manipulation, demonstrate \agent’s generality and flexibility in following multimodal instructions. 
+However, \agent’s reliance on trajectory data for training limits its applicability to video data, which lacks action labels. Considering the abundance and diversity of video data available online compared to trajectory data, extending the weak supervision framework to leverage both play and trajectory data would be a promising avenue for future work. 

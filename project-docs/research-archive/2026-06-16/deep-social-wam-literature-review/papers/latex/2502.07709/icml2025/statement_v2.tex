@@ -1,0 +1,23 @@
+In this paper, we focus on episodic online goal-conditioned RL with sparse and binary rewards, defined on %. The aim is to train a policy $\pi$ on
+a goal-augmented MDP $(S, A, P, G, R, S_0)$, with $S$ a set of states, $P$ the transition function of the environment, $A$ the action space, $G$ the goal space and $R:S\times G \rightarrow \{0;1\}$  a binary success function indicating whether a state $s \in S$ satisfies a goal $g \in G$. $S_0 \subseteq S$ stands as the set of initial states of the problem. The final aim is to discover the optimal policy $\pi^*$ that masters any goal in $G$ starting from any possible state in $S_0$. More specifically, we consider a textual environment where a prompting function $\phi:S\times G \rightarrow {\cal V}^K$ is given to transform any pair (state, goal) into a textual prompt of K tokens in a given vocabulary ${\cal V}$. % (with allows As we consider We define a task prompt  
+Our aim is thus to maximize: 
+$$J(\pi)=\mathbb{E}_{s_0 \sim {\cal U}(S_0), g \sim {\cal U}(G)} \left[\mathbb{P}_\pi(s_0,g) \right], $$
+where $\cal U(\cal X)$ stands for the uniform distribution over a  set $X$ and $\mathbb{P}_\pi(s_0,g)$ is defined as the probability for $\pi$ starting from $s_0$ to achieve $g$ within an episode of $T$ steps: $\mathbb{P}_\pi(s_0,g) = \mathbb{E}_{\tau \sim \pi(\tau|s_0,g)}[\mathds{1}(\exists s_t \in \tau, R(s_t,g)=1)]$, with $\mathds{1}$ the indicator function. $\pi(\tau|s_0,g)$ is the distribution of episodes of $T$ steps,  starting from $s_0$ (i.e., $\tau=(s_0,a_0, % s_1, a_1, 
+\ldots, a_{T-1}, s_T)$),  induced by policy $\pi$. $\pi$  selects any action $a_t \in A$ by sampling from a categorical distribution $\pi(.|\phi(s_t, g))$ at any step $t \in [[0,T-1]]$ of the episode.   
+
+
+However, given the possibly huge number of $(s_0,g)$ combinations, the direct maximization of the problem as stated above may become particularly inefficient. %intractable.
+Our aim is to leverage transfer of competences between problem configurations, and focus during training on tasks that maximize progress. In the following, we denote as $\pi^n$   %=\Xi(\pi^{n-1}, \Gamma^{n-1} \cup \{\tau^n\})$ % {\tau^i\}_{i \in [[1;N]])$ %$ \sim \pi(\tau|s_O,g))$
+the policy obtained after $n$ episodes of an RL algorithm $\Xi$, using experience $\Gamma^{n}$ acquired from $n$ training episodes, where each episode $\tau^i$ from $\Gamma^{n}$ was obtained using $\pi^{i-1}$ on a training task sampled from a task selector %distribution 
+$\eta({\cal T}^i|\pi^{i-1})$, with ${\cal T}^i \in \mathcal{E}_\mathcal{T} \equiv \{\phi(s,g)\}_{s \in S_0, g\in G}$ (i.e., $\mathcal{E}_\mathcal{T}$ is defined as the set of possible prompts for any combination of the starting configuration and goal to achieve). %  tasks  tuning on $n$ an initial policy on $\pi^{n-1}$ from experience $\Gamma^{n-1}$ at step $n-1$ augmented by a new episode sampled from $\pi^{n-1}$. % new experience acquired from sampling an episode from $$ 
+Given a budget of N training episodes, we thus consider the problem of approaching the optimal selector $\eta^* = \arg\max_\eta J(\pi^N)$. We propose to build $\eta$ on a proxy of the learning progress (LP) at each training step $n$, where LP is defined for any task ${\cal T}=\phi(s_0,g)$ as the improvement of the policy at step $n$ after $k$ steps of RL tuning  $\Xi$ using %new experience acquired from
+$k$ new episodes on task configuration $(s_0,g)$:  $LP^k_{\pi^n}({\cal T}=\phi(s_0,g))=\mathbb{P}_{\pi^{n+k}}(s_0,g) - \mathbb{P}_{\pi^{n}}(s_0,g)$. % training   %\sum_{n=1}^N \mathbb{E}_{\mathcal{T} \sim \eta(\pi^n)$$
+
+
+%Next, we define the set of tasks of the problem as $\mathcal{E}_\mathcal{T}=\{\phi(s,g)\}_{s \in S_0, g\in G}$ the set of prompts for any combination of the starting configuration and goal to achieve. 
+
+%face the aim is to within in a given number of N training episodes
+
+
+ % (i.e. r=1 if the goal is reached, 0 otherwise).
+%As the episode stops when a goal is reached or after a fixed number of steps, only two returns can be obtained for an episode where \( \pi \) tries to achieve the goal \( g \): 1 (success) or 0 (failure). We note an episode's outcome $\mathds{1}_{(\pi, g)}$. We thus define competence as the success probability: $\mathbb{P}_{\pi}(g) = \mathbb{E}_\pi\left[\mathds{1}_{(\pi, g)}\right]$.

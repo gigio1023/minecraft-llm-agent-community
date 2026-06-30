@@ -1,0 +1,716 @@
+
+
+
+\subsection{Proof of \creftitle{thm:dpo}}
+
+We state and prove a generalized version of \cref{thm:dpo}. In the
+assumptions below, we fix a parameter $\gamma \in [0,1)$; the setting $\gamma = 0$ corresponds to \cref{thm:dpo}.
+
+\begin{assumption}[Coverage]
+  \label{ass:conc-closs-apx}
+  All $\pi\in\Pi$ satisfy
+  $\cC_{\pi} \leq \Cconc$
+  for a parameter $\Ccon \geq (1-\gamma)^{-1}\Cstarg$, and
+  $\Cpp{\piref}{\pi} \leq \Closs$
+  for a parameter $\Closs \geq \abs{\cY}$.
+\end{assumption}
+By \cref{lem:conc_bound_general}, \cref{ass:conc-closs-apx} is consistent
+with the assumption that $\pistarb\in\Pi$.
+
+\begin{assumption}[Margin]
+  \label{ass:hard_margin-apx}
+  For all $x\in\supp(\cdist)$, the initial model $\piref$ satisfies
+  \[
+    \piref(\Ygamma(x)\mid{}x) \geq{}(1+\gammargin)\cdot\piref(y\mid{}x)\quad\forall{}y\not\in\Ygamma(x)
+  \]
+  for a parameter $\gammargin>0$.
+\end{assumption}
+
+
+      \begin{thmmod}{thm:dpo}{$'$}
+        \label{thm:dpo_general}
+                Assume that $\pistarb\in\Pi$ (\cref{ass:realizability_dpo}), and that
+        \cref{ass:conc-closs} and \cref{ass:hard_margin} hold with respect to some $\gamma \in [0,1)$, with parameters
+        $\Cconc$, $\Closs$, and $\gammargin>0$. For any $\delta,\deltafail\in(0,1)$,
+        the DPO algorithm in \cref{eq:dpo} ensures that with
+        probability at least $1-\deltafail$,
+        \begin{align}
+          \bbP_{x\sim\cdist}\brk*{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta}
+          \approxleq{}
+          \frac{1}{\gammargin\delta}\cdot{}\bigoht\prn*{\sqrt{\frac{\Cconc\log^{3}(\Closs\abs{\Pi}\deltafail^{-1})}{n}}
+          +\beta\log(\Cconc) + \gamma}
+        \end{align}
+        where $\bigoht\prn*{\cdot}$ hides factors logarithmic in $n$
+        and $\Cconc$ and doubly logarithmic in $\Pi$, $\Closs$, and
+        $\deltafail^{-1}$.
+      \end{thmmod}
+
+We first state and prove some supporting technical lemmas, then
+proceed to the proof of \cref{thm:dpo_general}.
+
+\subsubsection{Technical lemmas}
+
+The following result is a generalization of \cref{lem:conc_bound}.
+
+\begin{lemmod}{lem:conc_bound}{$'$}
+  \label{lem:conc_bound_general}
+  For all $\gamma\in(0,1)$, the model $\pistarb$ satisfies $\cC_{\pistarb} \leq (1-\gamma)^{-1}\Cstarg$ and $\Cpp{\piref}{\pistarb} \leq{} \abs*{\cY}$.
+\end{lemmod}
+\begin{proof}[\pfref{lem:conc_bound_general}]%
+  \newcommand{\ystarg}{\ystar_{\gamma}}
+  For any fixed $x \in \cX$, we have 
+    \begin{align}
+      \En_{y \sim \pistarb(\cdot\mid x)}\brk*{\frac{\pistarb(y\mid x)}{\piref(y\mid x)}}
+      &= \En_{y \sim \pistarb(\cdot\mid x)}\brk*{
+      \frac{\piref^{1+\beta^{-1}}(y\mid{}x)}{\piref(y\mid{}x)}
+        }\cdot{}\prn*{\sum_{y'\in\cY}\piref^{1+\beta^{-1}}(y'\mid{}x)}^{-1}\\
+      &\leq{} 
+        \max_{y\in\cY}\piref^{\beta^{-1}}(y\mid{}x)
+        \cdot{}\prn*{\sum_{y'\in\cY}\piref^{1+\beta^{-1}}(y'\mid{}x)}^{-1}\\
+            &\leq{} 
+              (1-\gamma)^{-1}\piref^{\beta^{-1}}(\Ygamma(x)\mid{}x)
+              \cdot{}\prn*{\sum_{y'\in\cY}\piref^{1+\beta^{-1}}(y'\mid{}x)}^{-1}\\
+                  &=
+              (1-\gamma)^{-1}\frac{\piref^{1+\beta^{-1}}(\Ygamma(x)\mid{}x)}{\piref(\Ygamma(x)\mid{}x)}
+        \cdot{}\prn*{\sum_{y'\in\cY}\piref^{1+\beta^{-1}}(y'\mid{}x)}^{-1}\\
+      &= 
+        (1-\gamma)^{-1}\frac{\sum_{y\in\Ygamma(x)}\piref^{1+\beta^{-1}}(y\mid{}x)}{\piref(\Ygamma(x)\mid{}x)}
+        \cdot{}\prn*{\sum_{y'\in\cY}\piref^{1+\beta^{-1}}(y'\mid{}x)}^{-1}\\
+      &\leq
+        (1-\gamma)^{-1}\frac{1}{\piref(\Ygamma(x)\mid{}x)}.
+    \end{align}
+    It follows that
+    $\cC_{\pistarb} \leq (1-\gamma)^{-1}\Cstarg$
+        as claimed.
+    
+For the second result, we have
+  \begin{align}
+    \Cpp{\piref}{\pistarb}
+    =\En_{\piref}\brk*{\frac{1}{\piref(y\mid{}x)}\cdot\prn*{\sum_{y'\in\cY}\piref^{1+\beta^{-1}}(y'\mid{}x)}^{\beta}}
+    \leq{}\En_{\piref}\brk*{\frac{1}{\piref(y\mid{}x)}}=\abs{\cY}.
+  \end{align}
+\end{proof}
+
+The next lemmas provide bounds on the tails of the self-rewards used
+in the algorithm.
+
+\begin{lemma}
+  \label{lem:logprob_bound}
+  Suppose $\beta\in\brk{0,1}$. For any model $\pi$, with probability at least
+  $1-\delta$ over the draw of $x\sim\cdist$, $y,y'\sim\piref(\cdot\mid x)$, we
+  have that
+  for all $s>0$, 
+  \begin{align}
+    \bbP\brk*{
+    \abs*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}
+    > \log(2\Cpp{\piref}{\pi}) + s} \leq \exp\prn*{-s}.
+  \end{align}
+\end{lemma}
+\begin{proof}[\pfref{lem:logprob_bound}]
+Define 
+\[X\ldef\abs*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}.\] 
+By the
+Chernoff method, we have that with probability at least $1-\delta$,
+\begin{align}
+  X
+  &\leq{} \log(\En\brk*{\exp(X)}) + \log(\delta^{-1})\\
+  &= \log\left(\En_{x\sim\cdist,y,y'\sim\piref(x)}\brk*{\exp\prn*{\abs*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}}}\right)
+    + \log(\delta^{-1})\\
+    &\leq{}     \log\Bigg(\En_{x\sim\cdist,y,y'\sim\piref(x)}\brk*{\exp\prn*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}}
+      \\&\qquad+
+      \En_{x\sim\cdist,y,y'\sim\piref(x)}\brk*{\exp\prn*{\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)-\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)}}\Bigg)
+      + \log(\delta^{-1})\\
+      &=
+      \log\left(2\En_{x\sim\cdist,y,y'\sim\piref(x)}\brk*{\exp\prn*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}}\right)
+        + \log(\delta^{-1})\\
+        &=
+          \log\prn*{\En_{x\sim\cdist,y,y'\sim\piref(x)}\brk*{\prn*{\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\cdot\frac{\piref(y'\mid{}x)}{\pi(y'\mid{}x)}}^\beta
+          }}
+        + \log(2\delta^{-1}).
+\end{align}
+As long as $\beta\leq{}1$, by Jensen's inequality, we can bound
+\begin{align}
+&\En_{x\sim\cdist,y,y'\sim\piref(x)}\brk*{\prn*{\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\cdot\frac{\piref(y'\mid{}x)}{\pi(y'\mid{}x)}}^\beta
+          }\\
+  &\leq{}\En_{x\sim\cdist,y'\sim\piref(x)}\brk*{\prn*{\En_{y\sim\piref(x)}\brk*{\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}}\cdot\frac{\piref(y'\mid{}x)}{\pi(y'\mid{}x)}}^\beta}\\
+&=\En_{x\sim\cdist,y'\sim\piref(x)}\brk*{\prn*{\frac{\piref(y'\mid{}x)}{\pi(y'\mid{}x)}}^\beta} \\
+&= \Cpp{\piref}{\pi},
+\end{align}
+which proves the result.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:fourth_moment}
+  Let $\beta\in\brk{0,1}$. For all models $\pi$, we have
+  \begin{align}
+    \En_{x\sim\mu,y,y'\sim\piref(\cdot\mid x)}\brk*{\abs*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}^4}
+    \leq{} O(\log^4(\Cpp{\piref}{\pi}) +
+                         1).
+  \end{align}
+\end{lemma}
+\begin{proof}[\pfref{lem:fourth_moment}]
+  Define 
+\[X\ldef\abs*{\beta\log\left(\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}\right)-\beta\log\left(\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}\right)}.\]
+Set $k = \log(2\Cpp{\piref}{\pi})$. 
+We can bound
+\begin{align}
+\En\brk*{X^4}
+&=
+\En\brk*{\int_{0}^{\infty}\indic\crl*{X^4>t}dt}\\
+&=
+4\En\brk*{\int_{0}^{\infty}\indic\crl*{X>t}t^3dt}\\
+&=
+4\int_{0}^{\infty}\bbP\brk*{X>t}t^3dt\\
+&\leq{} k^4 +
+4\int_{k}^{\infty}\bbP\brk*{X>t}t^3dt\\
+&\leq{} 
+k^4 + 4\int_{k}^{\infty}e^{k-t}t^3dt\\
+&=
+k^4 +
+4(k^3 + 3k^2 + 6k + 6) \\
+&= O(k^4 + 1),
+  \end{align}
+  where the third-to-last line uses \cref{lem:logprob_bound}.
+\end{proof}
+
+\subsubsection{Proof of \protect\creftitle{thm:dpo_general}}
+\begin{proof}[\pfref{thm:dpo_general}]
+For any model $\pi\in\Pi$, define $J(\pi)\ldef{} \En_{\pi}\brk*{\log\piref(y\mid{}x)}$. Let
+$\pihat\in\Pi$ denote the model returned by the DPO algorithm in \cref{eq:dpo_ml}.
+Let
+$\En_{\pi,\pi'}\brk*{\cdot}$ denote shorthand for
+$\En_{x\sim\cdist,y\sim\pi(x),y'\sim\pi'(x)}\brk{\cdot}$, and for any $r:\cX\times\cY\to\mathbb{R}$ define
+$\Delta^{r}(x,y,y'):=r(x,y) - r(x,y')$. Define
+\[\rstar(x,y):=\log\piref(y\mid{}x)=\beta\log\prn*{\frac{\pistarb(y\mid{}x)}{\piref(y\mid{}x)}}+Z(x),\]
+and let $\rhat(x,y) \ldef{}
+\beta\log\prn*{\frac{\pihat(y\mid{}x)}{\piref(y\mid{}x)}}$. By a
+standard argument \citep{huang2024correcting}, we have
+\begin{align}\pihat \in \argmax_{\pi:\cX\to\Delta(\cY)} \En_{\pi}[\rhat(x,y)] - \beta \Dkl{\pi}{\piref}.\label{eq:pihat-rhat-opt}\end{align}
+Therefore for any comparator model $\pistar: \cX \to \Delta(\cY)$ (not
+necessarily in the model class $\Pi$), we have
+\begin{align}
+J(\pistar) - J(\pihat)
+&= \En_{\pistar}[\rstar(x,y)] - \En_{\pihat}[\rstar(x,y)] \\ 
+&= \En_{\pistar}[\rhat(x,y)] - \beta\Dkl{\pistar}{\piref} - \En_{\pihat}[\rhat(x,y)] + \beta\Dkl{\pihat}{\piref} \\
+&\qquad+ \En_{\pistar}[\rstar(x,y)-\rhat(x,y)] + \beta\Dkl{\pistar}{\piref} + \En_{\pihat}[\rhat(x,y)-\rstar(x,y)] - \beta\Dkl{\pihat}{\piref} \\ 
+&\leq \En_{\pistar}[\rstar(x,y)-\rhat(x,y)] + \beta\Dkl{\pistar}{\piref} + \En_{\pihat}[\rhat(x,y)-\rstar(x,y)] - \beta\Dkl{\pihat}{\piref} \\ 
+&= \En_{\pistar,\piref}\brk*{\Delta^{\rstar}(x,y,y') -
+  \Delta^{\rhat}(x,y,y')}
+  + \En_{\pihat,\piref}\brk*{\Delta^{\rhat}(x,y,y') -
+  \Delta^{\rstar}(x,y,y')}\\
+  &\qquad+ \beta\Dkl{\pistar}{\piref} - \beta\Dkl{\pihat}{\piref} \label{eq:j-regret-decomp}
+\end{align}
+where the inequality uses \cref{eq:pihat-rhat-opt}. To bound the \rhs
+above, we will use the following lemma, which is proven in the sequel.
+\begin{lemma}
+\label{lem:com}
+For any model $\pi$ and any $\eta>0$, we have that
+\begin{align}
+&\En_{\pi,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+\Delta^{\rhat}(x,y,y')}}\\
+&\approxleq{}           \cC_{\pi}^{1/2}\cdot\prn*{\En_{\piref,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+    \Delta^{\rhat}(x,y,y')}^2\indic\crl*{\abs[\big]{\Delta^{\rstar}}\leq\eta,
+    \abs[\big]{\Delta^{\rhat}}\leq\eta}}}^{1/2}\\
+&~~~~
++ \cC_{\pi}^{1/2}(\log(\Cpp{\piref}{\pihat})+\log(\Cpp{\piref}{\pistarb}))\cdot\prn*{\bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rstar}}>\eta}
+  +
+  \bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rhat}}>\eta}}^{1/4}.
+\end{align}
+
+
+\end{lemma}
+Using \cref{lem:com} to bound the first two terms of \cref{eq:j-regret-decomp}, and using the fact that all $\pi\in\Pi$ have
+$\cC_{\pi}\leq\Cconc$ and $\Cpp{\piref}{\pi}\leq\Closs$, we
+have that
+\begin{align}
+&J(\pistar) - J(\pihat) \\
+&\approxleq{} (\cC_{\pistar}+\Cconc)^{1/2}\cdot\prn*{\En_{\piref,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+    \Delta^{\rhat}(x,y,y')}^2\indic\crl*{\abs[\big]{\Delta^{\rstar}}\leq\eta,
+\abs[\big]{\Delta^{\rhat}}\leq\eta}}}^{1/2}\\
+&+(\cC_{\pistar}+\Cconc)^{1/2}\log(\Closs)\cdot\prn*{\bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rstar}}>\eta}
++
+\bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rhat}}>\eta}}^{1/4}
++
+\beta\Dkl{\pistar}{\piref}.
+\label{eq:dpo1}
+\end{align}
+Let us overload notation and write $\Delta^{\pi}(x,y,y') =
+\beta\log\prn*{\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}}-\beta\log\prn*{\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}}$,
+so that $\Delta^{\pihat}=\Delta^{\rhat}$ and
+$\Delta^{\pistarb}=\Delta^{\rstar}$. Since $\pistarb\in\Pi$, the
+definition of $\pihat$ in \cref{eq:dpo} implies that
+\begin{align}
+  \sum_{(x,y,y')\in\cDpref}\prn*{\Delta^{\pihat}(x,y,y')-\Delta^{\pistarb}(x,y,y')
+  }^2
+  &\leq{}
+  \min_{\pi\in\Pi}\sum_{(x,y,y')\in\cDpref}\prn*{\Delta^{\pi}(x,y,y')-\Delta^{\pistarb}(x,y,y')}^2\\
+  &\leq{}
+  \sum_{(x,y,y')\in\cDpref}\prn*{\Delta^{\pistarb}(x,y,y')-\Delta^{\pistarb}(x,y,y')}^2 \\
+  &= 0. \label{eq:emp_loss}
+\end{align}
+\newcommand{\Brange}{B_{n,\deltafail}}
+Define $\Brange := \log(2n\Closs\abs{\Pi}\deltafail^{-1})$. It is immediate that
+\begin{align}
+    \sum_{(x,y,y')\in\cDpref}\prn*{\Delta^{\pihat}(x,y,y')-\Delta^{\pistarb}(x,y,y')
+  }^2 \indic\crl*{\abs[\big]{\Delta^{\pihat}}\leq\Brange,
+  \abs[\big]{\Delta^{\pistarb}}\leq\Brange}
+  \leq{} 0.
+\end{align}
+From here, Bernstein's inequality and a union bound implies that with probability at least $1-\deltafail$,
+\begin{align}
+&\En_{\piref,\piref}\brk*{\abs*{\Delta^{\pihat}(x,y,y') -
+\Delta^{\pistarb}(x,y,y')}^2\indic\crl*{\abs[\big]{\Delta^{\pihat}}\leq\Brange,
+\abs[\big]{\Delta^{\pistarb}}\leq\Brange}} \\
+&\approxleq{} \frac{\Brange^2\log(\abs{\Pi}\deltafail^{-1})}{n}\rdef\vepsstat^2.
+\end{align}
+In particular, if we combine this with \cref{eq:dpo1} and set
+$\eta=\Brange$, then \cref{lem:logprob_bound} implies that
+\begin{align}
+J(\pistar) - J(\pihat)
+&\approxleq{} (\cC_{\pistar}+\Cconc)^{1/2}\cdot\vepsstat
++(\cC_{\pistar}+\Cconc)^{1/2}\log(\Closs)\cdot\deltafail^{1/4}
++
+\beta\Dkl{\pistar}{\piref}.
+\end{align}
+Note that the above bound holds for any
+$\pistar:\cX\to\Delta(\cY)$. We define $\pistar$ by
+\[
+  \pistar(y\mid
+  x):= \frac{\piref(y\mid x) \indic[y \in
+    \Ygamma(x)]}{\piref(\Ygamma(x)\mid x)},
+\]
+which can be seen to satisfy $\cC_{\pistar} \leq{} \Cstarg \leq
+\Cconc$ and $\Dkl{\pistar}{\piref} \leq \log(\cC_{\pistar})
+\leq \log(\Cconc)$. With this choice, we can further bound the
+expression above by
+\begin{align}
+J(\pistar) - J(\pihat)
+&\approxleq{} (\Cconc)^{1/2}\cdot\vepsstat
++(\Cconc)^{1/2}\log(\Closs)\cdot\deltafail^{1/4}
++
+\beta\log(\Cconc)\label{eq:dpo2}
+\end{align}
+Given a desired failure probability $\deltafail$, applying the
+bound above with
+$\deltafail'\ldef{}\deltafail\wedge{}(\vepsstat/\log(\Closs))^4$
+then gives
+\begin{align}
+J(\pistar) - J(\pihat)
+&\approxleq{} (\Cconc)^{1/2}\cdot\vepsstat + \beta\log(\Cconc).
+\end{align}
+Finally, we observe that for our choice of $\pistar$,
+under the margin condition with parameter $\gamma$, we
+have
+\begin{align}
+J(\pistar) - J(\pihat)
+&=\En_{x\sim\cdist}\En_{y,y'\sim\pistar,\pihat}\brk*{\log\prn*{\frac{\piref(y\mid{}x)}{\piref(y'\mid{}x)}}}\\
+&\approxgeq{}\gammargin\cdot\En_{x\sim\cdist}\En_{y'\sim\pihat}\brk*{\indic\crl{y'\not \in \Ygamma(x)}} - \gamma\\
+&\approxgeq{}\gammargin\delta\cdot\En_{x\sim\cdist}\brk*{\indic\crl{\pihat(\Ygamma(x)\mid{}x)\leq{}1-\delta}} - \gamma
+\end{align}
+where the first inequality uses \cref{ass:hard_margin-apx} together with the fact that $y \in \Ygamma(x)$ with probability $1$ over $x\sim \mu$ and $y \sim \pistar(\cdot\mid x)$. This proves the result.
+
+\end{proof}
+
+               \begin{proof}[\pfref{lem:com}]
+          For any $\eta>0$, we can bound
+          \begin{align}
+            \En_{\pi,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+            \Delta^{\rhat}(x,y,y')}}
+            &\leq{}             \En_{\pi,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+            \Delta^{\rhat}(x,y,y')}\indic\crl*{\abs[\big]{\Delta^{\rstar}}\leq\eta,
+              \abs[\big]{\Delta^{\rhat}}\leq\eta}}\\
+            &~~~~+  \En_{\pi,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+            \Delta^{\rhat}(x,y,y')}\indic\crl*{\abs[\big]{\Delta^{\rstar}}>\eta
+                                \vee \abs[\big]{\Delta^{\rhat}}>\eta}}.
+          \end{align}
+          For the second term above, we can use Cauchy-Schwarz to bound
+          \begin{align}
+            &\En_{\pi,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+            \Delta^{\rhat}(x,y,y')}\indic\crl*{\abs[\big]{\Delta^{\rstar}}>\eta
+              \vee \abs[\big]{\Delta^{\rhat}}>\eta}}\\
+            &\leq{}\cC_{\pi}^{1/2}\cdot\prn*{\En_{\piref,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+            \Delta^{\rhat}(x,y,y')}^2\indic\crl*{\abs[\big]{\Delta^{\rstar}}>\eta
+              \vee \abs[\big]{\Delta^{\rhat}}>\eta}}}^{1/2}\\
+&\approxleq{}
+              \cC_{\pi}^{1/2}\cdot\prn*{\bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rstar}}>\eta}
+              +
+              \bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rhat}}>\eta}}^{1/4}\\
+            &\qquad\qquad\cdot{}\prn*{
+              \En_{\piref,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y')}^{4}}
+              +               \En_{\piref,\piref}\brk*{\abs*{\Delta^{\rhat}(x,y,y')}^{4}}
+                                                        }^{1/4}\\
+            &\approxleq{}
+              \cC_{\pi}^{1/2}\cdot\prn*{\bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rstar}}>\eta}
+              +
+              \bbP_{\piref,\piref}\brk*{\abs[\big]{\Delta^{\rhat}}>\eta}}^{1/4}
+              \cdot{}(\log(\Cpp{\piref}{\pihat})+\log(\Cpp{\piref}{\pistarb})),
+          \end{align}
+          where the last inequality follows from \cref{lem:fourth_moment}.
+
+            Meanwhile, for the first term, for any $\lambda>0$ we can
+            bound
+            \begin{align}
+              &\En_{\pi,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+                \Delta^{\rhat}(x,y,y')}\indic\crl*{\abs[\big]{\Delta^{\rstar}}\leq\eta,
+                \abs[\big]{\Delta^{\rhat}}\leq\eta}}\\
+              &\leq{}\cC_{\pi}^{1/2}\prn*{\En_{\piref,\piref}\brk*{\abs*{\Delta^{\rstar}(x,y,y') -
+                \Delta^{\rhat}(x,y,y')}^2\indic\crl*{\abs[\big]{\Delta^{\rstar}}\leq\eta,
+                \abs[\big]{\Delta^{\rhat}}\leq\eta}}}^{1/2}.
+            \end{align}
+
+        \end{proof}        
+
+\subsection{Proof of \creftitle{thm:xpo-sharpening} and \creftitle{thm:xpo-softmax}}
+\label{sec:proofs_exploration}
+
+In this section we prove \cref{thm:xpo-sharpening} as well as
+\cref{thm:xpo-softmax}, the application to linear softmax models. For
+the formal theorem statements, see \cref{thm:xpo-sharpening-apx} and
+\cref{thm:xpo-softmax-apx} respectively. The section is organized as
+follows.
+\begin{itemize}
+\item \cref{sec:xpo_background} gives necessary background on
+  KL-regularized policy optimization, as well as the Sequential
+  Extrapolation Coefficient.
+\item \cref{sec:xpo_reward} presents a generic guarantee for \xpo
+  under a general choice of reward function.
+\item \cref{sec:xpo_sharpening} instantiates the result above with the
+  self-reward function $r(x,y) := \log \piref(y \mid x)$ to prove
+  \cref{thm:xpo-sharpening}.
+\item Finally, \cref{sec:xpo_linear} applies the preceding results to
+  prove \cref{thm:xpo-softmax}.
+\end{itemize}
+
+\subsubsection{Background}
+\label{sec:xpo_background}
+To begin, we give background on KL-regularized policy optimization and the Sequential Extrapolation Coefficient. %
+
+\paragraph{KL-regularized policy optimization} Let $\beta>0$ be given,
+and let $r: \MX \times \MY \to [-\Rmax,\Rmax]$ be an unknown reward
+function on prompt/action pairs. Define a value function $J_\beta$
+over model class $\Pi$ by:
+\begin{align}
+  J_\beta(\pi) := \En_\pi[r(x,y)] - \beta \cdot
+  \Dkl{\BP^\pi}{\BP^{\piref}}.
+\end{align}
+We refer to this as a \emph{KL-regularized policy optimization}
+objective (we use the term ``policy'' following the reinforcement learning
+literature; for our setting, policies correspond to models). Given query access to $r$, the goal is to find $\pihat \in\Pi$ such that 
+\begin{align}
+  J_\beta(\pistarb) - J_\beta(\pihat) \leq \epsilon
+\end{align}
+where $\pistarb(y\mid x) \propto \piref(y\mid x) \exp(\beta^{-1}
+r(x,y))$ is the model that maximizes $J_\beta$ over all models $\pi: \MX \to \Delta(\MY)$.
+
+We make use of the following assumptions, as in \iftoggle{workshop}{\cite{xie2024exploratory}}{\citet{xie2024exploratory}}.
+
+\begin{assumption}[Realizability]\label{assumption:xpo-realizability}
+It holds that $\pistarb \in \Pi$.
+\end{assumption}
+
+\begin{assumption}[Bounded density ratios]\label{assumption:xpo-bdr-apx}
+For all $\pi \in \Pi$, $(x,y) \in \MX\times \MY$, $\abs[\big]{\beta \log \frac{\pi(y\mid x)}{\piref(y\mid x)}} \leq \Vmax$.
+\end{assumption}
+\dfc{Under realizability, we have $\Rmax\leq\Vmax$, so maybe we should
+  just state the guarantee in terms of $\Vmax$ only?}\dhruv{i personally think it's a bit more opaque to have no explicit bound on reward range and derive it implicitly from realizability}
+
+Finally, we require two definitions.
+
+\begin{definition}[Sequential Extrapolation Coefficient for RLHF, \citep{xie2024exploratory}]\label{def:sec}
+For a model class $\Pi$, reward function $r$, reference model $\piref$, and parameters $T \in \NN$ and $\beta,\lambda > 0$, the Sequential Extrapolation Coefficient is defined as
+\begin{align}
+&\SEC(\Pi,r,T,\beta,\lambda;\piref)  \\ 
+&:= \sup_{\pi^{(1)},\dots,\pi^{(T)} \in \Pi}\left\{\sum_{t=1}^T\frac{\EE^{(t)}\left[\beta\log\frac{\pi^{(t)}(y\mid x)}{\piref(y\mid x)} - r(x,y) - \beta\log\frac{\pi^{(t)}(y'\mid x)}{\piref(y'\mid x)} + r(x,y')\right]^2}{\lambda \lor \sum_{i=1}^{t-1} \EE^{(i)}\left[\left(\beta\log\frac{\pi^{(t)}(y\mid x)}{\piref(y\mid x)} - r(x,y) - \beta\log\frac{\pi^{(t)}(y'\mid x)}{\piref(y'\mid x)} + r(x,y')\right)^2\right]}\right\}
+\end{align}
+where $\EE^{(t)}$ denotes expectation over $x \sim \mu$, $y \sim \pi^{(t)}(\cdot\mid x)$, and $y' \sim \piref(\cdot\mid x)$.
+\end{definition}
+
+\begin{definition}
+Let $\epsilon>0$. We say that $\Psi \subseteq \Pi$ is a $\epsilon$-net for model class $\Pi$ if for every $\pi \in \Pi$ there exists $\pi' \in \Psi$ such that
+\[\max_{x \in \MX} \max_{y \in \MY} \left| \log \frac{\pi(y\mid x)}{\pi'(y\mid x)}\right| \leq \epsilon.\]
+We write $\cN(\Pi,\epsilon)$ to denote the size of the smallest $\epsilon$-net for $\Pi$.
+\end{definition}
+
+\subsubsection{Guarantees for KL-regularized policy optimization with \xpo}
+\label{sec:xpo_reward}
+
+\begin{algorithm}[t]
+\caption{Reward-based variant of Exploratory Preference Optimization \citep{xie2024exploratory}}\label{alg:xpo}
+\begin{algorithmic}
+\State \textbf{input:} Base model $\piref:\MX\to\Delta(\MY)$, reward function $r:\MX\times\MY\to\RR$, number of iterations $T \in \NN$, KL regularization coefficient $\beta>0$, optimism coefficient $\alpha>0$.
+\State Initialize: $\pi^{(1)} \gets \piref$, $\MD^{(0)} \gets \emptyset$.
+\For{iteration $t=1,\dots,T$}
+\State \textbf{Generate sample:} $(x^{(t)},y^{(t)}, \ty^{(t)})$ via $x^{(t)} \sim \mu$, $y^{(t)} \sim \pi^{(t)}(\cdot\mid x^{(t)})$, $\ty^{(t)} \sim \piref(\cdot\mid x^{(t)})$.
+\State \textbf{Update dataset:} $\MD^{(t)} \gets \MD^{(t-1)} \cup \{(x^{(t)},y^{(t)},\ty^{(t)})\}$.
+\State \textbf{Model optimization with global optimism:} 
+\begin{align}
+\pi^{(t+1)} &\gets \argmin_{\pi\in\Pi} \Bigg\{\alpha\sum_{(x,y,y') \in \MD^{(t)}} \log(\pi(y'\mid x)) \\
+&- \sum_{(x,y,y') \in \MD^{(t)}} \left(\beta \log\frac{\pi(y\mid x)}{\piref(y\mid x)} - \beta \log\frac{\pi(y'\mid x)}{\piref(y'\mid x)} - (r(x,y) - r(x,y'))\right)^2\Bigg\}.
+\end{align}
+\EndFor
+\State \textbf{return:} $\pihat \gets \argmax_{t \in [T+1]} J_\beta(\pi^{(t)})$. \Comment{Can estimate $J_\beta(\pi^{(t)})$ using validation data.}
+\end{algorithmic}
+\end{algorithm}
+
+In this section, we give self-contained guarantees for the \xpo
+algorithm (\cref{alg:xpo}). \xpo was introduced in
+\cite{xie2024exploratory} for KL-regularized policy optimization in
+the related setting where the learner only has indirect access to the
+reward function $r$ through \emph{preference data} (specifically,
+pairs of actions labeled via a Bradley-Terry model). Standard offline
+algorithms for this problem, such as $\algofont{DPO}$, require bounds
+on concentrability of the model class (see
+e.g. \cref{eq:conc}). \iftoggle{workshop}{\cite{xie2024exploratory}}{\citet{xie2024exploratory}} show that the \xpo algorithm avoids this dependence, and instead requires bounded Sequential Extrapolation Coefficient. 
+
+\cref{alg:xpo} is a variant of the \xpo algorithm which is adapted
+to reward-based feedback (as opposed to preference-based feedback),
+and \cref{thm:xpo-modified-apx} shows that this algorithm enjoys
+guarantees similar to those of \cite{xie2024exploratory} for this
+setting. Note that this is not an immediate corollary of the results in \iftoggle{workshop}{\cite{xie2024exploratory}}{\citet{xie2024exploratory}}, since the sample complexity in the preference-based setting scales with $e^{O(\Rmax)}$, and for our application to sharpening it is important to avoid this dependence. However, our algorithm and analysis only diverge from \iftoggle{workshop}{\cite{xie2024exploratory}}{\citet{xie2024exploratory}} in a few places.
+
+\begin{theorem}[Variant of \iftoggle{workshop}{Theorem~3.1 in \cite{xie2024exploratory}}{\citet[Theorem~3.1]{xie2024exploratory}}]\label{thm:xpo-modified-apx}
+Suppose that
+\Cref{assumption:xpo-realizability,assumption:xpo-bdr-apx} hold. For
+any $T \in \NN$, $\epdisc,\deltaf \in (0,1)$, by setting $\alpha := \frac{\beta}{\Rmax+\Vmax} \sqrt{\frac{\log(2\cN(\Pi,\epdisc)T/\deltaf)}{\SEC(\Pi) T}}$, \cref{alg:xpo} produces a model $\pihat \in \Pi$ such that with probability at least $1-\deltaf$,
+\begin{align}
+\beta\Dkl{\pihat}{\pistarb} = J_\beta(\pistarb) - J_\beta(\pihat) &\lesssim 
+(\Rmax+\Vmax) \sqrt{\frac{\SEC(\Pi)\log(2\cN(\Pi,\epdisc)T/\deltaf)}{T}} \\ 
+&+ \beta\epdisc \sqrt{\SEC(\Pi)T}
+\end{align}
+where $\SEC(\Pi) := \SEC(\Pi, r, T, \beta, \Vmax^2; \piref)$.
+\end{theorem}
+\begin{proof}[\pfref{thm:xpo-modified-apx}]
+For compactness, we abbreviate $\SEC(\Pi) := \SEC(\Pi,r,T,\beta,\Vmax^2;\piref)$. From Equation~(37) of \cite{xie2024exploratory}, we have
+\begin{align}
+&\frac{1}{T}\sum_{t=1}^T J_\beta(\pistarb) - J_\beta(\pi^{(t)}) \\ 
+&\approxleq \frac{\alpha}{\beta} (\Rmax+\Vmax)^2 \cdot \SEC(\Pi) + \frac{\beta}{\alpha T} + \frac{\Vmax}{T} + \frac{1}{T}\sum_{t=2}^T \E_{(x,y) \sim \piref}[\beta\log \pi^{(t)}(y\mid x) - \beta\log\pistarb(y\mid x)] \\ 
+&+ \frac{\beta}{\alpha (\Rmax+\Vmax)^2 T} \sum_{t=2}^T \E_{\substack{x \sim \mu \\ y,y' \sim \pibar^{(t)}\mid x}}\left[\left(\beta\log\frac{\pi^{(t)}(y\mid x)}{\piref(y\mid x)} - r(x,y) - \beta \log \frac{\pi^{(t)}(y'\mid x)}{\piref(y'\mid x)} + r(x,y')\right)^2\right]
+\end{align} 
+where $\pibar^{(t)} := \frac{1}{t-1} \sum_{i < t} \pi^{(i)} \otimes \piref$ denotes the model that, given $x \in \MX$, samples $i \sim \Unif([t-1])$ and then samples $y \sim \pi^{(i)}(\cdot\mid x)$ and $y' \sim \piref(\cdot\mid x)$. For any $2 \leq t \leq T$, define $L^{(t)}:\Pi \to [0,\infty)$ by
+\begin{align}
+L^{(t)}(\pi) 
+&:= \E_{(x,y) \sim \piref}[\beta\log \pi(y\mid x) - \beta\log\pistarb(y\mid x)] \\ 
+&+ \frac{\beta}{\alpha (\Vmax+\Rmax)^2} \E_{\substack{x \sim \mu \\ y,y' \sim \pibar^{(t)}\mid x}}\left[\left(\beta\log\frac{\pi(y\mid x)}{\piref(y\mid x)} - r(x,y) - \beta \log \frac{\pi(y'\mid x)}{\piref(y'\mid x)} + r(x,y')\right)^2\right].
+\end{align}
+Similarly, define
+\begin{align}
+\wh L^{(t)}(\pi) 
+&:= \sum_{(x,y,y') \in \MD^{(t)}}[\beta\log \pi(y'\mid x) - \beta\log\pistarb(y'\mid x)] \\ 
+&+ \frac{\beta}{\alpha (\Vmax+\Rmax)^2} \sum_{(x,y,y') \in \MD^{(t)}}\left[\left(\beta\log\frac{\pi(y\mid x)}{\piref(y\mid x)} - r(x,y) - \beta \log \frac{\pi(y'\mid x)}{\piref(y'\mid x)} + r(x,y')\right)^2\right]
+\end{align}
+where $\MD^{(t)}$ is the dataset defined in iteration $t$ of \cref{alg:xpo}. By \cref{assumption:xpo-realizability} we have $\pistarb \in \Pi$, so $\inf_{\pi\in\Pi} \wh L^{(t)}(\pi) \leq 0$. Moreover by definition, $\pi^{(t)} \in \argmin_{\pi\in\Pi} \wh L^{(t)}$. 
+
+Let $\Psi$ be an $\epdisc$-net over $\Pi$, of size $\cN(\Pi,\epdisc)$. Fix any $\pi \in \Psi$ and $2 \leq t \leq T$, and define increments $X_i := \wh L^{(i)}(\pi) - \wh L^{(i-1)}(\pi)$ for $2 \leq i \leq t$, with the notation $\wh L^{(1)}(\pi) := 0$ so that $\wh L^{(t)}(\pi) = \sum_{i=2}^t X_i$. Let $\MF_i$ be the filtration induced by $\MD^{(i)}$ and define $\gamma_i := \EE[X_i\mid \MF_{i-1}]$. Observe that $(t-1)L^{(t)}(\pi) = \sum_{i=2}^t \gamma_i$. For any $i$, note that we can write $X_i = Y_i + Z_i$ where $Y_i \in [-\Vmax,\Vmax]$ and $Z_i \in [0,\beta/\alpha]$. By \cref{cor:filtration-tail}, it holds with probability at least $1-\deltaf/(2|\Pi|T)$
+\[\sum_{i=2}^t \EE[Z_i\mid \MF_{i-1}] \lesssim \frac{\beta}{\alpha} \log(2|\Psi|T/\deltaf) + \sum_{i=2}^t Z_i.\]
+By Azuma-Hoeffding, it holds with probability at least $1-\deltaf/(2|\Pi|T)$ that
+\[\sum_{i=2}^t \EE[Y_i\mid \MF_{i-1}] \lesssim \Vmax\sqrt{T\log(2|\Psi|T/\deltaf)} + \sum_{i=2}^t Y_i.\]
+Hence, with probability at least $1-\deltaf/(|\Psi|T)$ we have
+\[(t-1)L^{(t)}(\pi) \lesssim \frac{\beta}{\alpha} \log(2|\Psi|T/\deltaf) + \Vmax\sqrt{T\log(2|\Psi|T/\deltaf)} + \wh L^{(t)}(\pi).\]
+With probability at least $1-\deltaf$ this bound holds for all $\pi \in\Psi$ and $2 \leq t \leq T$. Henceforth condition on this event. Fix any $\pi \in \Pi$ and $2 \leq t \leq T$. Since $\Psi$ is an $\epsilon$-net for $\Pi$, we see by definition of $L^{(t)}$ that there is some $\pi' \in \Psi$ such that 
+\[|L^{(t)}(\pi) - L^{(t)}(\pi')| \lesssim \beta \epdisc + \frac{\beta}{\alpha(\Vmax+\Rmax)^2} \cdot \beta\epdisc (\Vmax+\Rmax) \leq \beta\epdisc\left(1 + \frac{\beta}{\alpha(\Vmax+\Rmax)}\right)\]
+and similarly
+\[|\wh L^{(t)}(\pi) - \wh L^{(t)}(\pi')| \lesssim (t-1)\beta\epdisc\left(1 + \frac{\beta}{\alpha(\Vmax+\Rmax)}\right).\]
+
+It follows that, for all $2 \leq t \leq T$, since $\wh L^{(t)}(\pi^{(t)}) \leq 0$, we get
+\[(t-1)L^{(t)}(\pi^{(t)}) \lesssim \frac{\beta}{\alpha} \log(2|\Psi|T/\deltaf) + \Vmax\sqrt{T\log(2|\Psi|T/\deltaf)} + \beta\epdisc T\left(1 + \frac{\beta}{\alpha(\Vmax+\Rmax)}\right).\]
+Hence,
+\begin{align}
+&\frac{1}{T}\sum_{t=1}^T J_\beta(\pistarb) - J_\beta(\pi^{(t)}) \\ 
+&\approxleq \frac{\alpha}{\beta} (\Rmax+\Vmax)^2 \cdot \SEC(\Pi) + \frac{\beta}{\alpha T} + \frac{\Vmax}{T} + \frac{1}{T}\sum_{t=2}^T L^{(t)}(\pi^{(t)}) \\ 
+&\approxleq (\Rmax+\Vmax) \sqrt{\frac{\SEC(\Pi)\log(2|\Psi|T/\deltaf)}{T}} + \beta\epdisc \sqrt{\SEC(\Pi)T}
+\end{align}
+by taking
+\[\alpha := \frac{\beta}{\Rmax+\Vmax} \sqrt{\frac{\log(2|\Psi|T/\deltaf)}{\SEC(\Pi) T}}.\]
+Since the output $\pihat$ of \cref{alg:xpo} satisfies $\pihat \in \argmax_{t \in [T]} J_\beta(\pi^{(t)})$, the claimed bound on $J_\beta(\pistarb) - J_\beta(\pihat)$ is immediate. Finally, observe that by definition of $\pistarb$,
+\begin{align}
+J_\beta(\pistarb) - J_\beta(\pihat)
+&= \E_{(x,y) \sim \pistarb}\left[r(x,y) - \beta \log \frac{\pistarb(y\mid x)}{\piref(y\mid x)}\right] - \E_{(x,y) \sim \pihat}\left[r(x,y) - \beta \log \frac{\pihat(y\mid x)}{\piref(y\mid x)}\right] \\
+&= \E_{(x,y) \sim \pistarb}\left[r(x,y) - \beta \log \frac{\pistarb(y\mid x)}{\piref(y\mid x)}\right] - \E_{(x,y) \sim \pihat}\left[r(x,y) - \beta \log \frac{\pistarb(y\mid x)}{\piref(y\mid x)}\right] \\
+&\qquad+ \E_{(x,y) \sim \pihat}\left[\beta \log \frac{\pihat(y\mid x)}{\pistarb(y\mid x)}\right] \\
+&= \beta \log \E_{(x,y) \sim \piref} [\exp(r(x,y))] - \beta \log \E_{(x,y) \sim \piref} [\exp(r(x,y))] + \beta\Dkl{\pihat}{\pistarb} \\ 
+&= \beta\Dkl{\pihat}{\pistarb}.
+\end{align}
+This completes the proof.
+\end{proof}
+
+\subsubsection{Applying \xpo to \mlsharp}
+\label{sec:xpo_sharpening}
+
+We now prove \cref{thm:xpo-sharpening-apx}, the formal statement of
+\cref{thm:xpo-sharpening}, which applies \xpo to \mlsharp. This result
+is a straightforward corollary of \cref{thm:xpo-modified-apx} with the reward function $\rself(x,y) := \log \piref(y \mid x)$, together with the observation that low KL-regularized regret implies sharpness (under \cref{ass:hard_margin}).
+
+  \begin{theorem}[Sharpening via active exploration]
+    \label{thm:xpo-sharpening-apx}
+There are absolute constants $c_{\mathrm{\ref{thm:xpo-sharpening-apx}}},
+C_{\mathrm{\ref{thm:xpo-sharpening-apx}}}>0$ so that the following
+holds. Let $\epsilon,\delta,\gammargin,\deltafail,\beta \in (0,1)$ and
+$T \in \NN$ be given. For base model $\piref$, define reward function $r(x,y) := \log \piref(y\mid x)$. Let $\Rmax \geq 1+\max_{x,y}\log\frac{1}{\piref(y\mid x)}$. Suppose that $\piref$ satisfies \cref{ass:hard_margin} with parameter $\gammargin$, that $\beta^{-1} \geq 2\gammargin^{-1}\log(2|\MY|/\delta)$, and that there is $\epdisc \in (0,1)$ so that 
+\[T \geq C_{\mathrm{\ref{thm:xpo-sharpening-apx}}} \frac{\Rmax^2 \SEC(\Pi) \log(2\cN(\Pi,\epdisc)T/\deltafail)}{\epsilon^2\delta^2 \beta^2}\]
+and 
+\[\epdisc \leq c_{\mathrm{\ref{thm:xpo-sharpening-apx}}} \frac{\epsilon\delta}{\sqrt{\SEC(\Pi) T}}\]
+where $\SEC(\Pi) := \SEC(\Pi,r,T,\beta,\Rmax^2;\piref)$. Also suppose that $\pistarb \in \Pi$ where $\pistarb(y\mid x) \propto \piref^{1+\beta^{-1}} (y\mid x)$.
+
+Then applying \cref{alg:xpo} with base model $\piref$, reward function $r$, iteration count $T$, regularization $\beta$, and optimism parameter $\alpha := \frac{\beta}{\Rmax} \sqrt{\frac{\log(2\cN(\Pi,\epdisc)T/\delta)}{\SEC(\Pi) T}}$ yields a model $\pihat \in \Pi$ such that with probability at least $1-\deltafail$,
+\[\BP_{x \sim \mu}[\pihat(\Ystar(x)\mid x) < 1-\delta] \leq
+  \epsilon.\]
+The total sample complexity is
+\[
+  m = \bigoht\prn*{
+    \frac{\Rmax^2 \SEC(\Pi) \log(\cN(\Pi,\epdisc)/\deltafail)\log^2(\abs{\cY}\delta^{-1})}{ \gammargin^2\epsilon^2\delta^2}
+    }.
+  \]
+  \end{theorem}
+
+\begin{proof}[\pfref{thm:xpo-sharpening-apx}]
+By definition of $r$, we have $|r(x,y)| \leq \Rmax$ for all $x,y$. By assumption, \cref{assumption:xpo-realizability} is satisfied, and by definition of $\Rmax$, \cref{assumption:xpo-bdr} is satisfied with parameter $\Vmax := \beta \Rmax \leq \Rmax$. It follows from \cref{thm:xpo-modified-apx} that with probability at least $1-\deltafail$, the output $\pihat$ of \cref{alg:xpo} satisfies
+\begin{align} 
+\beta\Dkl{\pihat}{\pistarb} &\lesssim (\Rmax+\Vmax)\sqrt{\frac{\SEC(\Pi) \log(2\cN(\Pi,\epdisc)T/\deltafail)}{T}} \\
+&\qquad+ \beta\epdisc \sqrt{\SEC(\Pi) T}.
+\end{align}
+By choice of $T$ and $\epdisc$, so long as $C_{\mathrm{\ref{thm:xpo-sharpening-apx}}}>0$ is chosen to be a sufficiently large constant and $c_{\mathrm{\ref{thm:xpo-sharpening-apx}}}>0$ is chosen to be a sufficiently small constant, we have $\beta\Dkl{\pihat}{\pistarb} \leq \frac{1}{12}\beta\epsilon\delta$, so by e.g. Equation~(16) of \cite{sason2016f}, $\Dhels{\pihat}{\pistarb} \leq \epsilon\delta/(12)$.
+
+For any $x \in \MX$ and $y' \in \MY \setminus \Ystar(x)$, by \cref{ass:hard_margin} and definition of $\pistarb$ we have
+\begin{align}
+\frac{1}{\pistarb(y'\mid x)} \geq \frac{\max_{y \in \MY} \pistarb(y\mid x)}{\pistarb(y'\mid x)} &= \left(\frac{\max_{y \in \MY} \piref(y\mid x)}{\piref(y'\mid x)}\right)^{1+\beta^{-1}} \\
+&\geq (1+\gammargin)^{1+\beta^{-1}} \geq e^{\gammargin/(2\beta)} \geq \frac{2|\MY|}{\delta}
+\end{align}
+where the final inequality is by the assumption on $\beta$ in the
+theorem statement. Therefore
+\[\pistarb(\Ystar(x)\mid x) \geq 1 - \sum_{y' \in \MY \setminus \Ystar(x)} \pistarb(y'\mid x) \geq 1-\frac{\delta}{2}.\]
+Now for any $x$, we can lower bound
+\begin{align}
+\Dhels{\pihat(\cdot\mid x)}{\pistarb(\cdot\mid x)}
+&\geq \left(\sqrt{1 - \pihat(\Ystar(x)\mid x)} - \sqrt{1 - \pistarb(\Ystar(x)\mid x)}\right)^2 \\ 
+&\geq \frac{\delta}{12} \cdot \indic\{\pihat(\ystar(x)\mid x) \leq 1-\delta\}.
+\end{align}
+
+Hence,
+\begin{align}
+\BP_{x\sim\mu}[\pihat(\Ystar(x)\mid x)<1-\delta]
+&\leq \frac{12}{\delta} \EE_{x \sim \mu} \Dhels{\pihat(\cdot\mid x)}{\pistarb(\cdot\mid x)} \\ 
+&= \frac{12}{\delta} \Dhels{\pihat}{\pistarb} \\ 
+&\leq \epsilon.
+\end{align}
+as claimed.
+\end{proof}
+
+\subsubsection{Application: linear softmax models}
+\label{sec:xpo_linear}
+
+In this section we apply \cref{thm:xpo-sharpening} to the class of linear softmax models, proving \cref{thm:xpo-softmax}. This demonstrates that \cref{alg:xpo} can achieve an exponential improvement in sample complexity compared to \bestofnalg.
+
+\begin{definition}[Linear softmax model]
+Let $d \in \NN$ be given, and let $\phi: \MX \times \MY \to \RR^d$ be
+a feature map with $\norm{\phi(x,y)}_2 \leq 1$ for all $x,y$. Let
+$\piz: \MX \to \Delta(\MY)$ be the uniform model $\piz(y\mid x) :=
+\frac{1}{|\MY|}$, and let $B \geq 1$.\footnote{We use the notation
+  $\piz$ to highlight the fact that $\piz=\pi_\theta$ for $\theta=0$.}
+  We consider the linear softmax model class $\Pi_{\phi,B} := \{\pi_\theta: \theta \in \RR^d, \norm{\theta}_2 \leq B\}$ where $\pi_\theta:\MX \to \Delta(\MY)$ is defined by
+\[\pi_\theta(y\mid x) \propto \piz(y\mid x) \exp(\langle \phi(x,y), \theta\rangle).\]
+\end{definition}
+
+\begin{theorem}[Restatement of \cref{thm:xpo-softmax}]\label{thm:xpo-softmax-apx}
+Let $\epsilon,\delta,\gammargin,\deltafail \in (0,1)$ be
+given. Suppose that $\piref = \pi_{\theta^\star} \in \Pi_{\phi,B}$ for
+some $\theta^\star \in \RR^d$ with $\norm{\theta^\star}_2 \leq
+\frac{\gammargin B}{3\log(2|\MY|/\delta)}$. Also, suppose that
+$\piref$ satisfies \cref{ass:hard_margin} with parameter
+$\gammargin$. Then \cref{alg:xpo} with base model $\piref$, reward
+function $r(x,y) := \log \piref(x,y)$, regularization parameter $\beta
+:= \gammargin/(2\log(2|\MY|/\delta))$, and optimism parameter
+$\alpha(T) \propto
+\frac{\beta}{B+\log(|\MY|)}\sqrt{\frac{d\log(BdT/(\epsilon\delta))+\log(T/\deltafail)}{dT\log(T)}}$
+returns an $(\epsilon,\delta)$-sharpened model with probability at
+least $1-\rho$, and has sample complexity 
+\[m = \poly(\epsilon^{-1},\delta^{-1},\gammargin^{-1}, d, B, \log(|\MY|/\deltafail)).\]
+\end{theorem}
+
+Before proving the result, we unpack the
+conditions. \cref{thm:xpo-softmax-apx} requires the base model
+$\piref$ to lie in the model class and also satisfy the margin
+condition (\cref{ass:hard_margin}). For any constant
+$\epsilon,\delta>0$, the sharpening algorithm then succeeds with
+sample complexity $\poly(d, \gammargin^{-1}, B, \log(|\MY|))$. These
+conditions are non-vacuous; in fact, there are fairly natural examples
+for which
+non-exploratory algorithm such as \bestofnalg require sample
+complexity $\exp(\Omega(d))$, whereas all of the above parameters are
+$\poly(d)$. The following is one such example.
+
+\begin{example}[Separation between \rlhfalg and \sftalg]\label{ex:softmax}
+Set $\MX = \{x\}$ and let $\MY\subset\bbR^{d}$ be a $1/4$-packing of
+the unit sphere in $\RR^d$ of cardinality $\exp(\Theta(d))$. Define
+$\phi: \MX \times \MY \to \RR^d$ by $\phi(x,y) := y$, and let $B =
+Cd\log d$ for an absolute constant $C>0$. Fix any $y^\star \in \MY$ and define $\piref := \pi_{\theta^\star} \in \Pi_{\phi,B}$ by $\theta^\star := y^\star$. Then for any $y \neq y^\star$, we have $\langle y, y^\star\rangle \leq 1 - \Omega(1)$, so 
+\[\frac{\piref(y^\star\mid x)}{\piref(y\mid x)} = \exp(\langle y^\star - y, y^\star\rangle) = \exp(\Omega(1)) = 1+\Omega(1).\]
+Thus, $\piref$ satisfies \cref{ass:hard_margin} with $\gammargin =
+\Omega(1)$. Moreover, $\norm{\theta^\star}_2 = 1 \leq \frac{\gammargin
+  B}{3\log(2|\MY|/\delta)}$ for any $\delta = 1/\poly(d)$, so long as
+$C$ is a sufficiently large constant. It follows from
+\cref{thm:xpo-softmax} that \cref{alg:xpo} computes an
+$(\epsilon,\delta)$-sharpened model with sample complexity
+$\poly(\epsilon^{-1},\delta^{-1},d)$. However, since
+$\piref(y^\star\mid x) \leq \piref(y\mid x) \cdot \exp(2)$ for all $y
+\in \MY$, it is clear that 
+\[\Cstar = \EE\brk*{\frac{1}{\piref(\Ystar(x)\mid x)}} = \frac{1}{\piref(y^\star\mid x)} = \Omega(|\MY|) = \exp(\Omega(d)).\]
+Thus, the sample complexity guarantee for \bestofnalg in
+\cref{thm:bestofn} will incur \emph{exponential} dependence on $d$ in
+the sample complexity. It is straightforward to check that this
+dependence is real for \bestofnalg, and not just an artifact of the analysis, since the model that \bestofnalg is trying to learn (via MLE) will itself not be sharp in this example, unless $\exp(\Omega(d))$ samples are drawn per prompt.
+\end{example}
+
+We now proceed to the proof of \cref{thm:xpo-softmax-apx}, which requires the following bounds on the covering number and the Sequential Extrapolation Coefficient of $\Pi_{\phi,B}$.
+
+\begin{lemma}\label{lemma:softmax-net}
+Let $\epdisc>0$. Then $\Pi_{\phi,B}$ has an $\epdisc$-net of size $(6B/\epdisc)^d$.
+\end{lemma}
+
+\begin{proof}[\pfref{lemma:softmax-net}]
+By a standard packing argument, there is a set $\{\theta_1,\dots,\theta_N\}$ of size $(6B/\epdisc)^d$ such that for every $\theta \in \RR^d$ with $\norm{\theta}_2 \leq B$ there is some $i \in [N]$ with $\norm{\theta_i - \theta}_2 \leq \epdisc/2$. Now for any $x\in\MX$ and $y \in \MY$,
+\begin{align}
+\log \frac{\pi_{\theta}(y\mid x)}{\pi_{\theta_i}(y\mid x)} 
+&= \log \frac{\exp(\langle \phi(x,y),\theta\rangle)}{\exp(\langle \phi(x,y),\theta_i\rangle)} + \log \frac{\E_{(x',y')\sim \piz} \exp(\langle \phi(x',y'), \theta_i\rangle)}{\E_{(x',y')\sim \piz} \exp(\langle \phi(x',y'), \theta\rangle)} \\ 
+&= \langle \phi(x,y),\theta-\theta_i\rangle + \log \frac{\E_{(x',y')\sim \piz} \left[\exp(\langle \phi(x',y'), \theta\rangle)\exp(\langle \phi(x',y'), \theta_i-\theta\rangle)\right]}{\E_{(x',y')\sim \piz} \exp(\langle \phi(x',y'), \theta\rangle)}.
+\end{align}
+The first term is bounded by $\epdisc/2$ in magnitude. In the second term, we have $\exp(\langle \phi(x',y'),\theta_i-\theta\rangle) \in [\exp(-\epdisc/2),\exp(\epdisc/2)]$, so the ratio of expectations lies in $[\exp(-\epdisc/2),\exp(\epdisc/2)]$ as well, and so the log-ratio lies in $[-\epdisc/2,\epdisc/2]$. In all, we get $\left|\log \frac{\pi_{\theta}(y|x)}{\pi_{\theta_i}(y\mid x)}\right| \leq \epdisc$. Thus, $\{\pi_{\theta_1},\dots,\pi_{\theta_N}\}$ is an $\epdisc$-net for $\Pi$.
+\end{proof}
+
+\begin{lemma}\label{lemma:sec-softmax-bound}
+Let $r:\MX\times\MY \to [-\Rmax,\Rmax]$ be a reward function and let $T \in \NN$ and $\beta>0$. If $\lambda \geq 4\beta^2 B^2 + \Rmax^2$ then for any $\pistar \in \Pi_{\phi,B}$,
+\[\SEC(\Pi_{\phi,B}, r,T, \beta,\lambda; \pistar) \lesssim d\log(T+1).\]
+\end{lemma}
+
+\begin{proof}[\pfref{lemma:sec-softmax-bound}]
+Fix $\pi^{(1)},\dots,\pi^{(T)} \in \Pi_{\phi,B}.$ By definition, there are some $\theta^{(1)},\dots,\theta^{(T)} \in \RR^d$ with $\norm{\theta^{(t)}}_2 \leq B$ and \[\pi^{(t)}(y\mid x)\propto \piz(y\mid x)\exp(\langle \phi(x,y),\theta^{(t)}\rangle)\] for all $t \in [T]$ and $(x,y)\in\MX\times\MY$. Similarly, there is some $\theta^\star \in \RR^d$ with $\norm{\theta^\star}_2 \leq B$ and $\pistar(y\mid x) \propto \piz(y\mid x)\exp(\langle \phi(x,y),\theta^\star\rangle)$. 
+
+Define $\phit:\MX\times\MY \to \RR^{d+1}$ by $\phit(x,y) := [\phi(x,y), \frac{r(x,y)}{\Rmax}]$ and define $\thetat^{(t)} := [\beta(\theta^{(t)} - \theta^\star), -\Rmax]$. Then for any $t \in [T]$ we have
+\begin{align}
+&\frac{\EE^{(t)}\left[\beta\log\frac{\pi^{(t)}(y\mid x)}{\pistar(y\mid x)} - r(x,y) - \beta\log\frac{\pi^{(t)}(y'\mid x)}{\pistar(y'\mid x)} + r(x,y')\right]^2}{\lambda \lor \sum_{i=1}^{t-1} \EE^{(i)}\left[\left(\beta\log\frac{\pi^{(t)}(y\mid x)}{\pistar(y\mid x)} - r(x,y) - \beta\log\frac{\pi^{(t)}(y'\mid x)}{\pistar(y'\mid x)} + r(x,y')\right)^2\right]} \\ 
+&= \frac{\EE^{(t)}\left[\langle \phit(x,y) - \phit(x,y'), \thetat^{(t)}\rangle\right]^2}{\lambda \lor \sum_{i=1}^{t-1} \EE^{(i)}\left[\left(\langle \phit(x,y) - \phit(x,y'), \thetat^{(t)}\rangle\right)^2\right]} \\ 
+&\leq \frac{(\thetat^{(t)})^\top \Sigma^{(t)} \thetat^{(t)}}{\lambda \lor \sum_{i=1}^{t-1} (\thetat^{(t)})^\top \Sigma^{(i)} \thetat^{(t)}}
+\end{align}
+where for each $i \in [T]$ we have defined $\Sigma^{(i)} := \EE^{(i)}\brk*{ (\phit(x,y) - \phit(x,y'))(\phit(x,y) - \phit(x,y'))^\top}$. Observe that $\norm{\thetat^{(t)}}_2^2 \leq 4\beta^2 B^2 + \Rmax^2 \leq \lambda$ by assumption on $\lambda$. Therefore,
+\begin{align}
+\frac{(\thetat^{(t)})^\top \Sigma^{(t)} \thetat^{(t)}}{\lambda \lor \sum_{i=1}^{t-1} (\thetat^{(t)})^\top \Sigma^{(i)} \thetat^{(t)}}
+&\lesssim \frac{(\thetat^{(t)})^\top \Sigma^{(t)} \thetat^{(t)}}{\lambda + \sum_{i=1}^{t-1} (\thetat^{(t)})^\top \Sigma^{(i)} \thetat^{(t)}} \\ 
+&\leq \frac{(\thetat^{(t)})^\top \Sigma^{(t)} \thetat^{(t)}}{(\thetat^{(t)})^\top \left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right) \thetat^{(t)}} \\ 
+&\leq \lambda_{\max}\left(\left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right)^{-1/2} \Sigma^{(t)} \left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right)^{-1/2}\right) \\ 
+&\leq \Tr \left(\left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right)^{-1/2} \Sigma^{(t)} \left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right)^{-1/2}\right) \\ 
+&= \Tr\left(\left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right)^{-1}\Sigma^{(t)}\right).
+\end{align}
+Observe that $\Tr(\Sigma^{(t)}) \leq \max_{x,y} \norm{\phit(x,y)}_2^2 \lesssim 1$. Hence by \cref{lemma:elliptic}, we have
+\begin{align}
+&\sum_{t=1}^T\frac{\EE^{(t)}\left[\beta\log\frac{\pi^{(t)}(y\mid x)}{\pistar(y\mid x)} - r(x,y) - \beta\log\frac{\pi^{(t)}(y'\mid x)}{\pistar(y'\mid x)} + r(x,y')\right]^2}{\lambda \lor \sum_{i=1}^{t-1} \EE^{(i)}\left[\left(\beta\log\frac{\pi^{(t)}(y\mid x)}{\pistar(y\mid x)} - r(x,y) - \beta\log\frac{\pi^{(t)}(y'\mid x)}{\pistar(y'\mid x)} + r(x,y')\right)^2\right]} \\ 
+&\lesssim \sum_{t=1}^T \Tr\left(\left(I_d + \sum_{i=1}^{t-1}\Sigma^{(i)}\right)^{-1}\Sigma^{(t)}\right) \\ 
+&\lesssim d\log(T+1).
+\end{align}
+Since $\pi^{(1)},\dots,\pi^{(T)} \in \Pi$ were arbitrary, this completes the proof.
+\end{proof}
+
+The proof is now immediate from \cref{thm:xpo-sharpening-apx} and the above lemmas.
+
+\begin{proof}[Proof of \cref{thm:xpo-softmax-apx}]
+By the assumption on $\theta^\star$ and choice of $\beta$, the model $\pistarb$ defined by $\pistarb(y\mid x) \propto \piref(y\mid x)^{1+\beta^{-1}}$ satisfies $\pistarb = \pi_{(1+\beta^{-1})\theta^\star} \in \Pi_{\phi,B}$. By \cref{lemma:softmax-net}, we have $\cN(\Pi_{\phi,B},\epdisc) \leq (6B/\epdisc)^d$. Take $\Rmax := \sqrt{4\beta^2 B^2 + (2B+\log |\MY|)^2}$. We know that $r(x,y) := \log\piref(y\mid x)$ satisfies $|r(x,y)| \leq 2B+\log|\MY|$ for all $x,y$. By \cref{lemma:sec-softmax-bound}, we therefore get that $\SEC(\Pi_{\phi,B},r,T,\beta,\Rmax^2;\piref) \lesssim d\log(T+1)$. Substituting these bounds into \cref{thm:xpo-sharpening-apx} yields the claimed result.
+\end{proof}
+

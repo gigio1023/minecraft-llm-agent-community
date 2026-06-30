@@ -1,0 +1,125 @@
+
+\section{Introduction}
+
+\label{sec:intro}
+
+
+Developing AI agents capable of interacting with dynamic environments—often referred to as ``open-world'' in the literature~\citep{open-world}—to solve diverse tasks remains a long-standing challenge in Artificial Intelligence~\citep{kejriwal2024challenges}. Among the various environments used to study AI agents, games have emerged as a prominent choice, as they provide real-world challenges within programmable simulators, offering valuable opportunities for real-world simulation~\citep{genie, gato, deepmind_sima}. Compared to other digital environments such as web/apps~\citep{web-env-autoagent, UI-TARS-ui, Showui-ui}, mobile platforms~\citep{mobile-pan, Mobile-agent}, and coding IDEs~\citep{code-challenge, swe-bench, agent-coder}, games present a higher degree of control complexity, similar to that encountered by physical robotic agents~\citep{robocasa, robo-gensim, robo-auto}. While compared to robotics, games support long-horizon planning tasks and enable safer and more efficient testing within sandbox environments. 
+
+% or example, chess games () require strategic planning; MOBA games () require cooperation and control; sandbox games () with dynamic environments require generalization ability. These challenges drive the development of specialized models toward general-capable, open-ended agents that can adapt to ever-changing environments. However, evaluating such agents is a difficult problem.
+
+A crucial aspect of open-ended game agents is their \emph{generalizability}. The ultimate goal of developing AI agents is to deploy them in real, open-world environments, where they must solve tasks robustly across drastically different situations. With this in mind, early game agents have been studied in procedurally generated Atari-like environments with diverse configurations~\citep{procegen}. Recent efforts shift toward complex environments with greater freedom~\citep{minedojo,crafter,xland}, among which Minecraft stands out. Minecraft is a video game that provides procedurally generated open-world environments with a state space exceeding the number of atoms in the universe (we elaborate on the benefits of using Minecraft for open-ended game agents in~\cref{sec:minecraft_intro}). This vast environment allows agents to tackle infinite open-ended tasks using human-like actions in diverse situations. 
+
+Despite the numerous advantages of Minecraft as an experimental environment, we have identified several limitations in existing benchmarks that impede a comprehensive evaluation of agents' generalizability. These limitations include low task quality~\citep{minedojo}, insufficient diversity~\citep{crafter}, and the lack of automatic evaluation suites~\citep{groot}. We further illustrate these issues in~\cref{fig:mcu_vs_minedojo}. Based on these issues, we find that Minecraft agents lack a unified benchmark, and each agent is evaluated on a distinct set of tasks (see~\cref{sec:related_work} for further discussion). To address this, we introduce \emph{Minecraft Universe} (\textbf{MCU}), an advanced evaluation framework in Minecraft (\cref{fig:framework}). MCU encompasses thousands of composable tasks and provides a scalable automatic evaluation system, designed based on the following key principles:
+% adopt open-world environments, but they were either limited by task diversity~\citep{crafter} or task quality~\citep{minedojo}. Moreover, most of these studies lacked automatic evaluation for open-ended tasks~\citep{milani2023bedd, groot}, as illustrated in Table~\ref{tab:benchmark_compare}.
+% There are two main challenges in evaluating general-capable, open-ended agents. First, agents often overfit tasks, creating the illusion of learning without generalization~\citep{procegen3, bellemare13arcade, procegen1}.To truly assess generalization, a dynamic task set that covers a wide spectrum of challenges are required.This may involve intensive labor to collect diverse high-quality tasks, and a scalable benchmarking framework to evaluate the agents across dynamic environments. Second, open-ended tasks drive generalization~\citep{}, but they often require human evaluation due to the lack of clear success signals. This is expensive and time-consuming, especially as the number of tasks grows.
+\begin{figure*}
+    \centering
+    \includegraphics[width=1\linewidth]{figs/figure1.pdf}
+    % \vspace{-1em}
+    \caption{An overview of MCU. \emph{\textbf{a. Benchmarking pipeline.}} MCU includes two main components: \emph{\textbf{task generation} and \textbf{trajectory evaluation}}. The LLM-based task configuration generator instantiates the environment with the necessary prerequisites, random factors, and task descriptions for diverse atomic tasks. These configurations are verified using an environment simulator. The VLM-based evaluator assesses each task trajectory in video form across multiple dimensions, providing comprehensive performance insights. MCU offers a model-agnostic evaluation interface based on Minestudio~\citep{minestudio}, making it suitable for various agents. \emph{\textbf{b. Task category distribution.}} The atomic task set is sourced from the Minecraft wiki, in-game data, existing benchmarks, and brainstorming sessions. It spans 11 major categories and 41 subcategories, ensuring high \emph{\textbf{inter-task diversity}}. For readers unfamiliar with Minecraft, we illustrate the real-world challenges associated with different task categories to provide context. \emph{\textbf{c. Multi-dimensional capabilities.}} MCU evaluation shows that SOTA agents have made progress in overall task completion and material usage, but still have obvious limitations in creativity and error recognition. \emph{\textbf{d. Intra-task generalizability.}} Varying difficulty levels within the same task lead to performance degradation, which tests the agent's intra-task generalization capability. \emph{\textbf{e. Human vs AutoEval.}} The automatic evaluation (\emph{AutoEval}) of MCU is 8.1$\times$ more cost-effective and 4.8$\times$ more efficient in labeling 30 samples. Best viewed zoomed in.}
+    % \vspace{-4pt}
+    \label{fig:framework}
+\end{figure*}
+
+
+% \begin{table*}[t]jis
+
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figs/main.pdf}
+    \caption{A comparison between the ``tasks'' in MCU and Minedojo~\citep{minedojo}. We investigate the task list provided by MineDojo and identify several issues. For example, only programmatic tasks that have clear reward signal can be executable in the benchmark; many tasks in their list are repetitive (both No.1236 and No.699 are ``build nether portal''); and a large amount of tasks in the creative tasks are not solvable even by human. To address this, our MCU benchmark can create executable configurations for open-ended tasks, and ensure intra-task and inter-task diversity to simulate real game playing in different difficulty levels, while preserving solvability of tasks.}
+    \label{fig:mcu_vs_minedojo}
+\end{figure*}
+% In our work, we introduce the \emph{Minecraft Universe} (\textbf{MCU}), a generative benchmark built on Minecraft. 
+% % Minecraft provides a procedurally generated open world with \(2^{64}\) possible initial maps and infinite open-ended tasks~\citep{open-world, open-end}. 
+% % Its state space exceeds the number of atoms in the universe (as shown in Appendix~\ref{}), enabling free exploration. Unlike previous benchmarks that isolate tasks in separate state spaces, Minecraft integrates all tasks into a shared observation space, requiring agents to generalize across them.  
+% As shown in Figure~\ref{fig:framework}, MCU spans thousands of tasks across 11 categories and 41 sub-categories, offering a domain-general automatic evaluator to scale evaluations. It achieves high variability at both the environment and task levels, which helps prevent overfitting and fosters generalization. In particular, we create MCU based on the following design principles:
+% \vspace{-0.5em}
+\paragraph{High Task Diversity} 
+Task diversity plays a crucial role in: (1) simulating challenges across various scenarios to thoroughly evaluate generalizability, and (2) harnessing the full potential of open-ended game agents capable of solving a wide range of tasks. MCU emphasizes two key aspects of task diversity in its implementation: (1) \textbf{Intra-task diversity:} We utilize a large language model (LLM) to dynamically generate task initialization conditions—such as biome, weather, and player states—introducing variability and randomness that closely mirror real gameplay scenarios (\cref{fig:framework}a). 
+% As illustrated in~\cref{fig:framework}d, intra-task diversity is essential for assessing the generalizability of agents. 
+(2) \textbf{Inter-task diversity:} We collect 3,452 atomic tasks within Minecraft, spanning a broad spectrum of challenges, including precise control (\emph{e.g., combat, building}), logical reasoning (\emph{e.g., crafting, trading}), and knowledge application (\emph{e.g., tool use, animal care}) (\cref{fig:framework}b). These tasks can further be composed to generate new tasks on a combinatorial scale as detailed in~\cref{sec:task_suite}.
+% We also developed a task composition method to generate new tasks on a combinatorial scale as detailed in XXX.
+
+
+\paragraph{High Task Quality} Minecraft imposes numerous constraints that render unchecked tasks intractable~\citep{minedojo, taskgen_constraint}. For example, the task {``mine diamond with a wooden pickaxe”} is infeasible because diamonds cannot be mined with such a tool. Similarly, the task {``design and build a transportation system for your city”} from the MineDojo benchmark~\citep{minedojo} presents an extreme challenge even for humans. Other issues include repetitive tasks (\cref{fig:mcu_vs_minedojo}). To mitigate these issues, MCU filters tasks from a wide range of data sources, ensuring adherence to high-quality standards (\cref{fig:framework}b left). Additionally, in the LLM-based task configuration generator, we incorporate a series of soft constraints within the prompt, and implement a refinement mechanism based on self-reflection~\citep{reflexion} and the Minecraft simulator's feedback by executing the generated configuration. Further implementation details are provided in Section~\ref{sec:task_gen}.
+
+
+% https://arxiv.org/pdf/2401.10568 很多game 参考文献
+% CivRealm: A learning and reasoning odyssey in Civilization for decision-making agents
+
+
+% , both of which are resource-intensive
+\paragraph{Automated Evaluation} Open-ended tasks \citep{open-end, open-end2} inherently lack clear success signals and often depend on human evaluation or manually designed metrics~\citep{human-eval}, which hinders scalability. To address this issue, MCU introduces an automated evaluation system (\emph{AutoEval}) based on vision-language model (VLM) that fulfills two key objectives: (1) producing evaluation results that closely align with human judgments, and (2) offering multi-dimensional assessments that go beyond simple success rates for a comprehensive evaluation for open-ended tasks (\cref{fig:framework}c), while the designed ``task progress'' dimension is a process-supervised counterpart of 0-1 success rate. We also show in~\cref{fig:framework}e that \emph{AutoEval} is cost-efficient.
+%  As the scale of tasks grows, a robust automatic evaluation system becomes essential for efficiently assessing agents across open-ended tasks.
+
+
+\paragraph{Enduring Challenges}
+To ensure that MCU remains a long-term benchmark for agent development, we adopt two key strategies: (1) designing tasks with varying levels of difficulty, where increasing complexity introduces additional challenges such as adverse weather conditions and misleading factors. While state-of-the-art models achieve moderate success on simpler tasks, they struggle with more complex scenarios (\cref{fig:framework}d). (2) Enabling the composition of atomic tasks into more intricate tasks. This approach exponentially increases both the number and complexity of tasks, ensuring that MCU continues to provide a lasting challenge.
+
+
+% In summary, MCU introduce a diverse suite of high-quality, composable atomic tasks with a automatic evaluation system for procedurally generated open-world environments in Minecraft to evaluate open-ended game agents. By leveraging LLMs, each task is dynamically generated and uniquely instantiated during evaluation, promoting both inter-task and intra-task diversity. Our VLM-based evaluation system offers an scalable, automated solution, achieving over $90\%$ agreement with human evaluations. We hope that MCU benchmark will set a new standard for advancing agent generalization by systematically evaluating agents across diverse and open-ended challenges.
+
+
+
+
+
+ 
+
+% These challenges highlight a critical need for a unified benchmarking framework that not only leverages the vast procedural diversity of the environment but also systematically evaluates agents across diverse and dynamic tasks.
+
+
+
+% In our work, we introduce a benchmark method \textbf{M}ine\textbf{C}raft \textbf{U}niverse (\textbf{MCU}), 
+% which offers high degrees of freedom in task design and evaluation. 
+% To address these limitations, we introduce our benchmark, \textbf{M}ine\textbf{C}raft \textbf{U}niverse (\textbf{MCU}), which offers high degrees of freedom in task design and evaluation.
+% Minecraft, as an open-world platform, provides a rich and diverse set of challenges, including tasks such as Trade (logical reasoning), Mining (physical interaction), Combat (strategic planning), Building (artistic creation), Trapping (precision control), and Redstone (complex-knowledge application). 
+% \textcolor{black}{This variety provides agents with ample opportunities to explore and learn across diverse scenarios.} At the task level, we collect over 3000 atomic, composable tasks, with the potential to infinite expansion. 
+% By leveraging large language models (LLMs), each task is dynamically generated and uniquely instantiated during each evaluation, promoting essential generalization skills in agents. Tunable difficulty is also involved to ensure more flexible testing. Furthermore, we propose a domain-general, vision-language model (VLM)-based evaluation method capable of assessing open-ended tasks, even those without explicit end signals. Crucially, our method automates the whole pipeline of task generation, verification, and evaluation, enabling scalable benchmarking (Figure \ref{fig:framework}), which paves the way for comprehensive evaluation of generalist agents. We adhere to the criteria outlined in Section\ref{section2} to develop our benchmark.
+
+
+
+
+
+
+% In recent years, large language models (LLMs) have demonstrated remarkable progress in the field of AI~\citep{llama2,gpt4}. The release of the GPT series~\citep{gpt3} has significantly reshaped AI research, moving the focus away from task-specific models toward the development of foundation models~\citep{Bubeck2023SparksOA}. 
+% These models excel across a diverse set of tasks and are highly instructable, marking a substantial leap forward in versatility and adaptability. The next step in this evolution is the development of \emph{Generalist Agents}~\citep{Bubeck2023SparksOA}.
+% So, what is a Generalist Agent? From the perspective of users, the ideal generalist agent should embody a multifaceted utility, seamlessly integrating a spectrum of complex services. For instance, users typically prefer asking ChatGPT for a range of services like searching, translation, writing, coding, etc. This preference underscores the potential for a ``single-brain'' style generalist agent, which intriguingly aligns with neuroscience insights~\citep{Mountcastle1978AnOP, Zhu2020DarkBD, Taylor2005JeffHA}, offering a two-way benefit. Beyond that, generalist agents are also expected to interact effectively with their environment in order to adapt to real-world challenges in dynamic settings~\citep{generalist, interative1, interactive2}. Therefore, we think that generalists should have following two characteristics: 1) possess the generalization capability to manage diverse tasks; and 2) exhibit robust interactivity and adaptability in the real-world challenges.
+
+
+
+% Creating a generalist agent presents significant challenges. Early efforts attempted to create a ``one-fits-all"  network~\citep{Schmidhuber2018OneBN} with life-long learning strategies but struggled with basic tasks due to catastrophic forgetting~\citep{McCloskey1989CatastrophicII}. Recent meta-reinforcement learning (meta-RL) studies \citep{maml, meta-rl-survey, Lake2023HumanlikeSG} has shown potential in endowing models with human-like abilities for systematic generalization, but challenges such as scalability, sample inefficiency, and limited performance in complex environments persist~\citep{open-world, meta-rl-survey}. Recent efforts have shifted towards pretraining large foundation models on extensive internet-scale datasets~\citep{groot, vpt}, achieving significant advances in tackling more complex tasks in open-world environments. However, these models exhibit strong performance only on a constrained set of tasks, leaving their true generalization capabilities unproven. 
+
+
+% % different from other RL / multi-task environment
+% In light of these challenges, the need for rigorous evaluation methods becomes apparent. While benchmarks like DmLab-30\citep{deepmind30} and Procgen\citep{procegen} have made strides with multi-tasks learning and procedural generation, they fall short in assessing agent within competitive environments \citep{open-end, open-world}. Minedojo\citep{minedojo} and Crafter\citep{crafter}, have pushed forward in open-world contexts, they lack sufficient task dynamism and verification mechanisms. Other works\citep{dyval, taskgen} push boundaries with dynamic task generation and composition, yet constrained by text-only modality of the tasks. The CRAB framework \cite{crab} introduces a cross-environment benchmark that leverages multimodal language models to perform tasks across various GUI environments. However, the above benchmarks often face limitations in evaluating open-ended tasks due to the absence of clear completion signals, making it difficult to test agents on more creative and adaptive challenges. A comparison of these benchmarks is provided in Table \ref{tab:benchmark_compare}.
+
+
+
+% To address these limitations, we introduce our benchmark, \textbf{M}ine\textbf{C}raft \textbf{U}niverse (\textbf{MCU}), which offers high degrees of freedom in task design and evaluation. Minecraft, as an open-world platform, provides a rich and diverse set of challenges, including tasks such as Trade (logical reasoning), Mining (physical interaction), Combat (strategic planning), Building (artistic creation), Trapping (precision control), and Redstone (complex-knowledge application). \textcolor{black}{This variety provides agents with ample opportunities to explore and learn across diverse scenarios.} At the task level, we collect over 3000 atomic, composable tasks, with the potential to infinite expansion. By leveraging large language models (LLMs), each task is dynamically generated and uniquely instantiated during each evaluation, promoting essential generalization skills in agents. Tunable difficulty is also involved to ensure more flexible testing. Furthermore, we propose a domain-general, vision-language model (VLM)-based evaluation method capable of assessing open-ended tasks, even those without explicit end signals. Crucially, our method automates the whole pipeline of task generation, verification, and evaluation, enabling scalable benchmarking (Figure \ref{fig:framework}), which paves the way for comprehensive evaluation of generalist agents. We adhere to the criteria outlined in Section\ref{section2} to develop our benchmark.
+
+
+% Recognizing the imperative for more comprehensive benchmarks, 
+
+% reorder
+
+
+
+% In comparing benchmarks for generalization, MCU demonstrates a comprehensive approach across multiple dimensions, excelling in both environment and task-level features. 
+
+
+
+
+
+
+
+
+
+
+
+% Meta-RL enables agents to rapidly adapt to new environments with minimal prior knowledge
+%  in more varied and open-ended settings
+
+% + 页脚注释 We borrow the term “open world” from the game community. It highlights that the agent can navigate inside a diverse environment and accomplish open-ended tasks freely.

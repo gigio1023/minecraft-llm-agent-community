@@ -1,0 +1,139 @@
+\input{figures/method/figure}
+
+\section{Director}
+\label{sec:method}
+
+Director is a reinforcement learning algorithm that learns hierarchical behaviors directly from pixels. 
+As shown in \cref{fig:method}, Director learns a world model for representation learning and planning, a goal autoencoder that discretizes the possible goals to make them easier for the manager to choose, a manager policy that selects goals every fixed number of steps to maximize task and exploration rewards, and a worker policy that learns to reach the goals through primitive actions.
+All components are optimized throughout the course of learning by performing one gradient step every fixed number of environment steps. 
+The world model is trained from a replay buffer whereas the goal autoencoder is trained on the world model representations and the policies are optimized from imagined rollouts.
+For the pseudo code of Director, refer to \cref{sec:algo}.
+
+\subsection{World Model}
+\label{sec:wm}
+
+Director learns a world model that compresses the history of observations into a compact feature space and enables planning in this space \citep{watter2015e2c,zhang2018solar}.
+We use the Recurrent State Space Model (RSSM) model of PlaNet \citep{hafner2018planet}, which we briefly review here to introduce notation. 
+The world model consists of four neural networks that are optimized jointly:
+
+\eq{
+&\text{Model representation:} &&\reprW(s_t|s_{t-1},a_{t-1},x_t) \quad
+&&\text{Model decoder:} &&\recW(s_t) \approx x_t \\
+&\text{Model dynamics:} &&\dynW(s_t|s_{t-1},a_{t-1}) \quad
+&&\text{Reward predictor:} &&\rewW(s_{t+1}) \approx r_t \\
+}
+% \todo{Clarify that $\recW()$ and $\decW()$ are different, and why.}
+
+The representation model integrates actions $a_t$ and observations $x_t$ into the latent states $s_t$.
+The dynamics model predicts future states without the corresponding observations.
+The decoder reconstructs observations to provide a rich learning signal.
+The reward predictor later allows learning policies by planning in the compact latent space, without decoding images. 
+The world model is optimized end-to-end on subsequences from the replay buffer by stochastic gradient descent on the variational objective \citep{hinton1993vi,kingma2013vae,rezende2014vae}:
+
+\eq{
+\mathcal{L}(\theta) \doteq \sum_{t=1}^T \Big(
+&\beta\KL[\reprW(s_t|s_{t-1},a_{t-1},x_t) || \dynW(s_t|s_{t-1},a_{t-1})] \\[-1.5ex]
+& + \|\recW(s_t)-x_t\|^2
+  + (\rewW(s_{t+1})-r_t)^2
+\Big)
+\quad\text{where}\quad s_{1:T}\sim\mathrm{repr_\theta}
+\label{eq:wmloss}
+}
+
+The variational objective encourages learning a Markovian sequence of latent states with the following properties: The states should be informative of the corresponding observations and rewards, the dynamics model should predict future states accurately, and the representations should be formed such that they are easy to predict.
+The hyperparameter $\beta$ trades off the predictability of the latent states with the reconstruction quality \citep{beattie2016dmlab,alemi2018broken}.
+
+\subsection{Goal Autoencoder}
+\label{sec:ae}
+
+The world model representations $s_t$ are 1024-dimensional continuous vectors.
+Selecting such representations as goals would be challenging for the manager because this constitutes a very high-dimensional continuous action space.
+To avoid a high-dimensional continuous control problem for the manager, Director compresses the representations $s_t$ into smaller discrete codes $z$ using a goal autoencoder that is trained on replay buffer model states from \cref{eq:wmloss}:
+
+\eq{
+\text{Goal Encoder:} \quad \encW(z|s_t) \qquad
+\text{Goal Decoder:} \quad \decW(z) \approx s_t
+}
+
+Simply representing each model state $s_t$ by a class in one large categorical vector would require roughly one category per distinct state in the environment. 
+It would also prevent the manager from generalizing between its different outputs. 
+Therefore, we opt for a factorized representation of multiple categoricals.
+Specifically, we choose the vector of categoricals approach introduced in DreamerV2 \cite{hafner2020dreamerv2}. 
+As visualized in \cref{fig:vectorcat}, the goal encoder takes a model state as input and predicts a matrix of 8$\times$8 logits, samples a one-hot vector from each row, and flattens the results into a sparse vector with 8 out of 64 dimensions set to 1 and the others to 0. 
+Gradients are backpropagated through the sampling by straight-through estimation \citep{bengio2013straight}. 
+The goal autoencoder is optimized end-to-end by gradient descent on the variational objective:
+
+\eq{
+\mathcal{L}(\phi) \doteq
+\big\|\, \decW(z) - s_t \,\big\|^2 + \beta\KL[\encW(z|s_t) || \p(z)]
+\quad\text{where}\quad z \sim \encW(z|s_t)
+\label{eq:aeloss}
+}
+
+The first term is a mean squared error that encourages the encoder to compute informative codes from which the input can be reconstructed.
+The second term encourages the encoder to use all available codes by regularizing the distribution towards a uniform prior $\p(z)$.
+The autoencoder is trained at the same time as the world model but does not contribute gradients to the world model.
+
+\subsection{Manager Policy}
+\label{sec:manager}
+
+Director learns a manager policy that selects a new goal for the worker every fixed number of $K=8$ time steps.
+The manager is free to choose goals that are much further than 8 steps away from the current state, and in practice, it often learns to choose the most distant goals that the worker is able to achieve. 
+Instead of selecting goals in the high-dimensional continuous latent space of the world model, the manager outputs abstract actions in the discrete code space of the goal autoencoder (\Cref{sec:ae}). 
+The manager actions are then decoded into world model representations before they are passed on to the worker as goals. 
+To select actions in the code space, the manager outputs a vector of categorical distributions, analogous to the goal encoder in \cref{sec:ae}:
+
+\eq{
+\text{Manager Policy:} \quad \mgrW(z|s_t)
+}
+
+The objective for the manager is to maximize the discounted sum of future task rewards and exploration rewards.
+The exploration encourages the manager to choose novel goals for the worker, resulting in temporally-abstract exploration.
+This is important because the worker is goal-conditioned, so without an explicit drive to expand the state distribution, it could prefer going back to previously common states it has been trained on the most, and thus hinder exploration of new states in the environment.
+Because the goal autoencoder is trained from the replay buffer, it tracks the current state distribution of the agent and we can reward novel states as those that have a high reconstruction error under the goal autoencoder:
+
+\eq{
+r^{\mathrm{expl}}_t \doteq \big\|\, \decW(z) - s_{t+1} \,\big\|^2\ \quad\text{where}\quad z \sim \encW(z|s_{t+1})
+\label{eq:explrew}
+}
+
+Both manager and worker policies are trained from the same imagined rollouts and optimized using Dreamer \citep{hafner2019dreamer,hafner2020dreamerv2}, which we summarize in \cref{sec:policyopt}.
+The manager learns two state-value critics for the extrinsic and exploration rewards, respectively.
+The critics are used to fill in rewards beyond the imagination horizon and as baseline for variance reduction \citep{williams1992reinforce}.
+We normalize the extrinsic and exploration returns by their exponential moving standard deviations before summing them with weights $w^{\mathrm{extr}}=1.0$ and $w^{\mathrm{expl}}=0.1$.
+For updating the manager, the imagined trajectory is temporally abstracted by selecting every $K$-th model state and by summing rewards within each non-overlapping subsequence of length $K$.
+No off-policy correction \citep{schulman2017ppo,nachum2018hiro} is needed because the imagined rollouts are on-policy.
+
+\subsection{Worker Policy}
+
+The worker is responsible for reaching the goals chosen by the manager.
+Because the manager outputs codes $z$ in the discrete space of the goal autoencoder, we first decode the goals into the state space of the world model $g \doteq \dec(z)$.
+Conditioning the worker on decoded goals rather than the discrete codes has the benefit that its learning becomes approximately decoupled from the goal autoencoder.
+The worker policy is conditioned on the current state and goal, which changes every $K=8$ time steps, and it produces primitive actions $a_t$ to reach the feature space goal:
+
+\eq{
+\text{Worker Policy:} \quad \wkrW(a_t|s_t,g)
+}
+
+To reach its latent goals, we need to choose a reward function for the worker that measures the similarity between the current state $s_t$ and the current goal $g$, both of which are 1024-dimensional continuous activation vectors.
+Natural choices would be the negative L2 distance or the cosine similarity and their choice depends on the underlying feature space, which is difficult to reason about.
+Empirically, we found the cosine similarity to perform better.
+Cosine similarity would usually normalize both vectors, but normalizing the state vector encourages the worker to remain near the origin of the latent space, so that it can quickly achieve any goal by moving a small amount in the right direction.
+We thus incorporate the idea that the magnitude of both vectors should be similar into the cosine similarity, resulting in our \emph{max-cosine} reward:
+
+\eq{
+r^{\mathrm{goal}}_t \doteq \big(g/m\big)^T\big(s_{t+1}/m\big)
+\quad\text{where}\quad m \doteq \max\!\big(\,\|g\|, \,\|s_{t+1}\|\,\big)
+\label{eq:goalrew}
+}
+
+When the state and goal vectors are of the same magnitude, the reward simplifies to the cosine similarity.
+When their magnitudes differ, the vectors are both normalized by the larger of the two magnitudes, and thus the worker receives a down-scaled cosine similarity as the reward.
+As a result, the worker is incentivized to match the angle and magnitude of the goal.
+Unlike the L2 similarity, the reward scale of our goal reward is not affected by the scale of the underlying feature space.
+
+The worker maximizes only the goal rewards.
+We make this design choice to demonstrate that the interplay between the manager and the worker is successful across many environments, although we also include an ablation experiment where the worker additionally receives task reward, which further improves performance.
+The worker is optimized by Dreamer with a goal-conditioned state-value critic.
+For updating the worker, we cut the imagined rollouts into distinct trajectories of length $K$ within which the goal is constant.
+The state-critic estimates goal rewards beyond this horizon under the same goal, allowing the worker to learn to reach far-away goals.

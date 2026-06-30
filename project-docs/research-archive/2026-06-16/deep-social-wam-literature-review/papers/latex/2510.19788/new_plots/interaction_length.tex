@@ -1,0 +1,96 @@
+% Auto-generated PGFPlots template — grouped vertical bars (ggplot-like)
+% Ensure required packages when included standalone in lint/preview
+\makeatletter
+\@ifundefined{pgfplotsversion}{\RequirePackage{pgfplots}}{}
+\@ifundefined{pgfplotstableread}{\RequirePackage{pgfplotstable}}{}
+\makeatother
+% Data: new_plots/data/score_by_task_type_mean_wide.csv
+
+\begingroup
+% ------- configurable knobs -------
+% overall size (avoid digits in macro names)
+\newcommand{\PerfTaskPlotWidth}{\linewidth}
+\newcommand{\PerfTaskPlotHeight}{12em}
+% typography
+\newcommand{\PerfTaskFont}{\scriptsize}
+\newcommand{\PerfTaskXFont}{\tiny}
+% bar geometry
+\setlength{\PerfTaskBarWidth}{8pt}
+\setlength{\PerfTaskBarSep}{\PerfTaskBarWidth} % adjacent bars touch
+% margins
+\newcommand{\PerfTaskEnlargeX}{0.25}
+\newcommand{\PerfTaskEnlargeY}{0.04}
+% ---------------------------------
+
+% color palette provided centrally in main.tex: PerfClaude, PerfGemini, PerfHuman, PerfOThree, PerfAutumnSim
+
+% load combined mean+SEM table (wide)
+\pgfplotstableread[col sep=comma]{new_plots/data/interaction_length_by_task.csv}{\perftablesrc}
+\tikzsetnextfilename{interaction_length}
+\begin{tikzpicture}[]
+  \tikzpicturedependsonfile{new_plots/interaction_length.tex}
+  \begin{axis}[
+      % title={Mean Score by Task Type and Agent},
+      % ylabel={Mean Score},
+      tick label style={font=\PerfTaskFont},
+      xticklabel style={font=\PerfTaskXFont, rotate=20, anchor=east},
+      xtick=data,
+      % modern, ggplot-like styling
+      grid=none,
+      axis background/.style={fill=PlotBackground},
+      axis lines=left,
+      axis line style={draw=none},
+      x axis line style={draw=none},
+      axis y line*=left,
+      y axis line style={draw=black, -, xshift=-3pt},
+      tick style={draw=none},
+      ytick style={draw=black, xshift=-3pt},
+      yticklabel style={xshift=-3pt},
+      ytick pos=left,
+      tick align=outside,
+      legend style={font=\PerfTaskFont, draw=none, fill=none, at={(0.02,0.98)}, anchor=north west},
+      legend image code/.code={\draw[#1,draw=none] (0cm,-0.08cm) rectangle (0.28cm,0.08cm);},
+      legend columns=3,
+      label style={font=\PerfTaskFont},
+      title style={font=\PerfTaskFont},
+      width=\PerfTaskPlotWidth,
+      height=\PerfTaskPlotHeight,
+      ymin=0,
+      ymax=140,
+      ytick distance=40,
+      symbolic x coords={o3, claude-4-sonnet, gemini-2.5-pro, human},
+      xticklabels={claude-4-sonnet, gemini-2.5-pro, human, o3},
+      bar width=\PerfTaskBarWidth,
+      enlarge x limits=\PerfTaskEnlargeX,
+      enlarge y limits=false,
+    ]
+    % grouped vertical bars per task type with error bars (SEM)
+    \addplot+[ybar, bar shift=\dimexpr-1\PerfTaskBarSep\relax, draw=none, fill=PerfPlanning, mark=none,
+      error bars/.cd, y dir=both, y explicit,
+      error bar style={draw=black!40, line width=0.5pt, xshift=-1\PerfTaskBarSep},
+      error mark=|,
+      error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=-1\PerfTaskBarSep}]
+    table [x={source}, y={planning}, y error=planning_sem,
+        row predicate/.code={\edef\tempa{\thisrow{source}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+    \addplot+[ybar, bar shift=\dimexpr+0\PerfTaskBarSep\relax, draw=none, fill=PerfMFP, mark=none,
+      error bars/.cd, y dir=both, y explicit,
+      error bar style={draw=black!40, line width=0.5pt, xshift=0\PerfTaskBarSep},
+      error mark=|,
+      error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=0\PerfTaskBarSep}]
+    table [x={source}, y={masked_frame_prediction}, y error=masked_frame_prediction_sem,
+        row predicate/.code={\edef\tempa{\thisrow{source}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+    \addplot+[ybar, bar shift=\dimexpr+1\PerfTaskBarSep\relax, draw=none, fill=PerfCD, mark=none,
+      error bars/.cd, y dir=both, y explicit,
+      error bar style={draw=black!40, line width=0.5pt, xshift=1\PerfTaskBarSep},
+      error mark=|,
+      error mark options={draw=black!40, line width=0.5pt, mark size=1.5pt, xshift=1\PerfTaskBarSep}]
+    table [x={source}, y={change_detection}, y error=change_detection_sem,
+        row predicate/.code={\edef\tempa{\thisrow{source}}\edef\tempb{oracle}\ifx\tempa\tempb\pgfplotstablerowfalse\fi}] {\perftablesrc};
+    % legend with color patches (not lines)
+    % legend using solid color patches (not dashed lines)
+    \addlegendimage{ybar,ybar legend, draw=none, fill={PerfPlanning}}\addlegendentry{PL}
+    \addlegendimage{ybar,ybar legend, draw=none, fill={PerfMFP}}\addlegendentry{MFP}
+    \addlegendimage{ybar,ybar legend, draw=none, fill={PerfCD}}\addlegendentry{CD}
+  \end{axis}
+\end{tikzpicture}
+\endgroup

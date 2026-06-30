@@ -1,0 +1,68 @@
+\section{Learning Behaviors by Latent Imagination}
+\label{sec:behavior}
+\vspace{-1ex}
+
+\input{figures/schema/figure}
+\input{algos/agent}
+\input{figures/horizon/figure}
+
+Dreamer learns long-horizon behaviors in the compact latent space of a learned world model by efficiently leveraging the neural network latent dynamics. For this, we propagate stochastic gradients of multi-step returns through neural network predictions of actions, states, rewards, and values using reparameterization. This section describes the main contribution of our paper.
+
+\paragraph{Imagination environment}
+
+The latent dynamics define a Markov decision process \citep[MDP;][]{sutton1991dyna} that is fully observed because the compact model states $s_t$ are Markovian. We denote imagined quantities with $\tau$ as the time index. Imagined trajectories start at the true model states $s_t$ of observation sequences drawn from the agent's past experience. They follow predictions of the transition model $s_\tau\sim\q(s_\tau|s_{\tau-1},a_{\tau-1})$, reward model $r_\tau\sim\q(r_\tau|s_\tau)$, and a policy $a_\tau\sim\q(a_\tau|s_\tau)$. The objective is to maximize expected imagined rewards $\smash{\E{q}{\sum_{\tau=t}^\infty \gamma^{\tau-t} r_\tau}}$ with respect to the policy.
+
+\paragraph{Action and value models}
+
+Consider imagined trajectories with a finite horizon $H$. Dreamer uses an actor critic approach to learn behaviors that consider rewards beyond the horizon. We learn an action model and a value model in the latent space of the world model for this. The action model implements the policy and aims to predict actions that solve the imagination environment. The value model estimates the expected imagined rewards that the action model achieves from each state $s_\tau$,
+\begin{equation}
+\begin{aligned}
+\makebox[12em][l]{Action model:} && &a_\tau \sim\ \pr[q_\phi](a_\tau|s_\tau) \\
+\makebox[12em][l]{Value model:} && &v_\psi(s_\tau) \approx \E{q(\cdot|s_\tau)}{\textstyle\sum_{\tau=t}^{t+H}\gamma^{\tau-t}r_\tau}.
+\label{eq:action_value_model}
+\end{aligned}
+\end{equation}%
+The action and value models are trained cooperatively as typical in policy iteration: the action model aims to maximize an estimate of the value, while the value model aims to match an estimate of the value that changes as the action model changes.
+
+We use dense neural networks for the action and value models with parameters $\phi$ and $\psi$, respectively. The action model outputs a tanh-transformed Gaussian \citep{haarnoja2018sac} with sufficient statistics predicted by the neural network. This allows for reparameterized sampling \citep{kingma2013vae,rezende2014vae} that views sampled actions as deterministically dependent on the neural network output, allowing us to backpropagate analytic gradients through the sampling operation,
+\begin{equation}
+a_\tau=\operatorname{tanh}\!\big(\mu_\phi(s_\tau)+\sigma_\phi(s_\tau)\,\epsilon\big),
+\quad\epsilon\sim\Normal(0,\I).
+\end{equation}%
+
+\paragraph{Value estimation}
+
+To learn the action and value models, we need to estimate the state values of imagined trajectories $\{s_\tau,a_\tau,r_\tau\}_{\tau=t}^{t+H}$. These trajectories branch off of the model states $s_t$ of sequence batches drawn from the agent's dataset of experience and predict forward for the imagination horizon $H$ using actions sampled from the action model. State values can be estimated in multiple ways that trade off bias and variance \citep{sutton2018rl},
+\begin{alignat}{3}
+&\mathrm{V}_{\mathrm{R}}(s_\tau)&&\defined\E[\bigg]{q_\theta,q_\phi}{
+    \sum_{n=\tau}^{t+H} r_n}, \\
+&\mathrm{V}_{\mathrm{N}}^k(s_\tau)&&\defined\E[\bigg]{q_\theta,q_\phi}{
+    \sum_{n=\tau}^{h-1} \gamma^{n-\tau}r_n
+    +\gamma^{h-\tau} v_\psi(s_h)} \quad\text{with}\quad h=\min(\tau+k,t+H), \\
+&\mathrm{V}_{\mathrm{\lambda}}(s_\tau)&&\defined
+    (1-\lambda) \sum_{n=1}^{H-1} \lambda^{n-1} \mathrm{V}_{\mathrm{N}}^n(s_\tau) + \lambda^{H-1}\mathrm{V}_{\mathrm{N}}^H(s_\tau),
+\label{eq:lambda_value}
+\end{alignat}%
+where the expectations are estimated under the imagined trajectories. $\mathrm{V}_{\mathrm{R}}$ simply sums the rewards from $\tau$ until the horizon and ignores rewards beyond it. This allows learning the action model without a value model, an ablation we compare to in our experiments. $\mathrm{V}_{\mathrm{N}}^k$ estimates rewards beyond $k$ steps with the learned value model. Dreamer uses $\mathrm{V}_{\mathrm{\lambda}}$, an exponentially-weighted average of the estimates for different $k$ to balance bias and variance. \Cref{fig:horizon} shows that learning a value model in imagination enables Dreamer to solve long-horizon tasks while being robust to the imagination horizon. The experimental details and results on all tasks are described in \cref{sec:experiments}.
+
+\pagebreak
+
+\paragraph{Learning objective}
+
+To update the action and value models, we first compute the value estimates $\mathrm{V}_{\mathrm{\lambda}}(s_\tau)$ for all states $s_\tau$ along the imagined trajectories. The objective for the action model $\pr[q_\phi](a_\tau|s_\tau)$ is to predict actions that result in state trajectories with high value estimates. The objective for the value model $v_\psi(s_\tau)$, in turn, is to regress the value estimates,
+
+\noindent\begin{minipage}{.4\textwidth}\vspace*{-2ex}\hfil\begin{equation}
+\max_\phi\E[\bigg]{q_\theta,q_\phi}{\sum_{\tau=t}^{t+H} \mathrm{V}_{\mathrm{\lambda}}(s_\tau)}, \label{eq:action_objective} \\
+\end{equation}\end{minipage}%
+\noindent\begin{minipage}{.6\textwidth}\begin{equation}
+\min_\psi\E[\bigg]{q_\theta,q_\phi}{\sum_{\tau=t}^{t+H} \frac{1}{2}\Big\|v_\psi(s_\tau)-\mathrm{V}_{\mathrm{\lambda}}(s_\tau))\Big\|^2}. \label{eq:value_objective}
+\end{equation}\end{minipage}
+
+The value model is updated to regress the targets, around which we stop the gradient as typical \citep{sutton2018rl}. The action model uses analytic gradients through the learned dynamics to maximize the value estimates. To understand this, we note that the value estimates depend on the reward and value predictions, which depend on the imagined states, which in turn depend on the imagined actions. Since all steps are implemented as neural networks, we analytically compute $\smash{\nabla_\phi\E{q_\theta,q_\phi}{\sum_{\tau=t}^{t+H}\mathrm{V}_{\mathrm{\lambda}}(s_\tau)}}$ by stochastic backpropagation \citep{kingma2013vae,rezende2014vae}.
+We use reparameterization for continuous actions and latent states and straight-through gradients \citep{bengio2013straight} for discrete actions. The world model is fixed while learning behaviors.
+
+In tasks with early termination, the world model also predicts the discount factor from each latent state to weigh the time steps in \cref{eq:action_objective,eq:value_objective} by the cumulative product of the predicted discount factors, so terms are weighted down based on how likely the imagined trajectory would have ended.
+
+\paragraph{Comparison to actor critic methods}
+
+Agents using Reinforce gradients \citep{williams1992reinforce}, such as A3C and PPO \citep{mnih2016a3c,schulman2017ppo}, employ value baselines to reduce gradient variance, while Dreamer backpropagates through the value model. This is similar to deterministic or reparameterized actor critics \citep{silver2014dpg}, such as DDPG and SAC \citep{lillicrap2015ddpg,haarnoja2018sac}. However, these do not leverage gradients through transitions and only maximize immediate Q-values. MVE and STEVE \citep{feinberg2018mve,buckman2018steve} extend them to multi-step Q-learning with learned dynamics to provide more accurate Q-value targets. We predict state values, which is sufficient for policy optimization since we backpropagate through the dynamics. Refer to \cref{sec:related} for a more detailed comparison to related work.

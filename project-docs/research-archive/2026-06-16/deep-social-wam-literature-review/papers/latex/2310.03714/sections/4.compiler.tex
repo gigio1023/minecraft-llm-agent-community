@@ -1,0 +1,33 @@
+\section{The DSPy Compiler}\label{sec:compiler}
+
+A key source of DSPy's expressive power is its ability to compile---or automatically optimize---any program in this programming model. Compiling relies on a teleprompter, which is an optimizer for DSPy programs that improves the quality (or cost) of modules via prompting or finetuning, which are unified in DSPy. %
+While DSPy does not enforce this when creating new teleprompters, typical teleprompters go through three stages. 
+
+
+\paragraph{Stage 1: Candidate Generation}\label{sec:teleprompter:optimizations}
+
+The compiler first (recursively) finds all unique \texttt{Predict} modules (predictors) in a program, including those nested under other modules. For \textit{each} unique predictor $p$, the teleprompter may generate candidate values for the parameters of $p$: the instructions, field descriptions, or---most importantly---demonstrations (i.e., example input--output pairs). In this iteration of DSPy, we focus on demonstrations and find that simple rejection-sampling-like approaches can help bootstrap highly effective multi-stage systems.
+
+Consider the simplest non-trivial teleprompter in DSPy, \texttt{BootstrapFewShot} (simplified pseudocode in {Appendix~\ref{code:BootstrapFewShot}}). This teleprompter will simulate a teacher program (or, if unset, the zero-shot version of the program being compiled) on some training inputs, possibly one or more times with a high temperature. When running in \texttt{compile} mode, multi-stage traces are tracked transparently and in a thread-safe fashion throughout execution. The program's metric is used to filter for multi-stage traces that together help the pipeline pass the metric. We thus obtain potential labels for all signatures in the program by throwing away the bad examples and using the good examples as potential demonstrations, though these design decisions are under user control.
+
+While LMs can be highly unreliable, we find they can be rather efficient at searching the space of solutions for multi-stage designs. A well-decomposed program can typically find at least a few training examples where the LM can pass the constraints enforced by the signatures and metrics, allowing us to bootstrap iteratively if needed. 
+
+
+\paragraph{Stage 2: Parameter Optimization}
+
+Now each parameter has a discrete set of candidates: demonstrations, instructions, etc. Many hyperparameter tuning algorithms (e.g., random search or Tree-structured Parzen Estimators as in HyperOpt~\citep{bergstra2013making} and Optuna~\citep{akiba2019optuna}) can be applied for selection among candidates. We report simplified implementations of DSPy's \texttt{BootstrapFewShotWithRandomSearch} and \texttt{BootstrapFewShotWithOptuna} in {Appendix~\ref{code:BootstrapFewShotWithRandomSearch}} and {Appendix~\ref{code:BootstrapFewShotWithOptuna}}.
+
+Another type of optimization is \textit{finetuning} with \texttt{BootstrapFinetune}, where the demonstrations are used to update the LM's weights for each predictor. When this is applied, the LM parameter of each module is updated to the new LM weights.
+Typically, we are optimizing average quality using the metric with cross-validation over the training set or a validation set.
+This is applicable even with no labels for any stages, depending on the nature of metric.%
+
+\paragraph{Stage 3: Higher-Order Program Optimization} A different type of optimization that the DSPy compiler supports is modifying the control flow of the program. One of the simplest forms of these is ensembles, which we use in the case studies in this work. An ensemble will bootstrap multiple copies of the same program, and then replace the program with a new one that runs them all in parallel and \textit{reduces} their predictions into one with a custom function (e.g., majority voting). In future work, this stage can easily accommodate techniques for more dynamic (i.e., test-time) bootstrapping as well as automatic backtracking-like logic.
+
+
+
+
+
+
+
+
+

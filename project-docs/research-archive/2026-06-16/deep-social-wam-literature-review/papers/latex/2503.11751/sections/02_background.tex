@@ -1,0 +1,58 @@
+\section{Preliminaries and Formalization\iflongversion: Reward Model Robustness\fi} \label{sec:background}
+
+Given a prompt $x$ and a response $y$, a RM produces a score $\hat{s}=RM(x,y)$.
+RMs can be trained on a dataset of scored responses $D=\{(x,y,s)\}$ using (for example) a regression objective, minimizing
+\begin{align} \label{eq:orig-objective}
+    \E_{(x,y,s)\sim D}\left[(RM(x,y)-s)^2\right].
+\end{align}
+This RM training process is usually initialized from an ``SFT'' model (autoregressively pretrained LM that has been subsequently finetuned on instruction data; \citealp{bai2022training,ouyang2022training}).
+Alternatively, RMs may be trained using a dataset of pairwise preferences under a Bradley-Terry assumption~\citep{bradley-terry}, maximizing
+\begin{align}
+    \E_{(x,y_w,y_l)\sim\mathcal{D}}[\log \sigma \left(r(x,y_w) - r(x,y_l)\right)]
+\end{align}
+where $y_w$/$y_l$ are the winning/losing responses.
+
+
+The dataset $D$ may contain spurious correlations (e.g., with longer responses more frequently preferred; \citealp{singhal2023long}) that cause the RM to overfit to such artifacts and fail to generalize to out-of-distribution samples.
+This has been observed in other classification/regression tasks~\citepia{gururangan-etal-2018-annotation,poliak-etal-2018-hypothesis,mccoy-etal-2019-right},
+but is especially important for RMs. 
+First, their usually small training sets (due to the cost of data collection that in principle requires human judgment) are prone to be overfit (e.g. to stylistic artifacts).
+Second, RMs are expected to be robust to a wide test-time distribution: when used as evaluators, they need to judge diverse LM-generated outputs; when used in alignment, any overfitting effect would be actively \emph{exploited} by policy models, leading to ineffective alignment~\citepia{gao2022scaling,coste2024reward,eisenstein2024helping}.
+
+We
+\iflongversion
+operationalize
+\else
+measure
+\fi
+RM robustness by its consistency under equivalence-maintaining transformations.
+For transformed inputs
+\iflongversion
+$\tilde{x}, \tilde{y} = \delta(x, y)$\footnote{In special cases, some transformations also need to know if $y$ is the chosen one (see \S\ref{sec:controlled-transformations}): $\tilde{x}, \tilde{y} = \delta(x, y, \mathbb{I}[y=y_w])$.}
+\else
+$\tilde{x}, \tilde{y} = \delta(x, y)$
+\fi
+with the same meaning as the originals, an ideal RM should assign similar scores: $RM(x,y)\approx RM(\tilde{x}, \tilde{y})$.
+This is a standard
+\iflongversion
+formalization of robustness in ML~\citepia{42503,43405,8424625}.
+\else
+robustness formalization~\citep{42503,43405,8424625}.
+\fi
+It is complementary to previous studies on RM
+\iflongversion
+\emph{sensitivity}, examining prediction changes
+\else
+\emph{sensitivity}
+\fi
+under meaning-\emph{altering}
+\iflongversion
+transformations~\citep{shen2024the}, following another line of work in NLP~\citepia{Kaushik2020Learning,gardner-etal-2020-evaluating}.
+\else
+transformations~\citep{shen2024the}.
+\fi
+
+\paragraph{Our focus on ranking robustness.}
+It is challenging for transformations to exactly maintain equivalence. For example, wrapping the response with quotation marks maintains semantic equivalence but can be considered having worse style which would justify a lowered score.
+Thus, we mainly consider the ranking that an RM assigns to a response pair, $y_w$ and $y_l$, expecting $\mathbb{I}[RM(x,y_w)>RM(x,y_l)]=\mathbb{I}[RM(\tilde{x},\tilde{y}_w)>RM(\tilde{x},\tilde{y}_l)]$ with transformed $\tilde{x}$, $\tilde{y}_w$, and $\tilde{y}_l$ where $\mathbb{I}[\cdot]$ is the indicator function.
+E.g., when quotation marks are applied to both $y_w$ and $y_l$, stylistic changes equally affect both, and \emph{the RM ranking should not change}.

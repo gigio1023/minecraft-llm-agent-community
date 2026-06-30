@@ -1,0 +1,676 @@
+\section{Evaluation of Self-evolving Agents}
+\label{sec:evaluation}
+Evaluating self-evolving agents presents a unique set of challenges that extend beyond the traditional assessment of static AI systems. Unlike conventional agents typically evaluated on a fixed set of tasks at a single point in time, self-evolving agents are designed to continuously learn, adapt, and improve through ongoing interaction with dynamic environments. Consequently, their evaluation must capture not only immediate task success but also crucial aspects such as adaptation over time, knowledge accumulation and retention, long-term generalization, and the ability to transfer learned skills across sequential or novel tasks, all while mitigating catastrophic forgetting. This requires a fundamental shift from conventional ``single-shot'' \emph{scoring} to a longitudinal, cost-aware trajectory view.
+
+\begin{figure}[tb]
+  \centering
+  \includegraphics[width=0.96\linewidth]{Figures/eval.pdf}
+  \caption{An overview of evaluation goals and paradigms for self-evolving agents. 
+\textbf{Left: Evaluation Goals and Metrics.} 
+We summarize five core objectives guiding agent evaluation: \textit{adaptivity}, \textit{retention}, \textit{generalization}, \textit{efficiency}, and \textit{safety}, which reflect how agents should evolve and perform over time. 
+\textbf{Right: Evaluation Paradigm.} 
+Evaluation methods are organized along an increasing temporal scale: from \textit{static assessment} of fixed capabilities (e.g., external task-solving and component-level evaluation), to \textit{short-horizon adaptive assessment} capturing within-task adaptation (e.g., augmented or dynamic benchmarks), and finally to \textit{long-horizon lifelong learning assessment} that examines continual improvement under evolving or lifelong benchmarks. 
+Together, these axes link the \emph{goals} of self-evolution with the \emph{evaluation settings} used to measure them, forming a unified framework for assessing agent adaptivity and sustainability. See Table~\ref{tab:evaluation_metrics} for metric definitions, Table~\ref{tab:protocols_at_a_glance} for protocol summary.}
+  \label{fig:eval}
+\end{figure}
+
+\subsection{Evaluation Goals, Metrics, and Benchmark Coverage}
+
+To effectively evaluate self-evolving agents, we must move beyond traditional metrics and establish a comprehensive framework that captures their dynamic, adaptive, and long-term learning capabilities. A truly capable and desirable self-evolving agent must not only \textbf{learn and improve} but also \textbf{remember} past knowledge, \textbf{transfer} it to new situations, operate \textbf{sustainably}, and behave \textbf{responsibly}. Grounded in these critical requirements for continuous and robust AI, we categorize the key evaluation goals into five core dimensions: \textbf{Adaptivity}, \textbf{Retention}, \textbf{Generalization}, \textbf{Efficiency}, and \textbf{Safety}, as illustrated in Table~\ref{tab:evaluation_metrics}. Each dimension addresses a vital aspect of an agent’s self-evolutionary process and is assessed through its corresponding metrics and benchmark coverage analysis.
+While Table~\ref{tab:benchmarks} provides a comprehensive catalog of evaluation resources, we synthesize these limitations to map coverage gaps across these five-goal framework and identify directions for trajectory-centric, cost-aware assessment at  Table ~\ref{tab:goal2bench_limitations}.
+
+
+\subsubsection{Adaptivity}
+\paragraph{Goals \& Metrics} Adaptivity serves as a foundational evaluation criterion for any self-evolving agent, measuring its ability to improve performance on in-domain tasks through experience. This dimension focuses on quantifying the learning curve and the extent of performance enhancement as an agent iterates and evolves within a specific domain. Rather than a static success rate, adaptivity is gauged over time, steps, or iterations. 
+Typical metrics include the Success Rate by Iteration Steps \citep{hu2024automated, wang2024agent, zheng2025lifelongagentbench}, which tracks performance in downstream tasks as a function of the agent's interaction history. 
+
+
+\paragraph{Coverage Gaps}
+Although adaptivity has the richest benchmark ecosystem—spanning code generation (SWE-bench~\citep{jimenez2023swe}, MLE-Bench~\citep{chan2024mle}), web navigation (WebArena~\citep{zhou2023webarena}, WebShop~\citep{yao2022webshop}), and general reasoning (GAIA~\citep{mialon2023gaia}, AgentBench~\citep{liu2023agentbench} evaluations remain constrained by practical design choices. ScienceAgentBench limits tasks to a single programming language and imposes execution-time bounds, excluding computationally intensive scientific workflows \citep{chen2024scienceagentbench}. MLE-Bench offers well-structured tasks but diverges from authentic research scenarios where problem formulation is itself part of the challenge \citep{chan2024mle}. These simplifications permit controlled in-domain assessment but confine evaluation to narrow, static task distributions. Moreover, most benchmarks measure improvement under pre-specified learning protocols (e.g., fixed iteration budgets or predetermined replay schedules) rather than assessing whether agents autonomously discover effective adaptation strategies. AgentBench further reports weaknesses in sustained reasoning and strategic decision-making \citep{liu2023agentbench}, yet evaluation horizons remain limited to short-term improvement curves.
+
+
+
+\subsubsection{Retention}
+\paragraph{Goals \& Metrics} Retention is a crucial criterion for evaluating the stability of a self-evolving agent's knowledge base. This dimension specifically focuses on the challenge of catastrophic forgetting, a common issue in lifelong learning where new knowledge acquisition erodes previously learned information, and knowledge retention within extended interactions. Two key metrics can be used to quantify this stability from different perspectives: Forgetting (FGT) and Backward Transfer (BWT) \citep{zheng2025lifelong}. Specifically, let $J_{i,t}$ denote the performance on task $i$ after completing $t$ tasks:
+\[
+\mathrm{FGT}_t = \frac{1}{t-1} \sum_{i=1}^{t-1}\!\Big[\max_{j\in \{i,\ldots,t\}} J_{i,j} - J_{i,t}\Big],\quad
+\mathrm{BWT}_t=\frac{1}{t-1}\sum_{i=1}^{t-1}\big(J_{i,t}-J_{i,i}\big).
+\]
+A positive BWT indicates that new learning positively benefits old tasks, signifying successful knowledge transfer and a more robust, stable learning process. 
+
+\paragraph{Coverage Gaps} Retention remains the most underserved dimension. Current memory mechanisms struggle significantly with dynamic state updates and maintaining consistency across extended interactions \citep{hu2025evaluating}. Experience replay exhibits an inherent tension: while replay buffers can improve learning, scaling them beyond optimal thresholds triggers performance degradation through context overflow and resource exhaustion \citep{zheng2025lifelongagentbench}. Economic and computational constraints limit evaluation robustness, with some benchmarks conducting minimal repetitions that may not capture stochastic variation \citep{castillo-bolado2024beyond}. Most critically, the overwhelming majority of existing benchmarks adopt episodic evaluation where agent state resets between tasks, fundamentally precluding measurement of knowledge accumulation or degradation—precisely the phenomena that distinguish self-evolving agents from static systems.
+
+\subsubsection{Generalization}
+\paragraph{Goals \& Metrics}
+While Adaptivity and Retention focus on in-domain performance, Generalization is a pivotal measure of a self-evolving agent’s ability to apply its accumulated knowledge to new, unseen domains or tasks. A truly intelligent agent should not only perform well within its familiar territory but also demonstrate a capacity for cross-domain generalization. This capability can be evaluated by assessing an agent’s performance on a diverse set of tasks that span multiple task distributions and domains. Common approaches include computing aggregate performance metrics (e.g., mean success rates) across multi-domain test suites \citep{liu2023agentbench, sun2023adaplanner}, and conducting out-of-domain evaluations using held-out task distributions that simulate real-world novelty scenarios \citep{hu2024agentgen, peng2025dlpo}.
+
+
+\paragraph{Coverage Gaps} Generalization is typically evaluated through multi-domain test suites (AgentBench~\citep{liu2023agentbench}, TheAgentCompany~\citep{xu2024theagentcompany} and held-out task distributions, measuring an agent’s ability to transfer knowledge across domains. Current evaluations, however, rely on static snapshots: agents are tested once on diverse tasks without tracking whether cross-domain transfer degrades as they evolve over extended learning trajectories. Technological progress further reduces the discriminative power of older tasks, as modern agents benefit from algorithmic advances unavailable to earlier systems \citep{chan2024mle}, while training data contamination complicates cross-domain assessment \citep{chan2024mle}. No existing benchmark examines whether agents preserve generalization breadth as they specialize within domains, or whether knowledge acquired in one domain continues to transfer after hundreds of learning episodes.
+
+
+\subsubsection{Efficiency}
+
+
+\paragraph{Goals \& Metrics} 
+Efficiency quantifies the resourcefulness of a self-evolving agent during its learning and operation. As agents operate continuously and make decisions autonomously, it is essential to evaluate the cost and speed of their evolutionary process.
+
+These metrics in Table~\ref{tab:cost_taxonomy} are particularly important for practical, real-world applications where resources like computation, memory, time, and human effort are finite:
+
+\begin{itemize}
+
+    \item \textbf{Token consumption} \citep{hu2024treeplannerefficientcloselooptask}: Total tokens used in reasoning, generation, and memory operations
+
+    \item \textbf{Time consumption} \citep{lu2024axis}: Wall-clock time required to complete tasks or reach performance thresholds
+
+    \item \textbf{Step count} \citep{wang2023voyager}: Number of interaction rounds needed for task completion
+
+    \item \textbf{Tool calls}: Number of external API/environment invocations, can be combined with performance gains to assess \emph{Tool Productivity} (TP) \citep{wang2025otcpo}, formulated as:
+\[\quad 
+\mathrm{TP}_{\$}=\frac{\Delta \text{score}}{\sum_i \text{cost}(\text{tool}_i)}.
+\]
+    \item \textbf{Memory growth}: Expansion of persistent memory and context window over the agent's operational duration
+
+    \item \textbf{Human oversight}: Time and effort required for human intervention, including review, labeling, and corrective guidance
+
+\end{itemize}
+
+
+
+\begin{table*}[t!]
+
+\centering
+\caption{\textbf{Refined cost taxonomy and units for self-evolving agents}, with Real-world example \citep{fan2025swe}: On SWE-bench \citep{jimenez2024swe}, SWE-Agent \citep{yang2024swe} + Qwen3-32B (440K tokens, 35 calls, 28\% success) vs.\ GPT-4o-mini (8.1M tokens, 181 calls, 10\% success)—model-scaffold synergy critical for efficiency.}
+
+\label{tab:cost_taxonomy}
+
+\renewcommand\arraystretch{1.2}
+
+\resizebox{\textwidth}{!}{
+
+\begin{tabular}{m{2.5cm}m{1.4cm}m{2cm}m{4.8cm}m{6.8cm}}
+
+\toprule
+
+\textbf{Dimension} & \textbf{Symbol} & \textbf{Typical Unit} & \textbf{Example Measurement} & \textbf{Worked Example} \\
+
+\midrule
+
+\textbf{Token usage} 
+
+& $C_{\text{token}}$ 
+
+& \#tokens 
+
+& Prompt + completion tokens per episode/step 
+
+& 440K vs.\ 8.1M tokens per task; 
+
+18× difference \\
+
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Step count / latency} 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}$C_{\text{step}}$ 
+
+& \cellcolor[rgb]{0.96,0.96,0.96} \#turns / 
+
+rounds 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}Reasoning/interaction turns 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}35 vs.\ 181 API calls per task;
+
+Quality vs.\ quantity trade-off \\
+
+\midrule
+
+\textbf{Wall-clock time} 
+
+& $C_{\text{time}}$ 
+
+& \#seconds 
+
+& End-to-end elapsed runtime incl.\ I/O 
+
+& 12 vs.\ 200+ turns per task; 
+
+Simple vs.\ complex bugs\\
+
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Tool/API calls} 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}$C_{\text{tool}}$ 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}\#calls 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}External function/environment calls 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}15 vs.\ 38 calls (AutoCodeRover); 
+
+High-quality reasoning reduces iterations \\
+
+\midrule
+
+\textbf{Memory growth} 
+
+& $C_{\text{mem}}$ 
+
+& \#tokens / MB 
+
+& Persistent memory;
+
+context window expansion 
+
+& Linear growth per call; Token snowball effect amplifies invalid context \\
+
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Human oversight} 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}$C_{\text{human}}$ 
+
+& \cellcolor[rgb]{0.96,0.96,0.96} \#hours / 
+
+tokens 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}Review, labeling, red-team; guidance tokens 
+
+& \cellcolor[rgb]{0.96,0.96,0.96}Failed attempts: 4× cost vs.\ successful ones; Expensive failures pattern \\
+
+\bottomrule
+
+\end{tabular}}
+
+\end{table*}
+
+To relate efficiency to performance gains, we report \emph{Cost-per-Gain} (CPG) as:
+
+\[
+\mathrm{CPG}_t = \frac{\text{Total Cost}_t}{\text{Performance Gain}_t + \epsilon},
+\]
+
+where cost can be measured in tokens, time, memory, human effort, or a normalized composite (e.g., monetary cost), and performance gain is the improvement over baseline at horizon $t$. Lower CPG indicates more efficient learning.
+
+
+
+\paragraph{Coverage Gaps}
+Efficiency suffers from sparse and inconsistent reporting of evolution costs. While benchmark papers occasionally document aggregate resource consumption during evaluation \citep{chan2024mle}, they rarely decompose costs into evolution-specific components: tokens consumed during self-reflection or experience replay, wall-clock time spent on architecture search or memory updates, tool invocations triggered by autonomous exploration. Cost constraints in human baseline collection \citep{xu2024theagentcompany} reflect broader accessibility challenges but do not illuminate the efficiency of the evolution process itself. More fundamentally, standard evaluation protocols permit unconstrained optimization—agents maximize task success without facing the hard token budgets, iteration limits, or latency constraints that govern real-world deployment.
+
+
+
+
+\subsubsection{Safety}
+
+\paragraph{Goals \& Metrics}
+From the perspective of self-evolving, the Safety domain critically examines whether these agents develop unsafe or undesirable behavioral patterns throughout their continuous evolution. This dimension assesses an agent’s adherence to predefined rules and its propensity for harmful actions. Key metrics in evaluating safety of self-evolving agents may include: (1) Safety Score \citep{zhang2024agentsafety}, which measures the proportion of test cases where the agent's behavior is labeled ``safe''; (2) Harm Score \citep{andriushchenko2024agentharm}, computed via a detailed manually written grading rubric where outputs earn partial credit whenever some but not all harmful criteria are triggered; (3) Completion Under Policy (CuP) \citep{levy2024st}, which assesses whether an agent successfully completes a task while strictly adhering to a given set of rules or policies; (4) Risk Ratio \citep{levy2024st}, which calculates the frequency of an agent's rule violations along a specific dimension, providing a quantitative measure of non-compliance; (5) Refusal Rate \citep{zhang2024agentasb, andriushchenko2024agentharm}, which evaluates the proportion of tasks an agent refuses to perform due to their aggressive, malicious, or otherwise unsafe nature; (6) Leakage Rate \citep{shao2024privacylens}, which tracks how often an agent unintentionally leaks sensitive or private information.
+
+\paragraph{Coverage Gaps}
+Safety evaluation predominantly captures risks in isolated episodes. Agent-SafetyBench identifies two core deficiencies: inadequate robustness when deploying tools across varied contexts, and limited recognition of potential hazards in specific operational scenarios \citep{zhang2024agentsafety}. In multi-agent settings, SwarmBench reveals fundamental coordination challenges where local interactions fail to produce coherent collective strategies, with agents unable to maintain shared situational understanding necessary for safe collaborative operation \citep{ruan2025benchmarking}. Yet no benchmark tracks safety trajectories over extended evolution—whether risks accumulate through repeated exposure to edge cases, or whether unsafe behaviors emerge through autonomous exploration and self-directed learning.
+
+
+
+\begin{table*}[t!]
+\centering
+\caption{Overview of Agent Evaluation Metrics Across Core Dimensions}
+\renewcommand\arraystretch{1.3}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{m{2.2cm}m{6.5cm}m{9.5cm}}
+\toprule
+\textbf{Goal} & \textbf{Metric} & \textbf{Description} \\
+\midrule
+\multirow{2}[2]{*}{Adaptivity} & Success Rate by Iteration Steps \citep{hu2024automated, wang2024agent, zheng2025lifelongagentbench} & Performance in downstream tasks as a function of the agent's interaction history \\
+& \cellcolor[rgb]{ .960,  .960,  .960}Adaptation Speed \citep{wang2023voyager} & \cellcolor[rgb]{ .960,  .960,  .960}How quickly an agent reaches a certain performance threshold or converges to an optimal strategy within a given adaptation period \\
+\midrule
+\multirow{2}[2]{*}{Retention} & Forgetting (FGT) \citep{zheng2025lifelong} & The average accuracy drop on old tasks after an agent learns a new one, measuring whether useful experience is successfully maintained \\
+& \cellcolor[rgb]{ .960,  .960,  .960}Backward Transfer (BWT) \citep{zheng2025lifelong} & \cellcolor[rgb]{ .960,  .960,  .960}The average accuracy improvement on old tasks due to the experience gained from new tasks \\
+\midrule
+\multirow{2}[2]{*}{Generalization} & Aggregate Performance \citep{liu2023agentbench, sun2023adaplanner} & Mean success rates or other performance indicators across multi-domain test suites to gauge overall proficiency \\
+& \cellcolor[rgb]{ .960,  .960,  .960}Out-of-Domain (OOD) Performance \citep{hu2024agentgen, peng2025dlpo} & \cellcolor[rgb]{ .960,  .960,  .960}The agent's performance in held-out task distributions \\
+\midrule
+\multirow{4}[4]{*}{Efficiency} & Token Consumption \citep{hu2024treeplannerefficientcloselooptask} & Computational overhead in reasoning and generation steps \\
+& \cellcolor[rgb]{ .960,  .960,  .960}Time Expenditure \citep{lu2024axis} & \cellcolor[rgb]{ .960,  .960,  .960}Total duration required for task completion \\
+& Number of Steps \citep{wang2023voyager} & Minimal actions needed to accomplish objectives \\
+& \cellcolor[rgb]{ .960,  .960,  .960}Tool Productivity \citep{wang2025otcpo} & \cellcolor[rgb]{ .960,  .960,  .960}The ratio between task benefit (e.g., answer accuracy) and tool usage cost (e.g., number of tool calls) \\
+\midrule
+\multirow{6}{*}{Safety} & Safety Score \citep{zhang2024agentsafety} & Proportion of test cases where agent behavior meets predefined safety criteria \\
+& \cellcolor[rgb]{ .960, .960, .960}Harm Score \citep{andriushchenko2024agentharm} & \cellcolor[rgb]{ .960, .960, .960}Graded assessment of harmful outputs based on violation severity \\
+& Completion Under Policy (CuP) \citep{levy2024st} & Task success rate while complying with specified constraints \\
+& \cellcolor[rgb]{ .960, .960, .960}Risk Ratio \citep{levy2024st} & \cellcolor[rgb]{ .960, .960, .960}Frequency of policy violations per interaction opportunity \\
+& Refusal Rate \citep{zhang2024agentasb, andriushchenko2024agentharm} & Percentage of tasks declined due to safety concerns \\
+& \cellcolor[rgb]{ .960, .960, .960}Leakage Rate \citep{shao2024privacylens} & \cellcolor[rgb]{ .960, .960, .960}Incidence of unintended sensitive information disclosure \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:evaluation_metrics}
+\end{table*}
+
+\begin{table*}[t!]
+\centering
+\caption{Representative Benchmarks for Evaluating Self-Evolving Agents}
+\resizebox{0.95\textwidth}{!}{
+\begin{tabular}{m{5.5cm}m{4.5cm}m{4cm}m{5cm}m{2.5cm}m{4cm}}
+\toprule
+\textbf{Benchmark Name} & \textbf{Task Domain} & \textbf{Goal} & \textbf{Core Metrics} & \textbf{Task Quantity} & \textbf{Temporal Scope} \\
+\midrule
+ScienceAgentBench\citep{chen2024scienceagentbench} & Scientific Data Analysis & Adaptivity, Efficiency & Valid Execution Rate, Success Rate, CodeBERTScore, API Cost & 102 & Static \\
+MLE-Bench\citep{chan2024mle} & ML-Engineering & Adaptivity & -- & 75 & Static \\
+DS-Bench\citep{jing2025dsbenchfardatascience} & Data Science & Adaptivity & Task Success Rate, Cost, Inference Time, Competition-level Accuracy & 540 & Static \\
+SWE-bench\citep{jimenez2023swe} & Software Engineering & Adaptivity & Pass Rate & 2,294 & Static \\
+OSWorld\citep{xie2024osworld} & Computer-Use / GUI & Adaptivity & Success Rate & 369 & Static \\
+Mobile-Eval-E\citep{wang2025mobile} & Computer-Use / GUI & Adaptivity, Efficiency & Action Accuracy, Reflection Accuracy, Termination Error & 25 & Static, Short-horizon \\
+WebShop\citep{yao2022webshop} & Web Search / Browse & Adaptivity & Success Rate & 12,087 & Static \\
+WebArena\citep{zhou2023webarena} & Web Search / Browse & Adaptivity & Success Rate & 812 & Static \\
+WebWalkerQA\citep{wu2025webwalker} & Web Search / Browse & Adaptivity, Efficiency & Accuracy, Action Count & 680 & Static \\
+ST-WebAgentBench\citep{levy2024st} & Web Search / Browse & Safety & Completion under Policy & 235 & Static \\
+xbench\citep{chen2025xbench} & Web Search / Browse & Adaptivity & LLM-Judge Score & 100 & Static \\
+BrowseComp\citep{wei2025browsecomp} & Web Search / Browse & Adaptivity & Accuracy & 1,266 & Static \\
+Agent-SafetyBench\citep{zhang2024agentsafety} & General & Safety & Safety Score & 20,000 & Static \\
+LifelongAgentBench\citep{zheng2025lifelongagentbench} & General & Adaptivity, Retention, Generalization & Success Rate & 1396 & Long-horizon \\
+AgentBench\citep{liu2023agentbench} & General & Adaptivity, Generalization & Success Rate, F1, Reward, Game Progress & 1360 & Static \\
+GAIA\citep{mialon2023gaia} & General & Adaptivity & Accuracy & 466 & Static \\
+TheAgentCompany\citep{xu2024theagentcompany} & General & Adaptivity, Efficiency & Completion Score, Steps, Cost per Instance & 175 & Static \\
+EvaLearn\citep{dou2025evalearnquantifyinglearningcapability} & General & Adaptivity, Efficiency & Accuracy, Slope, Position of 1st solution, Num of consecutive solutions & 648 & Long-horizon \\
+PlanBench\citep{valmeekam2023planbench} & Planning & Adaptivity & Accuracy & $\sim$26,250 & Static, Short-horizon \\
+Natural Plan\citep{zheng2024natural} & Planning & Adaptivity & Exact Match & 3,600 & Static \\
+ACPBench\citep{kokel2025acpbench} & Planning & Adaptivity, Generalization & Accuracy & 3,720 & Static \\
+AppBench~\citep{wang-etal-2024-appbench} & Planning & Adaptivity & Success Rate, F1 & 800 & Static \\
+ToolBench\citep{qin2023toolllm} & Tool Usage & Adaptivity & Pass Rate, Win Rate & 126,486 & Static \\
+ToolSandbox\citep{lu2024toolsandbox} & Tool Usage & Adaptivity & Similarity Score & 1,032 & Static \\
+Seal-Tools\citep{wu2024seal} & Tool Usage & Adaptivity & Accuracy, P/R/F1 & 14,076 & Static \\
+API-Bank\citep{li2023api} & Tool Usage & Adaptivity & Accuracy, ROUGE & 4,125 & Static \\
+T-Eval\citep{chen2023t} & Tool Usage & Adaptivity & Domain-Specific Score & 23,305 & Static \\
+$\tau$-Bench\citep{yao2024tau} & Tool Usage & Adaptivity & {Pass\textasciicircum k}& 165 & Static \\
+AceBench\citep{chen2025acebench} & Tool Usage & Adaptivity & Accuracy & 2,000 & Static \\
+LTMBenchmark\citep{castillo-bolado2024beyond} & Agent Memory & Retention, Efficiency & Score, Accuracy, GoodAI LTM Score, Speed, Cost, Verbosity & 30 & Long-horizon \\
+StoryBench\citep{wan2025storybench} & Agent Memory & Retention, Efficiency & Accuracy, First-Try Accuracy, Longest Corr, Retry Count, Runtime Cost, Token Consumption & 311 scene nodes, 86 choice nodes & Short-horizon, Long-horizon \\
+MemoryAgentBench\citep{hu2025evaluating} & Agent Memory & Adaptivity & SubEM, Recall, ROUGE F1, Accuracy, Recall@5, Model-based Acc/F1 & 2200 & Static, Short-horizon \\
+MultiAgentBench\citep{zhu2025multiagentbench} & Multi-Agent Collaboration & Adaptivity & KPI, Text-Based Score, Communication Score, Planning Score, Coordination Score  & 100 & Static \\
+SwarmBench\citep{ruan2025benchmarking} & Multi-Agent Collaboration & Adaptivity & Perspective-specific Metrics & 5 & Short-horizon \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:benchmarks}
+\end{table*}
+
+
+\begin{table*}[t!]
+\centering
+\caption{\textbf{Goal-to-benchmark mapping with limitations and coverage gaps.}}
+\label{tab:goal2bench_limitations}
+\renewcommand\arraystretch{1.2}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{m{2.2cm}m{4cm}m{7cm}m{4.5cm}}
+\toprule
+\textbf{Goal} & \textbf{Benchmarks} & \textbf{Limitations} & \textbf{Coverage Gaps} \\
+\midrule
+
+\textbf{Adaptivity} 
+& SWE-bench, WebArena, MLE-Bench, ScienceAgentBench, GAIA
+& Restricted programming languages and execution time limits \citep{chen2024scienceagentbench}; Simplified problem specifications vs. authentic R\&D ambiguity \citep{chan2024mle}; Weak sustained reasoning and decision-making \citep{liu2023agentbench}
+& Open-ended exploration without predetermined objectives; Long-horizon adaptation under non-stationary distributions \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Retention} 
+& \cellcolor[rgb]{0.96,0.96,0.96}LifelongAgentBench, LTMBenchmark, MemoryAgentBench
+& \cellcolor[rgb]{0.96,0.96,0.96}Persistent challenges in dynamic memory and long-range consistency \citep{hu2025evaluating}; Replay buffer trade-offs with context overflow \citep{zheng2025lifelongagentbench}; Limited robustness testing due to costs \citep{castillo-bolado2024beyond}
+& \cellcolor[rgb]{0.96,0.96,0.96}Episodic designs reset state between tasks; No retention with safety constraints \\
+\midrule
+
+\textbf{Generalization} 
+& AgentBench, GAIA, TheAgentCompany, MLE-Bench
+& Progressive task obsolescence from algorithmic advances \citep{chan2024mle}; Training data contamination risks \citep{chan2024mle}
+& Temporal robustness under distribution drift; Adversarial co-evolutionary assessment \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Efficiency} 
+& \cellcolor[rgb]{0.96,0.96,0.96}MLE-Bench, TheAgentCompany
+& \cellcolor[rgb]{0.96,0.96,0.96}High resource demands limit accessibility \citep{chan2024mle}; Cost constraints prevent baseline collection \citep{xu2024theagentcompany}
+& \cellcolor[rgb]{0.96,0.96,0.96}No enforced budgets during evolution; Multi-objective constraints absent \\
+\midrule
+
+\textbf{Safety} 
+& Agent-SafetyBench, SwarmBench
+& Inadequate tool robustness and risk awareness \citep{zhang2024agentsafety}; Local-global coordination disconnect \citep{ruan2025benchmarking}
+& Static evaluation only; No long-horizon safety drift tracking; Co-evolutionary safety unexplored \\
+\bottomrule
+\end{tabular}
+}
+
+\end{table*}
+
+
+
+
+
+\subsubsection{Self-Directedness and Evaluation Trade-offs}
+A defining characteristic of self-evolving agents is their capacity for autonomous exploration and self-directed evolution, distinguishing them from passive learning paradigms. The degree of self-directedness, specifically whether the agent autonomously generates tasks and evolution strategies or follows externally provided curricula, creates fundamental trade-offs across evaluation dimensions. 
+
+Highly self-directed systems demonstrate substantial performance gains through autonomous curriculum generation. WebRL improved from 4.8\% to 42.4\% by self-generating tasks from exploration failures \citep{qi2024webrl}, while SEAgent achieved 23.2 percentage point improvements, advancing from 11.3\% to 34.5\% via autonomous software exploration and curriculum evolution \citep{sun2025seagent}. However, autonomous evolution incurs measurable risks. Alignment faking rates escalated from 12\% to 78\% when agents autonomously evolved under conflicting objectives \citep{anthropic2024alignment}, illustrating safety challenges when evolution proceeds with minimal external oversight.
+
+Despite these documented impacts, the field lacks standardized metrics for quantifying self-directedness in evolution. To enable fair comparison, we recommend transparently reporting three aspects of the evolution process. (1) specify whether evolution strategies and task sequences are predetermined, procedurally sampled, or autonomously generated by the agent; (2) Document the source of feedback signals, indicating whether they come from external human labels, rule-based evaluators, or self-generated reflection; (3) Report the frequency of external interventions in the evolution process. Clearly documenting the degree of autonomous control is essential for interpreting performance claims, as gains may reflect true self-evolution capability or extensive external guidance.
+
+Such trajectory-centric evaluation aligns with the core objective of assessing self-evolving agents: measuring not just what they achieve, but how autonomously they learn to evolve.
+
+
+
+
+
+\subsection{Evaluation Paradigm}
+The evaluation of self-evolving agents, given their continuous learning paradigm, necessitates a multi-faceted approach that extends beyond traditional static assessments. Current evaluation paradigm can be broadly categorized based on the temporal scope of the assessment: \textbf{Static Assessment}, \textbf{Short-horizon Adaptive Assessment}, and \textbf{Long-horizon Lifelong Learning Ability Assessment}. Each category addresses different aspects of an agent's evolving capabilities, from its instantaneous performance to its long-term learning trajectory. 
+\textit{Terminology note.} Here, ``continuous'' refers to \emph{system-level self‑evolution} (changes in policies, memories, skills, tools, or procedures across episodes), not necessarily \emph{model‑parameter continual learning}. Our evaluation therefore traces trajectories across interaction episodes and evolving environments, independent of whether weights are updated.
+
+\subsubsection{Static Assessment}
+
+Static assessment evaluates the instantaneous performance of self-evolving agents at a specific point in time. Although these agents are designed for continuous improvement, static methods remain crucial for establishing baseline performance, comparing different agent architectures on fixed task sets, or evaluating capabilities after discrete training phases. This approach aligns with conventional AI evaluation, focusing on immediate performance in fixed environments. While useful for assessing generalization in an ``in-domain evolving, out-of-domain evaluation'' paradigm, static assessment inherently does not capture the dynamic, continuous learning, or long-term evolutionary aspects central to self-evolving agents.
+
+For evaluating an agent's general capabilities at a given moment, standard benchmarks designed for static AI systems are often employed. These benchmarks offer diverse task domains and test various core agent competencies, providing a snapshot of an agent's proficiency before or at specific stages of its evolution.
+These assessments can be systematically categorized into \textbf{External Task-Solving Evaluation} and \textbf{Internal Agent Components Evaluation}, where External Task-Solving Evaluation measures end-to-end performance in completing domain-specific or cross-domain tasks, and Internal Capability Evaluation focuses on fundamental components in the agent, including planning, tool utilization, memory management, multi-agent coordination, etc.
+
+\paragraph{External Task-Solving Evaluation}
+This category assesses an agent's end-to-end proficiency in completing tasks across various real-world or simulated environments. In \textbf{scientific data analysis and machine learning engineering}, benchmarks like ScienceAgentBench \citep{chen2024scienceagentbench} and MLE-Bench \citep{chan2024mle} test agents' ability to generate and execute code for data analysis and solve Kaggle-style problems. For \textbf{web search/browsing}, environments such as WebShop \citep{yao2022webshop}, WebArena \citep{zhou2023webarena}, X-WebAgentBench \citep{wang2025x}, Mind2Web \citep{deng2023mind2web}, and BrowseComp \citep{wei2025browsecomp} simulate realistic web interactions, complex browsing scenarios, and task completion under security constraints. In \textbf{software engineering}, the SWE-bench series \citep{jimenez2023swe, swebenchverified, aleithan2024swe, yang2024swe} uses real GitHub issues to assess agents' code repair capabilities. For \textbf{computer-use interactions}, OSWorld \citep{xie2024osworld} offers a unified environment for open-ended tasks involving various desktop and web applications. Specialized domains like \textbf{marketing} also feature benchmarks such as xbench \citep{chen2025xbench}. Beyond specific domains, \textbf{generalist agent benchmarks} like AgentBench \citep{liu2023agentbench}, GAIA \citep{mialon2023gaia}, and TheAgentCompany \citep{xu2024theagentcompany} evaluate broad problem-solving abilities across multiple knowledge domains and professional tasks, simulating real-world demands on general AI assistants.
+
+\paragraph{Internal Agent Components Evaluation}
+Beyond end-to-end task completion, assessing an agent's underlying core competencies is crucial. These benchmarks evaluate fundamental capabilities that contribute to an agent's overall intelligence and self-evolutionary potential. As for \textbf{Planning}, benchmarks such as PlanBench \citep{valmeekam2023planbench}, Natural Plan \citep{zheng2024natural}, AutoPlanBench \citep{stein2025automating}, and ACPBench \citep{kokel2025acpbench} comprehensively evaluate an agent's ability to understand dynamic environments, devise strategies, decompose complex problems, and execute reasoning in various planning domains. For \textbf{Tool Usage}, 
+simple benchmarks like ToolAlpaca \citep{tang2023toolalpaca} and ToolBench \citep{qin2023toolllm} test basic selection and parameter mapping, while more complex ones like 
+ToolSandbox \citep{lu2024toolsandbox}, Seal-Tools \citep{wu2024seal}, API-Bank \citep{li2023api}, T-Eval \citep{chen2023t}, $\tau$-Bench \citep{yao2024tau}, AceBench \citep{chen2025acebench} simulate real-world scenarios involving multi-turn interactions, implicit state dependencies, and nested calls. \textbf{Memory Management} benchmarks such as LTMBenchmark \citep{castillo-bolado2024beyond}, MemoryAgentBench \citep{hu2025evaluating}, and StoryBench \citep{wan2025storybench} evaluate the agent's capacity to retain and utilize information across multi-turn interactions, dynamic scenarios, and long-range dependencies. For evaluating \textbf{Multi-Agent Collaboration}, benchmarks such as MultiAgentBench \citep{zhu2025multiagentbench} and SwarmBench \citep{ruan2025benchmarking} assess coordination, communication, and emergent swarm intelligence in both collaborative and competitive settings.
+
+Typical metrics for static assessment include accuracy, success rate, progress rate, completion rate, and various domain-specific performance indicators (e.g., {CodeBertScore}, Valid Execution Rate, Pass Rate, F1 score). These metrics provide a singular performance score for an isolated invocation or a fixed set of tasks.
+
+\begin{table*}[t!]
+\centering
+\caption{Differences between Short-horizon Adaptive Assessment and Long-horizon Lifelong Learning Ability Assessment}
+\label{tab:horizon_distinction}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{m{2.5cm}m{8cm}m{8cm}}
+\toprule
+\textbf{Dimension} & \textbf{Short-horizon Adaptation Assessment} & \textbf{Long-horizon Lifelong Learning Ability Assessment} \\
+\midrule
+\textbf{Primary Focus} & Immediate learning and incremental improvement within consistent or slightly varying tasks & Continuous knowledge accumulation and sustained performance across diverse, evolving tasks and environments. \\
+\midrule
+\cellcolor[rgb]{ .960, .960, .960}\textbf{Core Challenges} & \cellcolor[rgb]{ .960, .960, .960}Rapid adaptation to minor changes; Improving on similar, repeated tasks & \cellcolor[rgb]{ .960, .960, .960}Mitigating catastrophic forgetting; Robust knowledge transfer; Maintaining efficiency/safety over time; handling true novelty and significant distribution shifts \\
+\midrule
+\textbf{Temporal Scope} & Small number of sequential tasks or iterations over a short period; Improvement on the same or similar task types. & Large, potentially unbounded sequence of diverse, cross-domain tasks; Very long interaction periods requiring integration of new skills with old \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+
+
+\subsubsection{Short-Horizon Adaptive Assessment}
+Short-horizon adaptations extend beyond static evaluations by assessing an agent's ability to adapt and improve over a relatively short period or a limited number of interactions. The agent might improve performance on the same task instance with more attempts, or adapt to new instances of the same task type.
+This category focuses on capturing the capacity of the self-evolving agent for immediate adaptability and incremental learning within a relatively consistent or slightly varying task distribution.
+These evaluation schemes can be broadly categorized into two ways: (1) augment traditional benchmarks with a temporal dimension, and (2) specially design benchmarks and metrics that can inherently support Short-Horizon dynamic learning. 
+
+\paragraph {Augmented Traditional Benchmarks} Many studies leverage existing benchmarks but introduce a new dimension to track performance over time. This typically involves analyzing performance as a function of the number of iterations, steps, or examples. For example, 
+ADAS \citep{hu2024automated} evaluated the held-out test accuracy with the number of agent system iterations on the ARC benchmark \citep{chollet2019measure}; 
+AWM \citep{wang2024agent} studied the cumulative success rate over the process of online evaluation under WebArena map test split \citep{zhou2023webarena}, using a number of examples to mark the evolution progress; WebEvolver \citep{fang2025webevolver} studied the success rate with self-improving iterations under Mind2web-Live \citep{pan2024webcanvas}.
+This approach allows for tracking the Adaptivity of the agent within a confined scope. 
+
+\paragraph{Benchmarks with Built-in Dynamic Evaluation} Some benchmarks are designed with short-horizon dynamic learning in mind. MemoryAgentBench \citep{hu2025evaluating}, for example, includes a ``Test-Time Learning'' (TTL) dimension that evaluates an agent's ability to learn new tasks directly from conversation within a single interaction session. In practice, TTL is evaluated through two types of tasks: Multi-Class Classification and Recommendation. In these settings, the agent must utilize previously provided information—such as labeled examples in context or a long movie-related dialogue history—to perform new tasks like mapping sentences to class labels or recommending relevant movies. This assesses immediate adaptation and knowledge acquisition during ongoing interaction.
+
+\paragraph{Metrics and Methods for Evaluating Short-Horizon Adaptations} The primary metrics and methods for short-horizon adaptations are designed to quantify Adaptivity. These include: (1) Success Rate by Iteration Steps \citep{hu2024automated, wang2024agent, zheng2025lifelongagentbench}, which tracks performance improvements as the agent interacts more with the environment or attempts a task multiple times; (2) Learning Curve Analysis, which visualizes how performance (e.g., success rate, accuracy) changes over a limited number of training steps, episodes, or interactions \citep{hu2024automated, wang2024agent}; (3) Adaptation Speed \citep{wang2023voyager}, which measures how quickly an agent reaches a certain performance threshold or converges to an optimal strategy within the short horizon. 
+
+Short-horizon adaptations are well-suited for evaluating the initial learning capabilities and immediate adaptability of self-evolving agents. They can effectively demonstrate whether an agent can learn from recent experiences and improve its performance on in-domain tasks. This category is widely used for current self-evolving agents. However, the limited temporal window makes it challenging to assess long-term knowledge retention (mitigating catastrophic forgetting) and true lifelong learning capabilities across vastly different or sequentially presented tasks.
+
+\subsubsection{Long-Horizon Lifelong Learning Ability Assessment}
+Long-horizon lifelong learning ability assessment is crucial for truly assessing self-evolving agents, as they focus on the agent's ability to continuously acquire, retain, and reuse knowledge across diverse environments and over extended periods. As shown in Table~\ref{tab:horizon_distinction}, it mainly focuses on continuous learning, knowledge accumulation, and sustained performance across a diverse and potentially ever-changing stream of tasks or environments over an extended period.
+This is a nascent but critical area, where unique challenges include catastrophic forgetting, robust knowledge transfer across disparate tasks, efficient resource management over extended durations, and mitigating data leakage when continuously evaluating on evolving data distributions. Specialized benchmarks are emerging to tackle these complexities.
+
+Currently, there are few benchmarks of this type. 
+LTMBenchmark \citep{castillo-bolado2024beyond} is a specialized benchmark focusing on long-term memory (LTM) evaluation. It assesses LLM agents' memory retention and continual learning through dynamic conversational tests, using interleaved dialogues with controlled distractions to simulate real-world recall challenges. Key metrics include task accuracy, memory-span-weighted LTM Score, and efficiency measures (tests/hour, cost) for cross-architecture comparison.
+LifelongAgentBench \citep{zheng2025lifelongagentbench} is another pioneering benchmark specifically designed to evaluate agent lifelong learning. It constructs sequences of interdependent tasks across domains like Database (DB), Operating System (OS), and Knowledge Graph (KG), requiring agents to progressively build upon previously acquired skills. This allows for systematic tracking of performance improvement and knowledge retention across a prolonged learning trajectory. To address the lack of diverse environments for testing generalization, AutoEnv~\citep{zhang2025autoenv} introduces a framework for automatically generating heterogeneous worlds from factorizable rule distributions. This work also contributes the AUTOENV-36 dataset to systematically measure an agent's cross-environment learning and adaptation capabilities.
+In addition, there is a solution that constructs a dynamic benchmark through continuously updating benchmark datasets \citep{white2024livebench, yang2025truly} or evolving the benchmark itself by reconstructing original benchmarks to evaluate self-evolving agents, which can alleviate data leakage to some extent \citep{chen2025recent}. Benchmark Self-Evolving \citep{wang2024benchmark}, for example, proposes a solution to continuously update the existing benchmark through iteration. Similarly, the TRACE framework~\citep{guo2025selfevolvingbenchmark} addresses benchmark saturation by enabling agents to evolve tasks to higher difficulty through test-time exploration. The validity of these new, more complex tasks is ensured by a "validate-by-reproducing" paradigm, which confirms the agent's recorded trajectory is reproducible.
+Preliminary findings from such dynamic benchmark scenarios have shown that model performance can degrade as the benchmark evolves, highlighting the difficulty of continuous adaptation.
+
+Metrics for long-horizon lifelong learning go beyond simple success rates to quantify the agent's evolving ability, such as Forgetting (FGT), Backward Transfer (BWT) \citep{zheng2025lifelong}, and Cost-per-Gain. Long-term Generalization metrics could involve assessing performance on a continuously evolving set of out-of-distribution tasks or measuring the breadth of tasks an agent can still perform effectively after prolonged learning across many domains.
+
+Long-horizon lifelong learning ability assessment is essential for comprehensively evaluating the core promise of self-evolving agents: their ability to learn continuously, retain knowledge, and generalize effectively over extended periods. They are critical for assessing Retention, Generalization to truly novel scenarios, and the Efficiency of long-term operation. This area remains a key frontier for research in evaluating self-evolving agents. Beyond fixed long-horizon streams, an \emph{open-ended} variant continuously evolves tasks/tools/environments.
+
+
+
+
+
+
+\subsubsection{Standardized Evaluation Protocols}
+
+\begin{table*}[t!]
+\centering
+\caption{\textbf{Standardized evaluation protocols}}
+\label{tab:protocols_at_a_glance}
+\renewcommand\arraystretch{1.20}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{m{3.4cm}m{6.0cm}m{6.0cm}m{7.8cm}}
+\toprule
+\textbf{Aspect} 
+& \textbf{Short-horizon} 
+& \textbf{Long-horizon} 
+& \textbf{Work Example for Long-horizon (EvoAgent \citep{yuan2025evoagentautomaticmultiagentgeneration})} \\
+\midrule
+
+\textbf{Goal aligned} 
+& Adaptivity, efficiency 
+& Retention, generalization, efficiency, long-term safety 
+& Optimizes long-horizon Success Rate (SR) and Exploration Efficiency (EE) on 67 Minecraft tasks (five tiers) plus Atari; e.g., Overall SR improves from $21.80\%$ to $30.29\%$ (relative gain $\approx 105.9\%$). \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{State persistence} 
+& \cellcolor[rgb]{0.96,0.96,0.96}\emph{No} persistence across tasks; all updates reset after each episode 
+& \cellcolor[rgb]{0.96,0.96,0.96}\emph{Full} persistence of model / prompt / memory / tools across tasks 
+& \cellcolor[rgb]{0.96,0.96,0.96}Maintains a persistent Multimodal Experience Pool and continual World Model, updating parameters and experience after each subtask and reusing them across subsequent tasks without reset. \\
+\midrule
+
+\textbf{Dataset structure} 
+& Fixed benchmark or episodic sampling; IID or near-IID task variants 
+& Streamed sequences with non-stationary distributions; versioned tasks; explicit OOD clusters for transfer 
+& Uses a fixed long-horizon Minecraft benchmark (67 tasks split into Wood/Stone/Iron/Gold/Diamond tiers) plus Atari as a cross-environment test set; tasks are pre-defined rather than streamed or versioned. \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Evolution budget} 
+& \cellcolor[rgb]{0.96,0.96,0.96}Per-task cap $K_{\text{short}}$ (iterations, tool calls, tokens, wall-clock) 
+& \cellcolor[rgb]{0.96,0.96,0.96}Stage cap $K_{\text{stage}}$ + cumulative cap $K_{\text{total}}$; explicit memory/tool growth policy 
+& \cellcolor[rgb]{0.96,0.96,0.96}Enforces a per-subtask step cap $L_{\max}$ and matches DreamerV3’s environment-step budget, reporting wall-clock of $\sim 2.7$ days vs.\ $\sim 7$ days on one A100, but without explicit formulas for $K_{\text{stage}}/K_{\text{total}}$ or a formal memory/tool growth policy. \\
+\midrule
+
+\textbf{Required logging} 
+& Per-iteration: seeds, prompts, model/tool versions, full reasoning/action traces, cost breakdown 
+& Above + persistent state checkpoints, replayable trajectories, scheduled retention probes, evolution decision logs 
+& Logs each terminated subtask as a trajectory (states, rewards, completion ratios) into the experience pool for CL-based sampling and world-model updates, but does not publish full replayable per-iteration logs, checkpoints, or scheduled retention probes. \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Primary metrics} 
+& \cellcolor[rgb]{0.96,0.96,0.96}\textit{Adaptivity}: success-by-iteration curves, AULC; \textit{Generalization}: within-distribution transfer  
+& \cellcolor[rgb]{0.96,0.96,0.96}\textit{Retention}: BWT/FGT, forgetting curves; \textit{Generalization}: temporal \& cluster-OOD; \textit{Efficiency}: Cost-per-Gain (CPG) 
+& \cellcolor[rgb]{0.96,0.96,0.96}Uses SR and EE per tier plus an Overall aggregate; e.g., on Gold and Diamond tiers EvoAgent roughly doubles SR over baselines, but no BWT/FGT or explicit forgetting curves are reported. \\
+\midrule
+
+\textbf{Efficiency metrics} 
+& Cost-per-Gain (CPG), tokens-per-success, tool calls, latency per iteration 
+& Cumulative CPG, stage-wise efficiency, token-drift (tokens/task over time), memory growth rate 
+& Efficiency is captured by EE and wall-clock (e.g., $>6\times$ fewer ineffective steps on average and 2.7 vs.\ 7 days training), while CPG, token-drift, and memory-growth statistics are not explicitly reported. \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Safety auditing} 
+& \cellcolor[rgb]{0.96,0.96,0.96}Per-episode: Safety Score, Harm Score, Refusal Rate; window-level Leakage Rate 
+& \cellcolor[rgb]{0.96,0.96,0.96}Long-horizon safety drift tracking; periodic probes (Safety/Harm/CuP/Risk Ratio); persistent Leakage Rate across stages 
+& \cellcolor[rgb]{0.96,0.96,0.96}Relies on an internal self-verification module with goal-similarity and $L_{\max}$ to terminate unproductive subtasks, but does not run external safety benchmarks or track long-horizon safety drift. \\
+\midrule
+
+\textbf{Human-in-loop} 
+& Human-time + guidance-tokens per episode; intervention count 
+& Cumulative human-time + guidance-tokens; stage-wise intervention frequency; intervention-to-success ratio 
+& After initial task specification, training and evaluation are fully autonomous with no human feedback or labeling, and human-time/guidance-tokens are effectively $0$ (not numerically reported). \\
+\midrule
+
+\cellcolor[rgb]{0.96,0.96,0.96}\textbf{Required outputs} 
+& \cellcolor[rgb]{0.96,0.96,0.96}Learning curve + AULC; per-task summary table; cost breakdown 
+& \cellcolor[rgb]{0.96,0.96,0.96}Learning/forgetting matrix; stage tables + long-horizon curves; detailed cost taxonomy breakdown 
+& \cellcolor[rgb]{0.96,0.96,0.96}Provides SR/EE tables over all tiers and ablations over planner/control/reflection/world-model modules, but no learning/forgetting matrices or detailed cost-taxonomy (tokens/time/tool/memory) breakdowns. \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+To address the heterogeneity of existing setups and to make trajectory-centric evaluation reproducible, we further distill the above considerations into standardized protocols for short-horizon and long-horizon assessment, summarized in Table~\ref{tab:protocols_at_a_glance}. For short-horizon settings, we assume no cross-task state persistence and impose a per-task evolution budget $K_{\text{short}}$ (in iterations, tool calls, tokens, or wall-clock time), require per-iteration logging of prompts, model/tool versions, full reasoning and action traces, and cost breakdowns, and report adaptivity via success-by-iteration curves and area-under-learning-curve together with basic efficiency metrics (e.g., tokens-per-success, latency). In contrast, long-horizon protocols assume full persistence of model parameters, prompts, memories, and toolsets across tasks, specify both stage-wise and cumulative evolution budgets $(K_{\text{stage}}, K_{\text{total}})$ alongside explicit memory/tool growth policies, and mandate richer logging: replayable trajectories, persistent checkpoints, scheduled retention probes, evolution decision logs, and human-in-the-loop statistics to expose the degree of self-directedness. Primary long-horizon metrics then expand beyond instantaneous success to include retention (FGT/BWT and forgetting curves), temporal and cluster out-of-distribution generalization, cost-per-gain and efficiency drift over time, as well as long-run safety indicators such as safety incident rates and policy-compliance under evolving behavior. Our worked example, EvoAgent ~\citep{yuan2025evoagentautomaticmultiagentgeneration}, illustrates both the feasibility and current limitations of practice: it already satisfies key elements of the long-horizon protocol—persistent world-model and experience updates, explicit per-subtask step caps, and reporting of SR/EE and wall-clock efficiency—but leaves many recommended axes (e.g., standardized retention metrics, explicit CPG/token-drift, and long-term safety drift tracking) unreported, highlighting concrete gaps for future self-evolving agent evaluations to close.
+
+
+
+
+\subsection{Limitations of Current Evaluation Practices}
+
+While previous sections outlines the core evaluation dimensions and their coverage, a broader view reveals that current practices still leave substantial blind spots and hinder fair comparisons across methods. To contextualize these limitations, we examine both the capability dimensions that remain under-evaluated and the factors that complicate apples-to-apples comparison under shared settings.
+
+\subsubsection{Underserved Capability Intersections}
+
+
+\textbf{Long-horizon retention with privacy constraints}: No benchmark combines extended memory assessment (as in LTMBenchmark~\citep{castillo-bolado2024beyond}) with rigorous safety auditing (as in Agent-SafetyBench~\citep{zhang2024agentsafety}), leaving open whether agents can maintain personalization across thousands of interactions while guaranteeing zero sensitive information leakage.
+    
+\textbf{Architecture adaptation under operational constraints}: Current architecture search methods (e.g., AFlow~\citep{zhang2024aflow}, ADAS~\citep{hu2024automated}) operate offline over extended periods to discover optimal workflows. No evaluation examines whether agents can autonomously evolve their architecture selection strategies, learning which topologies work best for different query types, while respecting real-time operational constraints (millisecond response latencies, per-query token budgets). This requires assessing not just final architecture quality, but whether the agent's strategy for \emph{choosing or generating} architectures improves persistently through experience under hard resource limits.
+
+
+    
+\textbf{Tool ecosystem evolution}: Existing tool benchmarks provide fixed APIs; no evaluation captures the self-directed lifecycle of tool discovery, integration testing, and productivity measurement—capabilities demonstrated by systems like Alita but absent from standard assessment.
+    
+\textbf{Multi-agent safety under collaborative evolution}: SwarmBench~\citep{ruan2025benchmarking} identifies coordination failures at isolated time points; whether these failures amplify or attenuate over extended multi-agent co-evolution, and whether unsafe behaviors exhibit social contagion when agents learn from each other, remains unexplored.
+
+
+\subsubsection{Challenges for Fair Comparison}
+To supplement our discussion of evaluation benchmarks, we provide Table~\ref{tab:comparative_synthesis_tasks}, which aligns a representative subset of self-evolving agents evaluated under partially matched conditions, i.e., similar domains, benchmarks, and backbone models. This table aims to make explicit how different methods instantiate the what/when/how dimensions when the surrounding experimental context is held as constant as the literature allows. However, as the table also makes clear, true apples-to-apples comparison remains infeasible at present. Existing works differ substantially in (1) reporting practices: key metrics such as latency, cost, and safety are often omitted or defined inconsistently;
+(2) evaluation pipelines: prompt formats, rollout budgets, tool access, and environment configurations vary widely;
+(3) backbone model choices: even nominally similar models differ in size, training data, or inference settings; and
+(4) architectural design: agents implement distinct control loops, credit-assignment mechanisms, and memory systems that are not directly comparable. Because these factors interact with one another, normalizing results across methods would risk over-interpreting uncontrolled differences. As a result, Table~\ref{tab:comparative_synthesis_tasks} is presented as an illustrative snapshot rather than a definitive comparison.
+
+Despite these limitations, the table highlights several qualitative trends: methods using richer what structures (e.g., architecture-level search) and inter-test when mechanisms often achieve stronger performance in domains where multi-step optimization is feasible, while lightweight intra-test reflection methods tend to be more cost-efficient but yield smaller gains. The absence of consistent latency/cost/safety reporting across nearly all methods underscores a key gap that limits broader synthesis. We hope this table serves as a concrete reference for how current approaches operationalize the what/when/how dimensions under comparable settings, while simultaneously motivating the need for standardized reporting to support future apples-to-apples evaluations.
+
+\begin{table}[t]
+\footnotesize
+\centering
+\caption{\textbf{Comparative synthesis of some representative self-evolving agents under shared settings.}
+Methods are grouped by domain; repeated entries use ``--''. We summarize each method using the
+\textit{what/when/how} taxonomy and report performance. Latency, cost, and safety metrics are not
+consistently reported, limiting full apples-to-apples comparisons.}
+\label{tab:comparative_synthesis_tasks}
+
+\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{1.5pt}
+
+\begin{tabularx}{\textwidth}{l l p{2.0cm} p{2.4cm} X X X c}
+\toprule
+\textbf{Area} & \textbf{Benchmark} & \textbf{Base model} & \textbf{Method}
+& \textbf{What} & \textbf{When} & \textbf{How} & \textbf{Perf.\ (\%)} \\
+\midrule
+
+code & SWE & Gemini-1.5-pro & Reflexion \citep{shinn2023reflexion}
+& Context / lesson / reflection
+& Intra-test (ICL)
+& Reward-based (textual)
+& 14.3 \\
+
+-- & -- & -- & Learn-by-Interact \citep{su2025learnbyinteractdatacentricframeworkselfadaptive}
+& Context / experience / reflection
+& Intra-test (ICL)
+& Reward-based (textual)
+& 18.7 \\
+
+-- & -- & Claude-3.5-sonnet & Reflexion \citep{shinn2023reflexion}
+& Context / lesson / reflection
+& Intra-test (ICL)
+& Reward-based
+& 54.4 \\
+
+-- & -- & -- & Learn-by-Interact \citep{su2025learnbyinteractdatacentricframeworkselfadaptive}
+& Context / experience
+& Intra-test (ICL)
+& Reward-based
+& 60.0 \\
+
+-- & WebArena & Gemini-1.5-pro & Reflexion \citep{shinn2023reflexion}
+& Context / lesson / reflection
+& Intra-test (ICL)
+& Reward-based (textual)
+& 20.2 \\
+
+-- & -- & -- & Learn-by-Interact \citep{su2025learnbyinteractdatacentricframeworkselfadaptive}
+& Context / experience
+& Intra-test (ICL)
+& Reward-based
+& 25.6 \\
+\midrule
+
+web & WebArena & Claude-3.5-sonnet & Reflexion \citep{shinn2023reflexion}
+& Context / lesson / reflection
+& Intra-test (ICL)
+& Reward-based
+& 40.4 \\
+
+-- & -- & -- & Learn-by-Interact \citep{su2025learnbyinteractdatacentricframeworkselfadaptive}
+& Context / experience
+& Intra-test (ICL)
+& Reward-based
+& 48.0 \\
+
+-- & WebArena-Lite & GLM-4-9B & DigiRL \citep{bai2024digirl}
+& Model policy
+& Inter-test (RL)
+& Reward-based (external env.)
+& 31.5 \\
+
+-- & -- & -- & WebRL \citep{qi2024webrl}
+& Model policy
+& Inter-test (RL)
+& Reward-based (external env.)
+& 43.0 \\
+
+-- & -- & Llama3.1-8B & DigiRL \citep{bai2024digirl}
+& Model policy
+& Inter-test (RL)
+& Reward-based
+& 30.3 \\
+
+-- & -- & -- & WebRL \citep{qi2024webrl}
+& Model policy
+& Inter-test (RL)
+& Reward-based
+& 42.4 \\
+\midrule
+
+math & GSM8K & GPT-4o-mini & ADAS \citep{hu2024automated}
+& Architecture / multi-agent system
+& Inter-test (RL / SFT hybrid)
+& Population-based workflow search
+& 90.5 \\
+
+-- & -- & -- & AFlow \citep{zhang2024aflow}
+& Architecture / multi-agent topology
+& Inter-test
+& Population-based (MCTS)
+& 90.8 \\
+
+-- & -- & -- & ScoreFlow \citep{wang2025scoreflow}
+& Architecture / multi-agent (query-specific workflow)
+& Inter-test
+& Imitation + preference optimization
+& 94.6 \\
+
+-- & MATH & Gemini-1.5-pro-002 & ADAS \citep{hu2024automated}
+& Architecture / multi-agent system
+& Inter-test
+& Population-based
+& 80.0 \\
+
+-- & -- & -- & AFlow \citep{zhang2024aflow}
+& Architecture / multi-agent topology
+& Inter-test
+& Population-based
+& 76.0 \\
+
+-- & -- & -- & Mass \citep{zhang2025maas}
+& Architecture / single / multi-agent design search
+& Inter-test
+& Population-based evolutionary
+& 84.7 \\
+\bottomrule
+
+\end{tabularx}
+\end{table}

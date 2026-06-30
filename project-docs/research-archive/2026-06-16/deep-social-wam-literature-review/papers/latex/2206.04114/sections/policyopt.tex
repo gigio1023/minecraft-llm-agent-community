@@ -1,0 +1,48 @@
+\section{Policy Optimization}
+\label{sec:policyopt}
+
+Both the worker and manager policies of Director are optimized using the actor critic algorithm of Dreamer \citep{hafner2019dreamer,hafner2020dreamerv2}. 
+For this, we use the world model to imagine a trajectory in its compact latent space. 
+The actor network is optimized via policy gradients \citep{williams1992reinforce} with a learned state-value critic for variance reduction and to estimate rewards beyond the rollout:
+
+\eq{
+\text{Actor:} \quad \p<\pi>(a_t|s_t) \qquad
+\text{Critic:} \quad v(s_t)
+}
+
+The world model allows cheaply generating as much on-policy experience as needed, so no importance weighting or clipping applies \citep{schulman2017ppo}. 
+To train both actor and critic from an imagined trajectory of length $H$, $\lambda$-returns are computed from the sequence of rewards and predicted values \citep{sutton2018rlbook}:
+
+\eq{
+V^\lambda_t \doteq r_t + \gamma \Big(
+  (1 - \lambda) v(s_{t+1}) +
+  \lambda V^\lambda_{t+1}
+\Big), \quad
+V^\lambda_H \doteq v(s_H).
+}
+
+The $\lambda$-returns are averages over multi-step returns of different lengths, thus finding a trade-off between incorporating further ahead rewards quickly and reducing the variance of long sampled returns. 
+The critic is learned by regressing the $\lambda$-returns via a squared loss, where $\operatorname{sg}(\cdot)$ indicates stopping the gradient around the targets:
+
+\eq{
+\mathcal{L}(v) \doteq
+\E_{p_\phi,\pi}<\big>[ \textstyle\sum_{t=1}^{H-1}
+  \frac{1}{2}\big(v(s_t)-\operatorname{sg}(V^\lambda_t)\big)^2
+].
+\label{eq:vloss}
+}
+
+The actor is updated by policy gradients on the same $\lambda$-returns, from which we subtract the state-value $v(s_t)$ as a baseline that does not depend on the current action for variance reduction. 
+The second term in the actor objective, weighted by the scalar hyperparameter $\eta$, encourages policy entropy to avoid overconfidence and ensures that the actor explores different actions:
+
+\eq{
+\mathcal{L}(\pi)\doteq
+-\E_{\pi,p_\phi}[\textstyle\sum_{t=1}^H
+    \ln\p<\pi>(a_t|s_t)\operatorname{sg}(V^\lambda_t-v(s_t))
+    +\,\eta\H[\p<\pi>(a_t|s_t)]
+]
+\label{eq:aloss}
+}
+
+When there are multiple reward signals, such as the task and exploration rewards for the manager, we learn separate critics \citep{burda2018rnd} for them and compute separate returns, which we normalize by their exponential moving standard deviation with decay rate $0.999$. 
+The baselines are normalized by the same statistics and the weighted average of the advantages is used for updating the policy.

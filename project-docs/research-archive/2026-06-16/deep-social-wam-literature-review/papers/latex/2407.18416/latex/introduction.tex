@@ -1,0 +1,84 @@
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=1\columnwidth]{figures/teaser_redo-cropped.pdf} % example-image-duck
+    \caption{Comparison of responses between a general LLM (Left: No assigned persona) and a persona-assigned LLM (Right:\textit{``a cowboy''}).
+    Assigning the persona yields highly relevant answers as opposed to the generic \textit{``I don't have ... preferences''}.
+    }
+    \label{fig:cover_example}
+\end{figure}
+
+As the applications of LLM agents continue to rapidly diversify (customer service chatbots \cite{nandkumar2024enhancing}, code generation \cite{ugare2024improving}, robotics \cite{dalal2024plan}, etc.), a new frontier presents itself in personalizing agents to align with different users. Persona agents, i.e., LLM agents assigned with a persona, have emerged as the community standard to enable personalized user experiences at scale~\cite{louie2024roleplay, wu2024role, tseng2024two}. 
+Persona agents are a powerful construct and can imbibe the assigned persona and extrapolate to generate outputs from a persona-specific distribution (Figure~\ref{fig:cover_example}).
+
+% Persona agents are a powerful construct and enable personalized alignment of agent responses to diverse user needs. For instance, in a tractor manufacturing setting, when asked, ``\textit{What do you look for personally in a tractor}'' Claude 3.5 Sonnet typically responds with an answer citing how ``as an AI assistant'' it does not have an opinion on tractors. However, when acting as a farmer agent, it responds with, ``\textit{First off, I'm lookin' for raw power...Fuel efficiency is mighty important. Diesel ain't cheap, and every dollar saved is a dollar earned.}''
+
+These persona agents have demonstrated potential in diverse and personalized dialogue generation across various contexts \cite{li2023chatharuhi, cuicustom, han-etal-2022-meet, salemi2023lamp}, enhanced performance in tasks such as mathematical reasoning, physics, and software development~\cite{kong-etal-2024-better, xu2023expertprompting, qian2023communicative}, and simulating human behavior for scientific research in domains such as psychology \cite{li2024evaluating, huang2023revisiting, zhang2024exploring}. 
+
+However, progress on persona agents has been severely limited by a lack of robust and targeted large-scale evaluation.
+While recent research \cite{kamruzzaman2024exploring, liu2024evaluating} has addressed this to some extent, they exhibit major limitations: (1) they are static and constrain evaluation to predetermined personas. Therefore, they fail to capture the full diversity of possible agents and raise concerns about potential data contamination with new SOTA LLMs.
+(2) the persona agents are not initialized in environments relevant to the agent (i.e. a cowboy agent should be tested in farm-related environments); and (3) these benchmarks are uni-dimensional and fail to holistically evaluate personalized agents~\cite{wang2024incharacter, chen2022large, wang2023rolellm, shen2023roleeval, light2023from}.
+
+We propose \textbf{\benchmark, the first dynamic evaluation framework for persona agents}.
+\benchmark enables large-scale, multi-dimensional, and targeted evaluation of any arbitrary persona agent assigned to any arbitrary persona.
+To support this automated evaluation across \textit{any} persona in \textit{any} environment, we introduce \textbf{\score}—the first automatic metric aligned with human judgment that captures how well a persona agent acts in accordance with its assigned persona across diverse tasks and settings.
+
+\benchmark operates through a three-stage evaluation pipeline. \textit{1) Dynamic Environment Selection:} An LLM reasoner selects relevant environments from a pool of 150 diverse domains based on the agent's assigned persona.
+\textit{2) Persona-Task Generation:} Task-specific questions are dynamically generated to probe the agent’s persona-consistent behavior across each environment.
+\textit{3) Agent Response Evaluation:} The agent responds using a persona-specific system prompt. Then, \score evaluates these responses using expert-curated rubrics.
+
+To align \score with human preferences, we first generate exemplar responses at each rubric level using LLM reasoners, effectively calibrating the evaluators. Multiple state-of-the-art LLM evaluators then independently score the agent’s responses, and we ensemble their judgments to ensure robustness and reduce individual model bias.
+
+% \benchmark begins with a dynamic environment selection phase, where an LLM reasoner chooses relevant environments based on the agent's persona from a diverse pool of $150$ environments.
+% Next, in the question generation phase, task-specific questions are created to probe the agent's interactions within each environment to evaluate the agent on each task. The LLM agent then adopts the given persona utilizing a carefully crafted system prompt and responds to the generated questions. 
+% \score, given expert-curated rubric outlines for each task in \benchmark, first leverages LLM reasoners to provide tailored example responses for each possible score in the rubric to calibrate judgment with humans. \score then utilizes multiple state-of-the-art LLM evaluator models and ensemble their assigned scores to assess the agent's responses using the comprehensive rubrics.
+
+This dynamic framework avoids the pitfalls of static evaluation—namely, data contamination, lack of personalization, and limited coverage—by tailoring environments, questions, and evaluation criteria to the persona. 
+To support standardized comparisons across research, we also release a static benchmark consisting of 200 personas and 10,000 questions, while preserving \benchmark's extensibility for custom persona-agent evaluations.
+
+To ensure methodological rigor, \benchmark enforces a strict separation between \textit{evaluator models} and \textit{evaluated persona agents}, mitigating circular evaluation concerns.
+We also adopt a modular architecture for \benchmark that supports model swapping across roles. 
+This prevents overfitting to any single model’s biases and enables fairer evaluation—consistent with prior best practices \citep{selfrefine, self-instruct, schick2023toolformer}.
+
+We benchmark the capability of ten leading open and close source LLMs (namely \textsc{GPT-3.5}, \textsc{LLaMA-2-13B}, \textsc{LLaMA-2-70B}, \textsc{LLaMA-3-8B}, \textsc{Claude 3 Haiku}, \textsc{Claude 3.5 Sonnet}, \textsc{GPT-4.1}, \textsc{GPT-4.5}, \textsc{LLaMA-3.3-70B}, and \textsc{Deepseek-V3}) to act as persona agents in \benchmark.
+These models were evaluated on $200$ diverse personas encompassing $10,000$ questions.
+\benchmark demonstrates significant weaknesses in even the latest SOTA models such as \textsc{Claude 3.5 Sonnet} and \textsc{GPT-4.5}, that fail to outperform less advanced models such as \textsc{GPT-3.5} at the level they do on other tasks and domains. 
+
+Importantly, our results indicate that a \textit{model's increased size or capacity is not a definite indication of its persona agent capabilities.}
+For example, we show that \textsc{Claude 3 Haiku} is very resistant to generating responses while being a persona agent despite being a SOTA model.
+This finding should motivate future studies to carefully study the ability of all SOTA LLMs to be persona agents before deployment and to push toward highly capable and faithful persona agents. 
+
+Our main contributions are as follows:
+\begin{enumerate}
+    \item Introduced \textbf{\benchmark}, the first dynamic evaluation framework for persona agents in LLMs. Our findings show that model complexity does not guarantee enhanced persona agent abilities, underscoring \benchmark's importance in assessing persona agents. 
+    \item Established \textbf{\score} as the first automatic metric to our knowledge to quantify the capabilities of persona agents on five agent evaluation tasks. These five tasks are all grounded in decision theory and make up the different decision aspects of persona agents.
+    \item Benchmarked the \textbf{\score} of $200$ persona agents for ten open and closed source LLMs on $10,000$ agent-relevant questions
+\end{enumerate}
+
+\begin{table}[!t]
+\centering
+\definecolor{lightgray}{gray}{0.92}
+\definecolor{highlight}{HTML}{D1E7DD} % soft green
+\definecolor{rowgray}{gray}{0.97}
+\newcommand{\tick}{\textcolor{green!60!black}{\checkmark}}
+\newcommand{\cross}{\textcolor{red!70!black}{\ding{55}}} % requires pifont package
+\rowcolors{2}{rowgray}{white}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}>{\centering\arraybackslash}m{3.2cm}cccc@{}}
+\toprule
+& \makecell[c]{\textbf{RoleLLM} \\ \cite{li2023chatharuhi}} 
+& \makecell[c]{\textbf{RoleEval} \\ \cite{xu2023expertprompting}} 
+& \makecell[c]{\textbf{InCharacter} \\ \cite{xu2024character}} 
+& \cellcolor{highlight}\makecell[c]{\textbf{PersonaGym} \\ \textbf{(Ours)}} \\
+\midrule
+\textbf{Arbitrary Personas}       & \cross & \cross & \tick & \cellcolor{highlight}\tick \\
+\textbf{Persona-Tailored Ques.}   & \cross & \tick & \cross & \cellcolor{highlight}\tick \\
+\textbf{Multidimensional}         & \tick & \tick & \cross & \cellcolor{highlight}\tick \\
+\textbf{Open-Ended}               & \tick & \cross & \tick & \cellcolor{highlight}\tick \\
+\bottomrule
+\end{tabular}
+}
+\caption{Comparison of existing persona-agent evaluation frameworks. \textbf{PersonaGym} supports arbitrary personas, generates persona-specific tasks, and enables multidimensional open-ended evaluation.}
+\label{tab:dataset_compare_transposed_onecolumn}
+\end{table}
+
+

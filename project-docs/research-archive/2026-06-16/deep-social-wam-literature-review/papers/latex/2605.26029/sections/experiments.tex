@@ -1,0 +1,231 @@
+\section{Experiments}
+\label{sec:experiments}
+
+We use \projectname{} to ask four questions. (RQ1) Does correct prediction
+imply mechanism recovery? (RQ2) Which interaction regime best balances task
+accuracy and graph recovery, and can offline intervention traces replace online
+experimental choice? (RQ3) How do model family, scale, and thinking traces
+affect prediction and mechanism recovery across graph sizes? (RQ4) Why do
+agents fail, and what simple check can reduce these failures?
+The paired prediction and SCM-recovery targets separate task success from
+mechanism faithfulness, and DSL traces expose the
+hypotheses agents commit to.
+
+\subsection{Experimental Setup}
+\label{sec:exp-setup}
+
+\paragraph{Setup.}
+The main suite evaluates four models---\texttt{GPT-5-mini},
+\texttt{GPT-5.2-high}, \texttt{Qwen3.5-Thinking}, and
+\texttt{Qwen3.5-Non-thinking}---on \projectname{}'s 3--7 node graph families,
+with up to 50 topologies per (graph size, model) cell and one run
+per task. Observation--intervention scaling experiments use
+\texttt{GPT-5-mini} and \texttt{GPT-5.2-high} on the 4-node and 6-node suites.
+Targeted follow-ups use the 4-/6-node suites, primarily with
+\texttt{GPT-5-mini}. All runs use temperature 0.1 and fixed
+observation/intervention budgets per graph size
+(Appendix~\ref{app:appendix}).
+The reactor crystal's hidden
+\texttt{frequency}
+is the target in every episode, so end-task accuracy is the exact prediction
+rate for that value; mechanism recovery is scored
+separately with graph, parent, root, edge, and coefficient metrics against the
+full episode SCM. Except for the explicit observation--intervention scaling
+suite, all follow-up analyses use the mixed regime with two initial
+observations; RQ2 motivates this setting as the anchor for subsequent analyses.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.62\linewidth]{figures/rq4_linear_vs_quad_metric_breakdown.pdf}
+\caption{Matched 4-node comparison between linear and hard-quadratic
+mechanisms for \texttt{GPT-5-mini}. Topology is fixed; only the functional form
+changes. Task accuracy and \texttt{frequency}-weight $F_1$ collapse while
+all-edge and root-node $F_1$ are preserved or even rise --- agents lose the
+mechanism, not the graph.}
+\label{fig:linear_vs_quad}
+\end{figure}
+\subsection{RQ1: Correct Frequency Prediction Does Not Imply Mechanism Recovery}
+\label{sec:rq1-dissociation}
+
+\projectname{} pairs each episode with a ground-truth SCM, so we can score the
+answer and the mechanism separately. Three controls show that these axes split
+in different ways rather than collapsing to one scalar.
+
+\paragraph{Function form.}
+Holding the 50 four-node topologies fixed but replacing the linear mechanism
+with a hard-quadratic one cuts \texttt{GPT-5-mini} accuracy from 48\% to 24\%
+(Figure~\ref{fig:linear_vs_quad}).
+The graph is not simply lost: root-node $F_1$ rises (0.559$\to$0.829) and edge
+precision is preserved, but \texttt{frequency}-weight $F_1$ collapses
+(0.589$\to$0.251; Appendix Table~\ref{tab:linear_quad_metrics}). The agent can
+find plausible parents and still fail because it misses the quantitative
+mechanism.
+
+\paragraph{Hidden perturbations.}
+Off-target hidden noise leaves accuracy near baseline (40--54\% versus 48\%)
+but lowers all-edge $F_1$ from 0.79 to 0.61--0.70. When the hidden disturbance
+can perturb \texttt{frequency} itself, accuracy drops to 26--40\%
+(Appendix Figure~\ref{fig:hidden_variables};
+Appendix Table~\ref{tab:hidden_metrics}), showing that some successful
+predictions came from fitting a local target equation rather than recovering a
+mechanism robust to hidden target perturbations.
+
+\paragraph{Target outgoing edges.}
+\texttt{FreqParent} keeps mean edge counts matched but lets
+\texttt{frequency} have outgoing edges. Accuracy rises on 4- and 6-node graphs
+because the target has fewer incoming edges to fit, while all-edge recovery
+falls because global directionality is harder
+(Appendix Figure~\ref{fig:FreqParent_followup_metrics};
+Appendix Table~\ref{tab:freqparent_followup_metrics}).
+
+\begin{tcolorbox}[takeawaysbox]
+Prediction accuracy is necessary but not sufficient evidence of mechanism
+recovery.
+\end{tcolorbox}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.58\linewidth]{figures/rq1_pareto_migration.pdf}
+\caption{Prediction-versus-recovery gap across the four scaling families.
+Each suite is shown as an Obs.-only $\to$ Mixed arrow in
+(task accuracy, all-edge $F_1$) space: mixed regimes consistently shift
+mass toward higher graph fidelity at comparable or better task accuracy.}
+\label{fig:disambiguation_gap_summary}
+\end{figure}
+\subsection{RQ2: Observation-Conditioned Online Intervention Outperforms Pure and Offline Regimes}
+\label{sec:rq2-interaction}
+RQ2 separates two questions: whether agents need observations, interventions,
+or both; and whether offline intervention data is enough when the agent does not choose
+the experiments online. Figure~\ref{fig:disambiguation_gap_summary} summarizes
+the three online regimes across our four scaling families. For
+\texttt{GPT-5-mini}, pure observation often gives the strongest end-task
+accuracy on the easier graphs, but mixed observation-conditioned intervention
+consistently recovers more faithful graphs on both the 4-node and 6-node
+families. In the \texttt{GPT-5.2-high} 6-node setting, for example,
+observation-only has higher accuracy than mixed (92\% versus 80\%) but much
+lower graph-recovery $F_1$ (0.47 versus 0.80). Pure intervention is weak on
+both axes, becoming useful only after observation narrows the hypothesis
+space. We therefore use mixed online regimes as the anchor for follow-up controls.
+The full regime scatter appears in Appendix Figure~\ref{fig:regime_scatter};
+full scaling curves and tables appear in Appendix
+Figures~\ref{fig:app_scaling_curves} and~\ref{fig:app_reeval_scaling} and
+Appendix~\ref{app:full_experiment_tables}.
+
+The \emph{Golden} control then separates offline intervention data from online
+intervention decisions by giving the agent a bounded low-MEC intervention chain
+instead of letting it intervene online. Golden improves task accuracy above the
+main suite baselines (90\% versus 48\% on 4-node graphs, 44\% versus 24\% on
+6-node graphs) but drops all-edge $F_1$ on both sizes
+(Figure~\ref{fig:golden_followup_metrics};
+Appendix Table~\ref{tab:golden_followup_metrics}). High-quality intervention
+chains therefore behave mostly like stronger observations: they help fit the
+target equation, but they do not replace the structural signal supplied by the
+agent's own online intervention loop.
+
+\begin{tcolorbox}[takeawaysbox]
+Observation-conditioned online intervention gives the best balance: observations
+narrow the hypothesis space, while agent-chosen interventions recover more
+faithful graphs.
+\end{tcolorbox}
+
+\begin{figure}[!ht]
+\centering
+\begin{minipage}[b]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq2_golden_tradeoff.pdf}
+\captionof{figure}{Golden-intervention experiments on \texttt{GPT-5-mini}.
+Baseline $\to$ Golden arrows in (task accuracy, all-edge $F_1$) space:
+injected low-MEC intervention traces improve \texttt{frequency} prediction
+but hurt all-edge recovery, separating intervention data from intervention
+choice.}
+\label{fig:golden_followup_metrics}
+\end{minipage}\hfill
+\begin{minipage}[b]{0.49\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_high_minus_mini_gap.pdf}
+\captionof{figure}{Capability gap (\texttt{GPT-5.2-high} $-$ \texttt{GPT-5-mini}) in
+percentage points across graph sizes and metrics. Scaling concentrates in
+accuracy and \texttt{frequency}-weight $F_1$; root-node gains are near zero
+or negative at 6--7 nodes, showing where larger models still stall.}
+\label{fig:model_metric_support}
+\end{minipage}
+\end{figure}
+
+\subsection{RQ3: Model Family and Scale Pay Off Unevenly Across the Two Axes}
+\label{sec:rq3-scaling}
+
+\texttt{GPT-5.2-high} outperforms \texttt{GPT-5-mini} across graph sizes, but
+the gains concentrate on mediated structure and quantitative mechanism
+fitting rather than every metric uniformly. Figure~\ref{fig:four_model_node_radar}
+extends the model-family comparison to all 3--7 node main suites, covering the
+two GPT models and \texttt{Qwen3.5} with and without thinking traces.
+\texttt{GPT-5.2-high} is the strongest model overall, with the best endpoint
+accuracy and lowest directed all-edge SHD at every graph size. Open-weight
+\texttt{Qwen3.5} models can be competitive with \texttt{GPT-5-mini} on some
+task scores, but their SHD rises faster as graph size grows. Thinking generally
+improves Qwen structure recovery, lowering SHD at four graph sizes and raising
+all-edge \(F_1\) at every measured size. Across the
+full 3--7 node sweep, even \texttt{GPT-5.2-high} still drops to 64\%
+accuracy and directed SHD 4.761 at 7 nodes (Figure~\ref{fig:four_model_node_radar}),
+and the per-metric gap (Figure~\ref{fig:model_metric_support}) concentrates in
+accuracy and \texttt{frequency}-weight $F_1$ while root-node gains flatten on
+6--7 node graphs. Absolute metric trajectories appear in Appendix
+Figure~\ref{fig:scaling_metric_curves}; per-model metrics are in
+Appendix~\ref{app:full_experiment_tables}.
+
+\begin{tcolorbox}[takeawaysbox]
+Scaling improves direct-parent and coefficient recovery, but does not remove
+the need for better exploration and mechanism-checking methods; thinking helps
+Qwen recover structure over most graph sizes, but does not close the gap to
+the strongest GPT model.
+\end{tcolorbox}
+
+\begin{figure}[!ht]
+\centering
+\begin{minipage}[t]{0.45\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_four_model_task_accuracy_radar.pdf}\\
+{\footnotesize (a) Task accuracy.}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.45\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/rq3_four_model_shd_radar.pdf}\\
+{\footnotesize (b) Directed all-edge SHD.}
+\end{minipage}
+\caption{Four-model comparison across the 3--7 node main suites. Each vertex
+fixes graph size and compares \texttt{GPT-5.2-high},
+\texttt{GPT-5-mini}, \texttt{Qwen3.5-Thinking}, and
+\texttt{Qwen3.5-Non-thinking}. Lower SHD is better; a reversed edge counts as
+one directed SHD error. Task values are endpoint reactor accuracies.}
+\label{fig:four_model_node_radar}
+\end{figure}
+
+\subsection{RQ4: Agents Fail by Stopping Early, and a Single Verification Step Helps}
+\label{sec:rq4-failure}
+The DSL trajectories show that failure is often early commitment rather than
+missing data. Across the main 4-node and 5-node experiments, both successful
+and failed runs leave about half of the intervention budget unused, while more
+budget yields only modest gains (Appendix Figure~\ref{fig:overconfidence_diagnostics}).
+
+The DSL lets us
+inspect \emph{why} agents stop: at the step where each run commits to a final
+answer, we compare the recorded hypothesis $H_t$ (graph + structural
+equation + coefficients) against the data already collected. Successful runs
+mostly end with hypotheses consistent with their own
+$\mathcal{D}_{\le t}$, while failed runs end with hypotheses that mispredict
+the very observations and intervention outcomes that produced them.
+The
+failure mode is therefore better described as
+\emph{overconfidence}: agents treat an unverified hypothesis as a final
+theory rather than continuing to spend budget on disambiguating experiments.
+Consistent with this reading, a single explicit
+verification step that checks $H_T$ against $\mathcal{D}_{\le T}$ before
+committing raises 4-node accuracy from 48\% to 60\%, making verification a
+cheap fix for a trajectory-level failure mode.
+
+\begin{tcolorbox}[takeawaysbox]
+Many failures are not caused by an exhausted budget; they are caused by
+committing before checking whether the proposed SCM explains the evidence
+already collected.
+\end{tcolorbox}
+

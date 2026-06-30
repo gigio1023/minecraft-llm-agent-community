@@ -1,0 +1,167 @@
+\section{Reinforcement Learning Fine-Tuning}
+
+\subsection{Reinforcement Learning Fine-Tuning Training Details}
+\label{Appendix:RLTrainingDetails}
+
+RL experiments were performed with the phasic policy gradient (PPG) algorithm,\cite{pmlr-v139-cobbe21a} an RL algorithm based on the proximal policy optimization (PPO) algorithm\cite{schulman2017proximal} that increases sample efficiency by performing additional passes over the collected data to optimize the value function as well as an auxiliary value function.
+These algorithms have been described extensively in previous work,\cite{pmlr-v139-cobbe21a, schulman2017proximal} so here we describe them only briefly.
+A major inefficiency when training on-policy algorithms is that, to remain on-policy, one can only take a single gradient step before new rollout data needs to be gathered to continue optimization.
+To alleviate the potentially destructive effects of taking multiple optimization steps in a single iteration, PPO prevents the policy from changing too much in a single step by clipping the loss when the difference between the current policy and the policy before the update becomes too large.\cite{schulman2017proximal}
+We also use generalized advantage estimation (GAE), which can speed-up credit assignment by looking more than 1 step into the future when determining the advantage of an action, with the look-ahead being determined by hyperparameter $\lambda$.\cite{schulman2015high}
+
+
+PPG improves the sample efficiency of PPO when the policy and value function share the same network by following different optimization processes for the policy, the value function, and their shared representation.
+PPG splits optimization in two phases: a wake phase and a sleep phase.
+In the wake phase, the policy and value function are optimized as in normal PPO training, with the only exception being that every sample is used at most once, which prevents the policy from overfitting on these samples.
+In the sleep phase PPG optimizes the value function and an auxiliary value function (which is optimized with the exact same loss as the regular value function, but its output is never used during training), while keeping a Kullback-Leibler (KL) divergence loss to the policy before the start of the sleep phase to ensure that the policy does not change. Because the policy is not optimized in this step, PPG does allow samples to be reused multiple times in this phase.
+The assumption behind optimizing the value function during the sleep phase is that value function optimization is less sensitive to being trained multiple times on the same sample.
+Optimizing the auxiliary value function does not directly affect either the value function or the policy, but it can improve the shared representation of both functions (the assumption being that predicting the value-function requires encoding all features that are important for distinguishing states).
+The coefficients for the three losses (value function loss, auxiliary value function loss, and KL loss) are listed in Table~\ref{tab:rlhyperparameters}.
+In our experiments a single iteration consists of two sleep cycles and one wake cycle.
+
+Because the value and auxiliary value functions are not optimized during BC pre-training, they are initialized at the start of RL fine-tuning. 
+Each value function is implemented as a single, fully connected layer on top of the last residual transformer block of the pretrained model (Appendix~\ref{appendix:training_details_IDM_architecture}).
+The weights of the auxiliary value function are randomly initialized while the weights of the regular value function are initialized with zero weights, which appeared to prevent destructive updates early in training that could happen with a randomly initialized value function.
+To prevent the value-function loss from having gradients that depend greatly on the magnitude of the reward, we normalize the value-function target by subtracting the mean and dividing by the standard deviation, which are estimated through an exponentially weighted moving average.
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+ \textbf{Hyperparameter} & \textbf{Value} \\  
+ \hline
+Learning rate:           & $2\times 10^{-5}$ \\
+Weight decay:            & $0.04$     \\
+Batch size:              & $40$       \\
+Batches per iteration:   & $48$       \\
+Context length:          & $128$      \\
+Discount factor ($\gamma$): & $0.999$    \\
+GAE $\lambda$:            & $0.95$     \\
+PPO clip:                & $0.2$      \\
+Max Grad norm:           & $5$        \\
+Max Staleness:           & $2$        \\
+PPG sleep cycles:        & $2$        \\
+PPG sleep value-function coefficient:        & $0.5$        \\
+PPG sleep auxiliary value-function coefficient:        & $0.5$        \\
+PPG sleep KL coefficient:        & $1.0$        \\
+PPG sleep max Sample Reuse:    & $6$        \\
+KL divergence coefficient $\rho$:                 & $0.2$      \\
+Coefficient $\rho$ decay:                & $0.9995$   \\  
+\hline
+\end{tabular}
+\end{center}
+\caption{Hyperparameters for RL experiments. These are the hyperparameters for all treatments with two exceptions. First, when fine-tuning from the early-game model without a KL divergence loss, in addition to the KL divergence loss being set to 0, the learning rate was set to $3\times 10^{-6}$ (the best setting out of a sweep over 5 different learning rates), as we found that performance was substantially lower with the standard learning rate of $2\times 10^{-5}$ and the agent did not even learn to collect logs. We suspect that the reason that the learning rate needed to be lowered when fine-tuning without a KL loss is that the KL loss prevents making optimization steps that change the policy too much in a single step, especially in early iterations when the value function has not been optimized yet, and the KL loss thus makes it possible to optimize with a higher learning rate. Second, when running RL from a randomly initialized policy there is no KL divergence loss or KL divergence decay, but instead we use an entropy bonus of $0.01$, which reportedly worked well in previous work.\cite{kanitscheider2021multi}}
+\label{tab:rlhyperparameters}
+\end{table}
+
+
+To prevent catastrophically forgetting the skills of the pretrained network when RL fine-tuning, we apply an auxiliary KL divergence loss between the RL model and the frozen pretrained policy.\cite{vinyals2019grandmaster}
+This loss is defined as:
+\begin{equation}
+    L_{klpt} = \rho \mathrm{KL}(\pi_{pt}, \pi_\theta)
+\end{equation}
+Where $\pi_\theta$ is the the policy being trained, $\pi_{pt}$ is the frozen pretrained policy, $\mathrm{KL}(\pi_{pt}, \pi_\theta)$ is the Kullback-Leibler divergence between the policy being trained and the pretrained policy, and $\rho$ is a coefficient to weight this loss relative to other losses.
+
+In the fine-tuning experiments, this KL divergence loss replaces the common entropy maximization loss, which is often added to RL experiments to encourage exploration.\cite{williams1992simple, mnih2016asynchronous}
+The idea behind entropy maximization is that, when all actions appear to have equal value, such as when the agent has not learned about the next reward, it should maximize its entropy to increase the chance that it discovers the next reward.
+Blindly exploring by maximizing entropy is effective when the state and action spaces are sufficiently small or the reward is sufficiently dense, but becomes infeasible when the state and action spaces are large and rewards are sparse, which is the case in the diamond-pickaxe task.
+Instead of blindly exploring through uniform-random actions, we assume that the pretrained policy has an action distribution that is much more likely to take sequences of actions that lead to interestingly new states, and thus, in states where the agent assigns equal value to each of its actions, it should mimic the action-distribution of the pretrained policy instead of a uniform-random action distribution.
+In experiments with a randomly initialized policy we do include the entropy maximization loss with a coefficient of $0.01$, which has been an effective setting in other Minecraft work.\cite{kanitscheider2021multi}
+Empirically, we found that a high coefficient $\rho$ for this KL divergence loss would prevent the agent from properly optimizing the reward function while a low coefficient $\rho$ was ineffective at protecting the learned skills of the pretrained policy and preventing catastrophic forgetting.
+As such, we start with a relatively high coefficient $\rho$ and decay it % \pz{"loss" here is actuall a loss coefficient, correct? Such that $loss = KL\_loss * KL$ ? I think the phrase "decay the loss" is a bit confusing, given that it is $KL\_loss$ coefficient that is decayed. I understand that calling it "KL coefficient" does not work because PPG/PPO has its own KL coefficient... Maybe a greek letter, and add an equation? This will also clarify the order of policies in KL (as in, is it KL(current || pretrained) or KL(pretrained || current)? }\ale{Agreed}
+by a fixed factor after each iteration (Table~\ref{tab:rlhyperparameters}).
+This method protects policy skills in early iterations while guaranteeing that the policy can eventually maximize the reward function, regardless of how different its behavior has to be to do so relative to the pretrained policy.
+
+For the reward function we estimated the rough quantities of each item that a human player might gather when trying to craft a diamond pickaxe, and we reward the model for gathering up to that quantity for each item.
+We started these estimates by iterating over the technology tree backward from a diamond pickaxe and adding the requirements for each item to the reward function (e.g.\ first we added a diamond pickaxe to the reward function, then we added the 3 diamonds and 2 sticks required for crafting a diamond pickaxe, then we added the 1 iron pickaxe required for mining diamonds, and so on).
+Then we added coal and torches to the reward function, with coal being useful as fuel when smelting iron and for crafting torches while the torches themselves improve visibility and prevent enemies from spawning. 
+Finally, we reward the model for bringing additional logs (5 logs are required to craft all items in the reward function, but we reward up to 8 logs), which can be used as fuel or crafted into a crafting table or sticks if the agent runs out.
+In practice the agent rarely collects the additional logs, places the torches, or uses coal as fuel when smelting, but the reward function was based on human expectations on what would be useful to execute this task, rather than designed around how an RL model behaves after training.
+Finally, to encourage the agent to keep mining diamonds and crafting diamond pickaxes after it has crafted its first diamond pickaxe, we did not put a limit on the number of diamonds or diamond pickaxes that would be rewarded.
+
+\begin{table}[]
+\begin{center}
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Item} & \textbf{Quantity rewarded} & \textbf{Reward per item} \\
+\hline
+Log & $8$ & $1/8$ \\
+Planks & $20$ & $1/20$ \\
+Stick & $16$ & $1/16$ \\
+Crafting table & $1$ & $1$ \\
+Wooden pickaxe & $1$ & $1$ \\
+Cobblestone & $11$ & $1/11$ \\
+Stone pickaxe & $1$ & $1$ \\
+Furnace & $1$ & $1$ \\
+Coal & $5$ & $2/5$ \\
+Torch & $16$ & $1/8$ \\
+Iron ore & $3$ & $4/3$ \\
+Iron ingot & $3$ & $4/3$ \\
+Iron pickaxe & $1$ & $4$ \\
+Diamond & inf & $8/3$ \\
+Diamond pickaxe & inf & $8$ \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Reward per item and total quantity rewarded.}
+\label{tab:rlreward}
+\end{table}
+
+
+The rewards for the different items are separated into 4 tiers, roughly depending on how late a player would usually get the relevant item.
+The first tier consists of all wooden and stone items and has a base reward of 1, the second tier consists of all items requiring coal with a base reward of 2, the third tier consists of all items requiring iron with a base reward of 4, and the final tier is diamond with a base reward of 8.
+Thus items later in the sequence of items towards a diamond pickaxe generally give a higher reward.
+To make sure that the agent does not over-value items that are supposed to be gathered in bulk (e.g.\ the agent is rewarded for up to 20 planks but only up to 1 crafting table, which can cause the agent to focus on planks at the expense of creating a crafting table), we divide the base reward of each item by the total quantity that the agent gets rewarded for (for the purpose of determining the reward, the total quantity for diamonds is 3 and the total quantity for diamond pickaxes is 1, even though we did not put a limit on the number of these items being rewarded). For example, the agent is rewarded for 3 iron ore, which has a base reward of 4 for being in the iron tier and up to 3 blocks of iron ore are rewarded, thus the reward per block of iron ore is $4/3$.
+The quantity and reward for each item are listed in Table~\ref{tab:rlreward}.
+
+%\jh{The next paragraph can be cut as well, given that it was added specifically to make it easier to explain the crafting-table bug, but it does stand on its own, so I am also fine with keeping it.}\bb{may as well leave it}\jc{agreed, let's leave it}
+While every item in the sequence towards a diamond pickaxe is rewarded, the reward function is still sparse and, in some cases, even deceptive. The sparsity comes from the fact that it can take thousands of actions to find the next reward, even after the agent has acquired all the necessary prerequisites (e.g.\ human players often take more than 10,000 actions to find a diamond after crafting an iron pickaxe).
+The reward function can be deceptive when the most efficient method for getting one item can make it far more difficult to get the next item.
+For example, a good strategy for the agent to craft a stone pickaxe quickly is to mine (i.e. spend a few seconds to pick up) its crafting table after crafting a wooden pickaxe, such that the agent has immediate access to a crafting table as soon as it has collected enough cobblestone.
+However, the fastest way to get a reward for gathering cobblestone is to mine down immediately after crafting a wooden pickaxe, while leaving the crafting table behind.
+Thus following the optimal strategy for gathering cobblestone makes it more difficult to learn to craft a stone pickaxe.
+
+%\jh{The following has been cut because it describes the crafting table but, but I'll leave it in comments for now in case someone wants to see what was cut.}
+%\jh{\sout{The pretrained policy often helps the agent overcome the sparsity and deceptiveness of the reward function, as human strategies generally take into account long term goals, such as by always bringing a crafting table, but there was one particular case where the prior of the VPT foundation model seemed ineffective at overcoming a particularly subtle form of deceptiveness in our reward function. 
+%By clicking on an item in the Minecraft recipe book and then closing the inventory before the crafting-grid is populated, it is possible to get the selected item to show in the player's inventory without actually crafting it.
+%Doing so does not count as a crafting event and it does not seem possible to use items that were added to the inventory in this way, but it is detected by our reward function as an instance of obtaining the target item.
+%In other words, it allows the agent to get the reward for a particular item without actually crafting the item and spending the necessary resources.
+%We hypothesize that this is the primary reason why fine-tuning from the VPT foundation model directly fails to learn to craft a wooden pickaxe.
+%Videos\footnote{Example at: \href{https://youtu.be/fw2bBQwQBHA}{https://youtu.be/fw2bBQwQBHA}} show that the agent uses this trick to get the reward for a crafting table without actually crafting a usable crafting table, such that it can immediately use the planks that would otherwise be consumed to craft sticks.
+%The agent thus ends-up in a state where it does not have a crafting table to craft the wooden pickaxe.
+%The same issue does not happen when fine-tuning from the early-game model, likely because the prior of the early-game model is better for crafting crafting tables and wooden pickaxes.
+%Once the wooden pickaxe reward is discovered with sufficient frequency, the agent will learn that the trick to get a crafting table reward without crafting it actually hurts its longer term reward, and no longer exhibit this behavior.}}
+
+Experiments ran for approximately 6 days (144 hours) on 80 GPUs (for policy optimization) and 56,719 CPUs (mostly for collecting rollouts from Minecraft). In this time the algorithm performed roughly 4,000 optimization iterations and collected roughly 1.4 million Minecraft episodes consisting of 12,000 frames each, for a total of 16.8 billion frames.
+
+\subsection{Reinforcement Learning Fine-Tuning Additional Data}
+\label{Appendix:RLPreliminary}
+
+Additional figures that are helpful for understanding the main results of the RL fine-tuning experiments are presented in this section.
+First, we show the items-over-training figure when RL fine-tuning from the early-game model without a KL loss (Fig.~\ref{fig:rlft_nokl}).
+When training without a KL loss, the model only learns to obtain the four items that the early-game model is capable of getting zero-shot, which are logs, planks, sticks, and crafting tables.
+Second, we present preliminary experiments in which we directly compare RL fine-tuning from the house-building model and RL fine-tuning from the early-game model (Fig.~\ref{fig:rlft_vs_housebuilding}).
+These experiments differ from the main experiments in that, for both treatments shown here, the KL loss coefficient was set to $0.4$, the learning rate was set to $6\times 10^{-5}$, and the reward for each item was $1/quantity$ for all items (i.e. items closer to the diamond pickaxe did not have an increased reward).
+While RL fine-tuning from the house-building model initially worked better than RL fine-tuning from the early-game model, fine-tuning from the early-game model worked better after 800,000 episodes and showed signs of smelting iron ingots, which is why the early-game model was chosen for the main experiments.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.5\linewidth]{assets/a_4/earlygamenokleval.pdf}
+\end{center}
+\caption{Items obtained when RL fine-tuning from the early-game model without a KL loss. The model learns to obtain all items that the early-game model can craft zero-shot, which are logs, planks, sticks, and a crafting table. In contrast to the treatment with a KL-penalty, it does not learn any items beyond these initial four, likely because skills that are not performed zero-shot, and for which the model thus does not initially see any reward, are catastrophically forgotten while the first four items are learned.}
+\label{fig:rlft_nokl}
+\end{figure}
+
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.49\linewidth]{assets/a_4/rlft-vs-housebuilding.pdf}
+\includegraphics[width=0.49\linewidth]{assets/a_4/rlft-vs-housebuilding-ingots.pdf}
+\end{center}
+\caption{Preliminary experiments when RL fine-tuning from the early-game model compared to RL fine-tuning from the house-building model. \textbf{(Left)} While reward initially increases faster when fine-tuning from the house-building model, fine-tuning form the early-game model eventually obtains a slightly higher reward. \textbf{(Right)} RL fine-tuning from the early-game model has a higher likelihood of smelting an iron-ingot, which is why the early-game model was chosen for future RL fine-tuning experiments. }
+\label{fig:rlft_vs_housebuilding}
+\end{figure}
+
+
+
+

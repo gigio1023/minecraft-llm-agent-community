@@ -1,0 +1,96 @@
+Eureka Output:
+Here are the reward terms I am planning to implement:
+1. height_reward: Encourage the agent to maintain a z-position of at least 2 * ball_radius.
+2. balance_reward: Encourage the agent to balance on the ball by minimizing the distance between the feet and the top of the ball.
+3. smooth_actions_reward: Encourage smooth actions to reduce jittery or fast actions.
+
+```python
+def _reward_height(self):
+    env = self.env
+    height_threshold = 2.0 * env.ball_radius
+    height_reward = torch.where(env.base_pos[:, 2] >= height_threshold, torch.ones_like(env.base_pos[:, 2]), torch.zeros_like(env.base_pos[:, 2]))
+    return 1.0 * height_reward
+
+def _reward_balance(self):
+    env = self.env
+    ball_top = env.object_pos_world_frame + torch.tensor([0.0, 0.0, env.ball_radius], device=env.device).unsqueeze(0)
+    feet_dist_to_ball_top = torch.norm(env.foot_positions - ball_top.unsqueeze(1), dim=-1)
+    balance_reward = 1.0 - torch.mean(feet_dist_to_ball_top, dim=-1)
+    return 1.0 * balance_reward
+
+def _reward_smooth_actions(self):
+    env = self.env
+    action_diff = env.actions - env.last_actions
+    smooth_actions_reward = -torch.mean(torch.abs(action_diff), dim=-1)
+    return 0.1 * smooth_actions_reward
+```
+
+The height_reward motivates the agent to maintain a z-position above the threshold. The balance_reward ensures the agent learns to balance on the ball by minimizing the distance between the feet and the top of the ball. The smooth_actions_reward encourages the agent to take smoother actions rather than jittery or too fast actions that may burn out the motors.
+
+####################################################################################################
+
+Reward Reflection:
+We trained a RL policy using the provided reward function code and tracked the values of the individual components in the reward function as well as global policy metrics such as task score and episode lengths after every 500 epochs and the maximum, mean, minimum values encountered:
+task score: ['12.42', '62.72', '67.46', '69.36', '70.67', '80.36', '112.15', '152.94', '185.67', '241.25'], Max: 285.75, Mean: 115.54, Min: 12.42 
+episode length: ['11.45', '62.74', '67.35', '69.35', '70.68', '79.95', '111.51', '152.29', '184.50', '237.52'], Max: 276.88, Mean: 115.86, Min: 11.45 
+rew balance: ['8.28', '39.74', '42.03', '42.49', '43.45', '50.95', '75.72', '108.42', '135.23', '179.91'], Max: 217.18, Mean: 80.06, Min: 8.28 
+rew height: ['12.29', '51.43', '55.16', '57.51', '58.48', '66.92', '95.47', '135.24', '167.38', '222.18'], Max: 267.01, Mean: 100.62, Min: 12.29 
+rew smooth actions: ['-1.30', '-9.17', '-11.89', '-13.57', '-15.27', '-19.87', '-34.40', '-47.73', '-56.97', '-72.17'], Max: -1.30, Mean: -31.26, Min: -87.12 
+rew total: ['19.26', '81.99', '85.29', '86.43', '86.66', '98.00', '136.80', '195.93', '245.64', '329.93'], Max: 397.07, Mean: 149.43, Min: 19.26 
+Please carefully analyze the policy feedback and provide a new, improved reward function that can better solve the task. Some helpful tips for analyzing the policy feedback:
+    (1) If the task score is always near zero, then you must rewrite the entire reward function
+    (2) If the values for a certain reward component are near identical throughout, then this means RL is not able to optimize this component as it is written. You may consider
+        (a) Changing its scale or the value of its temperature parameter
+        (b) Re-writing the reward component 
+        (c) Discarding the reward component
+    (3) If some reward components magnitude is significantly larger, then you must re-scale its value to a proper range
+Please analyze each existing reward component in the suggested manner above first, and then write the reward function code. The output of the reward function should be only your reward value.
+The code output should be formatted as a python code string: "```python ... ```".
+
+Some helpful tips for writing the reward function code:
+    (1) You may find it helpful to normalize the reward to a fixed range by applying transformations like torch.exp to the overall reward or its components
+    (2) If you choose to transform a reward component, then you must also introduce a temperature parameter inside the transformation function; this parameter must be a named variable in the reward function and it must not be an input variable. Each transformed reward component should have its own temperature variable
+    (3) Most importantly, the reward codes must only use attributes of the provided environment object (namely, variables that have prefix env.). Under no circumstance can you introduce new input variables.
+
+####################################################################################################
+
+Eureka Output:
+From the policy feedback, it seems that the reward for height ('rew height') and balance ('rew balance') are significant and show improvement, but the reward for smooth actions ('rew smooth actions') needs more optimization. I will increase the scale for smooth_actions_reward and introduce an exponential reward component for height_reward so that the reward gradient is smoother. Here is the updated reward function:
+
+```python
+def _reward_height(self):
+    env = self.env
+    height_threshold = 2.0 * env.ball_radius
+    height_temperature = 10.0  # new temperature parameter for exponential transformation
+    height_exp = torch.exp((env.base_pos[:, 2] - height_threshold) / height_temperature)
+    height_reward = torch.where(env.base_pos[:, 2] >= height_threshold, height_exp, torch.zeros_like(env.base_pos[:, 2]))
+    return 2.0 * height_reward  # increase scale of height_reward
+
+def _reward_balance(self):
+    env = self.env
+    ball_top = env.object_pos_world_frame + torch.tensor([0.0, 0.0, env.ball_radius], device=env.device).unsqueeze(0)
+    feet_dist_to_ball_top = torch.norm(env.foot_positions - ball_top.unsqueeze(1), dim=-1)
+    balance_reward = 1.0 - torch.mean(feet_dist_to_ball_top, dim=-1)
+    return 1.0 * balance_reward
+
+def _reward_smooth_actions(self):
+    env = self.env
+    action_diff = env.actions - env.last_actions
+    smooth_actions_reward = -torch.mean(torch.abs(action_diff), dim=-1)
+    return 0.5 * smooth_actions_reward  # increase scale of smooth_actions_reward
+```
+
+In this updated reward function, I introduced a temperature parameter (`height_temperature`) and applied an exponential transformation to the height_reward so that the reward gradient is smoother. I also multiplied the height_reward scale by 2 to make it more significant. Finally, I increased the scale of the smooth_actions_reward by 0.5 to encourage smoother actions more than before, which will help further improve the policy.
+
+####################################################################################################
+
+Reward Reflection:
+We trained a RL policy using the provided reward function code and tracked the values of the individual components in the reward function as well as global policy metrics such as task score and episode lengths after every 500 epochs and the maximum, mean, minimum values encountered:
+task score: ['12.42', '65.13', '71.19', '76.92', '100.98', '320.91', '602.55', '741.82', '865.37', '924.64'], Max: 1040.59, Mean: 407.71, Min: 12.42 
+episode length: ['11.45', '65.14', '71.13', '76.80', '100.93', '330.90', '608.89', '767.77', '903.78', '903.98'], Max: 1074.86, Mean: 409.03, Min: 11.45 
+rew balance: ['8.28', '41.57', '44.23', '47.64', '64.50', '237.34', '464.35', '574.94', '673.07', '722.61'], Max: 811.20, Mean: 310.16, Min: 8.28 
+rew height: ['25.01', '108.71', '122.09', '133.27', '181.14', '620.04', '1187.27', '1468.28', '1718.10', '1837.45'], Max: 2076.23, Mean: 797.53, Min: 25.01 
+rew smooth actions: ['-6.52', '-35.68', '-38.78', '-42.31', '-66.38', '-271.25', '-508.06', '-624.86', '-740.29', '-808.17'], Max: -6.52, Mean: -340.10, Min: -911.98 
+rew total: ['26.76', '114.60', '127.55', '138.60', '179.26', '586.13', '1143.56', '1418.36', '1650.88', '1751.89'], Max: 1975.46, Mean: 767.58, Min: 26.76 
+
+...

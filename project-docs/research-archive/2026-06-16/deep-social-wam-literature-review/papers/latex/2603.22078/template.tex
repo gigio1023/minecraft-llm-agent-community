@@ -1,0 +1,846 @@
+\documentclass{article}
+
+
+\usepackage{arxiv}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{amsmath}        % for \text in math mode
+\usepackage{lipsum}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{natbib}
+\graphicspath{ {./images/} }
+\usepackage{cleveref}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{pifont}
+\usepackage{authblk}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage[utf8]{inputenc}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+
+
+\definecolor{precolor}{RGB}{248, 202, 198}   % pink  – Semantic Understanding column header
+\definecolor{postcolor}{RGB}{224, 224, 150}
+\definecolor{taskcolor}{RGB}{194, 224, 244}  % blue  – Task-specific Data column header + cells
+
+
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+\renewcommand\Authands{ \quad }   % 控制 affil 之间的间距
+\newcommand{\VZ}[1]{\textcolor{blue}{[Vincent : #1]}}
+
+
+\fancyhead[C]{%
+  \vspace{-0.3em}%
+  {\small\textbf{Do World Action Models Generalize Better than VLAs? A Robustness Study}}\\[-0.5em]
+  \rule{\textwidth}{0.2pt}
+}
+
+% Remove default thick head rule
+\renewcommand{\headrulewidth}{0pt}
+
+
+% \title{Do World Action Models Really Outperform VLA Models? A comparative study on robustness}
+% Perhaps for title we should be more specific that we are comparing WMs to VLAs. This does not tell much
+
+\title{Do World Action Models Generalize Better than VLAs? A Robustness Study}
+\author{
+Zhanguang Zhang$^{1}$\thanks{Corresponding to \{zhanguang.zhang, yingxue.zhang\}@huawei.com}, Zhiyuan Li$^{1,2}$\thanks{work done during internship at Huawei Canada}, Behnam Rahmati$^{1}$, Rui Heng Yang$^{1}$, Yintao Ma$^{1}$, Amir Rasouli$^{1}$\\
+\vspace{-0.14cm}
+Sajjad Pakdamansavoji$^{1}$, Yangzheng Wu$^{1}$, Lingfeng Zhang$^{1}$, Tongtong Cao$^{1}$, Feng Wen$^{1}$\\
+\vspace{0.1cm}
+Xinyu Wang$^{1}$, Xingyue Quan$^{1}$ and Yingxue Zhang$^{1}$$^*$\\
+\vspace{0.5cm}
+$^{1}$Huawei Technologies \quad $^{2}$University of Toronto
+}
+
+% \author[1]{Zhanguang Zhang}
+% \author[1,2]{Zhiyuan Li}
+% \author[1]{Behnam Rahmati}
+% \author[1]{Rui Heng Yang}
+% \author[1]{Yintao Ma}
+% \author[1]{Amir Rasouli}
+
+% \author[1]{Sajjad Pakdamansavoji}
+% \author[1]{Yangzheng Wu}
+% \author[1]{Lingfeng Zhang}
+% \author[1]{Tongtong Cao}
+% \author[1]{Feng Wen}
+% \author[1]{Xingyue Quan}
+% \author[1]{Yingxue Zhang}
+
+% \affil[1]{Huawei Technologies}
+% \affil[2]{University of Toronto}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Robot action planning in the real world is challenging as it requires not only understanding the current state of the environment but also predicting how it will evolve in response to actions. Vision-language-action (VLA), which repurpose large-scale vision-language models for robot action generation using action experts, have achieved notable success across a variety of robotic tasks. Nevertheless, their performance remains constrained by the scope of their training data, exhibiting limited generalization to unseen scenarios and vulnerability to diverse contextual perturbations. 
+More recently, world models have been revisited as an alternative to VLAs. These models, referred to as world action models (WAMs), are built upon world models that are trained on large corpora of video data to predict future visual states. With minor adaptations, their latent representation can be decoded into robot actions. It has been suggested that their explicit dynamic prediction capacity, combined with spatiotemporal priors acquired from web-scale video pre-training, enables WAMs to generalize more effectively than VLAs. In this paper, we conduct a comparative study of prominent state-of-the-art VLA policies and recently released WAMs. We evaluate their performance on the LIBERO-Plus and RoboTwin 2.0-Plus benchmarks under various visual and language perturbations. Our results show that WAMs achieve strong robustness, with LingBot-VA reaching 74.2\% success rate on RoboTwin 2.0-Plus and Cosmos-Policy achieving 82.2\% on LIBERO-Plus. While VLAs such as $\pi_{0.5}$ can achieve comparable robustness on certain tasks, they typically require extensive training with diverse robotic datasets and varied learning objectives. Hybrid approaches that partially incorporate video-based dynamic learning exhibit intermediate robustness, highlighting the importance of how video priors are integrated. Overall, our findings shed light on critical insights into the strengths of WAMs relative to VLAs, as well as the remaining challenges for real-world deployment.
+\end{abstract}
+
+
+\section{Introduction}
+Robot motion planning in real-world environments—whether for navigation, manipulation, or locomotion—remains highly challenging. A key difficulty arises from the diversity and uncertainty of real-world settings, which makes it hard for robot policies to anticipate the consequences of their actions. Recently, vision–language–action (VLA) policies~\citep{pi05,openvla2025} have emerged as a new paradigm compared to traditional motion planning approaches~\citep{elbanhawi2014sampling}. By leveraging foundation models trained on large-scale vision and language data, VLA policies have demonstrated strong performance across a wide range of robotic tasks, including navigation~\citep{xu2024mobility}, manipulation~\citep{zheng2026xvla}, and locomotion~\citep{jiang2026wholebodyvla}.
+
+Despite their strong performance, VLAs exhibit several notable limitations, including limited generalization ability~\citep{ma2026generalvla} and a lack of robustness to distractions and cluttered environments~\citep{rasouli2025distracted}. In essence, they often lack a fundamental understanding of the physical world that is necessary for consistent planning across diverse environments. To address this issue, recent work has begun incorporating world models into robotic policies. Traditionally, world models have been used primarily as simulators for model training and evaluation~\citep{cutler2015real,ha2018_worldmodels,hafner2020_dreamer}. More recently, they have been increasingly integrated into robot policies—including VLAs—in a variety of ways, such as auxiliary training objectives~\citep{Chen_2025_ICCV,cen2025worldvla}, planning modules~\citep{yin2025womap,gao2025adaworld}, or guidance mechanisms for flow-based policies~\citep{du2025dynaguide,huang2025ladiwm,chen2026_hwm}. Building on this trend, new approaches go a step further by proposing the use of world models directly as control policies~\citep{kim2026cosmos,goswami2025osviwm, liao2025genie, li2026causal, ye2026dreamzero}, where the model’s latent representations are decoded into actions.
+ 
+Given the many similarities between foundation models and world models, there is ongoing debate about the primary advantages of world models and whether their explicit use in planning is necessary, since foundation-based robot policies may already implicitly model the world dynamics. To investigate this question, we conduct a comparative study of state-of-the-art VLA policies and world action models (WAMs), aiming to highlight their differences under a range of contextual perturbations. More specifically, we leverage two enhanced manipulation benchmarks to evaluate the robustness of policy models: \textbf{LIBERO-Plus}~\citep{fei25libero-plus}, which introduces seven types of perturbations to single-arm manipulation tasks, and \textbf{RoboTwin 2.0-Plus}, an in-house benchmark that follows a similar perturbation protocol in the two-arm Aloha-Agilex setup of RoboTwin 2.0~\citep{chen2025robotwin}. 
+
+Our findings reveal that WAMs generally demonstrate strong robustness to noise, lighting and layout perturbations in both single-arm and bimanual settings. This robustness is believed to be at least partially attributable to the spatiotemporal priors inherited from their world model backbones. While classic VLAs like $\pi_{0.5}$~\citep{pi05}, as well as hybrid approaches like MOTUS~\citep{bi2025motus} and VLA-JEPA~\citep{sun2026vla}, can achieve comparable or even superior robustness, they often require carefully curated and diverse datasets and/or explicit dynamic prediction objectives during the embodied pre-training phase. In contrast, the simplicity of the embodied pre-training phase represents a key advantage of WAMs over classic VLAs. However, the high inference overhead of WAMs remains a major challenge that limits their deployment in real-world robotic systems, with a single inference step being at least 4.8 times slower than $\pi_{0.5}$. Recent GigaWorld-Policy~\citep{ye2026gigaworld} and Fast-WAM~\citep{yuan2026fast} mitigate this issue by generating actions only at inference time, while jointly predicting future visual state or conditioning state prediction on actions during training. In our evaluation, Fast-WAM achieves performance on RoboTwin~2.0-Plus that is essentially on par with the state-of-the-art IDM-based WAM (LingBot-VA), but its robustness on LIBERO-Plus collapses sharply when the training data lacks diversity, suggesting that joint-denoising designs may rely more heavily on training-data diversity for generalization than IDM-style designs that explicitly condition action on a predicted future state. Their inference latency also remains substantial compared to the $\pi$-series, posing challenges for smooth real-world deployment. Further research is needed to more efficiently exploit the dynamic priors of world-model backbones and improve both training and inference efficiency.
+
+\section{Related Works}
+
+\subsection{Vision Language Action (VLAs)}
+%PaLM-E, RT-1/2/H, Octo, OpenVLA, Pi0/0.5/0.6, etc
+Recent progress in robot foundation models has focused on integrating perception, language understanding, and control within unified multimodal architectures. A central direction in this line of work is the development of vision–language–action (VLA) models that connect high-level semantic reasoning with low-level robot execution. Early work such as PaLM-E~\citep{driess2023palm} demonstrates that large language models can be adapted to embodied settings by representing visual observations and robot states as additional tokens in a transformer. This formulation shows that knowledge learned from internet-scale data can support downstream robotic manipulation and long-horizon tasks when paired with action prediction. Building on this paradigm, a series of works explored large-scale end-to-end VLA policies trained on robot demonstrations. RT-1 and RT-2~\citep{brohan2023rt1, zitkovich2023rt2} introduced transformer policies that map visual observations and language instructions directly to robot actions, showing that large multi-task datasets enable generalization across manipulation behaviors. RT-H~\citep{belkhale2024rth} further explored hierarchical policy structures that improve data efficiency and long-horizon execution. In parallel, the $\pi_0$ series~\citep{black2025pi0} studied scaling behavior in VLA policies, emphasizing the role of action representation and dataset diversity in enabling robust multi-task generalization.
+
+A second line of work emphasizes data-centric scaling and cross-embodiment generalization. Octo~\citep{ghosh2024octo}, trained on the Open X-Embodiment dataset~\citep{o2024open}, demonstrated that a single policy can learn from heterogeneous datasets spanning multiple robots and tasks. OpenVLA~\citep{openvla2025} further advanced this direction by providing an open-source VLA implementation built on pretrained multimodal encoders, highlighting the importance of reproducible pipelines and shared datasets for scaling robot foundation models. More recent research has focused on improving reasoning and adaptation within VLA architectures. CoT-VLA~\citep{zhao2025cotvla} introduces visual chain-of-thought reasoning by predicting intermediate visual goals before generating actions, improving long-horizon task performance. ChatVLA-2~\citep{zhou2025chatvla2} explores integrating open-world reasoning capabilities from pretrained vision–language models into robotic policies. Meanwhile, X-VLA~\citep{zheng2026xvla} investigates scalable cross-embodiment learning through embodiment-specific soft prompts, and SimpleVLA-RL~\citep{li2026simplevlarl} demonstrates that reinforcement learning applied after imitation pre-training can significantly improve robustness and long-horizon execution.
+
+\subsection{World Model in Robotics}
+World models learn the internal representation of the world and can predict future visual states conditioned on actions. Although the concept has long been studied~\citep{craik1967nature,sandage1988observational,ha2018world}, it has recently experienced a surge in interest and has been applied across a wide range of applications, including image retrieval~\citep{Yuanmin_2025_CVPR}, autonomous driving~\citep{Hassan_2025_CVPR,Zhao_2025_CVPR}, medical imaging~\citep{Yue_2025_CVPR,yang2025medical}, face generation~\citep{zheng2025learning}, and robotics locomotion~\citep{hao2025neural,wang2025disentangled}, navigation~\citep{bar2025navigation,yao2025navmorph}, object manipulation~\citep{zhen2025learning}.
+
+In the context of robotics, world models have been used in several ways, including as simulators for training and evaluation~\citep{shang2025roboscape}, as auxiliary modules to boost planning policies~\citep{yin2025womap}, or as policies themselves after certain adaptations~\citep{goswami2025osvi}. Below we provide a brief review of each of these categories. 
+
+\subsubsection{World Models as Learned Simulators}
+
+In robotics and embodied AI, world models are most operationally useful when treated as \textbf{learned simulators}: action-conditioned generative models that produce counterfactual futures for decision-making. Rather than focusing on perceptual reconstruction or open-ended generation, this view treats the model as a computational substrate for control, where imagined rollouts must remain action-grounded, decision-relevant, and stable under closed-loop distribution shift~\citep{ha2018world,hafner2019_planet,hafner2020_dreamer}. Importantly, simulation does not need to occur in pixel space. Latent dynamics models—such as recurrent state-space models and predictive state representations—enable compact rollouts as long as task-relevant structure is preserved~\citep{littman2001_psr}. This shift from reconstruction fidelity toward control-aligned prediction exposes a key tension: improvements in likelihood or visual fidelity do not necessarily translate to better planning or policy learning, especially under long-horizon drift or objective mismatch~\citep{lambert2020_objective_mismatch,soh2026_action_hallucination}.
+
+Learned simulators are used in two main ways. First, they support explicit planning, where policies optimize actions by querying the model at test time. Latent planners such as PlaNet, PETS, and MBPO perform model predictive control with varying strategies to mitigate model error~\citep{hafner2019_planet,chua2018_pets,janner2019_mbpo}. More recently, V-JEPA~2-AC enables planning from image goals in latent space after large-scale pre-training on video data~\citep{assran2025vjepa2}. H-WM further explores hierarchical planning by coupling symbolic task-level prediction with visual state prediction, using intermediate subgoals to guide long-horizon robotic task and motion planning~\citep{chen2026h}.
+Video-based and foundation-scale simulators extend this idea to high-dimensional observations, enabling goal-directed planning from images or large-scale video pre-training~\citep{finn2017_visualforesight,ebert2018_visualforesight}.  NVIDIA presents Cosmos-Predict2.5 as a multimodal world-generation model designed to support robotics planning and large-scale synthetic rollouts~\citep{nvidia2025_cosmos,ali2025_cosmospredict25}. 
+Second, world models enable imagination-based policy optimization, where policies are trained directly on simulated trajectories, as in World Models, Dreamer, and its successors~\citep{ha2018_worldmodels,hafner2020_dreamer,hafner2023_dreamerv3}. Hybrid approaches such as TD-MPC combine short-horizon model rollouts with value bootstrapping to limit compounding error while retaining sample efficiency~\citep{hansen2022_tdmpc,hansen2024_tdmpc2}. Across these paradigms, the simulator’s value lies less in perceptual realism and more in producing predictions that are reliable for control.
+
+In visual navigation, world models are increasingly used to support tasks such as image-goal navigation. The Navigation World Model (NWM)~\citep{bar2025navigation} enables goal-conditioned navigation by using a Model Predictive Control (MPC)~\citep{kouvaritakis2016model} framework to simulate and evaluate candidate trajectories. Building on this idea, a lightweight one-step world model~\citep{shen2026efficient} employs a 3D U-Net with spatial–temporal attention to predict future observations, improving robustness and efficiency in multi-modal goal navigation tasks. More recently, MindJourney~\citep{yang2025mindjourney} leverages world models for test-time scaling to enhance a vision–language model’s understanding of 3D dynamics.
+
+\begin{table}[t]
+\caption{\textbf{Summary of world action models (WAMs)}. \textbf{MOT}: mixture-of-transformers, indicating that separate transformer backbones are used for video and action streams, with cross-modal interactions facilitated via attention at each layer. Note that the released LingBot-VA model adopts a unified transformer for both modalities, instead of the mixture-of-transformer architecture described in the paper. \textbf{Pretrain Free}: the method does not require task-agnostic embodied pre-training. \textbf{Causal Pred.}: action prediction is conditioned on the generated visual state, or vice versa. \textbf{AR Gen.}: auto-regressive generation.}
+\label{tab:wam_compare}
+\centering
+\setlength{\tabcolsep}{3pt}
+
+\resizebox{0.9\linewidth}{!}{
+\begin{tabular}{L{3cm} C{1.5cm} C{3cm} C{1.5cm} C{1.5cm} C{1.5cm} C{1.5cm}}
+\toprule
+\textbf{Model} & \textbf{\#Params} & \textbf{Backbone} & \textbf{MOT} & \textbf{Pretrain Free} & \textbf{Causal Pred.} & \textbf{AR Gen.} \\
+\midrule
+
+VPP\newline
+\citep{hu2025video}
+& 1.5B
+& Stable Video Diffusion (SVD)
+& \xmark
+& \xmark
+& \cmark
+& \xmark \\
+
+GE-Act\newline
+\citep{liao2025genie} 
+& 2.2B 
+& LTX-Video-2B
+& \cmark 
+& \xmark
+& \xmark
+& \cmark \\
+
+Cosmos-Policy\newline
+\citep{kim2026cosmos}
+& 2B 
+& Cosmos-Predict2-2B 
+& \xmark 
+& \cmark
+& \xmark
+& \xmark \\
+
+LingBot-VA\newline
+\citep{li2026causal}
+& 5.3B 
+& Wan2.2-5B 
+& \cmark ?
+& \xmark
+& \cmark
+& \cmark \\
+
+DreamZero\newline
+\citep{ye2026dreamzero}
+& 14B 
+& Wan2.1-14B 
+& \xmark
+& \xmark
+& \xmark
+& \cmark \\
+
+GigaWorld-Policy\newline
+\citep{ye2026gigaworld}
+& >5B
+& Wan2.2-5B
+& \xmark
+& \xmark
+& \cmark
+& \xmark \\
+
+Fast-WAM\newline
+\citep{yuan2026fast}
+& 6B
+& Wan2.2-5B
+& \cmark
+& \cmark
+& \xmark
+& \xmark \\
+
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsubsection{World Models as Auxiliary Tasks}
+In this scheme, world knowledge is acquired by augmenting the policy with predictive capacities. This is achieved by introducing auxiliary prediction tasks~\citep{Chen_2025_ICCV,cen2025worldvla,zhang2025dreamvla,sun2026vla,wang2026unified} or by co-training the policy with a predictive model~\citep{wang2026unified,li2025unified}. In \citet{Chen_2025_ICCV}, a GPT-like architecture is proposed in which video content is converted into latent motion tokens that are incorporated with the text and the initial image observation. The model is first pre-trained to predict future video tokens and then finetuned with an action head to generate motions. WorldVLA~\citep{cen2025worldvla} enhances the VLA policy by adding image prediction component to generate future scenes given the observation and current action. DreamVLA~\citep{zhang2025dreamvla} augments the policy with three auxiliary predictive tasks: semantic, depth and dynamic prediction. In \citet{sun2026vla}, the authors employ a teacher–student training framework in which a predictive video encoder generates dynamic targets from future visual states, while the VLM backbone produces latent action representations using only the current observation. These two latent representations are then mapped and combined to form future states, which are learned through an alignment loss. The authors of \citet{wang2026unified} achieve multitasking by using interleaved representations that combine discrete vision, language, and action tokens as input. Unified World Model~\citep{zhu2025unified} integrates action and video diffusion processes within a unified transformer architecture, with independent diffusion timesteps governing each modality. Following this scheme, the model can learn a forward dynamics, an inverse dynamics, and a video generator. MOTUS~\citep{bi2025motus} introduces a Mixture-of-Transformers (MoT) architecture that unifies video and action generation, enabling training across five tasks with diverse data types. The model in \citet{li2025unified} learns a policy by decoupling video-action decoding. Via a masking operation in video and action space, the model is induced to forward and inverse dynamics, as well as planning capability. For the navigation task. UniWM~\cite{dong2025unified} integrates prediction and control within a unified multimodal framework, first predicting actions and then autoregressively reconstructing future visual observations, with the reconstruction loss serving as an auxiliary supervision for action prediction.
+
+% MOTUS~\citep{bi2025motus} introduces a Mixture-of-Transformers (MoT) architecture composed of three experts: a video generator built upon the pretrained Wan2.2-5B~\citep{wan2025wan}, a vision-language understanding expert based on the pretrained Qwen3-VL-2B~\citep{bai2025qwen3} and a transformer-based action expert trained from scratch. By learning an optical-flow-based latent action, MOTUS is trained on five modeling tasks---including world model and Inverse Dynamic Model (IDM)---using a six-layer data pyramid. Its unified architecture and training objectives enables effective knowledge transfer from pretrained video generation and VLM foundation models, while leveraging both web-scale unlabeled human videos and high-quality robot manipulation data for training.
+
+% \textbf{World Model as Auxiliary Task - Navigation - \textcolor{blue}{Lingfeng Zhang}}
+% Beyond manipulation tasks, several works have explored unified world-model approaches for navigation. In contrast to modular architectures that decouple high-level planning from visual world modeling, UniWM~\cite{dong2025unified} integrates prediction and control within a unified multimodal framework. By grounding action selection in visually imagined future observations, UniWM directly mitigates action-state misalignment. Specifically, the model first predicts actions and then autoregressively reconstructs the corresponding future visual observations. The reconstruction loss is employed as an auxiliary objective to supervise action prediction. The underlying hypothesis is that action-conditioned future image generation provides structured supervision that improves policy learning by enforcing consistency between predicted actions and their anticipated visual consequences.
+
+\subsubsection{World Action Models (WAMs)}
+Despite the success of the VLAs aforementioned, they are mostly finetuned from VLM backbone models pretrained with an auto-regressive next-token prediction objective. While this language-centric pre-training enables models to capture high-level visual semantics, it often neglects the perception and prediction of fine-grained world dynamics that are essential for precise robotic control. With recent advances in action-conditioned video generation, a growing body of research has begun to explore adapting video generation models for policy learning~\citep{bi2025motus, hu2025video, kim2026cosmos, li2026causal, ye2026dreamzero, ye2026gigaworld, yuan2026fast}.  Video Prediction Policy (VPP) by \citet{hu2025video} is among the earliest efforts to repurpose a video generation backbone for robot action generation. Specifically, a video diffusion model is first pretrained on text-guided video prediction task, and then further adapted to generate robot actions with a diffusion policy head conditioned on visual features encoded by the video model. Empirical results show that the video pre-training stage is crucial for the observed performance improvements. Building on this paradigm, mimic-video~\citep{pai2025mimicvideo} leverages a language-conditioned video generation model (i.e., Cosmos-Predict2-2B~\citep{agarwal2025cosmos}, while retaining the same two-stage training scheme. It introduces a flow matching-based action decoder that is trained from scratch and serves as an inverse dynamic model (IDM). 
+GE-Act~\citep{liao2025genie}, built on the Genie Envisioner (GE) platform, follows a similar strategy. Leveraging a pretrained video diffusion model backbone (i.e., LTX-Video-2B), it introduces a lightweight, flow-matching action decoder which maps video model encoded latent features to robot action trajectories. 
+Despite the success of mimic-video and GE-Act, training an additional action decoder from scratch can disrupt the latent space learned by the video model and incurs extra training cost. Instead, Cosmos-policy~\citep{kim2026cosmos} minimally adapts the diffusion process of the video generation model Cosmos-Predict2, encoding the robot state, future image and value estimates directly as latent frames. With these lightweight architectural modifications, the model is finetuned under joint training objectives for policy, world model and value prediction. The resulting model supports both direct policy generation and model-based planning through its predicted future state and value estimates.  
+LingBot-VA~\citep{li2026causal} and DreamZero~\citep{ye2026dreamzero} enhance causal reasoning capacity of video-based policy model by unifying future visual state prediction and action inference within an interleaved sequence and autoregressively generating future predictions conditioned on previous step's outputs. This formulation enables efficient KV-cache memory integration while enforcing causal consistency---both of which are crucial for long-horizon robotic tasks. While using different video generation backbones, both methods address the challenge of slow inference of video models for robot control. To improve real-time performance, they accelerate inference through techniques such as asynchronous inference pipeline and partial video denoising, among other optimizations. 
+
+GigaWorld-Policy~\citep{ye2026gigaworld} and Fast-WAM~\citep{yuan2026fast} aim to mitigate the slow inference time of WAMs by treating video generation as optional at test time. GigaWorld-Policy conditions future visual state prediction on actions, whereas Fast-WAM jointly generate both modalities. Both designs enable test-time action prediction without explicitly generating visual state, as required in other IDM-based approaches (e.g., LingBot-VA), thereby significantly reducing the inference latency. However, the reported inference latencies of GigaWorld-Policy (360 ms) and Fast-WAM (190 ms) remain substantially higher than that of $\pi_0$~\citep{black2025pi0} on a consumer-level device (73 ms), leaving considerable room for improvement. Beyond inference speed, Fast-WAM also demonstrates great data efficiency in both simulation and real-world tasks by requiring only task-specific finetuning, without costly embodied pre-training on large-scale task-agnostic data. As shown in our evaluation (\Cref{tab:robotwin_plus}), Fast-WAM is essentially on par with the state-of-the-art LingBot-VA on RoboTwin 2.0, despite the absence of embodied pre-training---further substantiating the data efficiency of the WAM paradigm.
+
+The key characteristics of recent WAMs are summarized in \Cref{tab:wam_compare}. We only consider the methods that leverage a pretrained world model backbone for robot action generation, with minimal or no architecture modifications. Consequently, MOTUS is excluded from this list: although it adopts a pretrained Wan2.2-5B for video generation, it relies on an additional VLM for action generation rather than the world model backbone itself. Typically, lightweight modifications are introduced to the video backbones to encode robot joint state and produce robot actions. While some approaches (e.g., Cosmos-Policy, GigaWorld-Policy) employ a unified transformer backbone for both video and action streams, others such as GE-Act and Fast-WAM adopt mixture-of-transformers (MOT) architectures, using a smaller, dedicated transformer for action modeling. Regarding training objectives, WAM models are typically trained to predict future visual state and actions, and in most cases require embodied pre-training on large-scale robot data. The design of causal attention also varies across methods. For instance, LingBot-VA conditions action generation on predicted visual state, whereas Cosmos-Policy and DreamZero jointly denoise both modalities. In contrast, GigaWorld-Policy conditions video generation on actions. Autoregressive generation is employed in GE-Act, LingBot-VA and DreamZero to condition prediction on historical context, improving temporal consistency and inference efficiency.
+
+\begin{table*}[t]
+\caption{\textbf{Training data of VLAs and WAMs across different training stages.} \textbf{Training stages}: \colorbox{precolor}{Embodied Pre-training}, \colorbox{postcolor}{Embodied Post-training}, \colorbox{taskcolor}{Task-specific Finetuning}. \textbf{PT}: filtered data for embodied post-training.}
+\label{tab:training_data}
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{lp{3.5cm}p{2.6cm}p{3.8cm}p{3cm}}
+\toprule
+\textbf{Model}
+  & \textbf{Semantic Understanding \& Spatial Grounding}
+  & \textbf{General Video}
+  & \textbf{Robot Data}
+  & \textbf{Task-specific Data} \\
+\midrule
+
+\multicolumn{5}{c}{\textit{VLAs}} \\
+
+\arrayrulecolor{lightgray}
+\midrule
+
+$\pi_0$
+  & -
+  & -
+  & \colorbox{precolor}{Cross-embodiment (>10k h)}
+  & \colorbox{taskcolor}{Trajectories (5--100 h)} \\[4pt]
+
+OpenVLA-OFT
+  & -
+  & -
+  & \colorbox{precolor}{Cross-embodiment (970k)}
+  & \colorbox{taskcolor}{Trajectories (20--300)} \\[4pt]
+
+X-VLA
+  & -
+  & -
+  & \colorbox{precolor}{Cross-embodiment (288k)}
+  & \colorbox{taskcolor}{Trajectories (50)} \\[4pt]
+
+$\pi_{0.5}$
+  & \colorbox{precolor}{High-level planning} & -
+  & \colorbox{precolor}{Mobile manipulation (400 h)}
+  & \colorbox{taskcolor}{Trajectories (1--20 h)}
+  \\
+  & \colorbox{precolor}{Web data-VQA} & 
+  & \colorbox{precolor}{Multi-env. tabletop} & 
+  \\
+  & \colorbox{precolor}{Web data-captioning} &
+  & \colorbox{precolor}{Cross-embodiment} & 
+  \\
+  & \colorbox{precolor}{Web data-grounding} & & \colorbox{postcolor}{Mobile manipulation (PT)} & 
+  \\
+  & \colorbox{postcolor}{High-level planning (PT)} & & \colorbox{postcolor}{Multi-env.\ tabletop (PT)} & 
+  \\
+  & \colorbox{postcolor}{Verbal instruction} & & &
+  \\
+  & \colorbox{postcolor}{Web data (PT)} & & &  
+  \\[4pt] 
+  % \cmidrule(lr){1-5}
+
+\arrayrulecolor{black}
+\midrule
+
+% HoloBrain0
+%   & -
+%   & \colorbox{precolor}{Human-Ego (338k)}
+%   & \colorbox{precolor}{Cross-embodiment (193k)}
+%   & \colorbox{taskcolor}{Trajectories (200)} \\[4pt]
+
+\multicolumn{5}{c}{\textit{VLA + WM}} \\
+\arrayrulecolor{lightgray}
+\midrule
+
+VLA-JEPA
+  & -
+  & \colorbox{precolor}{Human Ego (220k)}
+  & \colorbox{precolor}{Single-embodiment (76k)}
+  & \colorbox{taskcolor}{Trajectories (100)} \\[4pt]
+
+MOTUS
+  & -
+  & \colorbox{precolor}{Human Ego (231k)}
+  & \colorbox{precolor}{Cross-embodiment (781k)} 
+  & \colorbox{taskcolor}{Trajectories (100)} \\
+  & & & \colorbox{postcolor}{Cross-embodiment (781k)} \\
+  & & & \colorbox{postcolor}{Task-agnostic data (1k)} \\ [4pt] 
+  
+% \cmidrule(lr){1-5}
+
+\arrayrulecolor{black}
+\midrule
+\multicolumn{5}{c}{\textit{WAMs}} \\
+\arrayrulecolor{lightgray}
+\midrule
+
+Cosmos-Policy
+  & -
+  & -
+  & -
+  & \colorbox{taskcolor}{Trajectories (185)} \\[4pt]
+
+DreamZero
+  & -
+  & -
+  & \colorbox{precolor}{Single-embodiment (500 h)}
+  & \colorbox{taskcolor}{Trajectories (12--40 h)} \\
+
+GE-Act
+  & -
+  & -
+  & \colorbox{precolor}{Single-embodiment (3k h)}
+  & \colorbox{taskcolor}{Trajectories (1 h)} \\[4pt]
+
+LingBot-VA
+  & -
+  & -
+  & \colorbox{precolor}{Cross-embodiment (16k h)}
+  & \colorbox{taskcolor}{Trajectories (50)} \\[4pt]
+
+GigaWorld-Policy
+  & -
+  & \colorbox{precolor}{Human Ego (4.5k h)}
+  & \colorbox{precolor}{Cross-embodiment (6.7k h)}
+  & \colorbox{taskcolor}{Trajectories (50)} \\[4pt]
+
+Fast-WAM
+  & -
+  & -
+  & -
+  & \colorbox{taskcolor}{Trajectories (60 h)} \\[4pt]
+
+\arrayrulecolor{black}
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+
+\subsection{Differences between WAMs and VLAs} \label{sec:diff_wam}
+
+WAMs differ from VLAs in their backbone model choices, training strategies, and prediction schemes. While WAMs leverage video generation models pretrained for video synthesis, VLAs are typically built upon VLM backbones pretrained for next-token prediction. The training datasets used by several influential VLAs, WAMs, and hybrid approaches are summarized in \Cref{tab:training_data}. In terms of notation, the training scheme is divided into two phases: \textbf{task-agnostic embodied pre-training} and \textbf{task-specific finetuning}. The embodied pre-training may be followed by a separate post-training stage, as in the case of $\pi_{0.5}$~\citep{pi05}. During the embodied pre-training stage, WAMs are commonly trained to jointly predict future visual states and actions using robot manipulation data. In contrast, VLAs are typically trained either for next-token prediction or action diffusion, often using not only robot data but also multi-modal web data and human videos in some cases~\citep{pi05, BuQ-RSS-25}. In terms of prediction schemes, VLAs typically map current state $h_t$ directly to the action $a_t$ via $p_\theta(a_t | h_t)$. In contrast, WAMs either jointly predict the future visual state $h_{t+1}$ and action $a_t$ via $p_\phi(h_{t+1}, a_t | h_t)$ or first predict the future visual state and then condition action generation on the predicted state, analogous to an inverse dynamic model (IDM), as $p_\phi(h_{t+1} | h_t) \cdot g_\psi(a_t | h_t, h_{t+1})$. In a less common causal formulation, GigaWorld-Policy predicts the action first, then generates future visual state conditioned on the action.
+
+The pre-training stage of video generation backbones such as Cosmos-Predict2 involves future visual state prediction—specifically the $p_\phi(h_{t+1} \mid h_t)$ component—trained on diverse internet-scale video data covering natural dynamics, hand motion, driving, etc. This video pre-training objective enhances the model's ability to capture general physical dynamics and to predict fine-grained spatiotemporal state transitions. Given this prior physical knowledge, the embodied pre-training phase of WAMs can primarily focus on establishing general action prediction, $g_\psi(a_t \mid h_t, h_{t+1})$, which is a relatively easier learning problem. Prior work suggests that agents capable of generalizing to multi-step goal-directed tasks must effectively learn predictive structure in the environment~\citep{richens2025general}. In contrast, the backbones of VLAs---VLMs---are typically trained on static image-text data and therefore often lack fine-grained dynamic prediction capability. As a result, VLAs generally require more diverse geometric grounding, video data, and robotic data during embodied pre-training to implicitly acquire models of world dynamics.
+
+% \textbf{Differences: }
+
+% Classic VLA: temporal/physical understanding mainly comes from robot demonstrations (or robot+sim data). If the dataset doesn’t cover a regime, the policy often extrapolates poorly.
+
+% World-model-as-policy: starts from a large pretrained video world model that already captures rich spatiotemporal regularities, then adapts it to control.
+
+% \textbf{Essentially equivalent?}
+
+%  A policy is a conditional distribution.
+
+%  A classic VLA aims to learn a (possibly stochastic) policy
+% \[
+% \pi(a_t \mid h_t),
+% \]
+% where $h_t$ denotes the agent history (e.g., visual observations, language instruction, proprioception, and past actions).
+% A world-model-as-policy approach instead parameterizes a joint generative model over actions and additional latent variables (and optionally future observations),
+% \[
+% p(a_t, z_t \mid h_t) 
+% \]
+% from which a policy can be obtained by marginalization:
+% \[
+% \pi(a_t \mid h_t) \;=\; \int p(a_t, z_t \mid h_t)\, dz_t,
+% \]
+
+% There are formal results arguing that agents that generalize to multi-step goal-directed tasks must effectively have learned predictive structure that can be extracted from the policy~\cite{richens2025general}.
+
+% \textbf{Our conclusion}
+% Equivalent in the limit: with infinite capacity + optimal training + (if needed) unlimited inference-time compute, both can realize the same optimal behavior.
+
+% Not equivalent in the regime we care about: finite data/compute + imperfect objectives, they land in different solution classes, and WM-as-policy often gains leverage by shifting work to trajectory generation + search and planning, rather than a purely amortized action head.
+
+\section{Experiments}
+
+\subsection{Datasets}
+
+To systematically compare the robustness of world action models (WAMs) and vision-language-action (VLA) models under diverse perturbation factors, we propose the \textbf{RoboTwin 2.0-Plus} benchmark, constructed upon RoboTwin 2.0~\citep{chen2025robotwin} and following the perturbation protocol of LIBERO-Plus~\citep{fei25libero-plus} with minor parameter adjustments. Specifically, perturbations are applied along the following axes: (1)~\textit{Camera}, altering the viewpoint pose of the third-person camera; (2)~\textit{Robot}, varying the initial joint configuration; (3)~\textit{Language}, paraphrasing or altering task instructions; (4)~\textit{Light}, modifying illumination intensity, shadow direction, and color temperature; (5)~\textit{Background}, changing table and scene textures; (6)~\textit{Noise}, applying photometric distortions to input images; and (7)~\textit{Layout}, introducing task-irrelevant distractive objects into the workspace. This benchmark is designed to facilitate evaluation of WAMs and VLAs that provide open-source checkpoints trained on RoboTwin 2.0. Further details are provided in~\Cref{app:robotwin_plus}. In addition, we also evaluate existing approaches on the open-sourced \textbf{LIBERO-Plus} benchmark~\cite{fei25libero-plus}. 
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.8
+    \linewidth]{figures/robotwin2_plus_perturbation_strip.pdf}
+    \caption{\textbf{Examples of perturbations on RoboTwin 2.0-Plus tasks.} Definition of notations (N1, L1, etc.) can be found in \Cref{app:robotwin_plus}}
+    \label{fig:robotwin_plus}
+\end{figure}
+
+LIBERO-Plus and RoboTwin 2.0-Plus differ substantially in their underlying environments, as summarized in \Cref{tab:benchmark_comparison}. The primary distinction lies in their observation and action spaces. LIBERO-Plus employs a 7-DoF Franka Panda robot equipped with two cameras—one third-person view and one wrist-mounted—both operating at a resolution of $256\times256$. In contrast, RoboTwin 2.0-Plus features a dual-arm bimanual system based on the Aloha-Agilex platform, with three cameras: a head-mounted third-person view and two wrist-mounted cameras, each capturing images at $320\times240$ resolution. These differences in embodiment, sensing configuration, and action space make the two benchmarks complementary. LIBERO-Plus primarily evaluates single-arm dexterity under perturbations, whereas RoboTwin 2.0-Plus focuses on the robustness of bimanual coordination.
+
+\subsection{Evaluation Methods}
+
+We conduct comprehensive evaluation of VLAs and WAMs for which publicly available checkpoints exist. On RoboTwin 2.0-Plus, We evaluate X-VLA~\citep{zheng2026xvla}, MOTUS~\citep{bi2025motus} and LingBot-VA~\citep{li2026causal} using their released checkpoints finetuned on the original RoboTwin 2.0 dataset. Due to the known performance gap between the JAX and PyTorch implementations of the $\pi$-series models---also reported in \citet{bi2025motus} and \citet{li2026causal}---and the absence of a JAX version of $\pi_{0.5}$, we finetuned the JAX implementation of $\pi_{0.5}$ on the RoboTwin 2.0 dataset. The model is finetuned from the pretrained $\pi_{0.5}$ checkpoint on the full 27.5k RoboTwin 2.0 training data for 60k gradient steps using the openpi framework's recommended configuration: AdamW   optimizer ($\beta_1{=}0.9$, $\beta_2{=}0.95$, gradient clipping at 1.0), cosine decay learning rate schedule (peak $2.5{\times}10^{-5}$, decaying to $2.5{\times}10^{-6}$), batch size 64, with delta joint actions. More model checkpoints are publicly available for LIBERO, and some of them have been evaluated on LIBERO-Plus. We report the results of a diverse set of VLAs and WAMs, including classic VLAs from the $\pi_0$-series~\citep{black2025pi0, pi05} (JAX version); approaches that incorporate world modeling as auxiliary tasks, such as VLA-JEPA~\citep{sun2026vla}; and recent WAMs including GE-Act~\citep{liao2025genie} and Cosmos-Policy~\citep{kim2026cosmos}. A detailed comparison of these models is presented in \Cref{app:model_comp}. 
+
+% It should be noted that a significant performance gap has been observed in the JAX and PyTorch implementations of the $\pi$-series models, as also reported in \citet{bi2025motus} and \citet{li2026causal}. 
+
+% For RoboTwin 2.0-Plus evaluation, we retrain $\pi_{0.5}$ on the RoboTwin 2.0 dataset, following a two-stage schedule: the model is first finetuned on 2,500 clean demonstrations for 30k gradient steps, and then continues training on the full 27,500 demonstrations (clean + domain-randomized) for an additional 30k steps (60k total).
+
+Although DreamZero~\citep{ye2026dreamzero} is included in our WAM taxonomy (\Cref{tab:wam_compare}), we exclude it from the benchmark evaluation for three reasons. First, its released checkpoint is trained on a proprietary cross-embodiment dataset and cannot be directly applied to LIBERO or RoboTwin~2.0 without re-training. Second, re-training is prohibitively expensive, as the model is built on the Wan2.1-14B video generation backbone---the largest among all WAMs surveyed---and its autoregressive interleaved training procedure demands substantial GPU resources. Third, the inference pipeline requires a warm-up phase exceeding 15 minutes, making benchmark-scale evaluation across thousands of rollout episodes impractical. The checkpoint of GigaWorld-Policy is also not yet publicly available; we therefore include it in the architectural comparison but exclude it from the quantitative evaluation. Fast-WAM~\citep{yuan2026fast}, which was previously unreleased, has since become available and is included in our evaluation: we use the \texttt{robotwin\_uncond\_3cam\_384} checkpoint for RoboTwin 2.0-Plus (finetuned on the standard 27.5k clean + domain-randomized demonstrations) and a LIBERO checkpoint trained on clean demonstrations only. This training-data asymmetry between the two Fast-WAM checkpoints is intentional and revisited in \textbf{RQ 2}, as it offers a useful natural experiment on the role of task-specific data diversity.
+
+\subsection{Results}
+
+We aim to address the following research questions through our experiments and analysis: 
+\begin{itemize}
+    \item \textbf{RQ 1.} Are WAM-based policies robust to perturbations? 
+
+    \item 
+\textbf{RQ 2.} Is the performance advantage of WAMs consistent across different perturbation types? 
+
+    \item 
+\textbf{RQ 3.} How to explain the performance differences between VLAs and WAMs? 
+
+\item \textbf{RQ 4.} What are the runtime characteristics of WAMs and how do they compare to those of VLAs?  
+\end{itemize}
+
+Our key findings addressing the aforementioned questions are summarized below.
+
+\begin{table}[t]
+\centering
+\caption{\textbf{RoboTwin 2.0-Plus evaluation results}. The \textit{Original} column reports the success rate of each method evaluated in the original RoboTwin 2.0 \textit{Easy} setting. For a fair comparison, all methods use a single unified model across all tasks. The best result in each column is highlighted in \textbf{bold}, while second-best result is \underline{underlined}. \textbf{Lang.}: Language. \textbf{BG}: Background.}
+\label{tab:robotwin_plus}
+\begin{tabular}{@{}L{2.5cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm}@{}}
+\toprule
+Model & Original & Camera & Robot & Lang. & Light & BG & Noise & Layout & Total \\ \midrule
+
+\multicolumn{10}{c}{\textit{VLAs}} \\
+
+\arrayrulecolor{lightgray}\midrule
+
+$\pi_{0.5}$ & 78.4 & \textbf{45.6} & 27.6 & 74.4 & 49.6 & 71.7 & 64.9 & 56.8 & 58.6 \\
+% HoloBrain-0-GD & 92.8 & 27.2 & 78.0 & 92.4 & 89.6 & 91.2 & 51.2 & 86.0 & 76.1 \\
+% HoloBrain-0-Qwen & 91.6 & 24.4 & 67.6 & 91.2 & 90.8 & 90.8 & 84.4 & 87.6 & 78.6 \\
+X-VLA & 65.6 & 23.2 & \underline{65.2} & 64.4 & 63.1 & 58.6  & 49.7 & 34.8 & 53.1 \\
+
+\arrayrulecolor{black}\midrule
+
+\multicolumn{10}{c}{\textit{VLA + WM}} \\
+\arrayrulecolor{lightgray}\midrule
+
+MOTUS & 87.0 & 21.6 & \textbf{85.0} & 83.2 & 84.6 & 84.4 & 43.1 & 82.8 & 71.5 \\
+
+\arrayrulecolor{black}\midrule
+
+\multicolumn{10}{c}{\textit{WAMs}} \\
+
+\arrayrulecolor{lightgray}\midrule
+
+LingBot-VA & \textbf{92.1} & 28.9  & 36.2 & \textbf{87.3}  & \textbf{89.0} & \textbf{91.3}  & \textbf{80.9} & \textbf{87.9} & \textbf{74.2}  \\
+Fast-WAM & \underline{91.2} & \underline{30.4} & 53.2 & \underline{86.7} & \underline{88.8} & \underline{90.0} & \underline{76.4} & \underline{83.2} & \underline{72.7} \\
+\arrayrulecolor{black}\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/robotwin2_plus_case_study.png}
+    \caption{\textbf{Case studies on RoboTwin 2.0-Plus.} We present three representative cases comparing $\pi_{0.5}$ and LingBot-VA. Keyframes are shown sequentially from left to right.
+    \textbf{(a)} \textit{Task:} beat block with hammer. \textit{Perturbation:} noise (N3). \textit{Result:} $\pi_{0.5}$ collides with the hammer and fails to complete the task.
+    \textbf{(b)} \textit{Task:} handover block. \textit{Perturbation:} layout. \textit{Result:} $\pi_{0.5}$ collides with the red block during approach, leading to failure.
+    \textbf{(c)} \textit{Task:} rank RGB blocks. \textit{Perturbation:} lighting (L1–L4 mix). \textit{Result:} $\pi_{0.5}$ fails to grasp the first red block due to misalignment and does not recover. LingBot-VA success in all three cases shown.
+}
+    \label{fig:robotwin_case}
+\end{figure}
+
+\textbf{RQ 1.} Are WAM-based policies robust to perturbations?
+
+Recent WAM studies have reported superior performance over VLAs in both simulation and real robot experiments~\cite{kim2026cosmos, bi2025motus, li2026causal}. In particular, WAMs demonstrate stronger scene and task generalization, largely attributed to the spatiotemporal priors inherited from the video pre-training. We adopt RoboTwin 2.0-Plus and LIBERO-Plus described in prior session to rigorously evaluate the robustness of policy models under diverse perturbation conditions. As shown in \Cref{tab:robotwin_plus}, LinBot-VA achieves the SOTA success rate of 92.1\% on the original RoboTwin 2.0 benchmark and consistently exhibits great robustness to various perturbations. It ranks first in five out of seven perturbation categories and achieves an overall success rate of 74.2\%, which is significantly higher than 58.6\% by $\pi_{0.5}$ and 72.7\% of the second-best method Fast-WAM. Several representative cases are illustrated in \Cref{fig:robotwin_case}. While $\pi_{0.5}$ struggles with visual perturbations such as noise, light and cluttered layout, LingBot-VA performs effectively under these conditions, demonstrating greater robustness.
+The results of LIBERO-Plus further corroborate the robustness advantage of WAMs on a second benchmark. Cosmos-Policy achieves an impressive 98.5\% success rate on the original LIBERO benchmark and maintains an 82.2\% overall success rate with all perturbations introduced in LIBERO-Plus. GE-Act follows closely, attaining an 80.3\% success rate on LIBERO-Plus. Despite the high sensitivity of most VLAs to perturbations, $\pi_{0.5}$ delivers strong and consistent performance, achieving the highest overall success rate of 85.7\%. 
+
+Furthermore, Fast-WAM---the only WAM in our evaluation that requires no embodied pre-training---achieves an overall success rate of 72.7\% on RoboTwin 2.0-Plus (\Cref{tab:robotwin_plus}), placing it second only to LingBot-VA and ahead of MOTUS. This indicates that the spatiotemporal priors of the video backbone alone---without any large-scale embodied pre-training---can yield WAM-level robustness, provided the task-specific training data is sufficiently diverse, a condition we examine more carefully in \textbf{RQ 2}.
+
+Notably, several models occupy a middle ground between pure VLAs and WAMs, and their behavior sheds light on how video priors are integrated, not merely whether they are present. MOTUS incorporates a pretrained video generation backbone (Wan2.2-5B) but routes action generation through a separate VLM expert rather than the video model itself. On RoboTwin 2.0-Plus as shown in \Cref{tab:robotwin_plus}, MOTUS achieves the highest robot initial-state robustness (85.0\%) and the third-best overall score (71.5\%), suggesting that incorporation of the additional video backbone and jointly training with dynamic prediction enhances the robustness of the learned policy. VLA-JEPA, on the other hand, augments a standard VLM backbone (Qwen3-VL-2B) with a future-state prediction objective trained on human videos, effectively injecting video-like temporal priors into the VLA framework. Its competitive performance on LIBERO-Plus (77.9\% in total) indicates that even partial incorporation of spatiotemporal learning can meaningfully improve robustness, though it still falls short of dedicated WAMs that natively operate in the video latent space.
+
+
+% As shown in \Cref{tab:libero_plus_total}, WAMs consistently exhibit great robustness to various perturbations. Notably, Cosmos-Policy achieves an impressive 98.5\% success rate on the original LIBERO benchmark and maintains an 82.2\% overall success rate with all perturbations introduced in LIBERO-Plus. GE-Act follows closely, attaining an 80.3\% success rate on LIBERO-Plus. Despite the high sensitivity of most VLAs to perturbations, $\pi_{0.5}$ delivers strong and consistent performance across all perturbation types, achieving the highest overall success rate of 85.7\%. Model rankings across seven perturbations types are illustrated in \Cref{fig:libero_plus_rank}. 
+
+
+% \begin{figure}[h]
+%     \centering
+%     \includegraphics[width=\linewidth]{figures/libero_plus_rank.pdf}
+%     \caption{Libero-plus Ranking.}
+%     \label{fig:libero_plus_rank}
+% \end{figure}
+
+
+\textbf{RQ 2.} Is the performance advantage of WAMs consistent across different perturbation types?
+
+The behavior of WAMs varies across different types of perturbations. As shown in \Cref{tab:robotwin_plus}, LingBot-VA consistently demonstrates strong robustness to visually based perturbations. In particular, it maintains strong performance under light (89.0\%), noise (80.9\%), and layout (87.9\%) perturbations, while facing challenges in scenarios involving variations in camera viewpoint and the robot's initial state. A similar trend is observed in the LIBERO-Plus results shown in \Cref{tab:libero_plus_total}, where Cosmos-Policy and GE-Act demonstrate high robustness in light, noise and layout perturbations. Visualizations of predictions by Cosmos-Predict,  shown in \Cref{fig:cosmos_pred}, indicate that the future images predicted by Cosmos-policy remain highly accurate under varying noise and light conditions. Notably, when the input image is corrupted by noise, Cosmos-policy is able to effectively denoise the moving robotic arm in its predictions. This capacity is likely attributable to its pre-training on web-scale videos containing dynamic objects. However, the predictions exhibit severe spatial distortions and inconsistent color schemes under certain background perturbation---probably due to the uncommon background patterns. This degradation in the quality of predicted future images will likely lead to inaccurate action generation.
+
+Fast-WAM further provides a particularly clean natural experiment on the role of task-specific training-data diversity. On RoboTwin 2.0-Plus, where the released checkpoint was finetuned on the standard 27.5k clean + domain-randomized demonstrations, Fast-WAM is highly robust: 91.2\% on the original benchmark and 72.7\% averaged across perturbations (\Cref{tab:robotwin_plus})---a drop of only $\sim$18 points. On LIBERO-Plus, where the same architecture was trained on clean demonstrations only, the model achieves 97.6\% on the original benchmark but degrades sharply under nearly every perturbation type (camera 16.4\%, background 53.7\%, noise 37.7\%; \Cref{tab:libero_plus_total}), corresponding to an overall $\sim$46-point drop. Since the architecture and video backbone are identical across the two checkpoints, the contrast isolates the contribution of training-data diversity: the spatiotemporal priors of the video backbone are necessary but not sufficient for robustness, and task-specific training-data diversity remains a critical lever even when the backbone is video-pretrained. Comparing across architectures, this also suggests that Fast-WAM---which jointly denoises state and action without explicitly conditioning the latter on a predicted future state---may be more dependent on training-data diversity to acquire generalization than IDM-style WAMs such as LingBot-VA, where the explicit state-to-action causal coupling provides an additional architectural prior for robustness. Overall, this is consistent with our broader finding that robustness emerges from the \emph{integration} of dynamic priors with diverse training data rather than from the presence of either alone.
+
+% consistent with the noise and light robustness observed for Cosmos-Policy and GE-Act on LIBERO-Plus. Across both benchmarks, camera viewpoint and robot initial state remain the two most challenging perturbation types for WAMs, suggesting that spatiotemporal video priors provide limited benefit when the geometric configuration of the scene is altered. It is worth noting that the RoboTwin 2.0 training data is generated via randomized scripted policies, which inherently introduces variation in background textures and language instructions. As a result, all models in \Cref{tab:robotwin_plus} have been exposed to a degree of background and language noise during training. This likely explains why LingBot-VA achieves 91.3\% under background perturbations in RoboTwin 2.0-Plus---in contrast to the background vulnerability exhibited by WAMs on LIBERO-Plus, where the perturbations (e.g., high-saturation tabletop colors) fall further outside the training distribution.
+
+% Among the seven perturbation types, Cosmos-Policy and GE-Act demonstrate strong robustness to injected image noise (e.g., jitter, Gaussian blur) as well as light disruptions (e.g., variations in illumination intensity and direction, and shadow patterns). As illustrated in \Cref{fig:cosmos_pred}, the future images predicted by Cosmos-policy remain highly accurate under varying noise and light conditions. Notably, when the input image is corrupted by noise, Cosmos-policy is able to effectively denoise the moving robotic arm in its predictions. This capacity is likely attributable to its pre-training on web-scale videos containing dynamic objects. In contrast, the unusual background patterns introduced in the background perturbation type present significant challenges for WAMs. In some cases, severe spatial distortions and inconsistent color schemes are observed, as shown in \Cref{fig:cosmos_pred}. A possible explanation is the use of high saturated tabletop colors (e.g., pure black, pure red, or vivid wave patterns, as shown in the figure), which are uncommon in real-world environment and thus unlikely to be well represented in video pre-training data. For other perturbation types, including camera viewpoint and robot initial state---identified as the two most challenging settings for VLAs~\citep{fei25libero-plus}---both evaluated WAMs exhibit reliable and stable performance.  
+
+% We further evaluate the performance of the key models on each task suite: \texttt{Spatial}, \texttt{Object}, \texttt{Goal} and \texttt{Long} (also referred to as LIBERO-10). Most of the findings remain consistent across individual task suites---particularly for the most challenging \texttt{Long} task suite. However, the performance of Cosmos-policy and GE-Act degrades substantially under language variations for both the \texttt{Object} and \texttt{Goal} task suites. The language perturbations are generated by rewriting task instructions using a LLM, often requiring additional reasoning to infer the precise task specification. WAMs typically condition the diffusion process on the language embeddings produced by a third-party encoder (e.g., T5 in Cosmos-policy) and are not explicitly trained on language reasoning data. This factor may account for their relative weakness interpreting semantically diverse descriptions for the same task. 
+
+\begin{table}[t]
+\centering
+\caption{\textbf{LIBERO-Plus evaluation results}. The \textit{Original} column denotes results on the standard LIBERO benchmark. The results of $\pi_0$, $\pi_0\text{-FAST}$, Openvla-OFT-m, UniVLA, RIPT-VLA are sourced from \citet{fei25libero-plus}. The results reported for HoloBrain0-GD~\citep{lin2026holobrain} and ABot-M0~\citep{yang2026abot} are taken from their respective papers. The remaining models are evaluated using their official repositories and publicly released checkpoints. Specifically, $\pi_0 (\text{rerun})$ and $\pi_{0.5}$ are evaluated using their JAX implementations. The best result in each column is highlighted in \textbf{bold}, while second-best result is \underline{underlined}. \textbf{Lang.}: Language. \textbf{BG}: Background.}
+
+% [1] \citet{black2025pi0} [2] \citet{pertsch2025fast} [3] \citet{pi05} [4] \citet{kim2025fine} [5] \citet{wang2026unified} [6] \cite{tan2025interactive} [7] \citet{zheng2026xvla} [8] \citet{lin2026holobrain} [9] \citet{sun2026vla} [10] \citet{yang2026abot} [11] \citet{kim2026cosmos} [12] \citet{liao2025genie}.
+
+\label{tab:libero_plus_total}
+\begin{tabular}{@{}L{3.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm}}
+\toprule
+Model & Original & Camera & Robot & Lang. & Light & BG & Noise & Layout & Total \\ \midrule
+
+\multicolumn{10}{c}{\textit{VLAs}} \\
+
+\arrayrulecolor{lightgray}\midrule
+
+$\pi_0$ & 94.2 & 13.8 & 6.0 & 58.8 & 85.0 & 81.4 & 79.0 & 68.9 & 53.6 \\
+$\pi_0 (\text{rerun})$ & 91.3 & 61.0 & 40.8 & 63.5 & 89.3 & 84.1 & 80.1 & 76.4 & 69.4 \\
+$\pi_0$-FAST & 85.5 & 65.1 & 21.6 & 61.0 & 73.2 & 73.2 & 74.4 & 68.8 & 61.6 \\
+$\pi_{0.5}$ & 96.9 & \underline{75.4} & \underline{77.5} & 85.6 & \textbf{96.9} & \underline{94.6} & 89.7 & \textbf{85.7} & \textbf{85.7} \\
+Openvla-OFT\_m & 97.6 & 55.6 & 21.7 & 81.0 & 92.7 & 91.0 & 78.6 & 68.7 & 67.9 \\
+UniVLA & 95.2 & 1.8 & 46.2 & 69.6 & 69.0 & 81.0 & 21.2 & 31.9 & 42.9 \\
+RIPT-VLA & 97.5 & 55.2 & 31.2 & 77.6 & 88.4 & 91.6 & 73.5 & 74.2 & 68.4 \\
+X-VLA & 98.1 & 23.4 & \textbf{89.7} & 75.7 & 88.2 & \textbf{96.0} & 62.7 & 71.8 & 71.4 \\
+HoloBrain0-GD & 96.7 & 65.5 & 58.2 & 78.7 & 88.1 & 90.3 & 66.9 & 79.5 & 74.0 \\
+ABot-M0 & \textbf{98.6} & 60.4 & 67.9 & \underline{86.4} & 96.2 & 91.6 & 86.4 & 82.6 & 80.5 \\ 
+
+\arrayrulecolor{black}\midrule
+\multicolumn{10}{c}{\textit{VLA + WM}} \\
+\arrayrulecolor{lightgray}\midrule
+
+VLA-JEPA & 97.2 & 64.2 & 67.7 & \textbf{88.1} & 91.8 & 93.4 & 65.8 & \underline{83.9} & 77.9 \\ 
+
+\arrayrulecolor{black}\midrule
+\multicolumn{10}{c}{\textit{WAMs}} \\
+\arrayrulecolor{lightgray}\midrule
+
+GE-Act & 94.4 & 60.7 & 77.0 & 77.4 & 95.8 & 86.0 & \underline{90.9} & 80.2 & 80.3 \\
+Cosmos-Policy & \underline{98.5} & \textbf{75.8} & 63.3 & 81.7 & \underline{96.5} & 88.9 & \textbf{92.7} & 82.2 & \underline{82.2} \\
+Fast-WAM & 97.6 & 16.4 & 44.5 & 68.9 & 78.2 & 53.7 & 37.7 & 60.7 & 51.5 \\
+\arrayrulecolor{black}\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figures/cosmos_pred.png}
+    \caption{\textbf{Illustrations of future images predicted by Cosmos-policy.} Ground-truth and predicted images under three types of perturbations (noise, lighting, and background variations) in LIBERO-Plus are shown. GT: the ground truth. Pred.: the predictions generated by Cosmos-policy.}
+    \label{fig:cosmos_pred}
+\end{figure}
+
+\textbf{RQ 3.} How to explain the performance differences between VLAs and WAMs?
+
+As discussed in \Cref{sec:diff_wam}, WAMs differ from VLAs in both backbone selection and the subsequent training strategy for robot policy generation. Unlike VLAs, which typically leverage VLM backbones, WAMs build upon video diffusion models pretrained on web-scale video generation tasks. Exposure to diverse and temporally rich video data in video backbone enables WAMs to capture fine-grained visual dynamics and temporal dependencies without requiring extensive training for policy generation. As shown in \Cref{tab:training_data}, WAMs such as Cosmos-policy require only lightweight finetuning on downstream tasks while maintaining strong robustness under various visual perturbations. In contrast, the backbone models of VLAs are primarily trained on static image-text data and lack explicit priors over visual dynamics, which can limit their ability to adapt to new scenes and tasks. To achieve robustness comparable to WAMs, VLAs typically require additional training on diverse dynamic visual data. For instance, $\pi_{0.5}$ achieves strong cross-scene generalization and robustness to visual perturbations by incorporating diverse robotic data and web data into its training pipeline. Similarly, hybrid methods such as VLA-JEPA and MOTUS with strong robustness also incorporate human video data in their training pipeline. Overall, the spatiotemporal priors inherited from video generation backbones substantially simplifies the training process of WAMs and reduce their reliance on diverse visual data. This advantage is particularly valuable in settings where data availability is limited.
+
+% \begin{table}[h]
+% \caption{\textbf{Runtime Speed Comparison. }}
+% \label{tab:speed}
+% \centering
+% \begin{tabularx}{\linewidth}{
+% >{\raggedright\arraybackslash\hsize=2\hsize}X
+% *{8}{>{\centering\arraybackslash\hsize=0.75\hsize}X}
+% }
+% \toprule
+%  & $\pi_{0.5}$ & X-VLA & HoloBrain-0 & GE-Act & Cosmos-Policy & MOTUS (w/o VAE) & MOTUS & LingBot-VA \\
+% \midrule
+% Action chunk size & 50 & 30 & 64 & 36 & 16 & 16 & 16 & 32 \\
+% Inference $t$ (clock) & 63 ms & 195 ms & 283 ms & 300 ms & 390 ms & 1050 ms & 1175 ms & 5230 ms \\
+% Inference $t$ (w.r.t.\ $\pi_{0.5}$) & 1.0 & 3.1 $\times$ & 4.5 $\times$ & 4.8 $\times$ & 6.2 $\times$ & 16.7 $\times$ & 18.6 $\times$ & 83.0 $\times$ \\
+% \bottomrule
+% \end{tabularx}
+% \end{table}
+
+\begin{table}[h]
+\caption{\textbf{Runtime Speed Comparison.} The inference times of all models are evaluated using the same device. LingBot-VA(RW): real-world setting with three denoising steps for state and five for action. LingBot-VA(RT): RoboTwin 2.0 setting with 25 denoising steps for state and 50 for action. }
+\label{tab:speed}
+\centering
+\begin{tabularx}{\linewidth}{
+>{\raggedright\arraybackslash\hsize=1.8\hsize}X
+*{9}{>{\centering\arraybackslash\hsize=0.7\hsize}X}
+}
+\toprule
+ & $\pi_{0.5}$ & X-VLA & Fast-WAM$^\ast$ & GE-Act & Cosmos-Policy & LingBot-VA(RW) & MOTUS & LingBot-VA(RT) \\
+\midrule
+Action chunk size & 50 & 30 & 16 & 36 & 16 & 32 & 16 & 32 \\
+Inference $t$ (wall clock) & 63 ms & 195 ms & 190 ms & 300 ms & 390 ms & 480 ms & 1175 ms & 5230 ms \\
+Inference $t$ (w.r.t.\ $\pi_{0.5}$) & 1.0 & 3.1 $\times$ & 3.0 $\times$ & 4.8 $\times$ & 6.2 $\times$ & 7.6 $\times$ & 18.6 $\times$ & 83.0 $\times$ \\
+\bottomrule
+\end{tabularx}
+{\footnotesize $^\ast$Fast-WAM latency is reported by \citet{yuan2026fast} on their hardware and is not re-measured on our device.}
+\end{table}
+
+
+\textbf{RQ 4.} What are the runtime characteristics of WAMs and how do they compare to those of VLAs?
+
+A major limitation of WAMs is their slower runtime compared to VLAs, primarily due to the computational overhead of the future-state diffusion process. As summarized in \Cref{tab:speed}, the inference cost of WAMs varies considerably depending on architecture choices. Among VLAs, $\pi_{0.5}$ achieves the fastest inference at 63\,ms per chunk, while X-VLA takes 195\,ms per inference. In contrast, MOTUS and WAMs are consistently slower, requiring at least 4.8$\times$ runtime per inference compared to $\pi_{0.5}$.
+% MOTUS and WAMs are consistently slower: GE-Act requires 300\,ms (4.8$\times$), Cosmos-Policy 390\,ms (6.2$\times$), MOTUS 1,175\,ms (18.6$\times$), and LingBot-VA 5,230\,ms (83.0$\times$). 
+A critical factor that largely determines the speed of WAMs is the number of denoising steps for state and action, with state denoising typically dominating the runtime. For example, GE-Act requires only one denoising step for state and ten for action, whereas Cosmos-Policy performs five steps for both. MOTUS, in contrast, uses ten denoising steps for both state and action. LingBot-VA adopts different configurations depending on the setting: for real-world deployment, it uses three denoising steps for state and five for action, while for RoboTwin 2.0, it employs 25 and 50 steps, respectively, which explains its significantly longer inference time (5.2 seconds per inference). Runtime speed of WAMs is also affected by other factors, including backbone size (2B--5.3B parameters), generation strategy (joint denoising vs.\ separate action decoding), and whether autoregressive generation is employed. By omitting visual state generation at test time, Fast-WAM achieves the lowest inference latency among WAMs in our comparison (190 ms; \Cref{tab:speed}), but is still 3.0$\times$ slower than $\pi_{0.5}$. Further efforts are still needed to improve the inference efficiency of WAMs.
+
+% Although several optimization strategies have been used---such as asynchronous inference, partial state denoising and KV caching~\citep{li2026causal, ye2026dreamzero}---further efforts are still needed to improve the inference efficiency of WAMs.
+
+% A profiling of MOTUS's inference pipeline reveals that approximately 85\% of its total inference time is consumed by the denoising loop (10 diffusion steps), followed by VAE decoding (${\sim}9\%$), T5 text encoding (${\sim}2\%$), VLM feature extraction (${\sim}2\%$), VLM preprocessing (${\sim}1\%$), and VAE encoding (${\sim}1\%$). Within each denoising step, the forward pass through the 30-layer Mixture-of-Transformers backbone---which jointly attends over video, action, and understanding tokens before cross-attending to T5 language embeddings---is the most time-consuming component.
+
+
+% HoloBrain-0: 64, 283ms, 4.5 x
+
+% Interestingly, the robustness advantage of WAMs does not appear to scale with inference cost. $\pi_{0.5}$, the fastest model in our evaluation, achieves the highest overall success rate on LIBERO-Plus (85.7\%), outperforming all WAMs despite being 6--83$\times$ faster. Conversely, LingBot-VA is the slowest model yet achieves the best total on RoboTwin 2.0-Plus (74.2\%), while Cosmos-Policy---6.2$\times$ slower than $\pi_{0.5}$ but 13$\times$ faster than LingBot-VA---achieves a comparable 82.2\% on LIBERO-Plus. This suggests that the robustness of WAMs stems primarily from the spatiotemporal priors of their video backbones rather than from additional inference-time computation, and that the speed gap is largely an engineering overhead of the diffusion process rather than a necessary cost for improved performance.
+
+\section{Conclusion}
+
+We presented a systematic comparative study of world action models (WAMs) and vision-language-action models (VLAs), evaluating their robustness under diverse visual and language perturbations across two complementary benchmarks: RoboTwin 2.0-Plus and LIBERO-Plus. Our findings reveal that WAMs, by leveraging spatiotemporal priors from video generation backbones, consistently demonstrate strong robustness to noise, lighting, and layout perturbations---a pattern that holds across both single-arm (LIBERO) and bimanual (RoboTwin) settings. However, camera viewpoint and robot initial-state perturbations remain challenging for WAMs, indicating that video priors offer limited benefit when the geometric configuration of the scene is altered. Among VLAs, $\pi_{0.5}$ achieves competitive or superior robustness by incorporating diverse robotic and web data during training, suggesting that data diversity can compensate for the absence of explicit world modeling. Hybrid approaches such as MOTUS and VLA-JEPA, which partially integrate video-based temporal learning, exhibit robustness profiles that fall between pure VLAs and WAMs, highlighting that the manner in which video priors are incorporated matters as much as their presence.
+
+Our analysis also reveals that inference speed remains a major challenge for WAMs, primarily driven by the visual state denoising process. While faster methods such as GE-Act requires only a single denoising step, the slowest model, LingBot-VA, requires up to 25 steps on the RoboTwin dataset. Compared to $\pi_{0.5}$, the evaluated WAMs are at least 4.8 times slower per inference. This underscores a key practical challenge for WAMs and highlights the need for further research to improve their inference efficiency, enabling deployment in scenarios that require rapid response time or real-time interaction with dynamic environments. Recent approaches, such as Fast-WAM, have sought to accelerate inference by co-training visual state and action prediction and omitting state generation at test time. In our evaluation, Fast-WAM achieves competitive robustness on RoboTwin 2.0-Plus (72.7\% overall, second only to LingBot-VA) without any embodied pre-training, demonstrating the data efficiency of the WAM paradigm. However, when restricted to clean training demonstrations on LIBERO, Fast-WAM's robustness collapses (51.5\% overall vs.\ 97.6\% on the original benchmark), reinforcing that the WAM video prior is necessary but not sufficient---task-specific training-data diversity remains essential. A substantial latency gap also remains relative to $\pi_{0.5}$ ($\sim$3$\times$) in real-world deployment, indicating room for further optimization.
+
+
+% Our analysis also reveals that the robustness advantage of WAMs does not correlate with their inference cost. Despite being 6--83$\times$ slower than $\pi_{0.5}$, WAMs do not consistently outperform it, indicating that robustness stems from backbone pre-training rather than additional inference-time computation. This observation highlights a practical challenge: the computational overhead poses a significant barrier to deploying WAMs in scenarios that demand fast reaction times or real-time interaction with dynamic environments.
+
+
+% \paragraph{Limitations.} Our evaluation is limited to simulation benchmarks without real-world experiments. DreamZero could not be included due to cross-embodiment incompatibility and prohibitive compute requirements. The RoboTwin 2.0-Plus benchmark inherits training-time randomization that partially overlaps with certain perturbation types (e.g., background, language), which should be considered when interpreting results. Finally, our study focuses on success rate as the primary metric and does not analyze failure modes or trajectory quality in detail.
+
+\newpage
+
+% \bibliographystyle{unsrt}
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\newpage
+
+\appendix
+\section*{Appendix}
+\addcontentsline{toc}{section}{Appendix}
+
+\section{RoboTwin 2.0-Plus Benchmark}
+\label{app:robotwin_plus}
+
+To systematically evaluate the robustness of world action models under controlled perturbations, we extend the RoboTwin 2.0~\citep{chen2025robotwin} benchmark with LIBERO-Plus-style~\citep{fei25libero-plus} perturbation categories. We call this extended benchmark \textbf{RoboTwin 2.0-Plus}. It covers \textbf{7 perturbation dimensions} and \textbf{21 sub-dimensions}, applied to all 50 RoboTwin 2.0 dual-arm tasks.
+
+\subsection{Perturbation Taxonomy}
+
+\Cref{tab:perturbation_taxonomy} enumerates all 21 sub-dimensions. Each sub-dimension is individually configurable via YAML flags, enabling both combined and ablation-style evaluation.
+
+\begin{table*}[h]
+\caption{\textbf{RoboTwin 2.0-Plus perturbation taxonomy.} All 21 sub-dimensions across 7 LIBERO-Plus dimensions, with implementation-level parameter details.}
+\label{tab:perturbation_taxonomy}
+\centering
+\small
+\begin{tabular}{@{}lllp{7.2cm}@{}}
+\toprule
+\textbf{Dimension} & \textbf{Code} & \textbf{Sub-dimension} & \textbf{Implementation Details} \\ \midrule
+\multirow{5}{*}{Sensor Noise}
+  & N1 & Motion blur & Gaussian kernel ($r \in [3,15]$, $\sigma \in [1,8]$), rotated by random angle $\in [-30^\circ, 30^\circ]$ \\
+  & N2 & Gaussian blur & Isotropic Gaussian ($\sigma \in [1, 10]$) \\
+  & N3 & Zoom blur & Multi-scale warp accumulation ($s \in [1.0, 1.56]$, step $\in [0.01, 0.03]$) \\
+  & N4 & Fog & Homogeneous white fog with transmittance $e^{-\alpha d}$ ($\alpha \in [0.3, 1.5]$, $d{=}3$) \\
+  & N5 & Glass blur & Pixel displacement ($\delta \in [1, 5]$ px) + Gaussian ($\sigma \in [0.5, 2.5]$), 1--3 iterations \\ \midrule
+\multirow{4}{*}{Light Conditions}
+  & L1 & Diffuse color & Per-channel RGB tint $\in [0.0, 3.5]$ applied to all directional and point lights (always on) \\
+  & L2 & Direction & Spherical re-sampling: $\theta \in [8^\circ, 82^\circ]$, $\phi \in [0, 2\pi]$; 35\% chance of dramatic side lighting ($\theta \in [68^\circ, 82^\circ]$). Linked with L4 \\
+  & L3 & Specular & Material specular strength $\in [0.3, 6.0]$, shininess $\in [10, 250]$; applied to all scene actors (50\% chance per episode) \\
+  & L4 & Shadows & Directional light shadow on/off (50\% chance); co-activated with L2 \\ \midrule
+\multirow{3}{*}{Camera Viewpoints}
+  & C1 & Distance & Distance scaling $\in [0.85, 1.0]\times$ original (head camera only) \\
+  & C2 & Spherical position & Azimuth/elevation perturbation ($\pm 10^\circ$) + $\pm 10\%$ distance variation (disabled by default) \\
+  & C3 & Orientation & Yaw/pitch/roll each $\in [0^\circ, 5^\circ]$ with random sign \\ \midrule
+Robot Init States & -- & Joint perturbation & Gaussian noise (std${}=0.1$\,rad, clip $\pm 0.225$\,rad) on all joints of both arms; gripper set to extreme (0.05 or 0.95) with $p{=}0.25$ \\ \midrule
+\multirow{2}{*}{Background Textures}
+  & B1 & Scene theme & Wall + floor RGB color tint, per-channel multiplier $\in [0.4, 1.8]$; combined with upstream texture swap \\
+  & B2 & Surface appearance & Table material: metallic $\in [0.0, 0.8]$, roughness $\in [0.05, 0.95]$, per-channel color tint $\in [0.4, 1.8]$ \\ \midrule
+\multirow{2}{*}{Objects Layout}
+  & O1 & Distractor objects & Variable count per episode (3--15 objects, vs.\ fixed 10 in upstream) \\
+  & O2 & Target pose & Position: Gaussian noise ($\sigma{=}2$\,cm, x/y only); orientation: uniform yaw $\pm 15^\circ$ \\ \midrule
+\multirow{3}{*}{Language Instructions}
+  & R1 & Distraction & Irrelevant conversational wrapping (${\sim}30\%$ of combined episodes) \\
+  & R2 & Common-sense rewording & Object names $\to$ functional descriptions, verb synonyms (${\sim}50\%$) \\
+  & R3 & Reasoning chain & Imperative $\to$ goal-state / outcome description (${\sim}20\%$) \\
+\midrule
+\multicolumn{4}{@{}l}{\textit{Total: 7 dimensions, 21 sub-dimensions implemented; 20/21 active by default (C2 disabled to avoid instability)}} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Evaluation Protocol}
+
+A full RoboTwin 2.0-Plus evaluation requires \textbf{8 configs} per task: 1 clean baseline + 7 perturbation branches (\Cref{tab:eval_configs}). Each branch activates exactly one perturbation dimension while keeping all others at their default (clean) values, isolating the effect of each dimension on policy performance. Each config runs 50 episodes per task.
+
+\begin{table}[h]
+\caption{\textbf{RoboTwin-Plus evaluation configs.} The 8 required configs for a complete robustness evaluation.}
+\label{tab:eval_configs}
+\centering
+\small
+\begin{tabular}{@{}clll@{}}
+\toprule
+\textbf{\#} & \textbf{Config} & \textbf{Perturbation} & \textbf{Active Sub-dims} \\ \midrule
+0 & \texttt{demo\_clean} & None (clean baseline) & -- \\
+1 & \texttt{demo\_vision\_noise} & Sensor Noise & N1--N5 (cycled) \\
+2 & \texttt{demo\_light} & Lighting & L1 (always) + L2/L3/L4 (stochastic) \\
+3 & \texttt{demo\_camera} & Camera Viewpoints & C1 + C3 (C2 disabled by default) \\
+4 & \texttt{demo\_robot\_state} & Robot Initial State & Joint noise + gripper extremes \\
+5 & \texttt{demo\_background\_plus} & Background & B1 (texture + color tint) + B2 \\
+6 & \texttt{demo\_objects\_plus} & Objects Layout & O1 (variable count) + O2 (pose) \\
+7 & \texttt{demo\_language\_plus} & Language & R1 + R2 + R3 (combined) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sub-dimension Details}
+
+\paragraph{Sensor Noise (N1--N5).} One of five noise types is applied per episode, cycled deterministically by episode index: \textbf{N1} motion blur (oriented Gaussian kernel), \textbf{N2} Gaussian blur (isotropic), \textbf{N3} zoom blur (multi-scale warp accumulation around the image center), \textbf{N4} fog (homogeneous white fog with exponential transmittance), and \textbf{N5} glass blur (random pixel displacement with iterative Gaussian smoothing). Noise severity is sampled uniformly in $[2, 3]$ per episode. All corruptions are applied to RGB observations at render time for both head and wrist cameras.
+
+\paragraph{Lighting.} \textbf{L1} (diffuse color): a strong per-channel RGB tint $\in [0.0, 3.5]$ is sampled and applied to all directional and point light sources; always active. \textbf{L2} (direction): the primary directional light is re-oriented via spherical coordinates ($\theta$, $\phi$), with a 35\% chance of dramatic side-lighting ($\theta \in [68^\circ, 82^\circ]$); activated jointly with \textbf{L4} (shadows): directional light shadow casting is toggled on/off (50\% per episode). \textbf{L3} (specular): specular strength $\in [0.3, 6.0]$ and shininess $\in [10, 250]$ are applied to all scene actor materials (50\% chance per episode).
+
+\paragraph{Camera Viewpoints.} Applied to the head camera only. \textbf{C1} (distance): viewing distance is scaled by a factor $\in [0.85, 1.0]$. \textbf{C2} (spherical position): azimuth and elevation are perturbed by up to $\pm 10^\circ$ with $\pm 10\%$ distance variation; disabled by default in the evaluation config but can be enabled via a YAML flag for ablation. \textbf{C3} (orientation): yaw, pitch, and roll are independently perturbed in $[0^\circ, 5^\circ]$ with random sign.
+
+\paragraph{Robot Initial States.} Gaussian noise with $\text{std}=0.1$\,rad (clipped to $\pm 0.225$\,rad per joint) is added to the home joint angles of both arms. Additionally, each gripper is set to an extreme position (0.05 or 0.95) with probability 0.25.
+
+\paragraph{Background.} \textbf{B1} (scene theme): in addition to the upstream texture swap, a random per-channel RGB multiplier $\in [0.4, 1.8]$ is applied to the wall color, and the floor receives an independent random color. \textbf{B2} (surface appearance): the table material is randomized with metallic $\in [0.0, 0.8]$, roughness $\in [0.05, 0.95]$, and a per-channel color tint $\in [0.4, 1.8]$.
+
+\paragraph{Objects Layout.} \textbf{O1} (distractor objects): the number of task-irrelevant objects placed on the table is sampled uniformly from $[3, 15]$ per episode, replacing the upstream fixed count of 10. \textbf{O2} (target pose): after scene initialization, task-relevant objects receive Gaussian position noise ($\sigma = 2$\,cm in $x$ and $y$; $z$ unchanged) and uniform yaw rotation up to $\pm 15^\circ$.
+
+\paragraph{Language Instructions.} 2{,}500 pre-generated instruction variants (50 tasks $\times$ 50 variants) are stored as JSON files. In the combined config, each episode samples one variant: \textbf{R1} (distraction, ${\sim}30\%$) wraps the original instruction in irrelevant conversational context; \textbf{R2} (common-sense rewording, ${\sim}50\%$) replaces object names with functional descriptions and uses verb synonyms; \textbf{R3} (reasoning chain, ${\sim}20\%$) rewrites the imperative instruction as a goal-state or outcome description. Individual R2-only and R3-only configs are provided for ablation studies.
+
+\section{Benchmark comparison}
+
+\label{app:bench_comp}
+\begin{table}[h]
+\caption{\textbf{Benchmark comparison} between LIBERO-Plus and RoboTwin 2.0-Plus.}
+\label{tab:benchmark_comparison}
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+Aspect & LIBERO-Plus & RoboTwin 2.0-Plus \\ \midrule
+Simulator & MuJoCo (robosuite) & SAPIEN (ManiSkill3) \\
+Robot & Franka Panda (7-DoF) & Aloha-AgileX (14-DoF) \\
+Arms & Single arm & Dual arm (bimanual) \\
+Cameras & 2 (third-person + wrist) & 3 (head + 2 wrist) \\
+Image resolution & $256\times256$ & $320\times240$ \\
+Native action space & 7-dim delta EEF & 14-dim joint positions \\
+Control mode & OSC (delta EE pose) & Joint position control \\
+Control frequency & 10\,Hz & 25--30\,Hz \\
+Base tasks & 40 (4 suites $\times$ 10) & 50 collaborative tasks \\
+Training demos & 50 per task & 50 clean + 500 randomized \\
+Total trajectories & 22,400 & 27,500 \\
+Distractor objects & 416 & 731 (147 categories) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+
+\section{Comparison of Evaluated Models} \label{app:model_comp}
+
+\begin{table}[h]
+\caption{\textbf{Model setup comparison.} Action representation, dimensionality, chunk size, and control frequency for each evaluated model. Entries marked with ``--'' indicate values inherited from the base model or not explicitly specified. Unless noted, models on LIBERO follow the native axis-angle rotation convention.}
+\label{tab:model_setup}
+\centering
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Model & Action Repr. & Dim & Chunk & Freq \\ \midrule
+\multicolumn{5}{@{}l}{\textit{VLA Models}} \\
+Pi0 & Delta EEF & 7 & 50 & 50\,Hz \\
+Pi0-FAST & Delta EEF (FAST tokenized) & 7 & 50 & 15--50\,Hz \\
+Pi0.5 & Absolute EEF / joints & 18--19 & 50 & 50\,Hz \\
+OpenVLA-OFT & Delta EEF & 7 & 8 & 3--10\,Hz \\
+UniVLA & Delta EEF (DCT tokenized) & 7 & 10 & -- \\
+RIPT-VLA & Delta EEF (inherited) & 7 & 8 & -- \\
+xVLA & Absolute EEF (6D rot.) & 10/20 & 32 & -- \\
+VLA-JEPA & Delta EEF & 7 & 7 & -- \\
+MOTUS & Latent (optical flow) & 14 & 48 & 30\,Hz \\ \midrule
+\multicolumn{5}{@{}l}{\textit{World Action Models}} \\
+GE-Act & Absolute EEF (Euler) & 7/14 & 54 & 30\,Hz \\
+Cosmos-Policy & Latent-frame + native & 7/14 & 16 & -- \\
+LingBot-VA & Absolute EEF (quat.) + joints & 30 & 4 & 50\,Hz \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We evaluate both VLA models and WAMs. The action representation and control details of each model are summarized in \Cref{tab:model_setup}. On the VLA side, \textbf{Pi0}~\cite{black2025pi0} and \textbf{Pi0-FAST} use delta end-effector control with axis-angle rotation and generate 50-step action chunks via flow matching and FAST tokenization, respectively. \textbf{Pi0.5}~\citep{pi05} extends Pi0 to predict absolute target poses with 50-step chunks at 50\,Hz, and supports both end-effector and joint-space control depending on the platform. \textbf{OpenVLA-OFT}~\citep{openvla2025} follows the native 7-dim delta end-effector convention on LIBERO with an action chunk size of 8, and \textbf{RIPT-VLA} inherits its action space from the OpenVLA-OFT base model. \textbf{UniVLA} tokenizes native actions via DCT (FAST tokenizer) with a chunk size of 10 on LIBERO. \textbf{xVLA}~\citep{zheng2026xvla} is notable for employing a unified absolute end-effector representation with 6D rotation across all benchmarks, outputting 10-dim per arm (padded to 20-dim for dual-arm), with a chunk size of 32. \textbf{VLA-JEPA}~\citep{sun2026vla} predicts delta end-effector actions with axis-angle rotation using a conditional flow-matching action head and a prediction horizon of 7 steps.
+
+On the WAM side, \textbf{Cosmos-Policy}~\citep{kim2026cosmos} encodes actions as latent frames within its video diffusion process, using the native 7-dim action space on LIBERO with a chunk size of 16. \textbf{GE-Act}~\citep{liao2025genie} predicts absolute end-effector poses with Euler angle rotation and generates 54-step action trajectories via a lightweight flow-matching decoder at 30\,Hz. \textbf{MOTUS}~\citep{bi2025motus} takes a fundamentally different approach by operating in a learned 14-dimensional latent action space derived from optical flow, which is mapped to robot-specific commands during fine-tuning, with a chunk size of 48 at 30\,Hz. \textbf{LingBot-VA}~\citep{li2026causal} uses a 30-dimensional representation combining absolute end-effector poses (with quaternion rotation) and joint angles for both arms, with a compact chunk size of 4 at 50\,Hz.
+
+% \paragraph{DreamZero.} Although DreamZero~\citep{ye2026dreamzero} is included in our WAM taxonomy (\Cref{tab:wam_compare}), we were unable to include it in our benchmark evaluation for three reasons. First, DreamZero's released checkpoint is trained on a proprietary cross-embodiment dataset and cannot be directly applied to LIBERO or RoboTwin~2.0 without re-training, as the action space and embodiment differ from those in our benchmarks. Second, re-training DreamZero is prohibitively expensive: the model is built on the Wan2.1-14B video generation backbone---the largest among all WAMs surveyed---and its autoregressive interleaved training procedure demands substantial GPU resources that exceed our available compute budget. Third, using released checkpoints, DreamZero's inference pipeline requires a warm-up phase exceeding 15 minutes under our settings during sanity check. While the authors propose asynchronous inference and partial denoising to accelerate steady-state execution, the initial warm-up latency alone makes benchmark-scale evaluation---which requires thousands of rollout episodes across multiple perturbation configs---impractical. Given these constraints, we report DreamZero in the architectural comparison but exclude it from the quantitative evaluation.
+
+% These differences in action parameterization are important to consider when interpreting results, as they may influence robustness to certain perturbation types. For instance, models using absolute end-effector representations (e.g., xVLA, Genie-Act) may exhibit different sensitivity to camera and robot pose perturbations compared to those using delta end-effector or joint-space control.
+
+\subsection{Detailed LIBERO-Plus Results} \label{app:detailed_libero_plus}
+
+\begin{table}[t]
+\centering
+\caption{Detailed LIBERO-Plus results for each task suite. \textbf{Lang.}: Language. \textbf{BG}: Background. The Fast-WAM LIBERO checkpoint was trained on clean demonstrations only, whereas its RoboTwin checkpoint was trained on clean + domain-randomized demonstrations (cf.\ \textbf{RQ 2}).}
+\label{tab:libero_plus_detail}
+\begin{tabular}{@{}L{1.5cm} L{2.5cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm} C{1.0cm}@{}}
+\toprule
+Category & Model & Camera & Robot & Lang. & Light & BG & Noise & Layout & Total \\ \midrule
+\multirow{7}{*}{Spatial} & $\pi_0$ & 70.7 & 49.1 & 67.9 & 92.8 & 95.0 & 87.7 & 94.0 & 78.6 \\
+ & $\pi_{0.5}$ & 76.9 & 85.4 & 90.3 & 97.6 & 95.3 & 91.7 & 97.7 & 90.3 \\
+ & X-VLA & 24.5 & 91.4 & 82.1 & 100.0 & 100.0 & 63.5 & 93.8 & 77.7 \\
+ & VLA-JEPA & 74.2 & 71.7 & 96.1 & 97.9 & 99.6 & 77.8 & 95.3 & 86.9 \\
+ & GE-Act & 72.3 & 75.7 & 90.8 & 100.0 & 89.1 & 97.7 & 89.6 & 87.5 \\
+ & Cosmos-policy & 81.1 & 59.7 & 88.2 & 89.0 & 91.1 & 98.0 & 99.2 & 86.6 \\
+ & Fast-WAM & 14.4 & 44.0 & 69.5 & 87.3 & 69.8 & 35.0 & 60.5 & 54.4 \\ \midrule
+\multirow{7}{*}{Object} & $\pi_0$  & 80.1 & 31.9 & 75.4 & 94.3 & 85.9 & 87.9 & 76.2 & 74.7\\
+ & $\pi_{0.5}$ & 91.4 & 70.6 & 92.4 & 98.7 & 98.0 & 95.5 & 88.6 & 90.0 \\
+ & X-VLA & 19.7 & 97.2 & 90.7 & 92.6 & 98.4 & 51.4 & 55.6 & 69.3 \\
+ & VLA-JEPA & 69.2 & 57.8 & 90.8 & 100.0 & 100.0 & 75.1 & 87.3 & 81.0 \\
+ & GE-Act & 81.3 & 83.4 & 83.6 & 98.3 & 94.8 & 97.2 & 79.7 & 87.7 \\
+ & Cosmos-policy & 88.4 & 61.6 & 81.9 & 100.0 & 96.4 & 94.3 & 87.1 & 86.2 \\
+ & Fast-WAM & 25.3 & 64.1 & 96.3 & 97.9 & 77.8 & 63.7 & 73.0 & 71.2 \\ \midrule
+\multirow{7}{*}{Goal} & $\pi_0$ & 56.6 & 43.3 & 43.2 & 90.3 & 84.7 & 82.8 & 59.8 & 63.4 \\
+ & $\pi_{0.5}$ & 80.1 & 80.2 & 71.5 & 98.6 & 92.9 & 94.2 & 71.1 & 82.7 \\
+ & X-VLA & 27.2 & 90.2 & 58.8 & 95.7 & 97.9 & 67.5 & 61.2 & 68.7 \\
+ & VLA-JEPA & 72.3 & 73.1 & 75.3 & 89.9 & 94.3 & 69.9 & 68.7 & 76.3 \\
+ & GE-Act & 52.5 & 71.9 & 46.3 & 93.9 & 87.2 & 83.4 & 68.9 & 70.0 \\
+ & Cosmos-policy & 75.7 & 64.1 & 67.6 & 99.6 & 95.0 & 91.6 & 56.2 & 76.4 \\
+ & Fast-WAM & 8.1 & 24.7 & 49.8 & 75.3 & 44.5 & 23.7 & 48.0 & 39.2 \\ \midrule
+\multirow{7}{*}{Long} & $\pi_0$  & 38.7 & 39.9 & 69.7 & 79.2 & 72.3 & 64.6 & 77.6 & 61.3 \\
+ & $\pi_{0.5}$ & 54.2 & 74.8 & 89.8 & 92.7 & 92.7 & 78.8 & 87.2 & 79.9 \\
+ & X-VLA & 22.2 & 79.9 & 71.3 & 95.6 & 94.5 & 68.2 & 76.6 & 69.9 \\
+ & VLA-JEPA & 42.5 & 68.5 & 90.9 & 78.4 & 81.3 & 44.3 & 86.2 & 67.9 \\
+ & GE-Act & 38.9 & 77.1 & 91.4 & 90.5 & 74.4 & 86.0 & 84.6 & 76.6  \\
+ & Cosmos-policy & 59.2 & 67.4 & 89.8 & 97.4 & 74.7 & 88.0 & 91.7 & 80.2 \\
+ & Fast-WAM & 17.7 & 45.3 & 60.1 & 52.2 & 22.8 & 28.5 & 61.2 & 41.1 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

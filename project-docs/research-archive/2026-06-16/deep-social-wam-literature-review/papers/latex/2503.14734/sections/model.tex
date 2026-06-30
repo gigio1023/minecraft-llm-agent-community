@@ -1,0 +1,255 @@
+\section{\modelname{} Foundation Model}
+\label{sec:model}
+
+% \textbf{@Scott Reed (PIC), @Jim Fan, @Yuke Zhu}
+
+\begin{figure}[t]
+\includegraphics[width=\textwidth]{assets/groot_inference_yuke_v2.pdf}
+\caption{\textbf{\modelname{} Model Overview.} Our model is a Vision-Language-Action (VLA) model that adopts a dual-system design.  We convert the image observation and language instruction into a sequence of tokens to be processed by the Vision-Language Model (VLM) backbone. The VLM outputs, together with robot state and action encodings, are passed to the Diffusion Transformer module to generate motor actions.
+\label{fig:groot_inference}}
+\end{figure}
+
+
+\modelname{} is a Vision-Language-Action (VLA) model for humanoid robots trained on diverse data sources. 
+%
+The model contains a vision-language backbone that encodes language and image input and a DiT-based flow-matching policy that outputs high-frequency actions.
+%
+We use the NVIDIA Eagle-2 VLM~\citep{eagle2} as the vision-language backbone. 
+%
+Specifically, our publicly released \modellarge{} model has 2.2B parameters in total, with 1.34B in the VLM.
+%
+The inference time for sampling a chunk of 16 actions is 63.9ms on an L40 GPU using bf16.
+%
+\FIGREF{fig:groot_inference} provides a high-level overview of our model design. We highlight three key features of \modelname{}:
+
+\begin{itemize}
+\item We design a compositional model that integrates Vision-Language Model (VLM)-based reasoning module (System 2) and Diffusion Transformer (DiT)-based action module (System 1) in a unified learning framework;
+\item We develop an effective pre-training strategy using a mixture of human videos, simulation and neural-generated data, and real robot demonstrations (see \FIGREF{fig:data_pyramid}) for generalization and robustness;
+\item We train a massively multi-task, language-conditioned policy that supports a wide range of robot embodiments and enables rapid adaptation to new tasks through data-efficient post-training.
+\end{itemize}
+
+\subsection{Model Architecture}
+\label{sec:model_architecture}
+In this section, we describe the \modelname{} model architecture, illustrated in \FIGREF{fig:network_architecture}.
+%
+\modelname{} uses flow-matching \citep{flowmatching} to learn action generation.
+%
+A diffusion transformer (DiT) processes the robot's proprioceptive state and action, which are then cross-attended with image and text tokens from the Eagle-2 VLM backbone to output the denoised motor actions. Below, we elaborate on each module in detail.
+
+\paragraph{State and Action Encoders} 
+To process states and actions of varying dimensions across different robot embodiments, we use an MLP per embodiment to project them to a shared embedding dimension as input to the DiT.
+%
+As in~\citet{black2024pi_0}, the Action Encoder MLP also encodes the diffusion timestep together with the noised action vector.
+%
+
+We use action flow matching, which samples actions through iterative denoising. The model takes as input noised actions in addition to encodings of the robot's proprioceptive state, image tokens, and text tokens.
+%
+The actions are processed in chunks as in~\citet{action_chunking}, meaning that at any given time $t$ the model uses $A_t = [a_t, a_{t+1}, \ldots, a_{t+H-1}]$ which contains the action vectors of timesteps $t$ through $t+H -1$. 
+%
+We set $H=16$ in our implementation.
+%
+%
+
+\paragraph{Vision-Language Module (System 2)}
+For encoding vision and language inputs, \modelname{} uses the Eagle-2~\citep{eagle2} vision-language model (VLM) pretrained on Internet-scale data. 
+%
+Eagle-2 is finetuned from a SmolLM2 \citep{allal2025smollm2} LLM and a SigLIP-2 \citep{tschannen2025siglip} image encoder. 
+%
+Images are encoded at resolution $224 \times 224$ followed by pixel shuffle \citep{pixel_shuffle}, resulting in 64 image token embeddings per frame. These embeddings are then further encoded together with text by the LLM component of the Eagle-2 VLM.
+%
+The LLM and image encoder are aligned over a broad set of vision-language tasks following the general recipe of \citet{eagle2}. 
+
+During policy training, a text description of the task, as well as (possibly multiple) images, are passed to the VLM in the chat format used during vision-language training. We then extract vision-language features of shape (batch size $\times$ sequence length $\times$ hidden dimension) from the LLM. 
+%
+We found that using middle-layer instead of final-layer LLM embeddings resulted in both faster inference speed and higher downstream policy success rate.
+%
+For \modellarge{}, we use the representations from the 12th layer. 
+%
+
+
+\begin{figure}[t]
+\includegraphics[width=1.0\linewidth]{assets/groot_model_v6.pdf}
+\caption{\textbf{\modelname{} Model Architecture.} \modelname{} is trained on a diverse set of embodiments ranging from single-arm robot arms to bimanual humanoid dexterous hands. 
+To deal with different robot embodiment's state observation and action, we use DiT blocks with an embodiment-aware state and action encoder to embed the robot's state and action inputs.
+\modelname{} model leverages latent embeddings of the Eagle-2 model to incorporate the robot's visual observation and language instructions. The vision language tokens will then be fed into the DiT blocks through cross-attention layers. \label{fig:network_architecture}}
+\end{figure}
+
+\paragraph{Diffusion Transformer Module (System 1)}
+%
+For modeling actions, \modelname{} uses a variant of DiT~\citep{peebles2023scalable}, which is a transformer with denoising step conditioning via adaptive layer normalization, denoted as $V_\theta$.
+%
+As shown in \FIGREF{fig:network_architecture}, $V_\theta$ consists of alternating cross-attention and self-attention blocks, similar to Flamingo~\citep{NEURIPS2022_960a172b} and VIMA~\citep{jiang2023vima}.
+%
+The self-attention blocks operate on noised action token embeddings $A_t^{\tau}$ together with state embeddings $q_t$, while cross-attention blocks allow conditioning on the vision-language token embeddings $\phi_t$ output by VLM.
+%
+%
+After the final DiT block, we apply an embodiment-specific Action Decoder, another MLP, to the final $H$ tokens to predict the actions.
+
+
+Given a ground-truth action chunk $A_t$, a flow-matching timestep $\tau \in [0, 1]$ and sampled noise $\epsilon \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$, the noised action chunk $A_t^{\tau}$ is computed as $A_t^{\tau} = \tau A_t + (1-\tau) \epsilon$. 
+%
+The model prediction $V_\theta(\phi_t, A_t^{\tau}, q_t)$ aims to approximate the denoising vector field $\epsilon - A_t$ by minimizing the following loss:
+%
+\begin{equation}
+\label{eq:fm_loss}
+\mathcal{L}_{\textit{fm}}(\theta) = \mathbb{E}_{\tau} \left[\| V_\theta(\phi_t, A_t^{\tau}, q_t) - (\epsilon - A_t)\|^2\right].
+\end{equation}
+%
+As in~\citet{black2024pi_0}, we use $p(\tau) = \text{Beta}(\frac{s-\tau}{s}; 1.5, 1)$, $s=0.999$.
+%
+During inference, we generate action chunks with $K$-step denoising.
+%
+First, randomly sample $A_t^0 \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and then use forward Euler integration to iteratively generate the action chunk, updating as follows:
+$$
+A_t^{\tau + 1/K} = A_t^{\tau} + \frac{1}{K} V_\theta(\phi_t, A_t^{\tau}, q_t).
+$$
+In practice, we found $K=4$ inference steps to work well across all embodiments.
+
+\subsection{Training Data Generation}
+\label{sec:training_data_generation}
+%
+To train \modelname{}, we use a diverse set of data sources and objectives to construct the data pyramid (\FIGREF{fig:data_pyramid}). 
+%
+We first source diverse human egocentric video data from open datasets, which forms the base, together with the web data used in VLM pretraining.
+%
+Next, we generate synthetic \textit{neural} trajectories using pre-trained video generation models. 
+%
+In this way, we $\sim$10$\times$ our in-house collected teleoperation trajectories --- the ``peak'' of the data pyramid --- from 88 hours to 827 hours, using diverse counterfactual robot trajectories with novel language instructions (see \FIGREF{fig:dream_sample} for examples). We additionally generate diverse simulation trajectories, which also expand the middle part of the data pyramid.
+
+In the next paragraph, we first describe how we extract \textit{latent} actions from videos, which we use to extract labels for web-scaled human egocentric datasets. Next, we describe how we generate \textit{neural} and \textit{simulated} robot trajectories, and how we obtain actions for each of these data sources.
+
+\paragraph{Latent Actions} 
+For human egocentric videos and neural trajectories, we do not have any actions that we can directly use to train \modelname{}. 
+%
+For these data, we instead generate latent actions by training a VQ-VAE model to extract features from consecutive image frames from videos~\citep{ye2025latent}.
+%
+The encoder takes the current frame $x_t$ and the future frame $x_{t+H}$ of a video with a fixed window size $H$ and outputs the latent action $z_t$.
+%
+The decoder is trained to take the latent action $z_t$ and $x_t$ and reconstruct $x_{t+H}$. This model is trained with a VQ-VAE objective, where the continuous embedding from the encoder is mapped to the nearest embedding from the codebook. 
+%
+After training, we take the encoder and use it as an inverse dynamics model; given an $x_t$ and $x_{t+H}$ pair, we extract the continuous pre-quantized embedding and use this as the latent action label during pre-training, with the same flow-matching loss, but treat it as a distinct ``LAPA'' embodiment.
+%
+Training the VQ-VAE model on all heterogeneous data together allows us to unify all of the data to share the same learned latent action space, potentially improving cross-embodiment generalization. \FIGREF{fig:latent_sample} shows $x_t$ and $x_{t+H}$ pairs from 8 distinct embodiments including both robot and human embodiment, all retrieved from similar latent actions; the first latent action shows all embodiments \textit{moving right arm to the left} and the second latent action shows \textit{moving right arm to the right}. 
+
+
+
+\begin{figure}[thb!]
+\centering
+\includegraphics[width=0.95\textwidth]{assets/latent_action.pdf}
+% \vspace{-8em}
+\caption{\textbf{Latent Actions.} We retrieve similar latent embeddings across various embodiments. The left images illustrate the latent action that corresponds to moving the right arm (or hand) to the left, while the right images illustrate the latent action that corresponds to moving the right arm (or hand) to the right. Note that this general latent action is not only consistent in different robot embodiments, but also in human embodiment.}
+\label{fig:latent_sample}
+\end{figure}
+
+
+
+\paragraph{Neural Trajectories} 
+\label{sec:neural_trajectories}
+Robot data scales linearly with human labor, since it typically requires a human operator to teleoperate the robot to produce each trajectory. 
+%
+Recently, \textbf{video generation models} have demonstrated significant potential for high-quality controllable video generation~\citep{brooks2024video, yang2024cogvideox, xiang2024pandora, lin2024stiv, wan2.1, ren2025videoworld}, which paves the way for building world models in the robotic domain. 
+%
+To harness these models, we fine-tune image-to-video generation models~\citep{agarwal2025cosmos, yang2024cogvideox, wan2.1} on all of our 88 hours of in-house collected teleoperation data and generate 827 hours of video data given the existing initial frames with novel language prompts, augmenting it by around 10$\times$. 
+%
+This enables generating training data that captures many more counterfactual scenarios in the real world without actually collecting teleoperation data for each of these cases (examples shown in \FIGREF{fig:dream_sample}; more examples of dream generations in \FIGREF{fig:appendix-dream}). 
+%
+
+To increase the diversity of our neural trajectories, we first use a commercial-grade multimodal LLM to detect the objects given initial frames and generate many more possible combinations of ``\textit{pick up \{object\} from \{location A\} to \{location B\}}", while instructing the model to only consider the physically feasible combinations.
+%
+We also apply post-processing mechanisms, including filtering and re-captioning, to the generated videos. 
+%
+For this, we also use a commercial-grade multimodal LLM as a judge and feed the downsampled 8 frames to filter out neural trajectories that do not follow the language instruction precisely.
+% that 1) do not follow the language instruction or 2) have inaccurate physics \checkthis{(Appendix \ref{} shows some examples of these failure cases)}. 
+%
+We then caption the filtered-out videos. (More details can be found in Appendix~\ref{sec:appendix_dream}).
+
+\begin{figure}[thb!]
+\centering
+\includegraphics[width=0.95\textwidth]{assets/dreams_0318.pdf}
+\vspace{-8em}
+\caption{\textbf{Synthetically Generated Videos.} We leverage off-the-shelf video generation models to create neural trajectories to increase the quantity and diversity of our training datasets. These generated data can be used for both pre- and post-training of our \modelname{}. (1) The first three rows are generated from the same initial frames but with different prompts (change left or right, the location to place the object), (2) the following two are from the same initial frames but replace the object to pick up, (3) the next row showcases the video model generating a robot trajectory which is very challenging to generate in simulation (spilling contents inside a mesh cup into a bin), and (4) the last row is generated from an initial frame from simulation data. We use the red rectangles to indicate the initial frames.}
+\label{fig:dream_sample}
+\end{figure}
+
+
+\paragraph{Simulation Trajectories}
+%
+Scaling up real-world data collection for humanoid robots is highly expensive due to the challenge of simultaneously controlling both arms and dexterous hands.
+%
+Recent research~\citep{wang2023robogen,mandlekar2023mimicgen,jiang2024dexmimicen} has demonstrated that generating training data in simulation is a practical alternative.
+%
+We use DexMimicGen~\citep{jiang2024dexmimicen} to synthesize large-scale robot manipulation trajectories.  
+
+
+Starting with a small set of human demonstrations, DexMimicGen applies demonstration transformation and replay in simulation to expand the dataset automatically. 
+%
+Each task is decomposed into a sequence of object-centric subtasks. 
+%
+The initial human demonstrations are segmented into smaller manipulation sequences, each corresponding to a subtask involving a single object. 
+%
+These segments are then adapted to new environments by aligning them with the object's position, preserving the relative poses between the robot's end effector and the object.
+%
+To ensure smooth execution, the system interpolates movements between the robot's current state and the transformed segment.
+%
+The robot then follows the full sequence step by step, verifying task success at the end. Only successful demonstrations are retained, ensuring high-quality data. Using DexMimicGen, we scale a limited set of human demonstrations into a large-scale humanoid manipulation dataset. Considering the pre- and post-training datasets, we have generated 780,000 simulation trajectories --- equivalent to 6,500 hours, or nine continuous months, of human demonstration data --- in just 11 hours. These simulation data significantly supplement the real-robot data with minimal human costs.
+
+
+
+\subsection{Training Details}
+\label{sec:training_details}
+
+
+\paragraph{Pre-training}
+
+During the pre-training phase, \modelname{} is trained via flow-matching loss (Equation~\ref{eq:fm_loss}) on a diverse collection of embodiments and data sources, encompassing various real and synthetic robot datasets as well as human motion data.
+%
+We refer readers to Sec.~\ref{sec:datasets} for a detailed description of the datasets.
+%
+
+For human videos, in the absence of ground-truth actions, we extract learned latent actions and use them as flow-matching targets (see Sec.~\ref{sec:training_data_generation}).
+%
+For robot datasets such as our GR-1 humanoid data or Open X-Embodiment data, we use both ground-truth robot actions as well as learned latent actions as flow-matching targets.
+%
+In the case of neural trajectories (Sec.~\ref{sec:neural_trajectories}) used to augment our robot datasets, we use both latent actions as well as predicted actions from an inverse-dynamics model trained on the real robot data.
+%
+Pre-training hyper-parameters are listed in Table~\ref{tab:hyperparameters} in the Appendix.
+
+\paragraph{Post-training}
+
+%
+In the post-training phase, we fine-tune our pre-trained model on datasets corresponding to each single embodiment.
+%
+As in pretraining, we keep the language component of the VL backbone frozen and fine-tune the rest of the model.
+%
+Post-training hyperparameters are given in Table~\ref{tab:hyperparameters} in the Appendix.
+
+\paragraph{Post-training with Neural Trajectories}
+To overcome the challenge of data scarcity during post-training, we explore augmenting the data for each downstream task by generating neural trajectories, similar to the procedure described in Sec.~\ref{sec:training_data_generation}.
+%
+For downstream tasks that are conditioned on multiple views, we finetune the video model to generate multiple subimages in a grid (\FIGREF{fig:appendix-dream}).
+%
+For simulation tasks, we collect diverse initial frames from the randomly initialized environment. 
+%
+For real robot tasks, we randomly initialize object poses manually and record the robot's initial observation. 
+%
+Novel initial frames could also be created automatically using img2img diffusion (example shown in \FIGREF{fig:appendix-dream}), but we leave further exploration for future work.
+%
+We also demonstrate examples of (1) multi-round video generation for generating long-horizon trajectories composed of atomic tasks and (2) neural trajectories of liquids and articulated objects, known to be extremely challenging to simulate, though we leave quantitative evaluation of downstream tasks for future work.
+
+For our post-training pipeline with neural trajectories, we restrict ourselves to fine-tuning the video generation model \textit{only} on the human-collected trajectories for simulation tasks and only 10\% of the data from the real-world benchmark collected for post-training, to match the realistic scenario that we only have access to limited number of teleoperation data. 
+%While we usually only 10x our post-training data for this paper, we can infinitely generate neural trajectories given initial frames of the environment.
+%
+Since the generated videos do not have action labels, we use either latent or inverse dynamics models (IDM) labeled actions~\citep{baker2022video} and train the policy model to treat these pseudo-actions as action labels for a different embodiment. In low-data regime scenarios, we also restrict ourselves on training the IDM models only on the low-data, to facilitate realistic scenarios. Details of how we train the IDM models are provided in Appendix \ref{sec:appendix_idm}. Some empirical comparisons between latent and IDM-labeled actions are made in Sec. \ref{sec:quant_results}. 
+%
+During post-training, we co-train the policy with real-world trajectories with neural trajectories with a 1:1 sampling ratio. 
+
+\paragraph{Training Infrastructure}
+
+We train \modelname{} on a cluster managed via NVIDIA OSMO \citep{nvidia_osmo}, an orchestration platform for scaling complex ‌robotics workloads. The training cluster is equipped with H100 NVIDIA GPUs connected via NVIDIA Quantum-2 InfiniBand in a fat-tree topology. We facilitate fault-tolerant multi-node training and data ingestion via a custom library built on top of the Ray distributed computing library \citep{moritz2018ray}. We use up to 1024 GPUs for a single model. \modellarge{} used roughly 50,000 H100 GPU hours for pretraining.
+%
+
+Compute-constrained finetuning was tested in the context of a single A6000 GPU.
+%
+If only tuning the adapter layers (action and state encoders + action decoder) and DiT, a batch size up to 200 can be used.
+%
+When tuning the vision encoder, a batch size of up to 16 can be used.

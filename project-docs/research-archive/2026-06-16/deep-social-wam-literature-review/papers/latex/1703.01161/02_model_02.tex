@@ -1,0 +1,151 @@
+% \begin{figure*}
+% \subfloat[]{\includegraphics[scale=0.4]{./Figures/FuN_architecture.pdf}} 
+% \subfloat[]{\includegraphics[scale=0.6]{./Figures/Dilated_LSTM.pdf}}
+% \caption{The schematic illustration of a) FuN network architecture (section~\ref{sec:model}); b) dilated LSTM (section~\ref{subsec:dLSTM}).}
+% \label{fig:architecture}
+% \end{figure*}
+
+\begin{figure}
+    \centering
+    \includegraphics[scale=0.4]{./Figures/FuN_architecture.pdf}
+    \caption{The schematic illustration of FuN (section~\ref{sec:model}) \figskiny }
+    \label{fig:architecture}
+\end{figure}
+
+\section{The model}
+\label{sec:model}
+
+\paragraph{What is FuN?} FuN is a modular neural-network consisting of two modules -- the Worker and the Manager. %, which are both recurrent networks.
+%that starts with a perceptual module (e.g. spatial convolutional layers with a fully connected layer on top), which takes an observation from the environment $x_t$ and computes a shared intermediate representation $z_t$ of perceptual inputs. 
+%It then splits into two modules - the Worker and the Manager. 
+% Both Worker and Manager are recurrent networks. 
+The Manager internally computes a latent state representation $s_t$ and outputs a goal vector $g_t$. The Worker produces actions conditioned on external observation, it’s own state, and the Manager’s goal. The goals $g_t$ are trained using an approximate \textit{transition policy gradient}, so that they align with rewarding directions (in state space) for the agent to follow from $s_t$. The Worker is then trained via intrinsic reward to produce actions that cause these directions to be followed.
+The Manager and the Worker share a perceptual module (e.g. a convolutional network), which takes an observation from the environment $x_t$ and computes a shared intermediate representation $z_t$. 
+
+Figure~\ref{fig:architecture}a illustrates the overall design and the following equations describes the forward dynamics of our network:
+
+%\todo{(discuss): Maybe matrix/vector notation and bold symbols? With only one matrix it doesn't make much sense}
+
+\begin{equation}
+z_t = f^\textnormal{percept}(x_t)
+\end{equation}
+\begin{equation}
+s_t = f^\textit{Mspace}(z_t)
+\end{equation}
+\begin{equation}
+h^M_t, \hat{g}_t = f^\textit{Mrnn}(s_t, h^M_{t-1}); g_t=\hat{g}_t/||\hat{g}_t||; 
+\end{equation}
+\begin{equation}
+w_t = \phi(\sum_{i=t-c}^t {g_i}) 
+\label{eqn:FuN:pool_embed}
+\end{equation}
+\begin{equation}
+h^W, U_t = f^\textit{Wrnn}(z_t, h^W_{t-1}) 
+\label{eqn:FuN:psi}
+\end{equation}
+\begin{equation}
+\pi_t = \textit{SoftMax}(U_t w_t)
+\label{eqn:FuN:pi}
+\end{equation}
+
+%\todo{DS: what about $FC(CNN(x_t))$ or $MLP(CNN(x_t))$ instead of $CNNfc$? Avoids cumbersome terminology.} 
+
+%Here CNN stands for a convolutional network; Lin is a linear fully connected layer and ReLu is a non-linearity; LSTM is long-short-term-memory network~\cite{hochreiter1997lstm}, which produces output and its updated state $h$.
+where both the Manager and the Worker are recurrent. Here $h^M$ and $h^W$ correspond to the internal states of the Manager and the Worker respectively. A linear transform $\phi$ maps a goal $g_t$ into an embedding vector $w_t \in R^k$, which is then combined via product with matrix $U_t$ (Workers output) to produce policy $\pi$ -- vector of probabilities over primitive actions. 
+The next section provides the details on goal embedding and the following sections~\ref{sec:Learning},\ref{subsec:tpg} describes how FuN is trained. 
+%Section~\ref{subsec:tpg} shows that Managers learning rule can be interpreted as a policy gradient for an isomorphic MDP.
+% Section~\ref{subsec:dLSTM} introduces dilated LSTM -- a recurrent network design used in the Manager.
+% Section~\ref{subsec:goal_embedding} describes how goal $g_t$ modulates the Worker's policy via a multiplicative interaction in goal embedding space. 
+
+
+ 
+%We describe this last step in more details in section~\ref{subsec:goal_embedding}.
+
+%\todo{DS: it's a bit distracting to mix capital, lower-case, greek, etc. What's the convention being followed?}
+
+%\todo{All variables in these equations should be explained in this paragraph. Superscripts A and P I assume are referring to actor and planner and should be replaced with D and M (doer and manager)}
+
+\subsection{Goal embedding}
+\label{subsec:goal_embedding}
+The goal $g$ modulates the policy via a multiplicative interaction in a low dimensional goal-embedding space $R^k, k<<d$. The Worker first produces an embedding vector for every action, represented by rows of matrix $U \in R^{|a| \times k}$ (eq.~\ref{eqn:FuN:psi}). 
+To incorporate goals from the Manager, the last $c$ goals are first pooled by summation and then embedded into a vector $w \in R^k$ using a linear projection $\phi$ (eq.~\ref{eqn:FuN:pool_embed}). The projection $\phi$ is linear, with no biases, and is learnt with gradients coming from the Worker's actions. The embedding matrix $U$ is then combined with the goal embedding $w$ via a matrix-vector product (eq.~\ref{eqn:FuN:pi}).
+%, quite similar to UVFA~\cite{schaul2015uvfa} \todo{DS: confusing - UVFA is for value fns - perhaps drop this}. 
+Since $\phi$ has no biases it can never produce a constant non-zero vector  -- which is the only way the setup could ignore the Manager's input. This makes sure that the goal output by the Manager always influences the final policy. Notice how, due to pooling of goals over several time-steps, the conditioning from the Manager varies smoothly. 
+%This gradual variation in goal has many of the same effects as the commonly employed strategy of ``commitment'' (termination function), seen in works such as~\cite{vezhnevets2016straw, bacon2015option}.\todo{koray: I don't understand this last sentence, maybe explain a little more in detail.}
+
+
+% \subsection{Alternate world}
+
+% The following equations describe how our model elements operate, and Figure~\ref{fig:architecture}a illustrates the overall design of our network.:
+% \begin{equation}
+% \mathbf{z}_t = \alpha(\mathbf{x}_t)
+% \end{equation}
+% \begin{equation}
+% \mathbf{s}_t = \gamma(\mathbf{z}_t) \textnormal{ ; } \mathbf{s}_t \in \mathbb{R}^d
+% \end{equation}
+% \begin{equation}
+% [\mathbf{h}^M_t, \hat{\mathbf{g}}_t] = \beta^{M'}(\mathbf{h}^M_{t-1}, \mathbf{s}_t) \textnormal{ ; } \hat{\mathbf{g}_t} \in \mathbb{R}^d  
+% \end{equation}
+% % \begin{equation}
+% % [\mathbf{h}^M_t, \mathbf{s}_t, \hat{\mathbf{g}}_t] = \beta^M(\mathbf{h}^M_{t-1},\mathbf{z}_t) ; \textnormal{ } \mathbf{s}_t \in \mathbb{R}^d \textnormal{ ; } \hat{\mathbf{g}_t} \in \mathbb{R}^d  
+% % \end{equation}
+% \begin{equation}
+% [\mathbf{h}^W_t, \mathbf{U}_t] = \beta^W(\mathbf{h}^W_{t-1},\mathbf{z}_t)
+% \end{equation}
+% \begin{equation}
+%  \mathbf{g}_t = \hat{\mathbf{g}}_t/||\hat{\mathbf{g}}_t||
+% \end{equation}
+% \begin{equation}
+%  \mathbf{w}_t = \mathbf{M} \sum_{i=t-c}^t \mathbf{g}_t \textnormal{ ; } \hat{\mathbf{w}_t} \in \mathbb{R}^k   \textnormal{ where } k << d
+% \end{equation}
+% \begin{equation}
+%  \mathbb{\pi}_t = \textnormal{SoftMax}(\mathbf{U}_t \mathbf{w}_t)
+% \end{equation}
+% Here $\mathbf{h}^M$ and $\mathbf{h}^W$ correspond to the internal recurrent-states of the Manager and the Worker respectively. A matrix $\mathbf{M}$ projects the $c$-most-recent goals $\mathbf{g}_t$ (which have been sum-pooled) into an embedding vector $\mathbf{w}_t \in R^k$ where $k<<d$. A second, time-dependent matrix $U_t$ (produced by the Worker) projects $\mathbf{w}_t$ to produce policy $\mathbb{\pi}$ -- a 
+% vector of probabilities over primitive actions. 
+% %
+% The next section provides the details on goal embedding and the following sections~\ref{sec:Learning},\ref{subsec:tpg} describes how FuN is trained. 
+
+
+%% ALTERNATE:
+
+% \subsection{Alternate world}
+
+
+
+% The following equations describe how our model elements operate, and Figure~\ref{fig:architecture}a illustrates the overall design of our network.:
+% \begin{equation}
+% \mathbf{z}_t = \alpha(\mathbf{x}_t)
+% \end{equation}
+% \begin{equation}
+% [\mathbf{h}^M_t, \mathbf{s}_t, \hat{\mathbf{g}}_t] = \beta^M(\mathbf{h}^M_{t-1},\mathbf{z}_t) ; \textnormal{ } \mathbf{s}_t \in \mathbb{R}^d \textnormal{ ; } \hat{\mathbf{g}_t} \in \mathbb{R}^d  
+% \end{equation}
+% \begin{equation}
+% [\mathbf{h}^W_t, \mathbf{U}_t] = \beta^W(\mathbf{h}^W_{t-1},\mathbf{z}_t)
+% \end{equation}
+% \begin{equation}
+%  \mathbf{g}_t = \hat{\mathbf{g}}_t/||\hat{\mathbf{g}}_t||
+% \end{equation}
+% \begin{equation}
+%  \mathbf{w}_t = \mathbf{M} \sum_{i=t-c}^t \mathbf{g}_t
+% \end{equation}
+% \begin{equation}
+%  \mathbb{\pi}_t = \textnormal{SoftMax}(\mathbf{U}_t \mathbf{w}_t)
+% \end{equation}
+% This can be simplified in the since $\mathbf{s}_t$ is not dependent on the recurrent part of the Manager's state -- we first compute $\mathbf{s}_t$ and then use this as an input to the recurrent update.
+% I.e.
+% \begin{equation}
+% \mathbf{s}_t = \gamma(\mathbf{z}_t) 
+% \end{equation}
+% \begin{equation}
+% [\mathbf{h}^M_t, \hat{\mathbf{g}}_t] = \beta^{M'}(\mathbf{h}^M_{t-1}, \mathbf{s}_t) 
+% \end{equation}
+% % TODO: Forget about the general case, and just drop into the specific of what we actually do.
+
+% Here $\mathbf{h}^M$ and $\mathbf{h}^W$ correspond to the internal recurrent-states of the Manager and the Worker respectively. A matrix $\mathbf{M}$ projects the $c$-most-recent goals $\mathbf{g}_t$ (which have been sum-pooled) into an embedding vector $\mathbf{w}_t \in R^k$ where $k<<d$. A second, time-dependent matrix $U_t$ (produced by the Worker) projects $\mathbf{w}_t$ to produce policy $\mathbb{\pi}$ -- a 
+% vector of probabilities over primitive actions. 
+% %
+% The next section provides the details on goal embedding and the following sections~\ref{sec:Learning},\ref{subsec:tpg} describes how FuN is trained. 
+
+%% ALTERNATE2:
+

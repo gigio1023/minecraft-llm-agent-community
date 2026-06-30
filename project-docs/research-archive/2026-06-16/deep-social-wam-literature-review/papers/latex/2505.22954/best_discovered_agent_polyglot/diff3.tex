@@ -1,0 +1,257 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/coding_agent.py b/coding_agent.py
+index 6639abd..97f4b69 100644
+--- a/coding_agent.py
++++ b/coding_agent.py
+@@ -52,6 +52,10 @@ class SolutionAttempt:
+     test_output: str  # Raw test output
+     test_success: bool  # Whether tests passed
+     test_stats: dict  # Test statistics (e.g., number of passed/failed tests)
++    error_messages: List[str] = None  # List of specific error messages
++    test_details: dict = None  # Detailed test information like specific test names and their status
++    execution_time: float = None  # Test execution time in seconds
++    attempt_number: int = None  # The attempt number in the sequence
+ 
+ def get_thread_logger():
+     """
+@@ -150,12 +154,82 @@ class AgenticSystem:
+         ]
+         return new_msg_history
+ 
++    def extract_test_details(self, output: str) -> tuple[dict, List[str], dict]:
++        """Extract detailed test information from the output."""
++        error_messages = []
++        test_details = {}
++        stats = {"passed": 0, "failed": 0, "errors": 0, "total": 0, "skipped": 0}
++
++        # Split output into lines for analysis
++        lines = output.split("\n")
++        
++        # Language-specific parsing
++        if self.language == "python":
++            for line in lines:
++                if "FAILED" in line and "::" in line:
++                    test_name = line.split("::")[1].split()[0]
++                    test_details[test_name] = "FAILED"
++                    stats["failed"] += 1
++                elif "PASSED" in line and "::" in line:
++                    test_name = line.split("::")[1].split()[0]
++                    test_details[test_name] = "PASSED"
++                    stats["passed"] += 1
++                elif "ERROR" in line and "::" in line:
++                    test_name = line.split("::")[1].split()[0]
++                    test_details[test_name] = "ERROR"
++                    stats["errors"] += 1
++                    # Extract error message
++                    if lines.index(line) + 1 < len(lines):
++                        error_messages.append(lines[lines.index(line) + 1])
++        
++        elif self.language in ["javascript", "node"]:
++            current_test = None
++            for line in lines:
++                if line.startswith('checkmark'):
++                    test_name = line.replace('checkmark,', '').strip()
++                    test_details[test_name] = "PASSED"
++                    stats["passed"] += 1
++                elif line.startswith('x'):
++                    test_name = line.replace('x', '').strip()
++                    test_details[test_name] = "FAILED"
++                    stats["failed"] += 1
++                    current_test = test_name
++                elif current_test and ('Error:' in line or 'AssertionError:' in line):
++                    error_messages.append(f"{current_test}: {line.strip()}")
++
++        elif self.language == "rust":
++            for line in lines:
++                if "test" in line and "... ok" in line:
++                    test_name = line.split("test")[1].split("...")[0].strip()
++                    test_details[test_name] = "PASSED"
++                    stats["passed"] += 1
++                elif "test" in line and "... FAILED" in line:
++                    test_name = line.split("test")[1].split("...")[0].strip()
++                    test_details[test_name] = "FAILED"
++                    stats["failed"] += 1
++                elif "---- " in line and " stdout ----" in line:
++                    test_name = line.split("----")[1].split("stdout")[0].strip()
++                    if test_name in test_details and test_details[test_name] == "FAILED":
++                        error_messages.append(f"{test_name}: {next((l for l in lines[lines.index(line)+1:] if l.strip()), '')}")
++
++        # Generic counting for other languages or as fallback
++        if not any(stats.values()):
++            stats["passed"] = output.count("PASS") + output.count("ok")
++            stats["failed"] = output.count("FAIL") + output.count("not ok")
++            stats["errors"] = output.count("ERROR") + output.count("panic:")
++            
++        stats["total"] = stats["passed"] + stats["failed"] + stats["errors"]
++        
++        return stats, error_messages, test_details
++
+     def run_tests(self) -> tuple[bool, str, dict]:
+         """Run tests and return success status, output, and test statistics."""
++        import time
++        
+         success = False
+         output = ""
+-        stats = {"passed": 0, "failed": 0, "errors": 0, "total": 0}
+-
++        start_time = time.time()
++        
+         try:
+             for command in TEST_COMMANDS.get(self.language, []):
+                 proc = subprocess.run(
+@@ -169,34 +243,97 @@ class AgenticSystem:
+                 success = proc.returncode == 0
+                 if not success:
+                     break
+-
+-            # Try to extract test statistics from output
+-            # This is a simple example; you might want to add more sophisticated parsing
+-            stats["passed"] = output.count("PASS") + output.count("ok")
+-            stats["failed"] = output.count("FAIL") + output.count("not ok")
+-            stats["errors"] = output.count("ERROR") + output.count("panic:")
+-            stats["total"] = stats["passed"] + stats["failed"] + stats["errors"]
++            
++            # Extract detailed test information
++            stats, error_messages, test_details = self.extract_test_details(output)
++            stats["execution_time"] = time.time() - start_time
++            
++            # Enhance stats with extracted information
++            stats["error_messages"] = error_messages
++            stats["test_details"] = test_details
+             
+         except Exception as e:
+             output = f"Error running tests: {str(e)}"
+             success = False
++            stats = {
++                "passed": 0, "failed": 0, "errors": 1, "total": 1,
++                "execution_time": time.time() - start_time,
++                "error_messages": [str(e)],
++                "test_details": {}
++            }
+ 
+         return success, output, stats
+ 
+     def analyze_test_results(self, attempts: List[SolutionAttempt]) -> str:
+-        """Analyze test results and create a summary for the agent."""
++        """Analyze test results and create a detailed summary for the agent."""
+         summary = "# Test Results Analysis\n\n"
+         
++        # Overall progress tracking
++        if len(attempts) > 1:
++            summary += "## Progress Overview\n"
++            first_attempt = attempts[0].test_stats
++            last_attempt = attempts[-1].test_stats
++            
++            progress = {
++                "passed": last_attempt["passed"] - first_attempt["passed"],
++                "failed": first_attempt["failed"] - last_attempt["failed"],
++                "errors": first_attempt["errors"] - last_attempt["errors"]
++            }
++            
++            summary += "Progress since first attempt:\n"
++            summary += f"- Additional passing tests: {progress['passed']}\n"
++            summary += f"- Reduced failures: {progress['failed']}\n"
++            summary += f"- Reduced errors: {progress['errors']}\n\n"
++        
++        # Detailed attempt analysis
+         for i, attempt in enumerate(attempts, 1):
+             summary += f"## Attempt {i}\n"
+             summary += f"Test Success: {attempt.test_success}\n"
+-            summary += f"Test Stats: {json.dumps(attempt.test_stats, indent=2)}\n"
+-            summary += "Key test output:\n```\n"
+-            # Extract relevant parts of test output (e.g., error messages)
+-            key_output = "\n".join(line for line in attempt.test_output.split("\n") 
+-                                 if "FAIL" in line or "ERROR" in line or "PASS" in line)
+-            summary += f"{key_output}\n```\n\n"
+-
++            summary += f"Execution Time: {attempt.test_stats.get('execution_time', 'N/A'):.2f}s\n"
++            
++            # Test statistics
++            stats = attempt.test_stats
++            total = stats.get("total", 0) or 1  # Avoid division by zero
++            pass_rate = (stats.get("passed", 0) / total) * 100
++            
++            summary += f"Pass Rate: {pass_rate:.1f}% ({stats.get('passed', 0)}/{total})\n"
++            summary += "Test Statistics:\n"
++            summary += f"- Passed: {stats.get('passed', 0)}\n"
++            summary += f"- Failed: {stats.get('failed', 0)}\n"
++            summary += f"- Errors: {stats.get('errors', 0)}\n"
++            summary += f"- Total: {total}\n\n"
++            
++            # Error messages
++            if stats.get("error_messages"):
++                summary += "Error Messages:\n```\n"
++                for error in stats["error_messages"][:5]:  # Limit to top 5 errors
++                    summary += f"{error}\n"
++                if len(stats["error_messages"]) > 5:
++                    summary += f"... and {len(stats['error_messages']) - 5} more errors\n"
++                summary += "```\n\n"
++            
++            # Test details
++            if stats.get("test_details"):
++                summary += "Individual Test Results:\n```\n"
++                for test_name, result in stats["test_details"].items():
++                    summary += f"{result}: {test_name}\n"
++                summary += "```\n\n"
++
++        # Recommendations for next attempt
++        if not attempts[-1].test_success:
++            summary += "## Recommendations for Next Attempt\n"
++            last_stats = attempts[-1].test_stats
++            
++            if last_stats.get("errors", 0) > 0:
++                summary += "- Focus on resolving runtime errors first\n"
++            if last_stats.get("failed", 0) > 0:
++                summary += "- Address failing test cases\n"
++            if len(attempts) > 1 and not attempts[-1].test_success:
++                # Compare with previous attempt
++                prev_stats = attempts[-2].test_stats
++                if last_stats.get("passed", 0) < prev_stats.get("passed", 0):
++                    summary += "- Recent changes caused regressions. Consider reverting some changes\n"
++            
+         return summary
+ 
+     def forward(self):
+@@ -238,20 +375,36 @@ Your task is to make changes to the files in the {self.git_tempdir} directory to
+             # Run tests and collect results 
+             test_success, test_output, test_stats = self.run_tests()
+             
+-            # Create and store attempt
++            # Create and store attempt with enhanced information
+             attempt = SolutionAttempt(
+                 patch=current_patch,
+                 test_output=test_output,
+                 test_success=test_success,
+-                test_stats=test_stats
++                test_stats=test_stats,
++                error_messages=test_stats.get('error_messages', []),
++                test_details=test_stats.get('test_details', {}),
++                execution_time=test_stats.get('execution_time', None),
++                attempt_number=attempt_num + 1
+             )
+             attempts.append(attempt)
+             
+-            # Update best attempt if this one is better
+-            if test_success and (best_attempt is None or 
+-                               attempt.test_stats["passed"] > best_attempt.test_stats["passed"]):
++            # Update best attempt based on multiple criteria
++            if test_success and (
++                best_attempt is None or
++                (attempt.test_stats["passed"] > best_attempt.test_stats["passed"]) or
++                (attempt.test_stats["passed"] == best_attempt.test_stats["passed"] and
++                 len(attempt.error_messages or []) < len(best_attempt.error_messages or []))
++            ):
+                 best_attempt = attempt
+             
++            # Log detailed attempt information
++            safe_log(f"\n=== Attempt {attempt_num + 1} Summary ===")
++            safe_log(f"Test Success: {test_success}")
++            safe_log(f"Tests Passed: {test_stats.get('passed', 0)}")
++            safe_log(f"Tests Failed: {test_stats.get('failed', 0)}")
++            safe_log(f"Errors: {test_stats.get('errors', 0)}")
++            safe_log(f"Execution Time: {test_stats.get('execution_time', 'N/A'):.2f}s")
++            
+             # If tests pass perfectly, we can stop
+             if test_success and attempt.test_stats["failed"] == 0 and attempt.test_stats["errors"] == 0:
+                 break
+\end{lstlisting}

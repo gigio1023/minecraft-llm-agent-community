@@ -1,0 +1,339 @@
+\section{Experiments and Results}%
+\label{sec:experiments}
+
+% Plot style definition
+\pgfplotsset{
+    performance/.style={
+        width=\linewidth,
+        height=0.6\linewidth,
+        grid=major,
+        grid style={line width=0.2pt, draw=gray!15},
+        axis lines=left,
+        xlabel=Agent Iteration,
+        ylabel=Utility,
+        xlabel near ticks,
+        ylabel near ticks,
+        legend pos=south east,
+        legend cell align=left,
+        legend style={
+            draw=none,
+            fill=white,
+            fill opacity=0.8,
+            text opacity=1,
+            font=\small
+        },
+        try min ticks=5,
+        cycle list={
+            {blue!40, opacity=0.4},
+            {red!80!black, thick},
+            {blue!20},
+        },
+        tick style={color=gray!70},
+        major grid style={line width=0.2pt,draw=gray!15},
+        minor grid style={line width=0.1pt,draw=gray!8},
+        every axis label/.append style={font=\small},
+        tick label style={font=\small}
+    }
+}
+
+% Performance plot
+\begin{figure}[t]
+    \centering
+    \begin{tikzpicture}
+    \begin{axis}[performance]
+        % Load data
+        \pgfplotstableread{data/main_plot_data.dat}\perfdata
+
+        % Raw scores
+        \addplot[c3!90] table[x=iteration,y=target_score] {\perfdata};
+        \addlegendentry{Mean Utility}
+
+        % Cumulative maximum
+        \addplot table[x=iteration,y=cummax_score] {\perfdata};
+        \addlegendentry{Best Utility So Far}
+
+        % Confidence intervals
+        \addplot[name path=upper,draw=none] table[x=iteration,y=ci_upper] {\perfdata};
+        \addplot[name path=lower,draw=none] table[x=iteration,y=ci_lower] {\perfdata};
+        \addplot[c3!30] fill between[of=upper and lower];
+        \addlegendentry{95\% Confidence Interval}
+
+        \node[anchor=south, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:1.1,0.63) {`Smart Edit'\\Tool};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:1.0,0.63) -- (axis cs:1,0.59);
+
+        \node[anchor=center, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:5.0,0.55) {Code Context\\Summarization};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:5.0,0.562) -- (axis cs:5,0.59);
+
+        \node[anchor=center, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:7,0.655) {File Edit\\Verification};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:7,0.645) -- (axis cs:7,0.605);
+
+        \node[anchor=center, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:9,0.685) {AST Symbol\\Locator};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:9,0.675) -- (axis cs:9,0.65);
+
+        \node[anchor=center, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize]
+              at (axis cs:13,0.7) {Hybrid Symbol Locator};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:13,0.693) -- (axis cs:13.9,0.675);
+    \end{axis}
+    \end{tikzpicture}
+    \caption{Performance across iterations. Key improvements are annotated with
+      their corresponding tool or agent modifications.}
+    \label{fig:performance}
+\end{figure}
+
+We first show a run that includes relatively long-horizon tasks in the benchmark
+set. We include \acr{SWE} Bench Verified
+\citep{chowdhuryIntroducingSWEbenchVerified2024} which tests problem
+decomposition, code navigation as well as fast and efficient file editing from
+which we select a fixed random subset of 50 questions. We also include 50 random
+questions from LiveCodeBench~\citep{jain2024livecodebench}, the questions from
+which resemble competitive programming and often include more theoretical
+reasoning\footnote{Both SWEBench-Verified and LiveCodeBench are MIT licensed}.
+
+We also include two example `synthetic' benchmark tasks, defined and curated
+entirely within the agent's codebase. The first of these is a file editing
+benchmark, constructed by cloning the repositories used in \acr{SWE} bench,
+finding `interesting' (i.e.~not trivial, nor complete overwrites) file edits in
+consecutive commits, mounting the repository checked out at the first commit in
+the working directory, and prompting the agent to edit the file such that it
+matches the target content of the second commit. The agent is scored on the
+closeness of the final file content to the target content, with time and dollar
+cost and token consumption also being accounted for in the utility function.
+The second is a codebase navigation problem, which is also constructed by
+cloning some Python repositories, from which we identify `interesting' symbols,
+and at least one reference to this symbol in the project. The benchmark task is
+for the agent to locate the definition of this symbol, and return the location
+in the format \texttt{path/to/file.py:line\_num:column\_num} from the example
+reference.
+
+We run the agent system using Sonnet 3.5 (v2)
+\citep{anthropicIntroducingClaude35} in most of the agents in the agent system,
+with the exception of a `reasoning agent' which uses o3 mini
+\citep{openaiOpenAIO3mini2025}. While the base agent system can run with much
+smaller and less expensive models, and many of our benchmark tasks can be solved
+by this class of models, the
+meta-improvement task is a complicated long-horizon task which requires powerful
+models. The API cost of the 15 iteration run was approximately \$7,000.
+
+The results are shown in Figure~\ref{fig:performance}, with more detailed
+iteration-level peformance numbers in Table~\ref{tab:performance}.
+
+\begin{table}[t]
+\caption{Performance per iteration: the benchmark accuracy numbers correspond to
+a synthetic file editing benchmark and symbol location (codebase navigation)
+benchmark, SWE-Bench Verified, and LiveCodeBench, respectively. We also show the
+metrics averaged across all problem instances across all benchmarks to compare
+the relative `per problem' costs across agent iterations.}
+\label{tab:performance}
+\begin{center}
+
+% Load data
+\pgfplotstableread[col sep=space]{data/main_table.dat}\loadeddata
+
+\pgfplotstabletypeset[
+    columns={iteration,file,symbol,swe,lcb,cost,time,tokens,cached},
+    every head row/.style={
+        before row={
+            \toprule
+            & \multicolumn{4}{c}{\bf Benchmark Accuracy} &
+            \multicolumn{4}{c}{\textbf{Average Metrics} (per benchmark problem)} \\
+            \cmidrule(lr){2-5} \cmidrule(lr){6-9}
+        },
+        after row=\midrule
+    },
+    every last row/.style={after row=\bottomrule},
+    columns/iteration/.style={
+        column type=r,
+        string type,
+        column name={\bf Iter}
+    },
+    columns/file/.style={
+        column type=r,
+        fixed zerofill,
+        precision=2,
+        column name={\bf File}
+    },
+    columns/symbol/.style={
+        column type=r,
+        fixed zerofill,
+        precision=2,
+        column name={\bf Sym}
+    },
+    columns/swe/.style={
+        column type=r,
+        fixed zerofill,
+        precision=2,
+        column name={\bf SWE-Bv}
+    },
+    columns/lcb/.style={
+        column type=r,
+        fixed zerofill,
+        precision=2,
+        column name={\bf LCB}
+    },
+    columns/cost/.style={
+        column type=r,
+        fixed zerofill,
+        precision=2,
+        column name={\bf Cost (\$)}
+    },
+    columns/time/.style={
+        column type=r,
+        fixed zerofill,
+        precision=1,
+        column name={\bf Time (s)}
+    },
+    columns/tokens/.style={
+        column type=r,
+        string type,
+        column name={\bf Tokens (M)}
+    },
+    columns/cached/.style={
+        column type=l,
+        string type,
+        column name={\bf \% Cached}
+    }
+]\loadeddata
+
+\end{center}
+\end{table}
+
+The numbers show a promising progression. For the file editing benchmark, the
+agent is initially only equipped with the ability to overwrite files which is
+slow and token inefficient, and it quickly implemented self-termed `smart'
+editing tools based on diffs and ranges. For the symbol navigation task, the
+agent implemented a simple \acr{AST} based symbol locator at iteration 9
+(perhaps exploiting the fact that our benchmarks were predominantly Python
+based), which yielded good improvements also reflected in other
+tasks.\footnote{Note that we attribute the low score in the symbol locator
+  benchmark to poor data quality---some of the target symbols point to
+  uninstalled external libraries for instance.} The \acr{SWE} Bench Verified
+subset saw an appreciable increase in performance throughout the run, accuring
+agent framework improvements. The LiveCodeBench scores saw a subtle
+improvement, although not as pronounced as some of the other benchmarks.
+
+\subsection{Performance on Reasoning Tasks}%
+\label{subsec:reasoning_tasks}
+
+We also evaluate the effectiveness of the self-referential agent system in
+improving task performance in more reasoning-heavy domains. We ran another
+experiment with two question answering tasks in the benchmark set: \acr{AIME}
+2024 and \acr{GPQA} Diamond \cite{reinGPQAGraduateLevelGoogleProof2023}, the
+results of which are shown in Figure~\ref{fig:aime_gpqa}.
+
+\pgfplotsset{
+    aime/.style={
+        width=\linewidth,
+        height=0.4\linewidth,
+        grid=major,
+        grid style={line width=0.2pt, draw=gray!15},
+        axis lines=left,
+        title=\acr{AIME} and \acr{GPQA} Show Little Improvement,
+        xlabel=Agent Iteration,
+        ylabel=Mean Accuracy,
+        xlabel near ticks,
+        ylabel near ticks,
+        legend pos=north east,
+        legend cell align=left,
+        legend style={
+            draw=none,
+            fill=white,
+            fill opacity=0.8,
+            text opacity=1,
+            font=\small
+        },
+        try min ticks=5,
+        cycle list={
+            {blue!40, opacity=0.4},
+            {red!80!black, thick},
+            {blue!20},
+        },
+        tick style={color=gray!70},
+        major grid style={line width=0.2pt,draw=gray!25},
+        minor grid style={line width=0.1pt,draw=gray!18},
+        every axis label/.append style={font=\small},
+        tick label style={font=\small}
+    }
+}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+    \begin{axis}[aime]
+        % Load data
+        \pgfplotstableread{data/aime_gpqa_plot.dat}\perfdata
+
+        % Raw scores
+        \addplot[c3!90] table[x=iteration,y=target_score] {\perfdata};
+        \addlegendentry{Mean Accuracy}
+
+        % Cumulative maximum
+        \addplot table[x=iteration,y=cummax_score] {\perfdata};
+        \addlegendentry{Best Mean Accuracy So Far}
+
+        % Confidence intervals
+        \addplot[name path=upper,draw=none] table[x=iteration,y=ci_upper] {\perfdata};
+        \addplot[name path=lower,draw=none] table[x=iteration,y=ci_lower] {\perfdata};
+        \addplot[c3!30] fill between[of=upper and lower];
+        \addlegendentry{95\% Confidence Interval}
+
+        % Annotations for key iterations (adjust coordinates based on your data)
+        \node[anchor=south, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:1,0.79) {Independent math\\verifier};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:1,0.785) -- (axis cs:1,0.76);
+
+        \node[anchor=north, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:2,0.71) {Sympy symbolic\\calculator};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:2,0.715) -- (axis cs:2,0.76);
+
+        \node[anchor=north, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:4,0.66) {Math cross\\validator};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:4,0.66) -- (axis cs:4,0.685);
+
+        \node[anchor=south, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:4.8,0.79) {Geometry\\specialist};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:5,0.785) -- (axis cs:5,0.77);
+
+        \node[anchor=north, fill=white, fill opacity=0.9, text opacity=1,
+              rounded corners=2pt, inner sep=2pt, font=\footnotesize, align=center]
+              at (axis cs:6,0.66) {Systematic mathematical\\reasoning};
+        \draw[->,>=stealth,thick,opacity=0.6] (axis cs:6,0.66) -- (axis cs:6,0.69);
+    \end{axis}
+    \end{tikzpicture}
+    \caption{Agent Framework Saturation: the benefits the agent system was able
+      to find when the models alone (e.g. o3-mini-high) already perform well was
+      marginal.}
+    \label{fig:aime_gpqa}
+\end{figure}
+
+The results here show less improvement, and highlight an important interplay
+between the base models and the scaffolding system. The base agent system at
+iteration 0 used in Figure~\ref{fig:aime_gpqa} used Sonnet 3.5, with a
+`reasoning' sub-agent that used o3-mini. The o3-mini model alone scores 87\% and
+79\% on \acr{AIME} and \acr{GPQA} Diamond with a `high' reasoning effort, while
+the agent system as a whole averaged 76\% across the two benchmarks.
+
+Inspecting the traces, we observe that for many of the runs, the main agent
+merely delegated the problem to the o3-mini based reasoning agent, and did not
+leverage the full capabilites of the agent system. For `reasoning models' such
+as o1 \citep{openaiOpenAIO1System}, o3-mini or DeepSeek's R1
+\citep{deepseek-aiDeepSeekR1IncentivizingReasoning2025}), we suspect that the
+inclusion of crude components aiming to induce reasoning behaviour (such as
+those included in iterations 4 and 6 in Figure~\ref{fig:aime_gpqa}) may in fact
+interrupt the reasoning chain of thought of a reasoning model trained outside
+the agent system, resulting in a drop in performance. We look forward to future
+work training `agent' \acr{LLM}s jointly with the design of the agent system
+which will hopefully make better use of both components' strengths.
+

@@ -1,0 +1,80 @@
+\vspace{-9px}
+\section{Introduction}
+Human decision-making is often the result of extended chains of thought \citep{james1890principles,ericsson1984protocol}.
+Recent work has shown that explicit intermediate reasoning (``rationales'') can improve large language model~(LLM) performance as well \citep{rajani2019explain, shwartz2020unsupervised, nye2021show, wei2022chain, marasovic2021few, lampinen2022can}. 
+For example, \citet{nye2021show} demonstrated that LLMs explicitly trained to use ``scratchpads'' for intermediate steps can attain perfect in-distribution performance on arithmetic, and strong out-of-distribution generalization, while models trained to predict answers directly fail to do either. 
+These works suggest that generating explicit rationales before giving a final answer (``rationale generation'') is valuable for LLMs across 
+diverse
+tasks including mathematical reasoning, commonsense reasoning, code evaluation, social bias inference, and natural language inference.
+However, the two primary methods for inducing rationale generation both have serious drawbacks.
+
+One approach to rationale generation is the construction of a fine-tuning dataset of rationales, either manually by human annotators or automatically with hand-crafted templates \citep{rajani2019explain,shwartz2020unsupervised,nye2021show,cobbe2021training}. Manual methods are expensive, and it is infeasible to construct such a dataset for each interesting problem \citep{rajani2019explain}. Meanwhile, template-based methods rely on automatically-generated rationales but only work when a general solution is already known \citep{nye2021show} or reasonable hard-coded heuristics can be made \citep{shwartz2020unsupervised}. 
+
+An alternative is to leverage in-context learning by including only a few rationale examples in the language model prompt. This has been shown to improve accuracy on mathematical and symbolic reasoning tasks relative to prompting without rationales (``direct'' prompting) \citep{nye2021show,wei2022chain}. Yet, while few-shot techniques with rationales tend to outperform their non-reasoning counterparts, they generally substantially underperform models fine-tuned to directly predict answers using larger datasets \citep{nye2021show,wei2022chain}. 
+
+\begin{figure}
+\centering
+\hspace{-20px}
+\begin{subfigure}{.75\textwidth}
+  \centering
+    {
+    \small
+\hspace{3px}\includegraphics[width=\textwidth]{figures/starvis.pdf}    }
+\end{subfigure}
+\hspace{5px}
+\begin{subfigure}{.22\textwidth}
+  \centering
+    {
+    \scriptsize
+    \begin{Verbatim}[commandchars=+\[\]]
++makeblue[Q: What can be used]
++makeblue[to carry a small dog?]
++makeblue[Answer Choices:]
++makeblue[(a) swimming pool]
++makeblue[(b) basket]
++makeblue[(c) dog show]
++makeblue[(d) backyard]
++makeblue[(e) own home]
++makeblue[A:] +makered[The answer must be]
++makered[something that can be]
++makered[used to carry a small]
++makered[dog. Baskets are]
++makered[designed to hold things.]
++makered[Therefore, the answer]
++makered[is basket] +makeblue[(b)].
+\end{Verbatim}
+}
+\end{subfigure}
+\hspace{-20px}
+\caption{An overview of STaR and a STaR-generated rationale on CommonsenseQA. We indicate the fine-tuning outer loop with a dashed line. 
+The {\color{blue} questions} and ground truth {\color{blue} answers} are expected to be present in the dataset, while the {\color{Maroon} rationales} are generated using STaR.} 
+\label{fig:overview}
+\vspace{-15px}
+\end{figure}
+
+In this paper, we adopt a different approach: by leveraging the LLM's pre-existing reasoning ability, we iteratively \emph{bootstrap} the ability to generate high-quality rationales.
+Specifically, we few-shot prompt a large language model to self-generate rationales and refine the model's ability further by fine-tuning on those rationales that lead to correct answers. We repeat this procedure, using the improved model to generate the next training set each time. 
+This is a synergistic process, where improvements in rationale generation improve the training data, and improvements in training data further improve rationale generation. 
+
+However, we find this loop eventually fails to solve any new problems in the training set because it receives no direct training signal for problems it fails to solve. 
+To overcome this issue, we propose \textbf{rationalization}: for each problem that the model fails to answer correctly, we generate a new rationale by providing the model with the correct answer.
+This lets the model reason backward---given the correct answer, the model can more easily generate a useful rationale. These rationales are then collected as part of the training data, which often improves overall accuracy.
+
+We thus develop the Self-Taught Reasoner (STaR, Fig.~\ref{fig:overview}) method, a scalable bootstrapping method allowing models to learn to generate their own rationales, while also learning to solve increasingly difficult problems. In our method, we repeat the following process: in each iteration, first construct a finetuning dataset by attempting to solve the dataset using the current model's \textbf{rationale generation} ability; then, augment this dataset using \textbf{rationalization}, justifying ground-truth answers to problems the model failed to solve; finally, finetune the large language model on the combined dataset. 
+
+Applying STaR on arithmetic, math word problems, and commonsense reasoning, we observe it is able to effectively translate a small number of few-shot prompts into a large rationale dataset,  yielding dramatic performance improvements. On CommonsenseQA \citep{talmor2019commonsenseqa}, we find STaR improves over both a few-shot baseline 
+(+35.9\%)
+and a baseline fine-tuned to directly predict answers 
+(+12.5\%)
+, and performs comparably to a fine-tuned model that is 30$\times$ larger (72.5\% vs.\ 73.0\%).
+
+
+Thus, we make the following contributions:
+\vspace{-5px}
+\begin{enumerate}
+    \itemsep0em 
+    \item We propose a bootstrapping mechanism to iteratively generate a rationale dataset from a few initial examples with rationales---without needing to check new rationales' correctness.
+    \item We complement \textbf{rationale generation} with \textbf{rationalization}, where a model is tasked with justifying an answer and then fine-tuned as if it had come up with the rationale without any hint. We show rationalization  accelerates and improves the bootstrapping process.
+    \item We evaluate these techniques with a variety of ablations in both mathematical and commonsense reasoning domains.
+    \item We propose what is, to our knowledge, the first technique to allow a  pre-trained large language model to iteratively use its language modeling capacity to improve itself.
+\end{enumerate}

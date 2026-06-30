@@ -1,0 +1,61 @@
+
+
+Discriminative LLM-based verifiers~\eqref{eq:disc} do not utilize the text generation capabilities of pretrained LLMs. To address this issue, we propose training generative verifiers, which we call \genV, using standard next-token prediction~\eqref{eq:sft}. To do so, \genV\ represents solution correctness using the LLM's probability distribution over tokens, instead of predicting a separate numerical score. This keeps the generation abilities of \genV\ intact as the verification decision is just another token, while also enabling several advantages that come for ``free'' with LLMs, such as unified training for solution generation and verification, chain-of-thought reasoning, and inference-time computation.
+
+\subsection{Direct Verifier} In its simplest form, \genV\ predicts whether a solution is correct using a single `Yes' or `No' token~(\autoref{fig:gen-rm-figure}, top). This can be done by maximizing $\log p_\theta(\text{`Yes'} \mid (\rvx, \rvy^+))$
+for correct solutions $\rvy^+$ and $\log p_\theta(\text{`No'} \mid (\rvx, \rvy^-))$ for incorrect solutions $\rvy^-$.
+To do so, we minimize the SFT loss in \eqref{eq:sft} on the dataset $\gD_{\mathrm{Direct}}$ containing problem-solution pairs and a `Yes` or `No' verification token:
+\begin{align*}
+\boxed{
+\gD_{\mathrm{Direct}} = \{(\rvx, \rvy^+,\rmI), \text{`Yes'}\} \union \{(\rvx, \rvy^-, \rmI), \text{`No'}\}}, \quad \rmI = \text{`Is the answer correct (Yes/No)?'}
+\end{align*}
+At inference, we use the likelihood of the `Yes' token as the verifier's score for re-ranking solutions:
+\begin{align}
+    r_{\text{Direct}}(\rvx, \rvy) = p_{\theta}(\text{Yes} \mid \rvx, \rvy, \rmI). 
+\label{eq:gen-rm-direct}
+\end{align}
+This score takes into account the verifier's confidence about its correctness prediction, which reduces the chance of being wrong at test-time when using a binary `Yes' or `No' prediction.
+
+
+
+\subsection{Unifying Generation and Verification} 
+\genV\ seamlessly integrates reward modeling, which distinguishes between correct and incorrect solutions, with SFT for generating correct solutions. This can be done by simply changing the data mixture in the SFT loss~\eqref{eq:sft} to include both verification and generation tasks. Given a verification dataset $\gD_{\text{verify}}$, which can be $\gD_{\text{Direct}}$ or $\gD_{\text{CoT}}$ (discussed below) of problems-solution pairs with correctness tokens (optionally with CoT rationales), \genV\ minimizes the loss:
+\begin{equation}
+\boxed{
+\gL_{\genV}(\theta, \gD_{\text{verify}}) = \gL_{\text{SFT}}(\theta, \gD_{\text{verify}}) + \lambda \gL_{\text{SFT}}(\theta, \gD_{\text{correct}})},
+\label{eq:co-train}
+\end{equation}
+where $\lambda > 0$  is a hyperparameter that controls the mixture ratio between verification~($\gD_{\text{verify}}$) and generating correct solutions~($\gD_{\text{correct}}$). 
+This unified training can improve verifier and generation performance via positive transfer between these two related tasks: how to generate a correct solution, and whether a solution is correct. By default, we train \genV\ verifiers using the unified loss in \eqref{eq:co-train}.
+
+
+\subsection{Chain-of-Thought Verifiers~(\genV-CoT)} 
+\label{sec:cot-verifier}
+Since verification often involves nuanced reasoning, generative verifiers can naturally benefit from CoT~\citep{wei2022chain}. Specifically, we can generate intermediate reasoning steps or critique (CoT) before making a decision about the solution correctness, which may identify subtle reasoning errors missed by direct verifiers~(\autoref{fig:gen-rm-figure}, bottom). To train CoT verifiers, we can minimize the SFT loss $\gL_{\genV}$ on the dataset $\gD_{\text{CoT}}$ 
+containing problem-solution pairs as inputs, and corresponding verification rationales $\rvv_\cot$ appended with a final question $\rmI$ and  `Yes' or `No' token as targets:
+\begin{align*}
+\boxed{
+\gD_\text{CoT} = \{\left(\rvx, \rvy^+, \rmI_\cot\right), (\rvv_\cot, \rmI, \text{`Yes'})\} \union \{\left(\rvx, \rvy^-, \rmI_\cot\right), (\rvv_\cot, \rmI, \text{`No'})\}}
+\end{align*}
+where $\rmI_\cot=$`Let's verify step by step.'.
+Notably, these rationales can either be human or LLM-generated, both of which we explore in this work. During inference, we first generate a CoT rationale $\rvv_{\textbf{CoT}}$ from \genV-CoT and then use the probability of `Yes' for assigning the correctness score:
+\begin{align}
+    r_{\text{CoT}}(\rvx, \rvy) &= p_{\theta}(\text{Yes} \mid \rvx, \rvy, \rmI_\cot, \rvv_\cot, \rmI),\quad \text{where}\ \ \rvv_{\textbf{CoT}} \sim p_{\theta}(\cdot \mid \rvx, \rvy, \rmI_\textbf{CoT}),
+    \label{eq:cot-reward}
+\end{align}
+Compared to \eqref{eq:gen-rm-direct} that only uses the instruction $\rmI$ to produce a score, the above CoT reward additionally conditions on $\rmI_\cot$ and self-generated $\rvv_\cot$ before getting a score via instruction $\rmI$.
+
+
+\textbf{Inference-time compute for CoT verifier.} When sampling verification CoTs, the generative verifier can use different reasoning paths and yield different correctness probabilities for the same problem-solution pair. As such, we would like to marginalize out these reasoning paths to select the most consistent correctness answer~\citep{wang2022self}. To do so, we use majority voting where we first generate $K$ verification CoT rationales, and average the CoT-verifier score for these rationales:
+\begin{equation}
+    r_{\text{MajV@K}}(\rvx, \rvy) = \dfrac{1}{K} \sum_{i=1}^{K} p_{\theta}\left(\text{Yes} \mid \rvx, \rvy, \rmI_\textbf{CoT}, \rvv_{\textbf{CoT}}^{(i)}, \rmI\right), \quad \text{where}\ \ \rvv_{\textbf{CoT}}^{(i)} \sim  p_{\theta}(\cdot \mid \rvx, \rvy, \rmI_\textbf{CoT}) \label{eq:gen-rm-maj-voting}
+\end{equation}
+Since individual verification rationales from CoT verifiers can have reasoning errors, majority voting can mitigate the impact of such errors by averaging correctness scores across multiple rationales. 
+Importantly, this means that \genV-CoT can leverage additional \textbf{inference-time compute} 
+to improve its accuracy, which discriminative verifiers cannot do. Unless otherwise specified, we report \genV-CoT performance based on majority voting with 32 votes, that is, $K=32$ in \eqref{eq:gen-rm-maj-voting}.
+
+\textbf{Synthetic Verification CoT Rationales for Training}
+Verifying LLM solutions with human-generated rationales can become increasingly expensive and challenging as LLMs surpass human reasoning abilities. To address this challenge, we explore using synthetically-generated rationales on GSM8K.
+One naive approach is to simply use the \textit{`Let's verify step by step'} prompt given a problem-solution pair, and keep the generated rationales only when they accurately verify the correctness of a solution~\citep{singh2023beyond, zelikman2022star}. However, such rationales (after filtering based on final yes/no responses) are still often of poor quality, due to 50\% accuracy from random guessing. 
+
+{To improve the quality of synthetic rationales, we provide a \textit{reference solution} in addition to the problem and solution to verify (see \autoref{prompt-cot-rationale-generation}), making it easier for an LLM to point out any reasoning error in the provided solution.} This idea is similar to reference-guidance grading ~\citep{zheng2024judging}. Here, a reference solution could be any model-generated solution that arrives at the correct final answer. After initial data generation, we then filter the synthetic rationales using their verification correctness. {Note that we condition on a reference solution only to generate training data, but do not include it during actual finetuning of the verifier, so that there is no train/test mismatch.}

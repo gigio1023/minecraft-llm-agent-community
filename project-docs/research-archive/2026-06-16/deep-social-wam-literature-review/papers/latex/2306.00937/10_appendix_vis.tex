@@ -1,0 +1,272 @@
+\section{Additional Visualizations}
+\label{appendix:additional_vis}
+\subsection{MineCLIP Evaluation}
+We ran MineCLIP evaluation on both text and visual prompts. The MineCLIP evaluation results can be found in \autoref{fig:appendix_mineclip_perf}.
+
+\subsection{Steerability with Programmatic Metrics}
+Similar to Figure 20 in the VPT appendix \citep{baker2022vpt}, we plot the programmatic metric performances (mean and 95\% confidence intervals) across the different goal prompt conditioning, both using visual prompts (\Cref{fig:prog_eval_visual}) and text prompts with CVAE prior (\Cref{fig:prog_eval_textvae}) conditioning, on our policy trained with hyperparameters in \Cref{table:model_hparams} and using conditional scaling $\lambda=7$ (for visual prompts) and $\lambda=6.0$ (for text prompts with CVAE prior). Each conditioning variant is run with 10 trials, each trial with a different environmental seed and with an episode length of 3000 timesteps (2.5 minutes gameplay). Across the conditioning variant, we use the same set of environmental seeds. For comparison, we also plot the metrics for an unconditional VPT (\texttt{early\_game}) agent (``\textit{VPT (uncond})'') and the text-conditioned agent investigated in VPT appendix \citep{baker2022vpt} (``\textit{VPT (text)*}'') when conditioned on the relevant text. When using \textit{visual} goal conditioning, we the use MineCLIP video encoder to embed a 16-frame clip of the agent performing the desired task taken from our training dataset. An example frame from each of the visual goals is illustrated in \Cref{fig:apdx_visual_goals}. When using \textit{text VAE} goal conditioning, we use the MineCLIP text encoder to encode the text prompts (\Cref{tab:apdx_text_prompt}) and use the CVAE prior to sample the goal embedding from the MineCLIP text embedding. 
+
+We note several differences in our experimental setup compared to that in VPT \citep{baker2022vpt}. We only run our evaluation episodes for 3000 timesteps, equivalent to 2.5 minutes of gameplay, compared to 5 minutes in the VPT paper. Due to a limited computational budget, we generate 10 episodes per conditioning variant, and 110 episodes for the unconditional (``\textit{VPT (uncond)}''), compared to VPT's 1000 episodes. Lastly, when measuring the inventory count, we log the maximum inventory count seen throughout the episode, which is a lower bound on the potential number of items collected since the agent can later throw out, place, or use these items to craft. As a result of these caveats, we denote the ``\textit{VPT (text)*}'' legend in \autoref{fig:prog_eval_visual} and \autoref{fig:prog_eval_textvae} with an asterisk as we use the results reported in \citep{baker2022vpt} directly for comparison.
+
+We make several observations. First, we observe that our agents is more \textit{steerable}: when conditioned to collect certain items (in bold), the agent collects (relatively) many more of those items than when conditioned on other instructions unrelated to that item, as well as compared to the unconditional VPT. When conditioned on tasks unrelated to the item (e.g. break a flower when interested in measuring logs collected), we also observe that the agent pursues that item \textit{less} than the unconditional agent. Second, we observe that for the bolded instructions which we expect to stand out, we outperform VPT performance (dashed blue line) \citep{baker2022vpt}, even with half the amount of time in the episode rollout. This suggests that our agent is both more steerable relative to the unconditioned VPT agent and the text-conditioned VPT agent investigated in the VPT appendix \citep{baker2022vpt}.
+
+
+\subsection{Prompt Chaining Visualization}
+We visualize two specific episodes from the prompt chaining experiments in \Cref{sec:exp_chaining} in \autoref{fig:apdx_chaining_tower_episode_main} (building a tower) and \autoref{fig:apdx_chaining_planks_episode_main} (crafting wooden planks). 
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/appendix_mineclip_eval_text_matrix.png}    
+        \caption{MineCLIP Text Evaluation}
+    \end{subfigure}
+    \begin{subfigure}{0.49\textwidth}
+        \includegraphics[width=\textwidth]{figures/4.2_final_perf_mineclip.pdf}
+        \caption{MineCLIP Visual Evaluation}
+    \end{subfigure}
+    \caption{\textbf{MineCLIP Evaluation}. We measure the cosine distance between the goal embedding given to the agent and the MineCLIP video embeddings throughout the episode and record the minimum across the episode. Dashed box indicates the minimum along the row, and the number in the diagonal box indicates the rank of the diagonal element in the row (0 specifies that the diagonal is the minimum element in the row). The ideal performance would be where the minimum values of each row lie on the diagonal. That is, the agent performs a specific task best when it is asked to perform that specific task. \textbf{Left:} We use the prior to convert the text into the goal embedding. Across our 11 text MineCLIP evaluation tasks, \agentname{} achieves the shortest distance between the episode and the MineCLIP goal embedding when prompted appropriately for most cases. This shows the strong general performance of \agentname{} across a wide variety of short-horizon tasks. \textbf{Right:} We embed the visual goals (\autoref{fig:apdx_visual_goals}) with the MineCLIP video encoder. Across our 11 visual MineCLIP evaluation tasks, \agentname{} achieves the shortest distance between the episode and the MineCLIP goal embedding when prompted appropriately except for in two cases, where it mixes up digging and dirt and swimming and going underwater.}
+    \label{fig:appendix_mineclip_perf}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.65\textwidth]{figures/success_rate_mat.pdf}
+    \caption{
+    \textbf{Visual Evaluation Success-Rate Matrix.} We manually reviewed the same videos used for the MineCLIP Visual Evaluation matrix in \autoref{fig:final_perf_mineclip} in order to verify that the MineCLIP scores correspond well to human judgment. Thus, the values in this matrix are subject to human error and subjectivity. Each cell value shows how often the agent achieves the Evaluation Prompt when conditioned on the Conditioned Prompt (success-rate). The dotted cell(s) is/are the maximum value in the row. Across the tasks, \agentname{} achieves the highest success-rate when prompted appropriately except in three cases, where it breaks wood more than leaves, explores more than it swims, and swims more than it goes underwater. This shows the strong general performance of \agentname{} across a wide variety of early-game short-horizon tasks.
+    }
+    \label{fig:success_rate_matrix}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/visual_goals_loop.png}
+    \caption{Sample frames from each of the 11 visual goals. Note that the text overlaid on the frame is \textit{not} present when we encode the 16-frame video with the MineCLIP video encoder, and is only present for the figure visualization.}
+    \label{fig:apdx_visual_goals}
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+     \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_travel_dist_rl_guidance_15to200_visual_visual_withVPTComparison.pdf}
+        \caption{}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_seed_rl_guidance_15to200_visual_visual_withVPTComparison.pdf}
+        \caption{}
+      \end{subfigure}
+      
+      \vspace{1em}
+      
+      \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_log_rl_guidance_15to200_visual_visual_withVPTComparison.pdf}
+        \caption{}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_dirt_rl_guidance_15to200_visual_visual_withVPTComparison.pdf}
+        \caption{}
+      \end{subfigure}
+    \caption{\textbf{Conditioning with Visual Goals}. We plot the performance of the programmatic metrics, including their mean values and 95\% confidence intervals, across different goal conditioning. See \Cref{fig:apdx_visual_goals} for visualization of these visual prompts. Plots are similar to Figure 20 in the VPT appendix \citep{baker2022vpt}. Each conditioning variant is run with 10 trials, each with a different environmental seed and with an episode length of 3000 time steps (2.5 minutes gameplay). We use the policy that was trained using the hyperparameters specified in \Cref{table:model_hparams}, and with a conditional scaling value $\lambda=7$. For comparison, the dashed horizontal lines refer to the performance of the unconditional VPT agent (``\textit{VPT (uncond)}'') and the text-conditioned VPT agent from Appendix I in \citep{baker2022vpt} (``\textit{VPT (text)*}'') conditioned on the relevant text.}
+    \label{fig:prog_eval_visual}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+     \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_travel_dist_rl_guidance_15to200_visual_text_vae_withVPTComparison_arxiv.pdf}
+        \caption{}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_seed_rl_guidance_15to200_visual_text_vae_withVPTComparison_arxiv.pdf}
+        \caption{}
+      \end{subfigure}
+      
+      \vspace{1em}
+      
+      \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_log_rl_guidance_15to200_visual_text_vae_withVPTComparison_arxiv.pdf}
+        \caption{}
+      \end{subfigure}
+      \hfill
+      \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/appendix_vpt_programmatic_dirt_rl_guidance_15to200_visual_text_vae_withVPTComparison_arxiv.pdf}
+        \caption{}
+      \end{subfigure}
+    \caption{\textbf{Conditioning with Text goals}. See  \Cref{tab:apdx_text_prompt} for the exact text string used for each conditioning variant. We use the same policy model but with a conditional scaling value $\lambda=6$. We observe strong steerability which outperforms the text-conditioned VPT in Appendix I of \citep{baker2022vpt}, and we observe that prompt-engineering can improve performance.}
+    \label{fig:prog_eval_textvae}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/4.4_cond_scale_value_camera_ready.pdf}
+    \caption{The conditional scale $\lambda$ in classifier-free guidance \citep{cfg} can be tuned to improve performance in each of the programmatic tasks. By tuning $\lambda$ to use classifier-free guidance at inference time, \agentname{} is able to collect \(7.5 \times\) more dirt, \(15 \times\) more wood, \(23 \times\) more seeds, and travel \(1.7 \times\) further than at $\lambda = 0$ (no guidance).}
+    \label{fig:full_cond_scale_exps}
+\end{figure}
+
+
+\renewcommand{\arraystretch}{1.25}
+\begin{table}[h]
+\begin{center}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Shortened Name} & \textbf{Conditioning Variant Name} & \textbf{Text Prompt} \\
+\hline
+dig & dig as far as possible & \textit{\textbf{dig as far as possible}} \\
+\hline
+dirt & get dirt & get dirt \\
+\hline
+sky & look at the sky & look at the sky \\
+\hline
+leaves & break leaves & \textit{\textbf{break leaves}} \\
+\hline
+wood & chop a tree & \textit{\textbf{chop a tree}} \\
+\hline
+seeds & collect seeds & \textit{\textbf{collect seeds}} \\
+\hline
+flower & break a flower & break a flower \\
+\hline
+explore & go explore & \textit{\textbf{go explore}} \\
+\hline
+swim & go swimming & go swimming \\
+\hline
+underwater & go underwater & go underwater \\
+\hline
+inventory & open inventory & \textit{\textbf{open inventory}} \\
+\hline
+dirt (engineered) & get dirt \dots & get dirt, dig hole, dig dirt, gather a ton of dirt, collect dirt \\
+\hline
+wood (engineered) & chop down the tree \dots &  chop down the tree, gather wood, pick up wood, chop it down, break tree\\
+\hline
+seeds (engineered) & break tall grass \dots & break tall grass, break grass, collect seeds, punch the ground, run around in circles getting seeds from bushes\\
+\hline
+\end{tabularx}
+\end{center}
+\caption{A summary of the different ways we refer to the 11 direct-prompting (not prompt-chaining) early-game evaluation task prompts. ``Shortened Name'' is the way we refer to the prompts in any success-rate matrix or MineCLIP matrix. This is also how we refer to the visual prompts which have no actual text. ``Conditioning Variant Name'' is the name used to refer to the ``Text Prompts'' in \Cref{fig:prog_eval_textvae}, since not all text prompts fit in the figure. A ``Conditioning Variant Name'' with ``\dots'' indicates that this is an engineered text prompt that does not fit in the figure. Also, in reference to the experiments \Cref{appendix:gen_to_novel_text}, the bolded and italicized prompts in the ``Text Prompt'' column are those that were present verbatim in the text-video pair dataset.
+}
+\label{tab:apdx_text_prompt}
+\end{table}
+
+
+\renewcommand{\arraystretch}{1.5}
+\begin{table}[h]
+\begin{center}
+% \begin{tabularx}{\textwidth}{|X|X|X|}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\hline
+\textbf{Task} & \textbf{Prompts} & \textbf{Precondition} \\ 
+\hline
+dig a hole, get dirt, look at the sky, break leaves, get wood, get seeds, break a flower, go explore, go swimming, go underwater, open inventory & Use the best-performing prompts in \autoref{tab:apdx_text_prompt} in the Appendix. & For grass and flowers, it works best when grass and flowers are in the current biome. We found breaking flowers to be less reliable than the others. \\ 
+\hline
+make a tower & ``build a tower'' & building blocks in hotbar. To obtain building blocks, you can use the dig a hole or get wood prompts from \autoref{tab:apdx_text_prompt}. \\ 
+\hline
+craft wooden planks & ``make wooden planks, craft wooden planks'' (*) & wooden logs.  To obtain wooden logs, use the get wood prompt from \autoref{tab:apdx_text_prompt}. \\ 
+\hline
+place torches, place a crafting table, place wooden planks & ``place [torches/a crafting table/wooden planks]'' &  [torches/crafting table/wooden planks] in the hotbar \\ 
+\hline
+make a crafting table & ``make a crafting table'' &  wooden planks. \\ 
+\hline
+break stone & ``mine stone, go mining, get stone'' (*) &  \\ 
+\hline
+get cobblestone & ``mine stone, go mining, get cobblestone'' (*) &  pickaxe in hotbar. \\ 
+\hline
+create a wooden pickaxe & ``craft a wooden pickaxe, make a wooden pickaxe'' (*) & already looking at a placed crafting table, has necessary materials. \\ 
+\hline
+hit a sheep, hit a pig, hit a cow & ``kill a [sheep/pig/cow]'' & agent is close to and looking at the sheep/pig/cow. (See \Cref{misgeneralization}). \\ 
+\hline
+\end{tabularx}
+\vspace{0.5em}
+\caption{Examples of tasks that \agentname{} is able to achieve. (*) denotes that this is a single prompt-engineered prompt. Note that this list represents only a subset of the capabilities of \agentname{} due to the difficulty associated with evaluating and describing the capabilities of open-ended models, which is an open research problem itself since capability depends strongly on preconditions, prompt engineering, and our own ability to come up with varied and challenging tasks. Please see \Cref{appx:challenges_in_eval} for further discussion.}
+\label{tab:other_tasks_table}
+\end{center}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \begin{subfigure}{0.45\textwidth}
+    \includegraphics[width=\linewidth]{figures/4.2_chaining_tower_ypos_episode.pdf}
+    \label{fig:apdx_chaining_tower_episode}
+  \end{subfigure}
+  \begin{subfigure}{0.24\textwidth}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_tower_frame52.pdf}
+        \label{fig:apdx_chaining_tower_episode_frame_1}    
+    \end{subfigure}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_tower_frame2015.pdf}
+        \label{fig:apdx_chaining_tower_episode_frame_3}    
+    \end{subfigure}
+  \end{subfigure}
+  \begin{subfigure}{0.24\textwidth}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_tower_frame1500.pdf}
+        \label{fig:apdx_chaining_tower_episode_frame_2}    
+    \end{subfigure}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_tower_frame2540.pdf}
+        \label{fig:apdx_chaining_tower_episode_frame_4}
+    \end{subfigure}
+    
+  \end{subfigure}
+  \caption{\textbf{Build a Tower task}. (\textit{Left}) We track the amount of dirt in the inventory and the agent's height position (y-axis) throughout the episode. In the first 1500 timesteps, the agent is conditioned on the visual get dirt goal, then the agent is conditioned on the visual build a tower goal for the final 1500 timesteps. Vertical dotted lines with numbers indicate the corresponding frames on the right. (\textit{Right}) The agent's observation frames at 4 different points in the episode. First the agent collects dirt, then begins to build the tower using the dirt blocks.}
+  \label{fig:apdx_chaining_tower_episode_main}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \begin{subfigure}{0.45\textwidth}
+    \includegraphics[width=\linewidth]{figures/4.2_chaining_planks_episode.pdf}
+    \label{fig:apdx_chaining_planks_episode}
+  \end{subfigure}
+  \begin{subfigure}{0.24\textwidth}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_planks_frame220.pdf}
+        \label{fig:apdx_chaining_planks_episode_frame_1}
+    \end{subfigure}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_planks_frame1500.pdf}
+        \label{fig:apdx_chaining_planks_episode_frame_3}    
+    \end{subfigure}
+  \end{subfigure}
+  \begin{subfigure}{0.24\textwidth}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_planks_frame876.pdf}
+        \label{fig:apdx_chaining_planks_episode_frame_2}    
+    \end{subfigure}
+    \begin{subfigure} {\textwidth}
+        \includegraphics[width=\linewidth]{figures/4.2_chaining_planks_frame1540.pdf}
+        \label{fig:apdx_chaining_planks_episode_frame_4}
+    \end{subfigure}
+    
+  \end{subfigure}
+  \caption{\textbf{Make Wooden Planks task}. (\textit{Left}) We track the number of logs and planks in the inventory. In the first 1500 timesteps, the agent is conditioned on the visual break wood goal, then the agent is conditioned on the visual craft wooden planks goal for the final 1500 timesteps. Vertical dotted lines with numbers indicate the corresponding frames on the right. (\textit{Right}) The agent's observation frames at 4 different points in the episode. First the agent breaks trees to collect wooden logs, then opens the inventory and crafts wooden planks.}
+  \label{fig:apdx_chaining_planks_episode_main}
+\end{figure}
+
+\begin{table}[h!]
+    \renewcommand{\arraystretch}{1.5}
+    \setlength{\tabcolsep}{10pt}
+    \centering
+    \begin{tabularx}{\textwidth}{|c|c|X|}
+        \hline
+        \textbf{Model} & \textbf{Simple Prompt} & \textbf{Complex Prompt} \\
+        \hline
+        Stable Diffusion \citep{rombach2022ldm} & steampunk market interior & steampunk market interior, colorful, 3D scene, Greg Rutkowski, Zabrocki, Karlkka, Jayison Devadas, trending on ArtStation, 8K, ultra-wide-angle, zenith view, pincushion lens effect \citep{sdprompts} \\
+        \hline
+        \agentname & collect seeds & break tall grass, break grass, collect seeds, punch the ground, run around in circles getting seeds from bushes \\
+        \hline
+    \end{tabularx}
+    \vspace{0.5em}
+    \caption{Example of evolving simple prompts into more complex ones for various models.}
+    \label{table:prompt-evolution}
+\end{table}

@@ -1,0 +1,144 @@
+\section{Method}
+\label{supp:sec:method}
+
+\subsection{\voyager Algorithm}
+\renewcommand\lstlistingname{Pseudocode}
+\lstinputlisting[language=python,caption={\voyager algorithm.}]{appendix/pseudocode/voyager.py}
+
+\subsection{Prompting}
+GPT-4 and GPT-3.5 offer users the ability to designate the role of each prompt message among three options:
+\begin{itemize}
+    \item System: A high-level instruction that guides the model behavior throughout the conversation. It sets the overall tone and objective for the interaction.
+    \item User: A detailed instruction that guides the assistant for the next immediate response.
+    \item Assistant: A response message generated the model.
+\end{itemize}
+See \url{https://platform.openai.com/docs/guides/chat/introduction} for more details.
+
+To save token usage, instead of engaging in multi-round conversations, we concatenate a system prompt and a user prompt to obtain each assistant's response.
+
+\renewcommand\lstlistingname{Prompt}
+\setcounter{lstlisting}{0}
+\subsection{Automatic Curriculum}
+\label{supp:sec:curriculum}
+\subsubsection{Components in the Prompt}
+\label{supp:sec:curriculum_components}
+The input prompt to GPT-4 consists of several components: 
+\begin{enumerate}[label=(\arabic*)]
+    \item Directives encouraging diverse behaviors and imposing constraints (so that the proposed task is achievable and verifiable): See Sec.~\ref{supp:sec:curriculum_prompt} for the full prompt;
+    \item The agent's current state:\begin{itemize}
+        \item \textbf{Inventory}: A dictionary of items with counts, for example, {\{`cobblestone': 4, `furnace': 1, `stone\_pickaxe': 1, `oak\_planks': 7, `dirt': 6, `wooden\_pickaxe': 1, `crafting\_table': 1, `raw\_iron': 4, `coal': 1\}};
+        \item \textbf{Equipment}: Armors or weapons equipped by the agents;
+        \item \textbf{Nearby blocks}: A set of block names within a 32-block distance to the agent, for example, {`dirt', `water', `spruce\_planks', `grass\_block', `dirt\_path', `sugar\_cane', `fern'};
+        \item \textbf{Other blocks that are recently seen}: Blocks that are not nearby or in the inventory;
+        \item \textbf{Nearby entities}: A set of entity names within a 32-block distance to the agent, for example, {`pig', `cat', `villager', `zombie'};
+        \item \textbf{A list of chests that are seen by the agent}: Chests are external containers where the agent can deposit items. If a chest is not opened before, its content is ``Unknown''. Otherwise, the items inside each chest are shown to the agent.
+        \item \textbf{Biome}: For example, {`plains', `flower\_forest', `meadow', `river', `beach', `forest', `snowy\_slopes', `frozen\_peaks', `old\_growth\_birch\_forest', `ocean', `sunflower\_plains', `stony\_shore'};
+        \item \textbf{Time}: One of {`sunrise', `day', `noon', `sunset', `night', `midnight'};
+        \item \textbf{Health and hunger bars}: The max value is 20;
+        \item \textbf{Position}: 3D coordinate $(x,y,z)$ of the agent's position in the Minecraft world;
+    \end{itemize}
+    \item Previously completed and failed tasks;
+    \item Additional context: See Sec.~\ref{supp:sec:curriculum_context};
+    \item Chain-of-thought prompting~\cite{wei2022chain} in response: We request GPT-4 to first reason about the current progress and then suggest the next task.
+\end{enumerate}
+
+\subsubsection{Additional Context}
+\label{supp:sec:curriculum_context}
+We leverage GPT-3.5 to self-ask questions to provide additional context. Each question is paired with a concept that is used for retrieving the most relevant document from the wiki knowledge base~\cite{fan2022minedojo}. We feed the document content to GPT-3.5 for self-answering questions. In practice, using a wiki knowledge base is optional since GPT-3.5 already possesses a good understanding of Minecraft game mechanics. However, the external knowledge base becomes advantageous if GPT-3.5 is not pre-trained in that specific domain. See Sec.~\ref{supp:sec:curriculum_prompt} for the full prompt.
+
+\subsubsection{Warm-up Schedule}
+In practice, we adopt a warm-up schedule to gradually incorporate the agent's state and the additional context into the prompt based on how many tasks the agent has completed. This ensures that the prompt is exposed to increasing amounts of information over the exploration progress and therefore begins with basic skills and progressively advances towards more intricate and diverse ones. The warm-up setting that we use across all the experiments is shown in Table.~\ref{supp:table:curriculum}.
+\input{appendix/tables/curriculum_warmup}
+
+\subsubsection{Full Prompt}
+\label{supp:sec:curriculum_prompt}
+\lstinputlisting[breaklines=true,caption={Full system prompt for automatic curriculum. The list of question-answer pairs represents the additional context.}]{appendix/prompts/curriculum_prompt.txt}
+\label{supp:sec:curriculum_prompt-curriculum}
+
+\lstinputlisting[breaklines=true,caption={Full system prompt for asking questions. We provide both good and bad examples as few-shot exemplars.}]{appendix/prompts/curriculum_qa_ask_prompt.txt}
+\lstinputlisting[breaklines=true,caption={Full system prompt for answering questions. Context represents the optional content from a wiki knowledge base.}]{appendix/prompts/curriculum_qa_answer_prompt.txt}
+
+\subsection{Skill Library}
+\label{supp:sec:skill_library}
+\subsubsection{Components in the Prompt}
+\label{supp:sec:skill_library_components}
+The input prompt to GPT-4 consists of the following components: 
+\begin{enumerate}[label=(\arabic*)]
+    \item Guidelines for code generation: See Sec~\ref{supp:sec:skill_library_prompt} for the full prompt;
+    \item Control primitive APIs implemented by us: These APIs serve a dual purpose: they demonstrate the usage of Mineflayer APIs, and they can be directly called by GPT-4.
+    \begin{itemize}
+        \item \texttt{exploreUntil(bot, direction, maxTime = 60, callback)}: Allow the agent to explore in a fixed direction for \texttt{maxTime}. The \texttt{callback} is the stopping condition implemented by the agent to determine when to stop exploring;
+        \item \texttt{mineBlock(bot, name, count = 1)}: Mine and collect the specified number of blocks within a 32-block distance;
+        \item \texttt{craftItem(bot, name, count = 1)}: Craft the item with a crafting table nearby;
+        \item \texttt{placeItem(bot, name, position)}: Place the block at the specified position;
+        \item \texttt{smeltItem(bot, itemName, fuelName, count = 1)}: Smelt the item with the specified fuel. There must be a furnace nearby;
+        \item \texttt{killMob(bot, mobName, timeout = 300)}: Attack the mob and collect its dropped item;
+        \item \texttt{getItemFromChest(bot, chestPosition, itemsToGet)}: Move to the chest at the specified position and get items from the chest;
+        \item \texttt{depositItemIntoChest(bot, chestPosition, itemsToDeposit)}: Move to the chest at the specified position and deposit items into the chest;
+        
+    \end{itemize}
+    \item Control primitive APIs provided by Mineflayer:
+    \begin{itemize}
+        \item \texttt{await bot.pathfinder.goto(goal)}: Go to a specific position. See below for how to set the goal;
+        \item \texttt{new GoalNear(x, y, z, range)}: Move the bot to a block within the specified range of the specified block;
+        \item \texttt{new GoalXZ(x, z)}: For long-range goals that don't have a specific Y level;
+        \item \texttt{new GoalGetToBlock(x, y, z)}: Not get into the block, but get directly adjacent to it. Useful for fishing, farming, filling a bucket, and using a bed.;
+        \item \texttt{new GoalFollow(entity, range)}: Follow the specified entity within the specified range;
+        \item \texttt{new GoalPlaceBlock(position, bot.world, \{\})}: Position the bot in order to place a block;
+        \item \texttt{new GoalLookAtBlock(position, bot.world, \{\})}: Path towards a position where a face of the block at \texttt{position} is visible;
+        \item \texttt{bot.isABed(bedBlock)}: Return true if \texttt{bedBlock} is a bed;
+        \item \texttt{bot.blockAt(position)}: Return the block at \texttt{position};
+        \item \texttt{await bot.equip(item, destination)}: Equip the item in the specified destination. \texttt{destination} must be one of ``hand'', ``head'', ``torso'', ``legs'', ``feet'', ``off-hand'';
+        \item \texttt{await bot.consume()}: Consume the item in the bot's hand. You must equip the item to consume first. Useful for eating food, drinking potions, etc.;
+        \item \texttt{await bot.fish()}: Let bot fish. Before calling this function, you must first get to a water block and then equip a fishing rod. The bot will automatically stop fishing when it catches a fish;
+        \item \texttt{await bot.sleep(bedBlock)}: Sleep until sunrise. You must get to a bed block first;
+        \item \texttt{await bot.activateBlock(block)}: This is the same as right-clicking a block in the game. Useful for buttons, doors, etc. You must get to the block first;
+        \item \texttt{await bot.lookAt(position)}: Look at the specified position. You must go near the position before you look at it. To fill a bucket with water, you must look at it first;
+        \item \texttt{await bot.activateItem()}: This is the same as right-clicking to use the item in the bot's hand. Useful for using a bucket, etc. You must equip the item to activate first;
+        \item \texttt{await bot.useOn(entity)}: This is the same as right-clicking an entity in the game. Useful for shearing a sheep. You must get to the entity first;
+    \end{itemize}
+    \item Retrieved skills from the skill library;
+    \item Generated code from the last round;
+    \item Environment feedback: The chat log in the prompt;
+    \item Execution errors;
+    \item Critique from the self-verification module;
+    \item The agent's current state: See Sec.~\ref{supp:sec:curriculum_components} for each element of the agent's state;
+    \item Task proposed by the automatic curriculum;
+    \item Task context: We prompt GPT-3.5 to ask for general suggestions about how to solve the task. In practice, this part is handled by the automatic curriculum since it has a systematic mechanism for question-answering (Sec.~\ref{supp:sec:curriculum_context});
+    \item Chain-of-thought prompting~\cite{wei2022chain} in response: We ask GPT-4 to first explain the reason why the code from the last round fails, then give step-by-step plans to finish the task, and finally generate code. See Sec.~\ref{supp:sec:skill_library_prompt} for the full prompt.
+\end{enumerate}
+
+\subsubsection{Full Prompt}
+\label{supp:sec:skill_library_prompt}
+\lstinputlisting[breaklines=true,caption=Full system prompt for code generation.]{appendix/prompts/action_prompt.txt}
+\lstinputlisting[breaklines=true,caption={Full system prompt for generating function descriptions. This is used when adding a new skill to the skill library. We give a one-shot example in the prompt.}]{appendix/prompts/skill_prompt.txt}
+\subsubsection{Examples}
+% A full list of skills is included in the supplementary folder.
+\renewcommand\lstlistingname{Skill library example}
+\setcounter{lstlisting}{0}
+\lstinputlisting[language=JavaScript,breaklines=true,caption=craftWoodenPlanks.]{appendix/skills/craftWoodenPlanks.js}
+\lstinputlisting[language=JavaScript,breaklines=true,caption=mineTenCobbledDeepslateBelowY0.]{appendix/skills/mineTenCobbledDeepslateBelowY0.js}
+\lstinputlisting[language=JavaScript,breaklines=true,caption=smeltFiveRawIronV2.]{appendix/skills/smeltFiveRawIronV2.js}
+\lstinputlisting[language=JavaScript,breaklines=true,caption=fillBucketWithWater.]{appendix/skills/fillBucketWithWater.js}
+\lstinputlisting[language=JavaScript,breaklines=true,caption=catchFiveFishSafely.]{appendix/skills/catchFiveFishSafely.js}
+
+
+\subsection{Self-Verification}
+\label{supp:sec:self_verification}
+\subsubsection{Components in the Prompt}
+The input prompt to GPT-4 consists of the following components: 
+\begin{enumerate}[label=(\arabic*)]
+\item The agent's state: We exclude other blocks that are recently seen and nearby entities from the agent's state since they are not useful for assessing the task's completeness. See Sec.~\ref{supp:sec:curriculum_components} for each element of the agent's state;
+\item Task proposed by the automatic curriculum;
+\item Task context: We prompt GPT-3.5 to ask for general suggestions about how to solve the task. In practice, this part is handled by the automatic curriculum since it has a systematic mechanism for question-answering (Sec.~\ref{supp:sec:curriculum_context});
+\item Chain-of-thought prompting~\cite{wei2022chain} in response: We request GPT-4 to initially reason about the task's success or failure, then output a boolean variable indicating the task's outcome, and finally provide a critique to the agent if the task fails.
+\item Few-shot examples for in-context learning~\cite{wei2022emergent,brown2020gpt3,raffel2020t5}.
+\end{enumerate}
+\subsubsection{Full Prompt}
+\renewcommand\lstlistingname{Prompt}
+\setcounter{lstlisting}{5}
+\lstinputlisting[breaklines=true,caption=Full system prompt for self-verification.]{appendix/prompts/critic_prompt.txt}
+
+\subsection{System-level Comparison between \voyager and Prior Works}
+We make a system-level comparison in Table.~\ref{supp:table:prior_comparison}. Voyager stands out as the only method featuring a combination of automatic curriculum, iterative planning, and a skill library. Moreover, it learns to play Minecraft without the need for any gradient update.
+\input{appendix/tables/prior_comparison}

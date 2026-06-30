@@ -1,0 +1,51 @@
+\input{tables/eval-metric-quality}
+
+\section{Experiments}
+\label{sec:experiments}
+
+We evaluate our agent-learning approach (Section~\ref{sec:method}) on 8 Programmatic tasks and 4 Creative tasks from the \minedojo benchmarking suite. \Rebuttal{We select these 12 tasks due to the diversity of skills required to solve them (e.g., harvesting, combat, building, navigation) and domain-specific entities (e.g., animals, resources, monsters, terrains, and structures).} We split the tasks into 3 groups and train one multi-task agent for each group: \texttt{Animal-Zoo} (4 Programmatic tasks on hunting or harvesting resource from animals), \texttt{Mob-Combat} (Programmatic, fight 4 types of hostile monsters), and \texttt{Creative} (4 tasks).  
+
+In the experiments, we empirically check the quality of \mineclip against manually written reward functions, and quantify how different variants of our learned model affect the RL performance. Table~\ref{table:core-experiments} presents our main results, and Fig.~\ref{fig:behavior_visualization} visualizes our learned agent behavior in 4 of the considered tasks. 
+Policy networks of all methods share the same architecture and are trained by PPO + Self-Imitation (Sec. \ref{sec:method-rl}, training details in the Appendix, Sec.~\ref{supp:sec:rl}). We compare the following methods: 
+
+\begin{itemize}[leftmargin=3em,labelsep=0.7em]
+    \item \textbf{Ours (Attn)}: our agent trained with the \mineclipattn reward model. For Programmatic tasks, we also add the final success condition as a binary reward. For Creative tasks, \mineclip is the only source of reward. 
+    \item \textbf{Ours (Avg)}: the average-pooling variant of our method.  
+    \item \textbf{Manual Reward}: hand-engineered dense reward using ground-truth simulator states. 
+    \item \textbf{Sparse-only}: the final binary success as a single sparse reward. Note that neither sparse-only nor manual reward is available for Creative tasks.
+    \item \textbf{\openaiclip}: pre-trained OpenAI CLIP model that has \textbf{not} been finetuned on any \minedojo videos. 
+\end{itemize}
+
+
+\para{\mineclip is competitive with manual reward.}
+For Programmatic tasks (first 8 rows), RL agents guided by \mineclip achieve competitive performance as those trained by manual reward. In three of the tasks, they even \textit{outperform} the hand-engineered reward functions, which rely on privileged simulator states unavailable to \mineclip. 
+\Rebuttal{For a more statistically sound analysis, we conduct the Paired \mbox{Student’s \emph{t}}-test to compare the mean success rate of each task (pairing column 3 ``Ours (Attn)'' and column 5 ``Manual Reward'' in Table \mbox{\ref{table:core-experiments}}). The test yields p-value $0.3991 \gg  0.05$, which indicates that the difference between our method and manual reward is not considered statistically significant, and therefore they are comparable with each other.}
+Because all tasks require nontrivial exploration, our approach also dominates the Sparse-only baseline. Note that the original OpenAI CLIP model fails to achieve any success. We hypothesize that the creatures in Minecraft look dramatically different from their real-world counterparts, which causes CLIP to produce \textit{misleading} signals worse than no shaping reward at all. It implies the importance of finetuning on \minedojo's YouTube data. 
+
+\input{tables/zero_shot_different_visual}
+
+
+\para{\mineclip provides automated evaluation.}
+For Creative tasks (last 4 rows), there are no programmatic success criteria available. We convert \mineclip into a binary success classifier by thresholding the reward value it outputs for an episode.  
+To test the quality of \mineclip as an automatic evaluation metric, we ask human judges to curate a dataset of 100 successful and 100 failed trajectories for each task. 
+We then run both \mineclip variants and \openaiclip on the dataset and report the binary F1 score of their judgement against human ground-truth in Table \ref{table:eval-metric-quality}. 
+The results demonstrate that both \mineclipattn and \mineclipavg attain a very high degree of agreement with human evaluation results \Rebuttal{on this subset of the Creative task suite that we investigate}. \openaiclip baseline also achieves nontrivial agreement on Find Ocean and Dig Hole tasks, likely because real-world oceans and holes have similar texture. We use the \texttt{attn} variant as an automated success criterion to score the 4 Creative task results in Table \ref{table:core-experiments}. Our proposed method consistently learns better than \openaiclip-guided agents. It shows that \mineclip is an effective approach to solving open-ended tasks when no straightforward reward signal is available. \Rebuttal{We provide further analysis beyond these 4 tasks in the 
+Appendix (Sec.~\ref{supp:sec:mineclip_complex_creative})}.
+
+
+\para{\mineclip shows good zero-shot generalization to significant visual distribution shift.}
+\Rebuttal{We evaluate the learned policy without finetuning on a combination of unseen weather, lighting conditions, and terrains --- 27 scenarios in total. For the baseline, we train agents with the original \mbox{\openaiclip} image encoder (not trained on our YouTube videos) by imitation learning. The robustness against visual shift can be quantitatively measured by the relative performance degradation on novel test scenarios for each task. Table~\mbox{\ref{table:zero-shot-gen-visual}} shows that while all methods incur performance drops, agents with \mbox{\mineclip} encoder is more robust to visual changes than the baseline across all tasks. Pre-training on diverse in-the-wild YouTube videos is important to boosting zero-shot visual generalization capability, a finding consistent with literature \mbox{\cite{radford2021clip, nair2022r3m}}.  
+}
+
+\para{Learning a Single Agent for All 12 Tasks}
+We have also trained a single agent for all 12 tasks. To reduce the computational burden without loss of generality, the agent is trained by self-imitating from successful trajectories generated from the self-imitation learning pipeline (Section \ref{sec:appendix_rl_training}). We summarize the result in Table \ref{table:supp-single-agent-12-tasks}. Similar to our main experiments, all numbers represent percentage success rates averaged over 3 training seeds, each tested for 200 episodes. 
+Compared to the original agents, the new 12-multitask agent sees a performance boost in 6 tasks, degradation in 4 tasks, and roughly the same success rates in 2 tasks. This result suggests that there are both positive and negative task transfers happening. To improve the multi-task performance, more advanced algorithms \cite{yu2020gradient,wu2020understanding} can be employed to mitigate the negative transfer effects.
+
+We also perform Paired Student’s \textit{t}-test to statistically compare the performance of the 12-multitask agent and those separately trained on each task group. We obtain a p-value of $0.3720 \gg 0.05$, which suggests that the difference between the two training settings is not statistically significant.
+
+\input{tables/single_agent_12_tasks}
+\input{tables/new_task_pig_and_string}
+
+\para{Generalize to Novel Tasks}
+To test the ability to generalize to new open-vocabulary commands, we evaluate the agent on two novel tasks: ``harvest spider string'' and ``hunt pig''. Table \ref{table:supp-hunt-pig-and-spider-string} shows that the agent struggles in the zero-shot setting because it has not interacted with pigs or spider strings during training, and thus does not know how to interact with them effectively. However, the performance improves substantially by finetuning with the \mineclip reward. Here the baseline methods are trained from scratch using RL with the \mineclip encoders and reward. Therefore, the only difference is whether the policy has been pre-trained on the 12 tasks or not. Given the same environment sampling budget (only around 5\% of total samples), it significantly outperforms baselines. It suggests that the multitask agent has learned transferable knowledge on hunting and resource collection, which enables it to quickly adapt to novel tasks.
+

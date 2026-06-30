@@ -1,0 +1,60 @@
+In this section, we make several basic observations about the inherent computational and representational challenges of \mlsharp. First, in \cref{sec:computational}, we focus on computational challenges, and show that computing a sharpened response for a given prompt $x$ can be computationally intractable in general, even when sampling $y\sim\piref(\cdot\mid{}x)$ can be performed efficiently. Then, in \cref{sec:representational}, we shift our focus to representational challenges, and show that even if $\piref$ is an autoregressive model, the ``sharpened'' version of $\piref$ may not be representable as an autoregressive model with the same architecture. These results motivate the statistical assumptions (coverage and realizability) made in our analysis of \sftalg and \rlhfalg in \cref{sec:theoretical_analysis}.
+
+
+To make the results in this section precise, we work in perhaps the simplest special case of autoregressive language modelling, where the model class consists of \emph{multi-layer linear softmax models}. Formally, let $\MX$ be the space of prompts, and let $\MY := \MV^H$ be the space of responses, where $\MV$ is the vocabulary space and $H$ is the horizon. For a collection of fixed/known $d$-dimensional feature mappings $\phi_h: \MX \times \MV^h \to \RR^d$ and a norm parameter $B$, we define the model class $\Pi_{\phi,B,H}$ as the set of models
+\begin{align}
+  \label{eq:linear_softmax}
+\pi_\theta(y_{1:H}\mid{} x) = \prod_{h=1}^H \pi_{\theta_h}(y_h\mid{} x,y_{1:h-1})
+\end{align}
+where 
+\[\pi_\theta(y_h\mid{} x,y_{1:h-1}) \propto \exp(\langle \phi(x,y_{1:h}), \theta_h\rangle)\]
+and $\theta = (\theta_1,\dots,\theta_H) \in (\RR^d)^H$ is any tuple with $\norm{\theta_h}_2 \leq B$ for all $h \in [H]$.
+
+\subsection{Computational Challenges}
+\label{sec:computational}
+
+Given query access to $\phi$, for any given parameter vector $\theta$ and prompt $x$, \emph{sampling} from a linear softmax model $\pi_\theta$ (\cref{eq:linear_softmax}) is computationally tractable, since it only requires time $\poly(H, |\MV|, d)$. Similarly, \emph{evaluating} $\pi_\theta(y_{1:H}\mid{} x)$ for given prompt $x$ and response $y_{1:H}$ is computationally tractable. %
+However, the following proposition shows that computing the sharpened response $\argmax_{y_{1:H} \in \MV^H} \pi_\theta(y_{1:H}\mid{} x)$ for a given parameter $\theta$ and response $x$ is $\NP$-hard. Hence, even inference-time sharpening is computationally intractable in the worst case.
+
+\begin{proposition}\label{prop:softmax-np-hardness}
+  Set $\MX = \{\perp\}$ and $\MV = \{-1,1\}$. Set $d = d(H) := H+H^2+H^3$. Identifying $[d]$ with $[H] \sqcup [H]^2 \sqcup [H]^3$, we define $\phi_h: \MX \times \MV^h \to \RR^d$ by $\phi_h(\perp,y_{1:h})_i = y_i$ and $\phi_h(\perp,y_{1:h})_{(i,j)} = y_iy_j$ and $\phi_h(\perp,y_{1:h})_{(i,j,k)} = y_iy_jy_k$. There is a function $B(H) \leq \poly(H)$ such that the following problem is $\NP$-hard: given $\theta = (\theta_1,\dots,\theta_H)$ with $\max_{h \in [H]} \norm{\theta_h}_2 \leq B(H)$, compute any element of $\argmax_{y_{1:H} \in \MV^H} \pi_\theta(y_{1:H}\mid{} x)$.
+  \dfc{Would be good to add a sentence (perhaps as a footnote) explaining how we define input length and emphasizing that we are considering a sequence of problems indexed by $H$ when we talk about np-hardness}
+\end{proposition}
+\dfedit{Note that our results in \cref{sec:theoretical_analysis} and \cref{sec:inference} bypass this hardness through the
+  assumption that the coverage parameter $\Cstar$ is bounded.}
+\begin{proof}[\pfref{prop:softmax-np-hardness}]\dfedit{Fix $H$ and recall that $d(H)=H+H^2+H^3$. We define three collection of basis vectors: $\crl*{e_h}_{h\in\brk{H}}$ cover the first $H$ coordinates, $\crl*{e_{(h,h')}}_{h,h'\in\brk{H}^2}$ cover the next $H^2$ coordinates, and $\crl*{e_{(h,h', h'')}}_{h,h',h''\in\brk{H}^3}$ cover the last $H^3$ coordinates.
+    } Suppose we define $\theta_1,\dots,\theta_{H-2} = 0$, so that $\pi_\theta(y_h|x,y_{1:h-1}) = 1/2$ for all $1 \leq h \leq H-2$. Define $\theta_{H-1} = \sum_{1 \leq i,j \leq H-2} J_{ij} e_{(i,j,H-1)}$ for a matrix $J \in \RR^{(H-2)\times(H-2)}$ to be specified later, and define $\theta_H = \frac{B}{2} (e_{(H-1,H)} + e_H)$. Then $2^{H-2}\cdot \pi_\theta(y_{1:H}\mid{} \perp) \leq 1/2$ for any $y_{1:H}$ with $y_{H-1} = -1$ or $y_H = -1$, \dfedit{since this implies that $\pi_{\theta_H}(y_H\mid{}\perp,y_{1:H-1})\leq{}1/2$}. Meanwhile, for any $y_{1:H}$ with $y_{H-1} = y_H = 1$, we have\loose
+\[2^{H-2}\cdot\pi_\theta(y_{1:H}\mid{} \perp) = \frac{\exp\prn*{\sum_{i,j\dfedit{\leq{}H-2}} J_{ij}y_iy_j}}{\exp\prn*{\sum_{i,j\dfedit{\leq{}H-2}}J_{ij}y_iy_j} + \exp\prn*{-\sum_{i,j\dfedit{\leq{}H-2}} J_{ij}y_iy_j}} \cdot \frac{\exp(B)}{\exp(B)+\exp(-B)}.\]
+Let $G$ be any graph on vertex set $[H-2]$ and let $J = -A(G)$ where $A(G)$ is the adjacency matrix of $G$. Then among $y_{1:H}$ with $y_{H-1} = y_H = 1$, $2^{H-2}\cdot\pi_\theta(y_{1:H}\mid{} \perp)$ is maximized when $y_{1:H-2}$ corresponds to a max-cut in $G$. If $G$ has an odd number of edges, then some max-cut removes strictly more than
+half of the edges, and for the corresponding sequence $y_{1:H}$ we have $2^{H-2}\cdot\pi_\theta(y_{1:H}\mid{} \perp) \geq (1/2+\Omega(1)) \cdot (1 - \exp(-\Omega(B)))$, which is greater than $1/2$ when we take $B := H$ and $H$ is sufficiently large. Thus, computing $\argmax_{y_{1:H} \in \MV^H} \pi_\theta(y_{1:H}\mid{} \perp)$ yields a max-cut of $G$. It is well-known that computing a max-cut in a graph is $\NP$-hard, and the assumption that $G$ has an odd number of edges is without loss of generality.
+\end{proof}
+
+
+
+\subsection{Representational Challenges}
+\label{sec:representational}
+
+To give provable guarantees for our sharpening algorithms, we required certain \emph{realizability} assumptions, which in particular posited that the model class actually contains a ``sharpened'' version of $\piref$ (\cref{assumption:bon-realizability,ass:realizability_dpo}). In the simple example of a \emph{single-layer} linear softmax model classes (corresponding to $H=1$ in the above definition), \cref{ass:realizability_dpo} is in fact satisfied, and the sharpened model can be obtained by increasing the temperature of $\piref$. However, multi-layer linear softmax models with $H \gg 1$ are more realistic. The following proposition shows that as soon as $H \geq 2$, multi-layer linear softmax model classes may not be closed under sharpening. This illustrates a potential drawback of training-time sharpening compared to inference-time sharpening, which requires no realizability assumptions. It also provides a simple example where greedy decoding does not yield a sequence-level arg-max response (since increasing temperature in a multi-layer softmax model class exactly converges to the greedy decoding).
+
+\begin{proposition}\label{prop:softmax-representational-lb}
+Let $\MX = \{\perp\}$, $\MV = [n]$, and $H = d = 2$. For any $n$ sufficiently large, there is a multi-layer linear softmax policy class $\Pi_{\phi,B,H}$ and a policy $\piref \in \Pi_{\phi,B,H}$ such that $y^\star_{1:H} := \argmax_{y_{1:H} \in \MV^H} \pi_\theta(y_{1:H}\mid{} \perp)$ is unique, but for all $B' > B$ and $\pi \in \Pi_{\phi,B',H}$, it holds that $\pi(y^\star_{1:H}\mid{}\perp) \leq 1/2$.
+\end{proposition}
+
+\begin{proof}[\pfref{prop:softmax-representational-lb}]
+Throughout, we omit the dependence on the prompt $\perp$ for notational clarity. Since $H=2$, the model class consists of models $\pi_\theta$ of the form
+\begin{equation} 
+\pi_\theta(a) = \pi_{\theta_1}(y_1) \pi_{\theta_2}(y_2\mid{} y_1) = \frac{\exp(\langle \phi_1(y_1),\theta_1\rangle)}{Z_{\theta_1}} \frac{\exp(\langle \phi_2(y_{1:2}), \theta_2\rangle)}{Z_{\theta_2}(y_1)}\label{eq:softmax-h2}
+\end{equation}
+\dfedit{for $Z_{\theta_1}\ldef{}\sum_{y_1\in\cV}\exp(\langle \phi_1(y_1),\theta_1\rangle)$ and $Z_{\theta_2}(y_1)\ldef{}\sum_{y_2\in\cV}\exp(\langle \phi_2(y_{1:2}), \theta_2\rangle)$.}
+
+Define $\phi_1$ by:
+\[\phi_1(i) = \begin{cases} e_1 & \text{ if } i = 1 \\ e_1 & \text{ if } i = 2 \\ e_2 & \text{ if } i \geq 3 \end{cases}.\]
+Define $\phi_2$ by:
+\[\phi_2(i,j) = \begin{cases} e_1 & \text { if } i = 2, j = 1 \\ e_2 & \text { if } i = 2, j \neq 1 \\ 0 & \text { if } i \neq 2 \end{cases}.\]
+
+Define $\piref := \pi_{\theta^\star}$ where $\theta^\star_1 := \theta^\star_2 :=B\cdot{}e_1$ for a parameter $B \geq \log(n)$. Then $\piref(1) = \piref(2)$ and $\piref(i) \leq e^{-B} \piref(2)$ for all $i \in \{3,\dots,n\}$. Moreover, $\piref(\cdot\mid{} i) = \Unif([n])$ for all $i \neq 2$, and $\piref(j\mid{} 2) \leq e^{-B} \piref(1\mid{} 2)$ for all $j \neq 1$. Thus,
+\[\piref(2,1) = \piref(2) \piref(1\mid{} 2) \geq \frac{1}{2 + (n-2)e^{-B}} \cdot \frac{1}{1 + (n-1)e^{-B}} \geq \Omega(1)\]
+whereas $\piref(i,j) = O(1/n)$ for all $(i,j) \neq (2,1)$. Thus, $(2,1)$ is the sequence-level argmax for sufficiently large $n$. However, for any $\pi_\theta$ of the form described in \cref{eq:softmax-h2}, we have
+\[\pi_\theta(2,1) \leq \pi_\theta(2) \leq \frac{\pi_\theta(2)}{\pi_\theta(1)+\pi_\theta(2)} = \frac{1}{2}\]
+since $\phi(1) = \phi(2)$. This means that there is no $B'$ for which $\Pi_{\phi,B',H}$ contains an $(\eps,\delta)$-sharpened policy for $\piref$ for any $\delta>1/2$.
+\end{proof}

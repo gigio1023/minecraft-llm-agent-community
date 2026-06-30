@@ -1,0 +1,59 @@
+<In this section we present additional information about the environment: first an example of textual input for the LLM-based RL agent \ref{app:zoo_ex_obs} and second a table containing detailed information for each goal category \ref{app:details_goal_categories}.  
+\subsection{Example of observation}
+\label{app:zoo_ex_obs}
+% To evaluate our method, we propose a novel goal-conditioned environment called the Playground-Text-Zoo, an extension of the Playground environment introduced in \cite{colas_language_2020}. Unlike its predecessor, the Playground-Text-Zoo is entirely text-based, where the agent’s observations, goals, and actions are expressed in natural language. This setup enables the use of an LLM as the agent’s policy. The environment is structured around hierarchical goals, encouraging the agent to apply common sense reasoning while interacting with objects that define the goals to be completed.
+
+% In the original Playground environment, the agent navigates a 2D grid along the $x$ and $y$ axes to manipulate objects through spatial movement. However, the Playground-Text-Zoo simplifies these mechanics by allowing the agent to interact with objects through direct commands, such as \texttt{"Go to \{object\}"}, eliminating the need for grid-based navigation. This change shifts the focus from spatial reasoning to task comprehension and execution via textual commands. The agent can move to any object and, when performing the \texttt{"Grasp"} action, the object is added to its inventory, which has a limited capacity of 2 items. Some objects can interact with each other. To make two objects interact, the agent must release the object in its inventory by using the \texttt{"Release \{object\}"} action while standing on the second object. Certain objects also have triple interactions, requiring the agent to hold two objects in its inventory and perform \texttt{"Release all"} while standing on the third object. An object can only be released if it leads to an interaction, meaning the agent must carefully manage its inventory to avoid filling it with useless objects without being able to release them.
+ 
+% The agent's observations include a detailed description of the scene, listing the objects present, the object the agent is standing on, and the objects in its inventory. These observations encapsulate all relevant information about the environment, providing a comprehensive representation of its state. Figure~\ref{fig:playground_obs} illustrates an example of such an observation returned by the environment.
+
+\begin{figure}[htbp]
+\centering
+\begin{tcolorbox}[myboxstyle]
+Goal: Grow blue elephant\\
+You see: baby blue elephant, baby green grizzly, red pea seed, blue water\\
+You are on: baby blue elephant\\
+Inventory (2/2): red carrot, green potato
+\end{tcolorbox}
+\caption{\textbf{An observation in the Playground-Text-Zoo environment.} In this state, the agent is standing on a baby blue elephant and can use the plants in its inventory to make it grow by performing the action \texttt{"Release all"}.}
+\label{fig:playground_obs}
+\end{figure}
+
+% In this environment, two main goal types are defined: grasping objects and growing objects. Objects are divided into several categories, such as furniture (which cannot be grown), plants, small herbivores, big herbivores, small carnivores, and big carnivores. Each category demands different interactions for growth, with varying levels of complexity for the agent. For example, growing a plant requires less interactions compared to growing a big carnivore. These categories create a hierarchical structure for the environment's goals, highlighting the importance of curriculum learning. This hierarchy is implicit, relying on common sense knowledge for comprehension. Figure~\ref{fig:goal_hierarchy} illustrates the goal hierarchy.
+
+% A key benefit of having distinct object categories is the ease with which various generalization tests can be conducted. We can evaluate the agent on goals that fall within the training category but involve objects the agent has not encountered before. For instance, we might test the agent with the goal \texttt{"Grow red tiger"}, where the tiger is classified as a big carnivore, even though the agent has not seen the tiger during training.
+
+% The Playground-Text-Zoo environment offers several advantages for the study of LLM based agents. Its object based nature allows for rapid modification and expansion of the goal space, facilitating experiments with a wide range of goals. The hierarchy in the goals—combined with the diverse categories of objects—ensures that the environment is rich enough to test complex metacognitive capabilities, yet structured enough to allow controlled experimentation. Appendix~\ref{app:playground-text-zoo} offers additional details about the environment.
+
+% We decided to develop our own environment instead of using an existing one because none met all our requirements. Environments like Minecraft \citep{johnson2016malmo} or Crafter \citep{hafner2021benchmarking} rely on image-based observations, and while current LLM agent methods using online RL have proven effective in fully text-based settings, transitioning to image-based environments is not straightforward. On the other hand, text-based environments like BabyAI-text \citep{carta_grounding_2023} are primarily focused on navigation goals and have a goal space that lacks the richness and common-sense reasoning we require. Lastly, although environments like WordCraft \citep{jiang2020wordcraft} are quite similar to ours, they do not feature clear goal categories as we do, making the design of generalization tests more difficult and less relevant.
+
+\subsection{Details over each goals categories} \label{app:details_goal_categories}
+
+The goals are grouped by categories that share the same strategy and which can be inferred from the semantic of the goals. For instance \textit{Grow cow} and \textit{Grow deer} are part of \textit{Grow big herbivore}. We fix the maximal number of actions to be $50\%$ longer than the optimal strategy. Table~\ref{tab:optimal_trajectories_categories} contains more details on each category.
+
+
+\begin{table}[!ht]
+\caption{The optimal trajectories per categories.}
+\label{tab:optimal_trajectories_categories}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\multirow{2}{*}{Categories}           & \multirow{2}{*}{Optimal action strategy}              & Minimal number & Maximal number \\
+                     &                                          & of actions     & of actions     \\ \hline
+Grasp X              & Go to X, Grasp                           & 2              & 3              \\ \hline
+\multirow{2}{*}{Grow plant} & Go to water, Grasp, Go to plant, & \multirow{2}{*}{4}              & \multirow{2}{*}{6}              \\
+                     & Release water &              &             \\ \hline
+\multirow{2}{*}{Grow small herbivore} & Go to water, Grasp, Go to plant, & \multirow{2}{*}{7}              & \multirow{2}{*}{11}              \\
+                     & Release water, Grasp, Go to herbivore, release plant &              &             \\ \hline
+\multirow{3}{*}{Grow small carnivore} & Go to water, Grasp, Go to plant, & \multirow{3}{*}{10}              & \multirow{3}{*}{15}              \\
+                     & Release water, Grasp, Go to herbivore, release plant, &              &             \\
+                     & Grasp, Go to carnivore, release &              &             \\ \hline
+\multirow{4}{*}{Grow big herbivore} & Go to water, Grasp, Go to plant, & \multirow{4}{*}{12}              & \multirow{4}{*}{18}              \\
+                     & Release water, Grasp, Go to water, Grasp &              &             \\ 
+                     & Go to plan, Release water, Grasp, Go to herbivore, &              &             \\ 
+                     & Release all &              &             \\ \hline
+\multirow{4}{*}{Grow big carnivore} & Go to water, Grasp, Go to plant, & \multirow{4}{*}{15}              & \multirow{4}{*}{23}              \\
+                     & Release water, Grasp, Go to water, Grasp &              &             \\ 
+                     & Go to plan, Release water, Grasp, Go to herbivore, &              &             \\ 
+                     & Release all, Grasp, Go to carnivore, Release herbivore &              &             \\ \hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,1184 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2025_conference,times}
+
+\iclrfinalcopy
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{times}
+\usepackage{latexsym}
+% \usepackage[colorlinks=true,citecolor=.]{hyperref}
+\usepackage{url}
+\usepackage{bbm}
+\usepackage{amsmath,amsfonts,bm}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{array}
+\usepackage[para]{threeparttable}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xspace}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage[normalem]{ulem}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{wrapfig}
+% \usepackage{salmon}
+\usepackage{caption}
+\captionsetup{font=small}
+
+
+%\title{LAPA: Building Latent \\Vision-Language-Action Model From Videos}
+\title{Latent Action Pretraining From Videos}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\author{Seonghyeon Ye$^{1 †}$\thanks{Denotes equal contribution.}
+\thanks{Work done during internship at Microsoft Research.} \quad Joel Jang$^{2}$\footnotemark[1] 
+  \thanks{Work done during internship at NVIDIA.} \\ 
+\textbf{Byeongguk Jeon}$^{1}$ \quad \textbf{Sejune Joo}$^{1}$ \quad \textbf{Jianwei Yang}$^{3}$ \textbf{Baolin Peng}$^{3}$ \quad \textbf{Ajay Mandlekar}$^{4}$ \\
+\textbf{Reuben Tan}$^{3}$ \quad \textbf{Yu-Wei Chao}$^{4}$ \quad \textbf{Yuchen Lin}$^{5}$ \quad 
+\textbf{Lars Liden}$^{3}$ \quad  \\ 
+\textbf{Kimin Lee}$^{1}$\thanks{Denotes equal advising.} \quad \textbf{Jianfeng Gao}$^{3}$\footnotemark[4] \quad \textbf{Luke Zettlemoyer}$^{2}$\footnotemark[4] \quad \textbf{Dieter Fox}$^{2,4}$\footnotemark[4] \quad \textbf{Minjoon Seo}$^{1}$\footnotemark[4] \\ \\
+$^{1}$KAIST  \quad $^{2}$University of Washington \quad $^{3}$Microsoft Research \\ $^{4}$ NVIDIA \quad $^{5}$ Allen Institute for AI  
+}
+
+% \renewcommand{\thefootnote}{\fnsymbol{footnote}} % This changes footnote numbering to symbols
+% \footnotetext[1]{Denotes equal contribution.}
+% \footnotetext[2]{Denotes equal supervision.}
+
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+%\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We introduce Latent Action Pretraining, the first unsupervised method for pretraining Vision-Language-Action (VLA) models without ground-truth robot action labels. Existing Vision-Language-Action models require action labels typically collected by human teleoperators during pretraining, which significantly limits possible data sources and scale. In this work, we propose a method to learn from internet-scale videos that do not have robot action labels. We first train an action quantization model leveraging VQ-VAE-based objective to learn discrete latent actions between image frames, then pretrain a \textit{latent} VLA model to predict these latent actions from observations and task descriptions, and finally finetune the VLA on small-scale robot manipulation data to map from latent to robot actions. 
+Experimental results demonstrate that our method significantly outperforms existing techniques that train robot manipulation policies from large-scale videos. Furthermore, it outperforms the state-of-the-art VLA model trained with robotic action labels on real-world manipulation tasks that require language conditioning, generalization to unseen objects, and semantic generalization to unseen instructions. 
+%Beyond robot videos, we also demonstrate that LAPA 
+Training only on human manipulation videos also shows positive transfer, opening up the potential for leveraging web-scale data for robotics foundation model{s}. 
+% Lastly, we show that learning latent action scales linearly with increasing data and model size.
+We will open-source the model checkpoints and code at \href{https://latentactionpretraining.github.io/}{latentactionpretraining.github.io}.
+\end{abstract}
+
+\section{Introduction}
+Vision-Language-Action Models (VLA) for robotics~\citep{brohan2023rt, kim2024OpenVLA} are trained by aligning large language models with vision encoders, and then finetuning it on on diverse robot datasets~\citep{open_x_embodiment_rt_x_2023}; this enables generalization to novel instructions, unseen objects, and distribution shifts \citep{michal2024robotic}. However, diverse real-world robot datasets mostly require human teleoperation, which makes scaling difficult. Internet video data, on the other hand, offers abundant examples of human behavior and physical interactions at scale, presenting a promising approach to overcome the limitations of small, specialized robotic datasets~\citep{pmlr-v235-yang24z}. However, it is challenging to learn from internet video data for two major challenges: first, much of the raw data on the web lacks explicit action labels; second, the data distribution from the web is fundamentally different from the embodiments and environments of typical robotic systems \citep{mccarthy2024generalistrobotlearninginternet}. We propose Latent Action Pretraining, an unsupervised approach to pretraining a robotic foundation model without the need for ground-truth robot action labels (Figure \ref{fig:fig1}).
+
+{Latent Action Pretraining consists of two models that are learned sequentially}, followed by a fine-tuning stage to map the latent actions to real robot actions. In the first pretraining stage, we use a VQ-VAE-based objective~\citep{van2017neural} to learn quantized latent actions between raw image frames. Analogous to Byte Pair Encoding~\citep{sennrich-etal-2016-neural} used for language modeling, this can be seen as learning to tokenize atomic actions without requiring predefined action priors (e.g., end-effector positions, joint positions). In the second stage, we perform behavior cloning by pretraining a Vision-Language Model to predict latent actions derived from the first stage based on video observations and task descriptions.
+Finally, we fine-tune the model on a small-scale robot manipulation dataset with robot actions to learn the mapping from the latent actions to robot actions. In this work, we refer to the resulting VLA models as LAPA.
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.83\textwidth]{
+    figures/Figure1.pdf}
+    \caption{\small{\textbf{Problem Formulation.} We investigate building a generalist robotic foundation model from human motion videos without action labels.}}
+    \vspace{-5mm}
+    \label{fig:fig1}
+\end{figure}
+
+We measure performance on diverse manipulation videos, including existing robot video datasets (without utilizing ground-truth actions) and human manipulation datasets. Our results show that the proposed method significantly outperforms baseline methods of training manipulation policies {without ground-truth action labels}, particularly in cross-environment and cross-embodiment scenarios. Furthermore, on real-world manipulation tasks, our method leads to a new monolithic VLA model, outperforming \textsc{OpenVLA}, the current state-of-the-art model Vision Language Action (VLA) model trained on a diverse mixture of datasets with ground-truth actions. These results demonstrate the effectiveness of learning unified quantized latent action representations across diverse robotic datasets featuring different embodiments (shown in Section \ref{subsec:latent_analysis}). We further demonstrate that Latent Action Pretraining remains effective even when pretrained on \textit{only} human manipulation video, outperforming models pretrained on Bridgev2 {\citep{walke2023bridgedata}}, one of the largest open-sourced robotic datasets. We observe that LAPA effectively captures environment-centric actions, including object and camera movements, which could be beneficial for downstream tasks like navigation or dynamic, non-quasistatic tasks. We expect that our method opens up the potential for building foundation models for robotics by pretraining on much larger web-scale video data. 
+
+We summarize our main contributions and findings below:
+\begin{itemize}
+    \item We propose Latent Action Pretraining, an unsupervised approach to pretraining a robotic foundation model to encode robotic skills from web-scale video data.    
+    \item Experiments on simulation and real-world robot tasks show that our method not only significantly outperforms baseline methods for training robotic manipulation policies {that are pretrained without using ground truth action labels}, but also leads to a VLA model that outperforms the current state-of-the-art VLA model trained with ground-truth actions (by +6.22\%), while achieving over 30x greater pretraining efficiency. 
+    % due to stronger cross-embodiment transfer by using latent actions.
+    % \item We demonstrate that using Large World Models (LWM)~\citep{liu2024worldmodelmillionlengthvideo} as an initialization for the backbone VLM model, combined with LAPA pretraining, results in over 30x greater efficiency compared to the current state-of-the-art pretraining methods.
+    \item We qualitatively demonstrate that it is possible to use {LAPA as the action prediction model and decoder of the latent action quantization model as the world model by predicting future frames conditioned on the current observation and the latent action predicted by LAPA,} effectively building a neural simulation capable of performing closed-loop evaluations entirely through neural inference.
+\end{itemize}
+
+\section{Related Work}
+\paragraph{Vision-Language-Action Models}
+Vision-Language Models (VLMs), trained on large-scale internet datasets of text, images, and videos, have shown strong capabilities in understanding and generating both text and multimodal data \citep{liu2023visual, chameleonteam2024chameleonmixedmodalearlyfusionfoundation, liu2024worldmodelmillionlengthvideo,abdin2024phi}. Leveraging this, recent advancements have introduced monolithic Vision-Language-Action Models (VLAs), which extend VLMs by fine-tuning them with robotic action data for enhanced physical grounding~\citep{brohan2023rt, kim2024OpenVLA, team2024octo, open_x_embodiment_rt_x_2023}. Incorporating auxiliary objectives, such as visual traces \citep{niu2024llarva}, language reasoning paths \citep{michal2024robotic}, or creating conversational-style instruction datasets from robot trajectories~\citep{li2024llara}, have further improved VLA performance. However, these methods remain dependent on labeled action data, limiting scalability. In contrast, our approach reduces reliance on human-teleoperated data by requiring labeled actions only for fine-tuning.
+
+% would learning from videos would be better?
+\paragraph{Training Robot Policies From Videos}
+
+Videos offer rich data for robot learning, but most lack action labels~\citep{mccarthy2024generalistrobotlearninginternet}. Related work pretrains a vision encoder on egocentric human videos~\citep{grauman2022ego4d} to improve visual representations~\citep{nair2022r3m, dasari2023unbiased}, or video generative models to generate future robot trajectories{~\citep{wu2024unleashing, liang2024dreamitate, helearning}}. Methods also extract diverse features from human videos such as interactions~\citep{zeng2024learning}, affordances~\citep{bahl2023affordances, kannan2023deft, srirama2024hrp, shaw2023videodex}, or visual traces~\citep{wen2023any, bharadhwaj2024track2act}. Some perform retargeting of human motions to robot actions to create robotic policies that involve hand pose estimators~\citep{wang2023mimicplay, zhu2024vision, shaw2023videodex, bharadhwaj2023zero, ye2023learning, qin2022dexmv} or motion capture systems~\citep{yang2024equibot}; these policies are usually task-specific or need aligned data human to robot data in the same environment. Finally, some train inverse dynamics models (IDMs), optical flow, or reinforcement learning models that predict actions from future state rollouts generated by world models~\citep{du2023learning, ko2024learning, yang2024learning, bharadhwaj2024gen2act} or use the IDM for active learning~\citep{NEURIPS2022_9c7008af}.
+
+% A related study~\citep{NEURIPS2022_9c7008af} uses an IDM to label actionless data, pretraining a visuomotor policy.
+% Videos contain rich information about dynamics and behavior which can be potentially beneficial for robot learning. However, most raw videos do not contain any action labels~\citep{mccarthy2024generalistrobotlearninginternet}. One line of work attempts to leverage egocentric human videos~\citep{grauman2022ego4d} to improve visual representations for visuomotor robotic tasks~\citep{nair2022r3m, dasari2023unbiased}. Some recent works explore the benefits of video generative models pretrained on human videos for downstream robotic tasks~\citep{wu2024unleashing, liang2024dreamitate}. Another line of work aims to learn useful information from human videos by learning from interactions~\citep{zeng2024learning}, affordances~\citep{bahl2023affordances, kannan2023deft, srirama2024hrp, shaw2023videodex}, or visual traces~\citep{wen2023any, bharadhwajtrack2act} extracted from human videos. However, all these works learn useful visual priors whereas our approach allows learning the mapping directly from perception to control during pretraining.
+
+% Another line of work aims to learn robot manipulation policies by retargeting human motions to robot motions. These works rely on off-the-shelf models such as hand pose estimators~\citep{wang2023mimicplay, zhu2024vision, shaw2023videodex, bharadhwaj2023zero, ye2023learning, qin2022dexmv} or motion capture systems~\citep{yang2024equibot} to retarget the human motions directly to robot motions. However, these works either learn only task-specific policies or require large in-domain perfectly aligned human-robot data and do not leverage the diverse, web-scale human motion data to train a single generalist policy.
+
+% The last line of work assumes one has access to a small-scaled robotic dataset with action labels to train an inverse dynamic model (IDM), optical flow, or reinforcement learning models that predicts actions from future state rollouts generated by world models~\citep{du2023learning, ko2024learning, yang2024learning, bharadhwaj2024gen2act} trained on diverse web-scale human videos. Another related work~\citep{NEURIPS2022_9c7008af} trains an IDM with a small amount of action-labeled data and uses the IDM to label large-scaled actionless web data and pretrain a visuomotor robot policy. We consider these methods as direct baselines to our proposed methods since they are scalable methods with the same experimental assumptions and learn both visual and control priors to train generalist robot policies.
+
+\paragraph{Latent Actions}
+Previous works have employed latent actions across diverse scenarios. GENIE~\citep{bruce2024genie} maps user inputs (ground-truth actions) to a latent space, allowing generative models to create interactive environments. We adopt a similar latent action model but apply it to label actionless data for training a monolithic VLA to solve robotic tasks. Similarly, \citet{edwards2018imitating} and \citet{schmidt2024learning} use latent actions to pretrain and fine-tune policies for video games~\citep{cobbe2019procgen}. In contrast, we focus on learning latent actions from real-world human motions for more complex, continuous robotic tasks. Unlike other work that leverages latent actions by converting ground-truth actions into latent to capture better multimodality and task semantics~\citet{lynch2020learning, jiang2023h, lee2024behavior, mete2024quest}, our approach derives latent actions directly from observations, not ground-truth actions.
+
+\section{LAPA: Latent Action Pretraining for general Action models}
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/latent_action_pretraining.pdf}
+    \caption{\small{\textbf{Overview of Latent Action Pretraining}. (1) Latent Action Quantization: We first learn discrete latent actions in a fully unsupervised manner using the VQ-VAE objective {(Detail in Figure \ref{fig:latentmodel})}. (2) Latent Pretraining: The VLM is trained to predict latent actions, essentially performing behavior cloning. After pretraining, we finetune LAPA on a small set of action-labeled trajectories to map the latent space to the end effector delta action space.}}
+    \vspace{-4mm}
+    \label{fig:fig2}
+\end{figure}
+{Latent Action Pretraining consists of two models that are learned sequentially}:  Latent Action Quantization and Latent Pretraining. 
+%An overview is provided in Figure \ref{fig:fig2}.
+%First, we use a VQ-VAE based objective to capture the discretized latent delta information between consecutive frames in a video. Next, a pretrained VLM is trained to predict the latent action designated by the encoder of the Latent Action Quantization model, given the current image and the language instruction. After LAPA, we finetune the VLA model on a small number of ground-truth action-labeled trajectories to map the latent space to the actual action space. 
+% Since the latent actions are not actual actions that are executable, we leverage small number of ground-truth action-labeled trajectories to map the latent space to the actual action space.
+The overall process is illustrated in Figure \ref{fig:fig2}. {Note that we use the same pretraining dataset for Latent Action Quantization and Latent Pretraining.}
+
+\subsection{Latent Action Quantization}
+To learn latent actions in a fully unsupervised manner, we train a latent action quantization model following \citet{bruce2024genie} with a few modifications. Our latent action quantization model is an encoder-decoder architecture where the encoder takes the current frame $x_t$ and the future frame $x_{t+H}$ of a video with a fixed window size $H$ and outputs the latent action $z_t$\footnote{Although \citet{bruce2024genie} conditioned on multiple past observations, we exclude previous frames due to computational constraints. We leave prepending past observations as future work.}. The decoder is trained to take the latent action $z_t$ and $x_t$ and reconstruct $x_{t+H}$. Unlike \citet{bruce2024genie}, we use cross attention to attend $z_t$ given $x_t$ instead of additive embedding, which empirically leads to capturing more semantically meaningful latent actions. Our quantization model is a variant of C-ViViT tokenizer \citep{villegas2023phenaki} where the encoder includes both spatial and temporal transformer while the decoder only contains spatial transformer since our model uses only two image frames as input. 
+
+Our latent action quantization training model is based on the VQ-VAE objective \citep{NIPS2017_7a98af17}, {where the nearest quantized representation from the continuous embedding is retrieved from an embedding space where each embedding corresponds to a codebook.} The VQ-VAE objective enables the latent action $z_t$ to be discrete tokens (codebooks), making it easy for VLMs to predict $z_t$. The latent action is represented using $s$ sequences from $|C|$ codebook vocabulary space. {The sequence length $s$ is designated by the kernel size, stride and padding value of a CNN network which is used right before the vector quantization process.} To avoid gradient collapse often observed in VQ-VAE, we utilize NSVQ \citep{9696322} which replaces the vector quantization error to a product of original error and a normalized noise vector. {We also apply stop gradient to the patch embedding of the frame $x_t$ during decoding to avoid representation collapse.} Codebook replacement technique from NSVQ is applied during early training steps to maximize codebook utilization. {Further model and training details are provided in Appendix \ref{appen:model_detail}}.
+
+We utilize the encoder of our latent action quantization model as an inverse dynamics model in latent pretraining and the decoder for generating neural-based closed-loop rollouts. Unlike previous works~\citep{bruce2024genie, valevski2024diffusion}, our approach trains both a world model that generates rollouts from the latent actions and a policy model that produces these latent actions through Latent Pretraining.
+% While previous works have utilized world models only as an interactive world simulator~\citep{bruce2024genie, valevski2024diffusion}, LAPA trains the model that generates the actions during the second stage, opening avenues for interesting future research (more discussion is provided in Section \ref{subsec:latent_analysis}).
+%We also introduce a new method of evaluating the quality of latent actions by training on a \textit{surrogate} task. We fine-tune a small 2-layered MLP model to predict ground-truth actions when given the latent actions as input; this approach helps us determine the optimal (1) VQ-VAE model size (2) sequence length (3) codebook size and (4) how long to train the model without having to go through the entire pertaining and fine-tuning pipeline.
+
+\subsection{Latent Pretraining}
+We use the encoder of the latent action quantization model as an inverse dynamics model to label all {frames} $x_t$, given {frame} $x_{t+1}$, with {latent action} $z_t$. Then, {we do action pretraining by using a pretrained VLM} to predict the $z_t$ given the language instruction of a video clip and the current image $x_t$. Instead of using the existing language model head of the VLM, we attach a separate latent action head {(a single MLP layer)} of vocab size $|C|$. By default, we freeze only the vision encoder and unfreeze the language model during training. Since latent pretraining does not rely on ground truth actions, it opens the possibility of using any type of raw video paired with language instructions. Also, in contrast to traditional action granularity used in robotics (e.g. end-effector positions, joint positions, joint torques, etc.), our approach does not require any priors about the action hierarchy/granularity and is learned in an end-to-end manner simply by being optimized to best capture the `delta' of consecutive observations in a given video dataset. We broadly refer to models having gone through latent pretraining as LAPA.
+% We observe that this leads to outperforming the current state-of-the-art VLA model, trained with the ground-truth actions (analysis provided in Section \ref{subsec:latent_analysis}).
+
+\subsection{Action Finetuning}
+VLAs that are pretrained to predict latent actions are not directly executable on real-world robots since latent actions are not actual delta end-effector actions or joint actions. To map latent actions to actual robot actions, we finetune LAPA on a small set of labeled trajectories that contain ground truth actions (delta end-effector). For action prediction, we discretize the continuous action space for each dimension of the robot so that the number of data points allocated for each bin is equal following \citet{kim2024OpenVLA, brohan2023rt}. We discard the latent action head (a single MLP layer) and replace it with a new action head to generate ground truth actions.\footnote{We also tried leaving the latent action head and adding additional head to decode the latent to ground-truth actions following \citet{schmidt2024learning} However, we empirically found that re-initializing the action head resulted in superior downstream task performance, likely due to the size of the underlying policy model (7B).}. 
+% We find that this still enables positive transfer from pretraining to fine-tuning since the underlying LLM parameters trained to predict meaning representations for control, given perception and task description.
+As with latent pretraining, we freeze the vision encoder and unfreeze all of the parameters of the underlying language model.\footnote{We leave parameter efficient fine-tuning approaches as future work for finetuning \citep{hu2022lora}.}
+% We collect the finetuning dataset by sampling a subset of existing training trajectories or doing rollouts and only using successful trajectories for simulation experiments. For real robot experiments, we collect about 100 trajectories through teleoperation. 
+%To measure the generalization capability, we finetune both LAPA and baselines on multi-instruction tasks in both simulation and real-world.
+
+\section{Experiments}
+In this section, we demonstrate the effectiveness of Latent Action Pretraining as a general-purpose pretaining method. Specifically, we focus on answering the following questions: \textbf{Q1.} How does LAPA perform when there are cross-task, cross-environment, and cross-embodiment gaps between pretaining and fine-tuning? \textbf{Q2.} Can LAPA learn superior priors compared to using ground-truth actions during pretraining in a multi-embodiment setting? \textbf{Q3.} Can we create a performant LAPA solely from raw human manipulation videos?
+
+\subsection{Benchmarks and Environments}
+
+% \begin{table}[t!]
+% \centering
+% \caption{\small{\textbf{Pretraining and fine-tuning dataset for each environment.} Cross-Env denotes cross-environment, Cross-Emb denotes cross-embodiment, and Multi-Emb denotes multi-embodiment. For fine-tuning, MT denotes multi-task training and MI denotes tasks with diverse multi-instructions. Category denotes the main capability we are trying to quantify. Illustration of each environment is shown in Figure \ref{fig:setup} in Appendix \ref{appen:experimental_details}.}}
+% \resizebox{0.6\textwidth}{!}{  % Resizes the table to fit within the page width
+% \begin{tabular}{l|c|cc|cc}
+% \toprule
+% \multirow{2}{*}{\textbf{Environment}} & \multirow{2}{*}{\textbf{Category}} & \multicolumn{2}{c}{\textbf{Pretraining}} & \multicolumn{2}{c}{\textbf{Fine-tuning}} \\
+% \cmidrule(lr){3-4} \cmidrule(lr){5-6} % Adding short midlines
+%             &          & Dataset & \# Trajs & Dataset & \# Trajs \\
+% \midrule
+% \multirow{3}{*}{LangTable} & In-Domain         & Sim (All 5 tasks)   & 181k   & 5 Tasks (MT, MI)   & 1k  \\
+%           & Cross-Task        & Sim (All 5 tasks)   & 181k   & 1 Task (MI)        & 7k  \\
+%           & Cross-Env & Real (All 5 tasks)  & 442k   & 5 tasks (MT, MI)   & 1k  \\
+% \midrule
+% \multirow{2}{*}{SIMPLER}  & In-Domain         & Bridgev2            & 60k    & 4 Tasks (MT)       & 100 \\
+%   & Cross-Emb         &  Something v2            & 200k    & 4 Tasks (MT)       & 100 \\
+% \midrule
+% \multirow{3}{*}{Real-World}     & Cross-Emb  & Bridgev2 & 60k & 3 tasks (MI) & 450 \\
+%          & Multi-Emb  & Open-X & 970k & 3 tasks (MI) & 450 \\
+%          & Cross-Emb & Something v2 & 200k & 3 tasks (MI) & 450 \\
+% \bottomrule
+% \end{tabular}
+% }
+% \vspace{-4mm}
+% \label{tab:setup}
+% \end{table}
+We evaluate the effectiveness of LAPA on 9 different task categories in 2 different simulation environments and 3 different real-world robotic tasks. Table \ref{tab:setup} shows an overview of the pretraining and fine-tuning dataset for each setup and Figure \ref{fig:setup} in Appendix \ref{appen:experimental_details} visualizes the simulation benchmark and real-world setups. More details of each evaluation setup are provided in Appendix \ref{appen:experimental_details}.
+
+\textbf{Language Table~\citep{lynch2022interactivelanguagetalkingrobots}} is a simulation where a robot performs 2 DOF actions to push blocks (see Figure \ref{fig:setup}) (a)). It includes 5 subtask categories: BlocktoBlock, BlocktoAbsolute, BlocktoBlockRelative, BlocktoRelative, and Separate. 
+% Each trajectory from both sim and real is classified to one of 87k behaviors specified via natural language instruction (e.g. `slide the blue cube down a bit'). 
+During evaluation, we evaluate models for both \textit{seen} and \textit{unseen} scenarios, where \textit{unseen} includes new objects (color and shape) and unseen combinations of seen objects. 
+% For Language Table experiments, we train VLA-based models to generate language directions (e.g. `move up') before actual actions following \citet{belkhale2024rthactionhierarchiesusing}, which significantly improved the performance \footnote{For 7 DOF robot experiments, we found the benefit of generating language directions to be marginal compared to the increased inference cost. Therefore, we only generate delta end-effector delta actions on other experiments.}.
+% Further details of the evaluation are provided in Appendix \ref{appen:experimental_details}. 
+
+\textbf{SIMPLER~\citep{li2024evaluatingrealworldrobotmanipulation}} is a set of simulated environments for evaluating generalist robot manipulation policies. We assess our models on 4 tasks (Figure \ref{fig:setup} (b)) using the 7 DOF WidowX robot arm. 
+% Pretraining was conducted with the Bridgev2 dataset~\citep{walke2023bridgedata}.
+Since SIMPLER lacks fine-tuning trajectories, we collect 100 multi-task trajectories using successful rollouts from a VLA model trained on BridgeV2 data~\citep{walke2023bridgedata}.
+% , with held-out trajectories differing in object orientation and position from the evaluation setup. 
+% Further details are in Appendix \ref{appen:experimental_details}.
+
+\textbf{Real-World Tabletop Manipulation} experiments used a 7 DOF Franka Emika Panda robot arm in three environments (shown in Figure \ref{fig:setup} (c)). 
+We utilize three pretraining data sources: Bridgev2~\citep{walke2023bridgedata}, Open-X~\citep{open_x_embodiment_rt_x_2023}, and Something Something v2~\citep{goyal2017something}. Following \citet{kim2024OpenVLA}, we finetune on three multi-instruction tasks: (1) ‘Pick $<$object$>$ into Sink’, (2) ‘Cover $<$object$>$ with Towel’, and (3) ‘Knock $<$object$>$ Over’. Each task involves 150 trajectories across 15 objects. We use a task-specific partial success criterion for evaluation, following  \citet{kim2024OpenVLA}.
+% As shown in Table \ref{tab:setup}, we have 3 different pretraining data sources for the real-world experiments: Bridgev2~\citep{walke2023bridgedata}, Open-X~\citep{open_x_embodiment_rt_x_2023}, and Something Something v2~\citep{goyal2017something}. During fine-tuning, following \citet{kim2024OpenVLA}, we perform experiments on three diverse multi-instruction tasks: (1) `Pick $<$object$>$ into Sink', (2) `Cover $<$object$>$ with Towel', and (3) `Knock $<$object$>$ Over'. For all three tasks, given three object candidates in random locations, the models should interact with the correct object. We collect 150 trajectories with 15 objects (10 trajectories for each object as a target) for each task. For evaluation, we adopt a partial success criteria for fine-grained evaluation, unique for each task, following \citet{kim2024OpenVLA}. 
+% Further details are provided in Appendix \ref{appen:experimental_details}. 
+
+\subsection{Baselines}
+For the underlying VLM, we use the 7B Large World Model (LWM-Chat-1M)~\citep{liu2024worldmodelmillionlengthvideo}. 
+% which also leads to much efficiency gains during pretraining (analysis provided in Section \ref{subsec:pretrain_efficiency}). We also compare with existing behavior cloning baselines that do not require ground truth actions during pretraining.
+
+\textbf{\textsc{Scratch}} denotes the baseline model where we finetune our backbone VLM only on the downstream tasks, to quantify the gains we get from the pretraining stage.
+
+\textbf{\textsc{UniPi} \citep{du2023learning}} uses a video diffusion model during pretraining to generate video rollouts given a language instruction, which does not require any action labels during pretraining similar to our approach. For finetuning, an inverse dynamics model (IDM) is trained to extract the ground truth actions given adjacent frames.\footnote{We do not compare with \citet{yang2024learning} since the model is not open-sourced and \citet{ko2024learning} since it is not a behavior cloning baseline.} We also finetune the diffusion model on the downstream task to match the target distribution.
+
+\textbf{\textsc{Vpt} \citep{NEURIPS2022_9c7008af}} trains an IDM on action labeled data, and uses the IDM model to extract pseudo actions on raw videos.
+% \footnote{For a fair comparison, we utilize the exact inverse dynamics model implementation from the authors of \citet{du2023learning}}.
+Then, we use the pseudo actions labeled by the IDM to pretrain our backbone VLM on the pretraining data, identical to Latent Pretraining of LAPA.
+
+\textbf{\textsc{ActionVLA}} denotes the baseline that uses the actual ground-truth robot action labels during pretraining with the same backbone VLM. 
+%We also finetune \textsc{ActionVLA} for fair comparison if finetuning data is not a complete subset of pretraining data. 
+This may be seen as the upper bound, since it utilizes the actual ground-truth labels. 
+% However, we find that LAPA is more performant in scenarios where there are embodiment shifts between pretraining and fine-tuning (Section \ref{sec:real_world}). 
+
+\textbf{\textsc{OpenVLA}~\citep{kim2024OpenVLA}} is a state-of-the-art VLA model that was pretrained on 970k real-world robot demonstrations from the Open X-Embodiment Dataset~\citep{open_x_embodiment_rt_x_2023}, mostly collected through human teleoperation. This model has a comparable number of parameters to LAPA (7B).
+% This model outperforms the previous SOTA VLA model, RT-2~\citep{brohan2023rt}.
+We compare against \textsc{OpenVLA} for real-world robot experiments by fine-tuning the pretrained \textsc{OpenVLA} on our downstream tasks. 
+
+Further details of baseline models are provided in Appendix \ref{appen:baseline}.
+
+%\paragraph{ATM} \citep{wen2024anypointtrajectorymodelingpolicy} trains a track transformer to predict the trajectories of sampled 2D points. Following the paper, we leverage an off-the-shelf tracker to track the 2D points and pretrain the track transformer to predict the point trajectories. After pretraining, we attach a policy model to predict the actual action using the finetuning dataset. 
+
+%\paragraph{Diffusion Policy} \citep{chi2023diffusionpolicy}, one of the state-of-the-art behavior cloning models which predicts smooth actions. This model does not have a pretraining stage and we implement a language-conditioned model to predict actions depending on the instruction.
+
+\subsection{Language Table Results}
+\label{sec:langtable}
+
+
+% \begin{figure}[ht]
+%     \centering
+%     \begin{subfigure}[b]{0.3\textwidth}
+%         \centering
+%         \includegraphics[width=\textwidth]{figures/lang_table_indomain.pdf}
+%         \caption{Caption 1}
+%         \label{fig:subfig1}
+%     \end{subfigure}
+%     \hfill
+%     \begin{subfigure}[b]{0.3\textwidth}
+%         \centering
+%         \includegraphics[width=\textwidth]{figures/lang_table_cross_task.pdf}
+%         \caption{Caption 2}
+%         \label{fig:subfig2}
+%     \end{subfigure}
+%     \hfill
+%     \begin{subfigure}[b]{0.3\textwidth}
+%         \centering
+%         \includegraphics[width=\textwidth]{figures/lang_table_cross_env.pdf}
+%         \caption{Caption 3}
+%         \label{fig:subfig3}
+%     \end{subfigure}
+%     \caption{Overall figure caption}
+%     \label{fig:mainfigure}
+% \end{figure}
+
+\begin{table}[ht]
+\caption{\textbf{Language Table Results.} Average Success Rate (\%) { $\pm$ StdErr} across the three different pretrain-finetune combinations from the Language Table benchmark as described in Table \ref{tab:setup}. We also note the \# of trajectories used for fine-tuning next to each category. }
+\centering
+\resizebox{0.65\textwidth}{!}{%
+    % Your table code here
+\begin{tabular}{lcccccc}
+\toprule
+                 & \multicolumn{2}{c}{In-domain (1k)} & \multicolumn{2}{c}{Cross-task (7k)} & \multicolumn{2}{c}{Cross-env (1k)} \\
+                 & Seen & Unseen & Seen & Unseen & Seen & Unseen \\
+\midrule 
+\textsc{Scratch}      & 15.6$_{\pm9.2}$ & 15.2$_{\pm8.3}$   & 27.2$_{\pm13.6}$ & 22.4$_{\pm11.0}$   & 15.6$_{\pm9.2}$ & 15.2$_{\pm8.3}$   \\
+\textsc{UniPi}            & 22.0$_{\pm12.5}$ & 13.2$_{\pm7.7}$   & 20.8$_{\pm12.0}$ & 16.0$_{\pm9.1}$   & 13.6$_{\pm8.6}$ & 12.0$_{\pm7.5}$   \\
+\textsc{Vpt}              & 44.0$_{\pm7.5}$ & 32.8$_{\pm4.6}$   & 72.0$_{\pm6.8}$   & \textbf{60.8}$_{\pm6.6}$     & 18.0$_{\pm7.7}$ & 18.4$_{\pm9.7}$   \\
+LAPA        & \textbf{62.0}$_{\pm8.7}$ & \textbf{49.6}$_{\pm9.5}$   & \textbf{73.2}$_{\pm6.8}$ & 54.8$_{\pm9.1}$   & \textbf{33.6}$_{\pm12.7}$ & \textbf{29.6}$_{\pm12.0}$   \\ \midrule
+\textsc{ActionVLA}        & 77.0$_{\pm3.5}$ & 58.8$_{\pm6.6}$   & 77.0$_{\pm3.5}$ & 58.8$_{\pm6.6}$   & 64.8$_{\pm5.2}$ & 54.0$_{\pm7.0}$   \\
+\bottomrule
+\end{tabular}}
+
+% Evaluation setup is consistent across the three different pretrain-finetune scenarios.
+
+%\caption{Average results of Language Table. \textsc{Scratch} directly finetunes a pretrained VLM \citep{liu2024worldmodelmillionlengthvideo} on action-labeled trajectories. \textsc{UniPi} \citep{du2023learning} uses a diffusion model for planning and \textsc{Vpt} \citep{NEURIPS2022_9c7008af} uses an inverse dynamics model to obtain pseudo labels for VLA pretraining. LAPA is pretrained with LAPA while \textsc{ActionVLA} is pretrained with ground truth actions with the same backbone model. We report the performance for individual tasks in Appendix \ref{}.}
+\vspace{-5mm}
+\label{tab:langtable_result}
+\end{table}
+
+\paragraph{In-Domain Performance} First, we assess LAPA's ability to learn from a small subset of in-domain action label data by pretraining on 181k trajectories and finetuning on 1k action-labeled trajectories (0.5\%). As shown in Table \ref{tab:langtable_result}, LAPA largely outperforms \textsc{Scratch} and narrows the gap with \textsc{ActionVLA} despite not using action labels during pretraining. Additionally, LAPA surpasses \textsc{UniPi} and \textsc{Vpt}. Notably, while \textsc{UniPi} handles simple tasks well, its diffusion model often generates incorrect plans for longer-horizon tasks, aligning with \citet{du2024video} (see Figure \ref{fig:unipi} of Appendix \ref{appen:lang_table_results}). \textsc{Vpt}, with the same backbone VLM as LAPA, outperforms \textsc{UniPi}, showing the superiority of the VLA model, but still underperforms LAPA, highlighting the effectiveness of latent actions.
+
+\paragraph{Cross-Task Performance} We investigate whether LAPA's broad skills can be retained after finetuning on a specific task. Pretraining LAPA on 181k trajectories and finetuning on only separate tasks (7k), we evaluate all 5 task categories, similar to the in-domain setup, to assess latent pretraining's benefits for unseen tasks. When comparing LAPA and \textsc{Scratch} in Table \ref{tab:langtable_result} and Table \ref{tab:langtable_seen_cross_task}, \ref{tab:langtable_unseen_cross_task} in Appendix \ref{appen:lang_table_results}, latent pretraining significantly benefits the separate task as well the other 4 task categories, resulting in a significant boost in both seen and unseen setups. Like before, \textsc{UniPi} is constrained by its diffusion model's planning limitations, while \textsc{Vpt} performs strongly, even surpassing \textsc{ActionVLA} in the unseen setting. This is likely due to using more labeled data (7k vs. 1k), helping the IDM generate more accurate pseudo labels.
+
+\paragraph{Cross-Environment Performance}
+We further investigate if Latent Action Pretraining benefits downstream performance when the pretraining and fine-tuning environments are different. We pretrain LAPA on 440k real-world trajectories, and then finetune on 1k simulation trajectories, which can be seen as testing on a setup where a real2sim gap is present (Figure \ref{fig:setup} (a)).
+% \footnote{We only test on the real2sim scenario since simulation evaluation is easily replicable and easier to setup. We leave exploration in the sim2real scenario as future work.}
+% Figure \ref{fig:setup} (a) compares the two environments.
+From Table \ref{tab:langtable_result}, we observe that LAPA still significantly outperforms \textsc{Scratch}, showing that latent pretraining leads to positive transfer even on cross-environment setting. Notably, both \textsc{UniPi} and \textsc{Vpt} significantly underperforms LAPA, showing that learning to predict latent actions is more robust to cross-environment transfer. \textsc{Vpt} only results in minor positive transfer, indicating that the IDM is not robust to environment shifts.
+
+% \begin{wrapfigure}{r}{0.25\textwidth}
+% \vspace{-8mm}
+%     \centering
+%     \includegraphics[width=\linewidth]{figures/simpler.pdf}
+% \caption{\textbf{SIMPLER Results.} Avg. success rate (\%) { $\pm$ StdErr} is shown across 4 tasks. Detailed results are in Appendix \ref{appen:simpler_results}.
+% % We provide the detailed results of individual tasks and subtasks (grasping and reaching) in Table \ref{tab:simpler_detailed} of Appendix \ref{appen:simpler_results}.
+% }
+% \vspace{-8mm}
+% \label{fig:simpler}
+% \end{wrapfigure} 
+% \subsection{SIMPLER Results}
+% \label{sec:simpler}
+
+
+% We pretrain our models on the Bridgev2~\citep{walke2023bridgedata} dataset and fine-tune on 100 trajectories collected from the SIMPLER environment~\citep{li2024evaluatingrealworldrobotmanipulation} (25 trajectories for each task). 
+
+
+% % partial success, early evaluation, training steps
+% \paragraph{Results}
+% As shown in Figure \ref{fig:simpler}, \textsc{UniPi} significantly underperforms all other baselines on the SIMPLER Environment. We observe that, although the generated plans from the diffusion models are quite accurate, the IDM lacks the capability to predict 7 DOF continuous actions accurately when given only 100 action-labeled trajectories. Specifically, we observe that \textsc{UniPi} often fails to grasp the object within the maximum step limit. This implies the effectivness of using VLAs in scenarios with insufficient action-labeled data. Similar to the results of Section \ref{sec:langtable}, LAPA outperforms baseline models that pretrain on actionless videos (\textsc{UniPi} and \textsc{Vpt}) and closes the performance gap with \textsc{ActionVLA}, which is pretrained on all of the 60K action-labeled trajectories from the Bridgev2 dataset. This highlights the effectiveness of LAPA, even when the complexity of the action space increases. We provide the detailed results of individual tasks and subtasks (grasping and reaching) in Table \ref{tab:simpler_detailed} of Appendix \ref{appen:simpler_results}.
+
+\subsection{Real-world Results}
+\label{sec:real_world}
+
+
+We pretrain our models on  (1) Bridgev2~\citep{walke2023bridgedata} to measure the \textbf{cross-embodiment} performance (WidowX embodiment for pretraining and Franka embodiment for finetuning)  and  (2) Open X-Embodiment Dataset ~\citep{open_x_embodiment_rt_x_2023} to measure the effect of pretraining in a \textbf{multi-embodiment} setting.
+% During fine-tuning, following \citet{kim2024OpenVLA}, we perform experiments on three diverse multi-instruction tasks: (1) `Pick $<$object$>$ into Sink', (2) `Cover $<$object$>$ with Towel', and (3) `Knock $<$object$>$ Over' (examples shown in Figure \ref{fig:setup}).
+Figure \ref{fig:real_world} shows the average success rate across the 3 tasks where each task encompasses unseen object combination, unseen object, and unseen instruction settings. We provide detailed results depending on the generalization type in Table \ref{tab:real_robot}.
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/real_robot.pdf}
+    \caption{\textbf{Real-world Tabletop Manipulation Results.} We evaluate on a total of 54 rollouts for each model encompassing unseen object combinations, unseen objects and unseen instructions. Average success rate (\%) { $\pm$ StdErr} are shown (detailed results provided in Appendix \ref{appen:real_results}).}
+    \label{fig:real_world}
+\vspace{-2mm}
+\end{figure}
+
+\paragraph{Bridgev2 Pretraining} We compare models that were pretrained on the Bridgev2 dataset. 
+% Note that this is a \textit{cross-embodiment} setting since pretraining is done with WidowX embodiment while finetuning is done with Franka embodiment.
+Similar to previous results, all models pretrained on Bridgev2 result in significant performance enhancement compared to \textsc{Scratch}. Furthermore, by comparing LAPA which does not leverage action-labeled trajectories during pretraining with models that use action-labeled trajectories during pretraining (\textsc{ActionVLA} and \textsc{OpenVLA}), we observe an interesting finding: LAPA outperform VLAs that use action labeled pretraining data on average success rate of the 3 tasks, unlike previous scenarios where VLAs pretrained on the ground-truth actions were upper bounds. LAPA significantly outperforms the other models in pick-and-place tasks; given that most tasks in Bridgev2 are pick-and-place, we hypothesize that VLA models pretrained on ground truth action labels have overfitted to the WidowX action space from the Bridgev2 dataset, hampering cross-embodiment adaptability to action distribution shifts during fine-tuning. In contrast, LAPA avoids this issue by not relying on ground truth action labels during pretraining.
+
+
+\begin{table}[t!]
+\centering
+\caption{\textbf{Evaluation Results divided into eval types}. We average the success rate across the 3 tasks depending on what capability we are trying to quantify: (1) seen objects but unseen combinations, (2) unseen objects, and new instructions requiring semantic reasoning. Best is \textbf{bolded} and second best is \underline{underlined}.}
+\resizebox{0.6\textwidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+ & Seen Obj. & Unseen & Seen Obj. & \multirow{2}{*}{AVG} \\
+ & Unseen Combo & Obj. & Unseen Instr.\\
+\midrule
+\textsc{Scratch}                      & 18.0 & 20.3 & 25.4 & 21.2 \\
+\midrule
+\textsc{ActionVLA} (Bridge)           & 38.3 & 31.8 & 27.7 & 32.6 \\
+\textsc{OpenVLA} (Bridge)             & 35.6 & 34.6 & 22.1 & 30.8 \\
+LAPA (Bridge)           & 43.4 & 31.4 & 35.6 & 36.8 \\
+\midrule
+\textsc{OpenVLA} (Open-X)              & \underline{46.2} & \underline{42.1} & \underline{43.4} & \underline{43.9} \\
+LAPA (Open-X)               & \textbf{57.8} & \textbf{43.9} & \textbf{48.5} & \textbf{50.1} \\
+\midrule
+LAPA (Human Videos)     & 36.5 & 37.4 & 28.1 & 34.0 \\
+\bottomrule
+\end{tabular}}
+\label{tab:real_robot}
+\vspace{-5mm}
+\end{table}
+
+\paragraph{Open-X Pretraining} From Figure \ref{fig:real_world}, we see that VLAs pretrained on the Open-X dataset outperforms VLAs pretrained on the Bridgev2 dataset, showing that data scaling during pretraining demonstrates positive transfer for downstream tasks~\citep{open_x_embodiment_rt_x_2023}. This also suggests there could be significant further improvement when scaling the diversity and scale of the pretraining data, especially with large web-scale video data.
+
+When comparing LAPA with \textsc{OpenVLA}, we see that LAPA significantly outperforms \textsc{OpenVLA} on 2 out of 3 tasks (Figure \ref{fig:real_world}). {Also, as shown in Table \ref{tab:real_robot}, LAPA (Open-X) outperforms OpenVLA (Open-X) on all types of generalization settings.} This highlights LAPA's effectiveness in a multi-embodiment setting by showcasing its ability to leverage a shared latent action space during pretraining, akin to how language and image representations are utilized. In contrast, contemporary action pretraining methods may suffer from reduced positive transfer between datasets due to the variability in action representation spaces across different embodiments and datasets.
+
+However, for pick and place task, LAPA underperforms \textsc{OpenVLA}. We observe that most failures of LAPA are due to early grasping. In fact, LAPA outperforms \textsc{OpenVLA} in reaching performance (83.33\% vs 66.67\%) (reaching performance for each task is provided separately in Appendix \ref{appen:real_results}). This suggests that, although LAPA possesses stronger language conditioning and coarse-grained planning abilities, there is room for improvement in skills such as grasping. Since grasping occurs only once or twice in each trajectory, the 150 labeled trajectories may not be sufficient for LAPA to accurately predict grasp actions based on the physical characteristics of diverse objects. 
+
+\subsection{Learning from Human Manipulation Videos}
+\begin{figure}[ht!]
+    % \centering
+    \begin{subfigure}[t]{0.3\textwidth} % Adjust the width to control size
+        \centering
+        \includegraphics[height=3.2cm]{figures/simpler_sthv2.pdf} % Set height explicitly
+        \caption{SIMPLER Results}
+        \label{fig:sthv2_simpler}
+    \end{subfigure}%
+    \hspace{4mm}
+     % little horizontal space between the figures
+    \begin{subfigure}[t]{0.6\textwidth} % Adjust the width to control size
+        \centering
+        \includegraphics[height=3.2cm]{figures/sthv2.pdf} % Match the same height
+        \caption{Real-world Tabletop Manipulation Robot Results}
+        \label{fig:sthv2_real}
+    \end{subfigure}
+    \caption{\small{\textbf{Pretraining from Human Video Results.} Average success rate (\%) { $\pm$ StdErr} of LAPA and baselines pretrained on human manipulation videos where the embodiment and environment gap is extreme. We evaluate on both simulation (left) and real-world robot setup (right).}}
+    \vspace{-4mm}
+    \label{fig:sthv2_combined}
+\end{figure}
+
+In this section, we show results when we extend Latent Action Pretraining to human manipulation videos, which aligns with the main motivation of this work. Unlike robot trajectories, human videos have two challenges: human videos do not contain action labels, and the distribution of human videos is distinct from the robot embodiment \citep{mccarthy2024generalistrobotlearninginternet}. We try to investigate whether our method as well as baseline approaches could address these challenges by pretraining on Something-Something V2 dataset \citep{goyal2017something}  which consists of 220K videos that includes human performing actions with everyday objects. 
+% simpler results - \textsc{Vpt} & \textsc{UniPi}
+% real robot 
+
+We first evaluate the performance of LAPA pretrained on human videos on SIMPLER. In addition to \textsc{Scratch}, we also compare with \textsc{UniPi} and \textsc{Vpt} pretrained with the same human video dataset. As shown in Figure \ref{fig:sthv2_simpler}, LAPA outperforms \textsc{Scratch}, showing that although the distribution of the pretraining data is distinct from the deployment setup, leveraging human videos for latent action pretraining results in positive transfer. Also, LAPA performs the best performance by outperforming \textsc{UniPi} and \textsc{Vpt}, implying that Latent Action Pretraining is robust to human to robot embodiment shifts. Note that it is impossible to train \textsc{ActionVLA} because the human videos do not have any robot action labels.
+
+We report the real-world robot experiments in Figure \ref{fig:sthv2_real}.
+Surprisingly, we can see that LAPA trained with human videos outperforms \textsc{OpenVLA} (Bridge) on average. Despite the larger embodiment gap for LAPA (Human to robot vs. Robot to robot), it learns a better prior for robot manipulation. {Also, as shown in Table \ref{tab:real_robot}, LAPA (Human Videos) shows good generalization performance, especially for unseen objects. We conjecture that this is because Something Something V2 dataset interacts with much diverse objects compared to Bridgev2.}
+%Furthermore, in the generalization capabilities shown in Table \ref{tab:real_robot}, LAPA (Human Videos) surpasses models pretrained on ground-truth action labels of BridgeV2 (\textsc{ActionVLA} (Bridge) and \textsc{OpenVLA} (Bridge)) in the unseen object and novel instruction setting. 
+This result highlights the potential of raw human manipulation videos from the web compared to expensive robot manipulation data, which requires time-intensive teleoperation to collect. We expect that applying our approach on large-scale internet videos (e.g., YouTube videos) could unlock the potential for large-scale pretraining of a generalist action foundational model, similar to foundational models in NLP or Computer Vision.
+
+% \subsection{Bi-manual Real Robot Experiments}
+
+
+% \section{Analysis and Ablations}
+% proxy evaluation, world modeling, qualtitative analysis 
+\subsection{Pretraining Efficiency}
+\label{subsec:pretrain_efficiency}
+% 30~40 efficient 
+The benefit of LAPA extends beyond downstream task performance to include pretraining efficiency. For pretraining LAPA (Open-X), the best-performing model, we use 8 H100 GPUs for 34 hours with a batch size of 128 (total of 272 H100-hours). In contrast, \textsc{OpenVLA} required a total of 21,500 A100-hours with a batch size of 2048. Despite being approximately 30-40 times more efficient for pretraining, LAPA still outperforms \textsc{OpenVLA} \footnote{We calculate based on the fact that H100 GPUs lead to 2-3 times speedup compared to A100 GPUs for training.}.
+
+We believe this efficiency stems from two factors: (1) the use of the Large World Model \citep{liu2024worldmodelmillionlengthvideo} as the backbone VLM model, and (2) the coarse-grained actions of LAPA compared to conventional action pretraining. First, the training objective during LWM pretraining includes generating the next state, which corresponds to the next frame in a video. We hypothesize that this objective enables the model to implicitly understand high-level actions in a video. Notably, \textsc{ActionVLA} (Bridge), which uses LWM as the backbone, and \textsc{OpenVLA} (Bridge), which uses Prismatic as the backbone, are trained on the same data and objective. However, \textsc{ActionVLA} reaches optimal performance (in terms of action token accuracy) in significantly fewer epochs (3 epochs) compared to \textsc{OpenVLA}'s 30 epochs. Second, the action space for LAPA is much smaller than that for \textsc{OpenVLA} ($8^4$ vs. $256^7$), making learning the perception-and-language to action generation problem easier to learn. For all LAPA models (BridgeV2, Open-X, Human Videos), we observe that a single epoch of training is sufficient to achieve optimal performance.
+
+\section{Ablation and Analysis}
+\label{sec:ablation}
+\subsection{Scaling Model, Data, and Latent Action Size}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ablation_model_scale.pdf}
+        \caption{Model Scaling}
+        \label{fig:subfig1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ablation_data_scale.pdf}
+        \caption{Data Scaling}
+        \label{fig:subfig2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ablation_codebook_seq.pdf}
+        \caption{Latent Action Length}
+        \label{fig:subfig3}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ablation_codebook_vocab.pdf}
+        \caption{Latent Action Vocab}
+        \label{fig:subfig4}
+    \end{subfigure}
+    \caption{\small{\textbf{Scaling Ablation Results of LAPA}. We scale 4 dimensions of LAPA: model parameters (in millions), data size (ratio among Bridgev2), and the latent action sequence and vocabulary size, and show the downstream average success rate (\%) on the SIMPLER fine-tuning tasks.}}
+    \vspace{-3mm}
+    \label{fig:scaling}
+\end{figure}
+Large Language Models (LLMs) have demonstrated scaling laws~\citep{kaplan2020scaling}, where performance improves with increases in model size, dataset size, and computational resources used for training. Similarly, we attempt to analyze whether LAPA benefits from scaling across three dimensions: latent action quantization model size, data size, and latent action representation space. For a controlled setup, we apply our method to Bridgev2 and then fine-tune it on SIMPLER except for Language Table result of Figure \ref{fig:subfig3}. 
+
+As shown in Figure \ref{fig:scaling}, scaling benefits LAPA across the three dimensions. Interestingly, we observe that the optimal scale of the latent action space depends on the complexity of the action dimension contained in the pretraining dataset. {For example, increasing the latent action sequence length
+is less effective compared to increasing the vocabulary for Language Table (Figure \ref{fig:scaling_langtable}).} Except for Language Table, we maintain the generation space of LAPA at $8^4$ throughout all of our main experiments. These results imply that when scaling pretraining to Internet-scale videos that go beyond manipulation videos, scaling LAPA in terms of model, dataset, and latent action space could improve performance, especially to capture higher action dimensions such as whole-body control. 
+%We hypothesize that if we scale the latent action vocabulary to a scale similar to that of LLMs, latent actions learned from our approach could potentially become the \textit{new language} for robotic foundation models.
+
+% model size, codebook vocab, seq, 
+\subsection{Latent Action Analysis}
+\label{subsec:latent_analysis}
+\begin{figure}[ht!]
+    \centering
+    \vspace{-3mm}\includegraphics[width=0.7\textwidth]{figures/latent_analysis_OpenX.pdf}
+    \caption{\small{\textbf{Latent Action Analysis.} We condition the current observation $x_1$ and quantized latent action to the decoder of the latent action quantization model. We observe that each latent action can be mapped into a semantic action. For example, latent action [1,1,3,2] corresponds to going down and left while [3,2,0,1] corresponds to going up a little bit.}}
+    \vspace{-4mm}
+    \label{fig:latent_analysis_Open-X}
+\end{figure}
+We qualitatively analyze the alignment of quantized latent actions with real continuous actions. For interpretation, we condition the current image observation $x_1$ and each latent action on the decoder of the latent action quantization model, and present the reconstructed images.
+
+In Language Table, we observe that each latent action corresponds to a distinct movement of the robot arm, with the distribution of latent actions being well-clustered in the actual 2D action space (shown in Figure \ref{fig:latent_analysis_lang}, \ref{fig:latent_analysis_lang_map} of Appendix \ref{appen:qual_analysis}). Next, for human manipulation videos, we observe that camera viewpoints also correspond to a latent action since the viewpoint changes within a video (shown in Figure \ref{fig:latent_analysis_sthv2} of Appendix \ref{appen:qual_analysis}). 
+We also analyze the latent actions learned from the Open-X embodiment, which encompasses multiple embodiments, tasks, and environments. As shown in Figure \ref{fig:latent_analysis_Open-X}, even though the embodiment and environment differ, conditioning on the same latent action results in a similar action in the reconstructed image. This supports our previous claim that latent actions are learned in a shared representation space, regardless of the embodiment or dataset, facilitating stronger positive transfer across diverse datasets.
+
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/rollout.pdf}
+    \caption{\small{\textbf{Closed loop rollout of LAPA.} LAPA is conditioned on current image $x_1$ and language instruction of `take the broccoli out of the pot'. We generate rollout images by conditioning the decoder of Latent Action Quantization Model with latent actions generated by LAPA.}}
+    \vspace{-4mm}
+    \label{fig:rollout}
+\end{figure}
+
+We also qualitatively analyze the coarse-grained planning capability of LAPA through a closed-loop rollout. We use a LAPA model that has only undergone pretraining, without any action finetuning. Since this model generates latent actions that are not directly executable in the real world, we condition the current observation $x_1$ and the predicted latent action from LAPA with the decoder of the latent action quantization model. As shown in Figure \ref{fig:rollout}, when conditioned on the current observation and the instruction to `take the broccoli out of the pot', LAPA generates robot trajectories that successfully reaches for the broccoli, moves down to grab it, and, as the arm moves away from the pot, the broccoli disappears. This shows the potential for LAPA as a general-purpose robotic \textit{world model}, not only predicting actions but also the outcomes of the actions. For example, this can lead to an extension of LAPA to act as a Task and Motion planning system, where it can first generate multiple plans given a natural language task instruction, choose the most optimal trajectory based on methods of quantifying the success among multiple trajectory candidates~\citep{hwang2024motif, duan2024ahavisionlanguagemodeldetectingreasoning}, and perform open-loop / closed-loop inference. This can lead a paradigm where we aim to improve performance through scaling test-time compute, as with LLMs~\citep{snell2024scaling}.
+
+% add visualization in langtable -> and then extend to proxy eval for 7dof 
+% \subsection{Qualitative Results}
+% \subsection{VLM Architecture Ablation}
+% \subsection{Scaling Laws}
+\section{Limitations and Conclusion}
+In this paper, we introduce Latent Action Pretraining, a scalable pretraining method for building VLAs {without using ground-truth action labels}. Across three benchmarks spanning both simulation and real-world robot experiments, we show that our method significantly improves transfer to downstream tasks compared to existing approaches. We also present a state-of-the-art VLA model that surpasses current models trained on 970K action-labeled trajectories. Furthermore, we demonstrate that our method can be applied purely on human manipulation videos, where explicit action information is absent, and the embodiment gap is substantial. 
+
+We still face certain limitations. First, LAPA underperforms compared to action pretraining when it comes to fine-grained motion generation tasks like grasping. We believe that increasing the latent action generation space could help address this issue. Second, similar to prior VLAs, LAPA also encounters latency challenges during real-time inference. Adopting a hierarchical architecture, where a smaller head predicts actions at a higher frequency. Lastly, while we qualitatively demonstrate that our latent action space captures camera movements (Figure \ref{fig:latent_analysis_sthv2}), we have not yet explored the application of LAPA beyond manipulation videos, such as those from self-driving cars, navigation, or landscape scenes. We leave these explorations for future work.
+
+\subsubsection*{Acknowledgments}
+We thank Arhan Jain and Marius Memmel for helping out with the robot hardware and teleoperation setup. Also, we thank Minyoung Hwang, Jiafei Duan, Junsu Kim, and Changyeon Kim for helpful discussions and constructive feedback. This work was partly supported by Center for Advanced Urban Systems (CAUS) of Korea Advanced Institute of Science and Technology (KAIST) funded by GS E\&C (40\%) and the Institute of Information \& Communications Technology Planning \& Evaluation(IITP) grant funded by the Korea government(MSIT) (RS-2024-00397966, Development of a Cybersecurity Specialized RAG-based sLLM Model for Suppressing Gen-AI Malfunctions and Construction of a Publicly Demonstration Platform, 30\%; No.RS-2022-II220264, Comprehensive Video Understanding and Generation with Knowledge-based Deep Logic Neural Network, 20\%; No.RS-2021-II212068, Artificial Intelligence Innovation Hub, 10\%).
+
+\bibliography{iclr2025_conference}
+\bibliographystyle{iclr2025_conference}
+\clearpage
+\appendix
+
+\section{Latent Action {Quantization} Details}
+\label{appen:model_detail}
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/latent_action_model.pdf}
+    \caption{\small{\textbf{Model architecture of our Latent Action Quantization Model.}}}
+    \label{fig:latentmodel}
+\end{figure}
+We show model architecture details of our latent action quantization model in Figure \ref{fig:latentmodel}. We utilize the C-ViViT model architecture from \citet{villegas2022phenaki} to replicate the latent action model from GENIE~\citep{bruce2024genie}. 
+{During the encoding process, both $x_{1}$ and $x_{2}$ are gone through a patch embedding to obtain $p_1$ and $p_2$ and gone through a spatial transformer. To convey temporal information, the representations for both outputs of spatial transformer are passed to a causal transformer (transformer with causal positional encodings) to get $e_1$ and $e_2$ continuous embeddings. We then define $d_1 = e_2 - e_1$ and discretize $d_1$ by finding the closest embedding from the codebook $z$ where the codebook size is determined as a hyperparameter.}
+
+\begin{equation}
+    z_1 = \arg \min_{z_k} |d_1 - z_k|^2
+\end{equation}
+
+{When obtaining $e_1$ and $e_2$, we go through a CNN network. The sequence length is designated by the kernel size, stride and padding value of a CNN network. After quantization, we apply NSVQ technique before decoding.}
+
+\begin{equation}
+    \hat{d_1} =  d_1 + \frac{\|d_1-z_1\|}{\|v\|}v 
+\end{equation}
+
+{where $v \sim \mathcal{N}(0,1)$. For decoding, we go through the following equation:}
+
+\begin{equation}
+    \hat{x_2} = D(Attn(sg[p_1],\hat{d_1},\hat{d_1})
+\end{equation}
+
+{where stop gradient ($sg$) is applied to $p_1$ to avoid representation collapse and cross attention is used to attend $\hat{d_1}$ given $p_1$. Unlike the encoder, decoder $D$ only include spatial transformer. The training objective is a L2 reconstruction loss.}
+
+\begin{equation}
+    L = \|x_2-\hat{x_2}\|_2^2
+\end{equation}
+
+After latent model training, we utilize the {$z_{1}$} as the latent action label for $x_{1}$. The encoder can be seen as the inverse dynamics model and the decoder can be seen as the world model. 
+
+\section{Details on Experimental Setup}
+\begin{table}[t!]
+\centering
+\caption{\small{\textbf{Pretraining and fine-tuning dataset for each environment.} Cross-Env denotes cross-environment, Cross-Emb denotes cross-embodiment, and Multi-Emb denotes multi-embodiment. For fine-tuning, MT denotes multi-task training and MI denotes tasks with diverse multi-instructions. Category denotes the main capability we are trying to quantify.}}
+\resizebox{0.8\textwidth}{!}{  % Resizes the table to fit within the page width
+\begin{tabular}{l|c|cc|cc}
+\toprule
+\multirow{2}{*}{\textbf{Environment}} & \multirow{2}{*}{\textbf{Category}} & \multicolumn{2}{c}{\textbf{Pretraining}} & \multicolumn{2}{c}{\textbf{Fine-tuning}} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-6} % Adding short midlines
+            &          & Dataset & \# Trajs & Dataset & \# Trajs \\
+\midrule
+\multirow{3}{*}{LangTable} & In-Domain         & Sim (All 5 tasks)   & 181k   & 5 Tasks (MT, MI)   & 1k  \\
+          & Cross-Task        & Sim (All 5 tasks)   & 181k   & 1 Task (MI)        & 7k  \\
+          & Cross-Env & Real (All 5 tasks)  & 442k   & 5 tasks (MT, MI)   & 1k  \\
+\midrule
+\multirow{2}{*}{SIMPLER}  & In-Domain         & Bridgev2            & 60k    & 4 Tasks (MT)       & 100 \\
+  & Cross-Emb         &  Something v2            & 200k    & 4 Tasks (MT)       & 100 \\
+\midrule
+\multirow{3}{*}{Real-World}     & Cross-Emb  & Bridgev2 & 60k & 3 tasks (MI) & 450 \\
+         & Multi-Emb  & Open-X & 970k & 3 tasks (MI) & 450 \\
+         & Cross-Emb & Something v2 & 200k & 3 tasks (MI) & 450 \\
+\bottomrule
+\end{tabular}
+}
+\vspace{-4mm}
+\label{tab:setup}
+\end{table}
+\label{appen:experimental_details}
+\begin{figure}[h!] 
+\centering
+\begin{subfigure}[b]{0.35\textwidth}
+\includegraphics[width=\textwidth]{figures/task1.pdf}
+\caption{\textsc{Language Table}}
+\end{subfigure}
+\begin{subfigure}[b]{0.39\textwidth}
+\includegraphics[width=\textwidth]{figures/task2.pdf}
+\caption{\textsc{Simpler}}
+\end{subfigure}
+\begin{subfigure}[b]{0.13\textwidth}
+\includegraphics[width=\textwidth]{figures/task3.pdf}
+\caption{\textsc{Real}}
+\end{subfigure}
+\caption{\small{\textbf{Experimental Setups}. (a) shows an example from the 440k real-world trajectories (top) and the 181k simulation trajectories (bottom) from the Language Table Benchmark. (b) shows the 4 different evaluation tasks we use with the SIMPLER environment. (c) shows the three different tasks that we perform in the real-world.}}
+\label{fig:setup}
+\vspace{-3mm}
+\end{figure}
+
+\paragraph{Language Table Experimental Setup}
+Figure \ref{fig:setup} (a) shows examples of the Language Table setup. For Language Table experiments, we train VLA-based models to generate language directions (e.g. `move up') before actual actions following \citet{belkhale2024rthactionhierarchiesusing}, which significantly improved the performance \footnote{For 7 DOF robot experiments, we found the benefit of generating language directions to be marginal compared to the increased inference cost. Therefore, we only generate delta end-effector actions on other experiments.}. For evaluation, we evaluate on 50 evaluation rollouts for each subtask category where the initial locations of the objects are randomized for each evaluation. Further details can be found in \href{https://github.com/google-research/language-table}{https://github.com/google-research/language-table}.
+
+\paragraph{SIMPLER Experimental Setup}
+Figure \ref{fig:setup} (B) shows examples of the SIMPLER setup. The SIMPLER environment does not provide any fine-tuning data for their evaluation pipeline, Thus, we first train our underlying VLM on the Bridgev2 dataset and perform zero-shot rollout on the 4 tasks in SIMPLER. Note that we use  held-out trajectories differing in object orientation and position from the evaluation setup. We filter 25 successful trajectories for each task (total of 100) and use them as the fine-tuning dataset for all of our experiments. For evaluation, we evaluate on 24 rollouts per task while randomizing the initial object locations. We consider Bridgev2 and SIMPLER to be \textit{in-domain} since they show a high correlation between real-world and simulation results with their simulation benchmark. Further details can be found in \href{https://github.com/simpler-env/SimplerEnv}{https://github.com/simpler-env/SimplerEnv}.
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/realworld_more.pdf}
+    \caption{\small{\textbf{Real-world Tabletop Manipulation Examples.}}}
+    \label{fig:real_samples}
+\end{figure}
+
+\paragraph{Real-world Tabletop Manipulation Experimental Setup}
+Figure \ref{fig:setup} (C) shows examples of the real-world tabletop manipulation experimental setup. For the teleoperation, we use the polymetis robotic stack\footnote{\href{https://github.com/facebookresearch/polymetis}{https://github.com/facebookresearch/polymetis}} to collect 150 trajectories for each of the tasks. All of the tasks require multi-instruction following capabilities since there are 3 objects in the scene and the model has to condition on the task description to infer which object to interact with. Figure \ref{fig:real_samples} shows samples of each task. For each task, we aim to quantify 3 distinct capabilities: 
+
+(1) We test the ability to infer the correct object from the task description between an unseen combination of seen objects during fine-tuninig, (2) We test the ability to infer the correct object from totally unseen objects during fine-tuning that may or may have not been observed during pretraining. Specifically, the \textit{knocking} tasks was conducted with real-world objects that were highly unlikely to have been in any of the pertaining datasets. (3) We test the ability to infer the correct object (among seen objects, unseen combinations) from a totally unseen instruction that requires semantic reasoning (e.g. Pick up a spicy object). For each evaluation criteria, 6 rollouts are performed for each models, resulting in a total of 18 rollouts for each task category. Since there are three tasks, each model is evaluated with 54 rollouts in the real-world. We provide the full list of all of the seen and unseen objects used for each rollout in Table \ref{tab:realresultdetail1}, \ref{tab:realresultdetail2}, \ref{tab:realresultdetail3}, and the total average success rates in Table \ref{tab:realresultdetail4}.
+
+Furthermore, for a fair comparison, we match the image resolution during training of all of our models and use the exact same object initial positions for all of our evaluation, mostly on the same day to minimize variability. For evaluation metrics, we adapt a partial success criteria for fine-grained evaluation, following \citet{kim2024OpenVLA}, which we describe in detail below.
+
+\textit{Knock down the $<$object$>$.} 
+
+For knocking, we give 0.5 partial score if the robot reaches to the correct object and 1 if the robot knocks down the correct object.
+
+\textit{Cover the $<$object$>$ with a towel.} 
+
+For covering, we give 0.33 partial score if the robot picks up the towel correctly, 0.66 if the robot reaches to the correct object or if the towel partially covers the object, and 1 if the correct object is completely covered by the towel.
+
+\textit{Pick up the $<$object$>$ and put it in the sink.} 
+
+For pick and place, we give 0.25 for reaching to the correct object, 0.5 for grasping the object, 0.75 for grasping and moving the object towards the sink, but failing to place the object in the sink, and 1 for placing the correct object in the sink.
+
+\section{Baseline Details}
+\label{appen:baseline}
+For \textsc{UniPi}, we use diffusion model from \citep{ko2024learning} which can be trained on 4 A100 GPUs. For all experiments, we train with 128 batch. We use the same inverse dynamics model as \textsc{Vpt} during inference. To mediate estimation errors between the predicted video plans and executed actions being accumulated, we periodically conduct replanning by regenerating new video plans after executing two actions.  For \textsc{Vpt}, we use ResNet18 followed by an MLP layer for the inverse dynamics model(IDM). The IDM is trained to predict an action when given two frames on a single A6000 GPU using using Adam optimizer with a
+learning rate 1e-4. For OpenVLA (Bridge), we pretrain on Bridgev2 for 30 epochs with a batch size of 1024. For OpenVLA (Open-X), we use the pretrained checkpoint from \citet{kim2024OpenVLA}. For finetuning, we use LoRA finetuning \citep{hu2022lora} with batch size of 32. We have observed that full-finetuning and lora finetuning leads to similar performance, so we use LoRA finetuning as default for efficient fine-tuning. We finetune the model until the training action accuracy reaches 95\%. For \textsc{ActionVLA} and \textsc{LAPA}, we train with a batch size of 128 and with image augmentation for real-world finetuning.
+
+
+\section{Experimental Result Analysis}
+%  win rate, analysis 
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Pretraining trajectories statistics for downstream tasks.} Number of trajectories that are the same task with evaluation task for each pretraining dataset: Bridgev2, Open-X, and Something Something V2 (Sthv2) dataset.}
+\begin{tabular}{lccc}
+\toprule
+Task & Bridgev2 & Open-X & Sthv2 \\
+\midrule
+Knocking & 2 & 7,969 & 6,655 \\
+Covering & 898 & 5,026 & 6,824 \\
+Pick \& Place & 10,892 & 911,166 & 3,272 \\
+\bottomrule
+\end{tabular}
+\label{tab:task_freq}
+\end{table}
+
+We further analyze the real-world robot results shown in Figures \ref{fig:real_world} and \ref{fig:sthv2_real}, focusing on how the task distribution in pretraining data impacts downstream performance.
+Table \ref{tab:task_freq} presents the number of trajectories corresponding to each evaluation task (Knocking, Covering, and Pick \& Place) across pretraining datasets (Bridgev2, Open-X, and Something Something V2 (Sthv2)), determined through \textit{lexical} matching. We expect future work to use other methods of analyzing the relationship between pertaining and fine-tuning task distributions that capture \textit{semantics} of the task rather than simple lexical matching. We perform this analysis to get a sense of how the task distribution in the pretraining data affects downstream task performance. 
+
+\paragraph{Knocking} There are almost no knocking-related trajectories in Bridgev2. This scarcity may explain why models trained on Bridgev2 performed worse compared to those trained on Sthv2, despite a larger embodiment gap in the Sthv2 dataset (Figure \ref{fig:sthv2_real}).
+
+\paragraph{Covering} A similar trend is observed for the covering task. Given that the number of covering trajectories in Bridgev2 is relatively small compared to the Sthv2 dataset, models trained on Bridgev2 occasionally underperform compared to LAPA trained on Sthv2. 
+
+\paragraph{Pick \& Place} For the pick and place task, the trend reverses. The number of pick and place tasks in Sthv2 is relatively small compared to Bridgev2 and Open-X, which might explain why LAPA trained on Sthv2 significantly underperforms models trained on Bridgev2 or Open-X. Based on these results, we expect that pretraining on videos encompassing a wide range of skills will lead to a more robust generalist policy compared to training on robot videos with narrower skill sets. We also expect future research to provide a more in-depth analysis of the relationship between task distribution in pretraining data and performance on downstream tasks.
+
+\begin{figure}[ht!] 
+\centering
+\begin{subfigure}[b]{0.4\textwidth}
+\includegraphics[width=\textwidth]{figures/pair_test2.png}
+\caption{\textbf{Win rate (\%) disregarding ties.}}
+\end{subfigure}
+\begin{subfigure}[b]{0.5\textwidth}
+\includegraphics[width=\textwidth]{figures/pair_test1.png}
+\caption{\textbf{Win rate (\%) with ties.}}
+\end{subfigure}
+\caption{\small{\textbf{Pairwise win rate (\%)}. We compare a pairwise win-rate of OpenVLA and LAPA across the 54 evaluation rollouts in the real-world. (a) shows the win-rate while ignoring the ties and (b) shows the ties together with the individual wins.}}
+\label{fig:pairwise}
+\vspace{-3mm}
+\end{figure}
+
+We also present the win rate of LAPA (Open-X) against OpenVLA (Open-X). As illustrated in Figure \ref{fig:pairwise}, LAPA outperforms OpenVLA in 65.4\% when disregarding the ties. When considering the ties, LAPA outperforms OpenVLA in 31.5\% of cases, while OpenVLA prevails in only 16.7\%. Interestingly, they tie in 51.9\% of the trials, suggesting that in about half the instances, both models either fail or achieve a similar partial success score. Note that these evaluations were performed while ensuring that the target and distractor objects were in identical initial locations during evaluation, alternating the models during evaluation. These results provide insight into the statistical significance of the comparison, supporting the use of multiple metrics to ensure a more comprehensive evaluation of physical robot performance in real-world scenarios~\citep{kress2024robot}, not only the average success-rate across all of the evaluation rollouts.
+
+\section{Detailed Latent Action Analysis}
+\label{appen:qual_analysis}
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/latent_analysis.pdf}
+    \caption{\small{\textbf{Latent Action Analysis in Language Table.} We condition the current observation $x_1$ and quantized latent action to the decoder of the latent action quantization model. We observe that each latent action can be mapped into a semantic action. For example, latent action 0 corresponds to moving a bit left and forward and corresponds to moving a bit left and back.}}
+    \label{fig:latent_analysis_lang}
+\end{figure}
+
+We provide further qualitative analysis of LAPA. First, we analyze latent actions learned from Language Table with vocabulary size of 8 and sequence length of 1. In Figure \ref{fig:latent_analysis_lang}, we show that each latent action corresponds to a semantic action (0: Move left and forward, 1: Move left and back, 2: Move right and back, 3: Move right slightly, 4: Move right, 5: Move back, 6: Do not move, 7: Move forward). We observe that increasing the latent action vocabulary size leads to capturing a more fine-grained information. 
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/langtable_analysis_map.png}
+    \caption{\small{\textbf{Correlation of latent action with ground-truth actions} When we map latent actions to ground-truth 2 DOF actions of Language Table, we observe that latent actions are well-clustered in the actual 2D action space.}}
+    \label{fig:latent_analysis_lang_map}
+\end{figure}
+We analyze the relationship between latent actions with ground-truth 2 DOF actions by mapping each instance into latent action space. As shown in Figure \ref{fig:latent_analysis_lang_map}, we observe that latent actions are well-clustered in the actual 2D action space, indicating that latent actions are meaningful representations that are highly related to actual continuous actions.
+
+We further analyze the latent actions learned from human manipulation videos using the Something-Something V2 dataset. As illustrated in Figure \ref{fig:latent_analysis_sthv2}, these latent actions capture not only hand movements but also camera movements. Since the camera viewpoint varies throughout the videos in the Something-Something V2 dataset due to the videos being egocentric, our latent action quantization model also learns to represent camera movements. For instance, latent actions [3,5,2,7] and [5,6,7,6] correspond to slight downward camera movement, [4,0,0,4] and [2,3,6,6] indicate rightward movement, and [4,2,0,0] and [5,7,0,5] represent subtle upward camera shifts.
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/sthv2_camera.pdf}
+    \caption{\textbf{Latent Action Analysis in Human Manipulation Videos.} We condition the current observation $x_1$ and quantized latent action to the decoder of the latent action quantization model. We observe that each latent action can be mapped into a semantic action including camera movements. For example, latent action [3,5,2,7] corresponds to moving the camera a bit down while [4,2,0,0] corresponds to moving the camera slightly up.}
+    \label{fig:latent_analysis_sthv2}
+\end{figure}
+
+{\section{Additional Ablation Results}}
+We first analyze the effect of window size $H$ for latent action quantization process. For all robot manipulation videos, we have determined the window size depending on the fps of the video so that the next frame models 0.6 seconds ahead from the current frame. For human manipulation videos, we have set the next frame to be 2.4 seconds ahead since we qualitatively observed that many of the frames of the human videos contain much less dynamic actions compared to robot videos. (However, we think that filtering these frames could make the window size the same as robot videos, which we leave as future work.). We have added an ablation experiment on the window size for robot videos (Bridgev2) by evaluating on SIMPLER in Figure \ref{fig:window_size}. Note that the default is $H=3$ because Bridgev2 is collected with 5hz.
+The results show that LAPA is quite robust to different window sizes. However, if the window size is extremely large, performance degradation is observed. This is expected since our quantization model is relatively small (300M parameters), it faces difficulties modeling latent information when the visual deltas are significant. 
+
+We also analyze the data scaling in terms of fine-tuning data by comparing with \textsc{Scratch}. We evaluate on SIMPLER. As shown in Figure \ref{fig:finetuning_scale}, LAPA (Bridge) consistently outperforms \textsc{Scratch} even when the fine-tuning data instances are small while the absolute performance increases with larger fine-tuning data.
+
+For data scaling, we also analyze the data scaling of human videos. We compare LAPA trained from 10\% of Sthv2 human video dataset with LAPA trained from the whole Sthv2 human video dataset. Results in Table \ref{tab:simpler_detailed_human} show that scaling the human video datasets boosts the performance for SIMPLER benchmark not only for the final success for all subtasks. We leave exploring scaling law for human videos more extensively or future work, since showing scaling law requires intensive computational resources to do different ablations of model size, data size, and computational resources.
+
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.35\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ablation_window_size.pdf}
+        \caption{Window Size}
+        \label{fig:window_size}
+    \end{subfigure}
+    \hspace{5mm}
+    \begin{subfigure}[b]{0.35\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ablation_finetune_data_scale.pdf}
+        \caption{Fine-tuning Data Scale}
+        \label{fig:finetuning_scale}
+    \end{subfigure}
+    \caption{\small{\textbf{Additional Ablation Results of LAPA.} We further analyze the performance of LAPA by varying the window size for latent action quantization and fine-tuning data scale. We report the average success rate in SIMPLER.}}
+    \vspace{-3mm}
+    \label{fig:scaling_additional}
+\end{figure}
+
+Finally, we vary the latent action length and vocabulary size in Language Table, extending the result of Figure \ref{fig:scaling} which was analyzed in Bridgev2 data. 
+As shown in Figure \ref{fig:scaling_langtable}, increasing the sequence and vocab size increases the performance. However, unlike SIMPLER, we observe that the increasing the latent action vocab size is much more effective compared to increasing the latent action sequence length in terms of absolute performance. This implies that for environments that are visually simple, increasing the latent action vocabulary might be more effective compared to sequence length.
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.35\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/langtable_ablation_codebook_seq.pdf}
+        \caption{Latent Action Seq}
+        \label{fig:subfig1_lang}
+    \end{subfigure}
+    \hspace{5mm}
+    \begin{subfigure}[b]{0.35\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/langtable_ablation_codebook_vocab.pdf}
+        \caption{Latent Action Vocab}
+        \label{fig:subfig2_lang}
+    \end{subfigure}
+    \caption{\small{\textbf{Ablation Results of LAPA in Language Table}. We try various latent action vocab and sequences of LAPA  and show the downstream average success rate (\%) on the Language Table fine-tuning tasks.}}
+    \label{fig:scaling_langtable}
+\end{figure}
+
+\section{Detailed Experimental Results}
+\label{appen:results}
+\subsection{Language Table}
+\label{appen:lang_table_results}
+We provide the detailed results of the experiments performed on the Language Table benchmark in Table \ref{tab:langtable_seen_in_domain}, \ref{tab:langtable_unseen_in_domain}, \ref{tab:langtable_seen_cross_task}, \ref{tab:langtable_unseen_cross_task}, \ref{tab:langtable_seen_cross_env}, \ref{tab:langtable_unseen_cross_env}. For all of the tables in the appendix, we \textbf{bold} the best result among the comparisons and \underline{underline} the second best. Each value denotes the success rate (\%). 50 evaluation rollouts are performed for each task category, resulting in 250 total evaluation rollouts per model for each table.
+
+We also show the qualitative result of \textsc{UniPi} where the diffusion model generates the correct plan for simple and short-horizon tasks (e.g. separate tasks). However, the diffusion model generates the wrong plan corresponding to the instruction when the task requires longer horizon planning (Figure \ref{fig:unipi}). 
+
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/unipi.pdf}
+    \caption{\small{\textbf{Success and Failure Cases of \textsc{UniPi}.} (Top) Given the instruction of `move the green block away from the red cube and red pentagon', the diffusion model of \textsc{UniPi} successfully generates the plan. (Bottom) Given the instruction of `put the blue moon toward the yellow block', the diffusion model fails to generate the correct plan.}}
+    \label{fig:unipi}
+\end{figure}
+\begin{table}[h!]
+\centering
+\caption{\textbf{Language Table In-Domain Seen Results.} }
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+ & \textsc{Scratch} & \textsc{UniPi} & \textsc{VPT} & \textsc{LAPA} & \textsc{ActionVLA} \\
+\midrule
+Block2Block & 4.0 & 14.0 & 36.0 & \underline{58.0} & \textbf{76.0} \\
+Block2Absolute & 6.0 & 4.0 & 38.0 & \underline{56.0} & \textbf{72.0} \\
+Block2BlockRelative & 10.0 & 12.0 & 48.0 & \underline{52.0} & \textbf{76.0} \\
+Block2Relative & 6.0 & 10.0 & 26.0 & \underline{48.0} & \textbf{70.0} \\
+Separate & 52.0 & 72.0 & 70.0 & \textbf{96.0} & \underline{90.0} \\
+\midrule
+\textbf{AVG} & 15.6 & 22.4 & 43.6 & \underline{62.0} & \textbf{76.8} \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:langtable_seen_in_domain}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Language Table In-Domain Unseen Results.} }
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+ & \textsc{Scratch} & \textsc{UniPi} & \textsc{VPT} & \textsc{LAPA} & \textsc{ActionVLA} \\
+\midrule
+Block2Block & 8.0 & 4.0 & 26.0 & \underline{50.0} & \textbf{62.0} \\
+Block2Absolute & 10.0 & 6.0 & 42.0 & \underline{48.0} & \textbf{58.0} \\
+Block2BlockRelative & 2.0 & 6.0 & 20.0 & \underline{28.0} & \textbf{48.0} \\
+Block2Relative & 8.0 & 6.0 & 32.0 & \underline{38.0} & \textbf{44.0} \\
+Separate & 48.0 & 44.0 & 44.0 & \textbf{84.0} & \underline{82.0} \\
+\midrule
+\textbf{AVG} & 15.2 & 13.2 & 32.8 & \underline{49.6} & \textbf{58.8} \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:langtable_unseen_in_domain}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Language Table Cross-Task Seen Results.} }
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+ & \textsc{Scratch} & \textsc{UniPi} & \textsc{VPT} & \textsc{LAPA} & \textsc{ActionVLA} \\
+\midrule
+Block2Block & 18.0 & 12.0 & \underline{74.0} & \underline{74.0} & \textbf{76.0} \\
+Block2Absolute & 8.0 & 6.0 & 56.0 & \underline{62.0} & \textbf{72.0} \\
+Block2BlockRelative & 6.0 & 2.0 & 62.0 & \underline{72.0} & \textbf{76.0} \\
+Block2Relative & 24.0 & 16.0 & \textbf{72.0} & 60.0 & \underline{70.0} \\
+Separate & 80.0 & 68.0 & \underline{96.0} & \textbf{98.0} & 90.0 \\
+\midrule
+\textbf{AVG} & 27.2 & 20.8 & 72.0 & \underline{73.2} & \textbf{76.8} \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:langtable_seen_cross_task}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Language Table Cross-Task Unseen Results.} }
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+ & \textsc{Scratch} & \textsc{UniPi} & \textsc{VPT} & \textsc{LAPA} & \textsc{ActionVLA} \\
+\midrule
+Block2Block & 16.0 & 4.0 & \textbf{66.0} & 46.0 & \underline{62.0} \\
+Block2Absolute & 10.0 & 10.0 & \underline{56.0} & 52.0 & \textbf{58.0} \\
+Block2BlockRelative & 8.0 & 10.0 & \underline{46.0} & \textbf{48.0} & \textbf{48.0} \\
+Block2Relative & 12.0 & 4.0 & \textbf{52.0} & 38.0 & \underline{44.0} \\
+Separate & 66.0 & 52.0 & \underline{84.0} & \textbf{90.0} & 82.0 \\
+\midrule
+\textbf{AVG} & 22.4 & 16.0 & \textbf{60.8} & 54.8 & \underline{58.8} \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:langtable_unseen_cross_task}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Language Table Cross-Environment Seen Results.} }
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+ & \textsc{Scratch} & \textsc{UniPi} & \textsc{VPT} & \textsc{LAPA} & \textsc{ActionVLA} \\
+\midrule
+Block2Block & 4.0 & 4.0 & 16.0 & \underline{26.0} & \textbf{66.0} \\
+Block2Absolute & 6.0 & 4.0 & 8.0 & \underline{16.0} & \textbf{58.0} \\
+Block2BlockRelative & 10.0 & 8.0 & 6.0 & \underline{20.0} & \textbf{62.0} \\
+Block2Relative & 6.0 & 4.0 & 12.0 & \underline{22.0} & \textbf{54.0} \\
+Separate & \underline{52.0} & 48.0 & 48.0 & \textbf{84.0} & \textbf{84.0} \\
+\midrule
+\textbf{AVG} & 15.6 & 13.6 & 18.0 & \underline{33.6} & \textbf{64.8} \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:langtable_seen_cross_env}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Language Table Cross-Environment Unseen Results.} }
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+ & \textsc{Scratch} & \textsc{UniPi} & \textsc{VPT} & \textsc{LAPA} & \textsc{ActionVLA} \\
+\midrule
+Block2Block & 8.0 & 2.0 & 2.0 & \underline{30.0} & \textbf{38.0} \\
+Block2Absolute & 10.0 & 6.0 & 4.0 & \underline{14.0} & \textbf{48.0} \\
+Block2BlockRelative & 2.0 & 6.0 & 2.0 & \underline{10.0} & \textbf{50.0} \\
+Block2Relative & 8.0 & 4.0 & \underline{40.0} & 18.0 & \textbf{54.0} \\
+Separate & 48.0 & 42.0 & 44.0 & \underline{76.0} & \textbf{80.0} \\
+\midrule
+\textbf{AVG} & 15.2 & 12.0 & 18.4 & \underline{29.6} & \textbf{54.0} \\
+\bottomrule
+\end{tabular}
+}
+\label{tab:langtable_unseen_cross_env}
+\end{table}
+
+
+\subsection{SIMPLER} 
+We provide results of various models evaluated on SIMPLER environment. Table \ref{tab:simpler_detailed} shows the setting where baseline models are pretrained on Bridgev2 and then finetuned on SIMPLER rollouts (100 videos). The results show detailed results for each task (stack green to yellow block, put carrot on plate, put spoon on otowel, put eggplant in basket) and subtasks (grasping and moving). As shown in Table \ref{tab:simpler_detailed}, \textsc{UniPi} significantly underperforms all other baselines on the SIMPLER Environment. We observe that, although the generated plans from the diffusion models are quite accurate, the IDM lacks the capability to predict 7 DOF continuous actions accurately when given only 100 action-labeled trajectories. Specifically, we observe that \textsc{UniPi} often fails to grasp the object within the maximum step limit. This implies the effectivness of using VLAs in scenarios with insufficient action-labeled data. Similar to the results of Section \ref{sec:langtable}, LAPA outperforms baseline models that pretrain without using ground-truth action labels (\textsc{UniPi} and \textsc{Vpt}) and closes the performance gap with \textsc{ActionVLA}, which is pretrained on all of the 60K action-labeled trajectories from the Bridgev2 dataset. This highlights the effectiveness of LAPA, even when the complexity of the action space increases. {We also evaluate the performance of \textsc{OpenVLA} fine-tuned on SIMPLER trajecotries for reference. The performance of \textsc{OpenVLA} (36.4) is similar to Scratch. The bad performance of \textsc{OpenVLA} on SIMPLER is a well known issue which is due to \textsc{OpenVLA} not being robust to real-to-sim transfer for SIMPLER.}
+
+
+We also provide detailed results of the setting where baseline models are pretrained on human manipulation videos (Something Something V2 dataset) and then finetuned on SIMPLER rollouts (100 videos) in Table \ref{tab:simpler_detailed_human}. We only compare to \textsc{UniPi}, \textsc{Vpt}, and LAPA since \textsc{ActionVLA} could not be trained without ground-truth action labels.
+\label{appen:simpler_results}
+\begin{table}[h!]
+\centering
+\caption{\textbf{SIMPLER results of Bridgev2 Pretraining.} Success, Grasping, and Moving Rates (\%) in SIMPLER environment. We pretrain \textsc{UniPi}, \textsc{Vpt}, and \textsc{LAPA} on Bridgev2 dataset without using ground-truth action labels and \textsc{ActionVLA} on Bridgev2 using action labels. {We also add the result of \textsc{OpenVLA} finetuned on SIMPLER trajectories for reference.} The main 4 tasks are: stack green to yellow block, put carrot on plate, put spoon on towel, and put eggplant in basket. Best is \textbf{bolded} and second best is \underline{underlined}.}
+\resizebox{0.7\textwidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Success Rate} & \textsc{Scratch} & \textsc{UniPi} & \textsc{Vpt} & \textsc{LAPA} & \textsc{ActionVLA} & {\textsc{OpenVLA}} \\
+\midrule
+Stack G2Y & 29.2 & 2.7 & 45.8 & \underline{54.2} & \textbf{75.0} & 41.6\\
+{Carrot2Plate} & 29.2 & 2.7 & 37.5 & 45.8 & \textbf{58.0} & \underline{50.0} \\
+{Spoon2Towel} & 50.0 & 0.0 & \textbf{70.8} & \textbf{70.8} & \textbf{70.8} & 37.5 \\
+Eggplant2Bask & 29.2 & 0.0 & \underline{50.0} & \textbf{58.3} & \underline{50.0} & 16.7 \\
+\textbf{AVG} & 34.4 & 1.3 & 51.0 & \underline{57.3} & \textbf{63.5} & 36.4\\
+\midrule
+\textbf{Grasping Rate} & & & & & \\
+\midrule
+Grasp Green Block & \underline{66.6} & 20.8 & 62.5 & 62.5 & \textbf{87.5} & 50.0 \\
+Grasp Carrot & 45.8 & 33.2 & 54.1 & 58.3 & \textbf{75.0} & \underline{66.6}\\
+Grasp Spoon & 70.8 & 22.2 & \underline{79.2} & \textbf{83.3} & \textbf{83.3} & 45.8 \\
+Grasp Eggplant & 62.5 & 16.0 & 70.8 & \textbf{83.3} & \underline{75.0} & 37.5 \\
+\textbf{AVG} & 61.4 & 23.1 & 66.7 & \underline{71.9} & \textbf{80.2} & 50.0 \\
+\midrule
+\textbf{Moving Rate} & & & & & \\
+\midrule
+Move Green Block & 58.3 & 29.1 & 58.3 & 66.6 & \textbf{91.6} & \underline{70.8} \\
+Move Carrot & 45.8 & 48.6 & 66.6 & 70.8 & \textbf{91.6} & \underline{75.0}\\
+Move Spoon & 70.8 & 34.6 & \underline{79.2} & \textbf{83.3} & \underline{79.2}  & 75.0\\
+Move Eggplant & \underline{87.5} & 58.0 & 70.8 & \underline{87.5} & \textbf{91.6} & 50.0\\
+\textbf{AVG} & 65.6 & 42.6 & 68.7 & \underline{77.1} & \textbf{88.5} & 67.7\\
+\bottomrule
+\end{tabular}
+}
+\label{tab:simpler_detailed}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{SIMPLER results of Human Manipulation Video Pretraining.} Success, Grasping, and Moving Rates (\%) in SIMPLER environment. We pretrain \textsc{UniPi}, \textsc{Vpt}, and \textsc{LAPA} on Something-Something V2 dataset without using ground-truth action labels. The main 4 tasks are: stack green to yellow block, put carrot on plate, put spoon on towel, and put eggplant in basket. Best is \textbf{bolded} and second best is \underline{underlined}.}
+\resizebox{0.6\textwidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Success Rate} & \textsc{VPT} & \textsc{UniPi} & \textsc{LAPA} & \textsc{LAPA (10\%)}\\
+\midrule
+StackG2Y & \textbf{50.0} & 0.0 & \textbf{50.0} & \underline{45.8}\\
+{Carrot2Plate} & 29.1 & 1.3 & \textbf{50.0} & \underline{41.6}\\
+{Spoon2Towel} & 37.5 & 1.3 & \underline{50.0} & \textbf{66.6} \\
+Eggplant2Bask & \textbf{66.6} & 0.0 & \underline{58.3} & 45.8 \\
+\textbf{AVG} & 45.8 & 0.7 & \textbf{52.1} & \underline{50.0}\\
+\midrule
+\textbf{Grasping Rate} & & & \\
+\midrule
+Grasp Green Block & \textbf{66.6} & 2.7 & \underline{58.3} & 50.0\\
+Grasp Carrot & \underline{45.8} & 31.7 & \textbf{62.5} & 41.6\\
+Grasp Spoon & \underline{70.8} & 21.7 & \textbf{75.0} & \underline{70.8} \\
+Grasp Eggplant & \textbf{91.6} & 6.8 & \underline{70.8} & 62.5\\
+\textbf{AVG} & \textbf{68.7} & 15.7 & \underline{66.7} & 56.2\\
+\midrule
+\textbf{Moving Rate} & & & \\
+\midrule
+Move Green Block & \textbf{62.5} & 2.7 & \textbf{62.5} & \underline{50.0}\\
+Move Carrot & \underline{58.3} & 37.5 & \textbf{70.8} & \underline{58.3} \\
+Move Spoon & {54.1} & 18.1 & \underline{75.0} & \textbf{79.2}\\
+Move Eggplant & \textbf{91.6} & 50.3 & \underline{83.3} & 62.5\\
+\textbf{AVG} & \underline{66.6} & 27.1 & \textbf{72.9} & 62.5\\
+\bottomrule
+\end{tabular}
+}
+\label{tab:simpler_detailed_human}
+\end{table}
+
+\subsection{Real-world}
+\label{appen:real_results}
+% We provide the detailed result of real world evaluation depending on the generalization type: (1) seen objects but unseen combinations, (2) unseen objects, and (3) seen objects but unseen instructions. The results are shown in Table \ref{tab:real_robot}. As shown in the table, LAPA (Open-X) outperforms OpenVLA (Open-X) on all types of generalization settings. Also, LAPA (Human Videos) shows good generalization performance, especially for unseen objects. We conjecture that this is because Something Something V2 dataset interacts with much diverse objects compared to Bridgev2.
+
+
+We also provide the full list of objects and the partial success recorded for each of the evaluation rollout: Knocking (Table \ref{tab:realresultdetail1}), Covering (Table \ref{tab:realresultdetail2}), and Pick \& Place (Table \ref{tab:realresultdetail3}). The total average success rate is provided in Table \ref{tab:realresultdetail4}).
+% \begin{table}[t!]
+% \centering
+% \caption{\textbf{Evaluation Results divided into eval types}. We average the success rate across the 3 tasks depending on what capability we are trying to quantify: (1) seen objects but unseen combinations, (2) unseen objects, and new instructions requiring semantic reasoning. Best is \textbf{bolded} and second best is \underline{underlined}.}
+% \resizebox{0.8\textwidth}{!}{
+% \begin{tabular}{lcccc}
+% \toprule
+%  & Seen Obj. & Unseen & Seen Obj. & \multirow{2}{*}{AVG} \\
+%  & Unseen Combo & Obj. & Unseen Instr.\\
+% \midrule
+% \textsc{Scratch}                      & 18.0 & 20.3 & 25.4 & 21.2 \\
+% \midrule
+% \textsc{ActionVLA} (Bridge)           & 38.3 & 31.8 & 27.7 & 32.6 \\
+% \textsc{OpenVLA} (Bridge)             & 35.6 & 34.6 & 22.1 & 30.8 \\
+% LAPA (Bridge)           & 43.4 & 31.4 & 35.6 & 36.8 \\
+% \midrule
+% \textsc{OpenVLA} (Open-X)              & \underline{46.2} & \underline{42.1} & \underline{43.4} & \underline{43.9} \\
+% LAPA (Open-X)               & \textbf{57.8} & \textbf{43.9} & \textbf{48.5} & \textbf{50.1} \\
+% \midrule
+% LAPA (Human Videos)     & 36.5 & 37.4 & 28.1 & 34.0 \\
+% \bottomrule
+% \end{tabular}}
+% \label{tab:real_robot}
+% \end{table}
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Knocking Task Results}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l|cc|ccc|c|c}
+\toprule
+& OpenVLA  & LAPA  & OpenVLA & {LAPA} & {ActionVLA} & \multirow{2}{*}{Scratch} & LAPA \\
+& (OpenX) & (OpenX)& (Bridge) & (Bridge) & (Bridge) &  & (Sthv2) \\
+\midrule
+\multicolumn{8}{c}{\textbf{Seen Objects, Unseen Object Combinations}} \\
+\midrule
+flamingo & 0 & 0.5 & 0.5 & 0.5 & 0 & 0 & 0.5 \\
+pistachios & 0.5 & 1 & 0.5 & 0 & 1 & 0 & 1 \\
+soft scrub & 0 & 0 & 0 & 0 & 0.5 & 0 & 0.5 \\
+white cup & 1 & 0 & 0 & 0.5 & 0.5 & 0.5 & 0 \\
+mustard & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+water bottle & 1 & 1 & 0.5 & 0 & 0 & 0.5 & 0 \\
+\midrule
+SUM & 2.5 & 3.5 & 1.5 & 1 & 2 & 1 & 2 \\
+\midrule
+\multicolumn{8}{c}{\textbf{Unseen Objects}} \\
+\midrule
+pringles & 0.5 & 0.5 & 0.5 & 0 & 0 & 0 & 0 \\
+hersey's chocolate syrup & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+popcorn & 0 & 1 & 1 & 1 & 1 & 0 & 1 \\
+skittles & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+green board marker & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 & 0.5 \\
+paper towel & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+\midrule
+SUM & 1 & 2 & 2 & 1.5 & 1.5 & 0.5 & 1.5 \\
+\midrule
+\multicolumn{8}{c}{\textbf{Seen Objects, Unseen Instructions}} \\
+\midrule
+a drink that contains orange & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+food to eat with milk & 0.5 & 0 & 0 & 0 & 0 & 0 & 0 \\
+a object used for cleaning & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+something to wash dishes & 1 & 1 & 0 & 0.5 & 1 & 0.5 & 0 \\
+the nuts & 1 & 1 & 0.5 & 1 & 1 & 0.5 & 1 \\
+rectangle object & 1 & 1 & 0.5 & 0.5 & 0.5 & 0 & 1 \\
+\midrule
+SUM & 3.5 & 4 & 1 & 2 & 2.5 & 1 & 2 \\
+\midrule
+Success Rate (Strict) & \underline{27.78\%} & \textbf{44.44\%} & 5.56\% & 11.11\% & 22.22\% & 0.00\% & 22.22\% \\
+Success Rate & \underline{38.89\%} & \textbf{52.78\%} & 25.00\% & 25.00\% & 33.33\% & 13.89\% & 30.56\% \\
+Reaching Success Rate & \underline{50.00\%} & \textbf{61.11\%} & 44.44\% & 38.89\% & 44.44\% & 27.78\% & 38.89\% \\
+\bottomrule
+\end{tabular}%
+}
+\label{tab:realresultdetail1}
+\end{table}
+
+% Table 2: Covering
+\begin{table}[h!]
+\centering
+\caption{\textbf{Covering Task Results}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l|cc|ccc|c|c}
+\toprule
+& OpenVLA  & LAPA  & OpenVLA & {LAPA} & {ActionVLA}& \multirow{2}{*}{Scratch} & LAPA \\
+& (OpenX) & (OpenX)& (Bridge) & (Bridge) & (Bridge) &  & (Sthv2) \\
+\midrule
+\multicolumn{8}{c}{\textbf{Seen Objects, Unseen Object Combinations}} \\
+\midrule
+icecream & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0 \\
+strawberry & 0.33 & 1 & 0.33 & 1 & 0.33 & 1 & 1 \\
+pepper & 0.33 & 0 & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 \\
+watermelon & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0 & 0.33 \\
+blue lego block & 0.66 & 1 & 1 & 1 & 1 & 0.33 & 0.33 \\
+pink duck & 0.33 & 1 & 0.33 & 0.33 & 0.33 & 0 & 0.33 \\
+\midrule
+SUM & 2.31 & 3.66 & 2.65 & 3.32 & 2.65 & 1.99 & 2.32 \\
+\midrule
+\multicolumn{8}{c}{\textbf{Unseen Objects}} \\
+\midrule
+donut & 0.33 & 1 & 0.66 & 1 & 0.66 & 0.66 & 0.33 \\
+orange & 0.33 & 0.33 & 1 & 0 & 0.33 & 1 & 1 \\
+mushroom & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 \\
+yellow lego block & 0.33 & 1 & 1 & 0.33 & 0 & 0.33 & 0.33 \\
+peas & 1 & 0 & 0.66 & 1 & 1 & 0.33 & 1 \\
+egg & 0 & 1 & 0.33 & 0 & 0.66 & 0 & 1 \\
+\midrule
+SUM & 2.32 & 3.66 & 3.98 & 2.66 & 2.98 & 2.65 & 3.99 \\
+\midrule
+\multicolumn{8}{c}{\textbf{Seen Objects, Unseen Instructions}} \\
+\midrule
+drink & 0.33 & 0 & 0.66 & 1 & 0.33 & 0.33 & 0.66 \\
+yellow object & 0.66 & 0.66 & 0 & 0 & 0.33 & 0 & 0.33 \\
+fruit & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 & 0.33 \\
+vegetable & 0.33 & 0.33 & 0 & 0.33 & 0.33 & 0.33 & 0.33 \\
+edible object & 0.33 & 0.33 & 0.66 & 0 & 0.33 & 1 & 0.33 \\
+condiment & 0.33 & 0.33 & 0.33 & 0 & 0.33 & 0.33 & 0.33 \\
+\midrule
+SUM & 2.31 & 1.98 & 1.98 & 1.66 & 1.98 & 2.32 & 2.31 \\
+\midrule
+Success Rate (Strict) & 5.56\% & \textbf{33.33\%} & 16.67\% & \underline{27.78\%} & 11.11\% & 16.67\% & 22.22\% \\
+Success Rate & 38.56\% & \textbf{51.67\%} & 47.83\% & 42.44\% & 42.28\% & 38.67\% & \underline{47.89\%} \\
+Reaching Success Rate & 16.66\% & \textbf{38.89\%} & \textbf{38.89\%} & \underline{27.78\%} & 22.22\% & 22.22\% & \underline{27.78\%} \\
+\bottomrule
+\end{tabular}%
+}
+\label{tab:realresultdetail2}
+\end{table}
+
+% Table 3: Pick&Place Sink
+\begin{table}[h]
+\centering
+\caption{\textbf{Pick \& Place Sink Task Results}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l|cc|ccc|c|c}
+\toprule
+& OpenVLA  & LAPA  & OpenVLA & {LAPA} & {ActionVLA} & \multirow{2}{*}{Scratch} & LAPA \\
+& (OpenX) & (OpenX)& (Bridge) & (Bridge) & (Bridge) &  & (Sthv2) \\
+\midrule
+\multicolumn{8}{c}{\textbf{Seen Objects, Unseen Object Combinations}} \\
+\midrule
+milk & 1 & 1 & 1 & 1 & 1 & 0 & 1 \\
+orange lego block & 1 & 1 & 0 & 1 & 0 & 0 & 0 \\
+ketchup & 0.25 & 0.25 & 0.25 & 0.25 & 0 & 0 & 0 \\
+corn & 1 & 0.75 & 1 & 0.25 & 0.25 & 0.25 & 0.25 \\
+icecream & 0.25 & 0 & 0 & 0 & 1 & 0 & 1 \\
+salt & 0 & 0.25 & 0 & 1 & 0 & 0 & 0 \\
+\midrule
+SUM & 3.5 & 3.25 & 2.25 & 3.5 & 2.25 & 0.25 & 2.25 \\
+\midrule
+\multicolumn{8}{c}{\textbf{Unseen Objects}} \\
+\midrule
+carrot & 1 & 0.25 & 0 & 0.25 & 1 & 0.25 & 0.25 \\
+yellow paprika & 1 & 1 & 0 & 0.25 & 0.25 & 0 & 1 \\
+yellow cube & 1 & 0.5 & 0.25 & 0.5 & 0 & 0 & 0 \\
+salmon sushi & 0 & 0.25 & 0 & 0.5 & 0 & 0 & 0 \\
+orange & 1 & 0 & 0 & 0 & 0 & 0.25 & 0 \\
+blue cube & 0.25 & 0.25 & 0 & 0 & 0 & 0 & 0 \\
+\midrule
+SUM & 4.25 & 2.25 & 0.25 & 1.5 & 1.25 & 0.5 & 1.25 \\
+\midrule
+\multicolumn{8}{c}{\textbf{Seen Objects, Unseen Instructions}} \\
+\midrule
+an object that is yellow & 1 & 1 & 0 & 1 & 0.25 & 0 & 0 \\
+an object that is round & 0 & 0.25 & 0 & 0 & 0 & 0.25 & 0 \\
+an object that is a fruit & 1 & 1 & 1 & 1 & 0 & 1 & 0.75 \\
+an object that you can drink & 0 & 0.25 & 0 & 0.5 & 0 & 0 & 0 \\
+an object that is a vegetable & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+an object that is an animal & 0 & 0.25 & 0 & 0.25 & 0.25 & 0 & 0 \\
+\midrule
+SUM & 2 & 2.75 & 1 & 2.75 & 0.5 & 1.25 & 0.75 \\
+\midrule
+Success Rate (Strict) & \textbf{50.00\%} & \underline{27.78\%} & 16.67\% & \underline{27.78\%} & 16.67\% & 5.56\% & 16.67\% \\
+Success Rate & \textbf{54.17\%} & \underline{45.83\%} & 19.44\% & 43.06\% & 22.22\% & 11.11\% & 23.61\% \\
+Reaching Success Rate & 66.67\% & \textbf{83.33\%} & 27.78\% & \underline{72.22\%} & 38.89\% & 27.78\% & 33.33\% \\
+\bottomrule
+\end{tabular}%
+}
+\label{tab:realresultdetail3}
+\end{table}
+
+% Table 4: Summary
+\begin{table}[h]
+\centering
+\caption{\textbf{Summary of Total Success Rates (\%)}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l|cc|ccc|c|c}
+\toprule
+& OpenVLA  & LAPA  & OpenVLA & {LAPA} & {ActionVLA} & \multirow{2}{*}{Scratch} & LAPA \\
+& (OpenX) & (OpenX)& (Bridge) & (Bridge) & (Bridge) &  & (Sthv2) \\
+\midrule & & & & & \\
+\midrule
+Total Success Rate & \underline{43.87\%} & \textbf{50.09\%} & 30.76\% & 36.83\% & 32.61\% & 21.22\% & 34.02\% \\
+Total Success Rate (Strict) & \underline{27.78\%} & \textbf{35.19\%} & 12.96\% & 22.22\% & 16.67\% & 7.41\% & 20.37\% \\
+\bottomrule
+\end{tabular}%
+}
+\label{tab:realresultdetail4}
+\end{table}
+
+% \section{Additional Ablations}
+% \label{appen:ablation}
+% \subsection{Latent Action Vocab Size}
+% \subsection{Latent Action Sequence Length}
+% \subsection{Window Size}\
+% \section{Detailed Results}
+% \subsection{Language Table}
+% \label{appen:lang_table}
+% \paragraph{Setup Details}
+% \paragraph{Results}
+% % indiv results for each task
+% \subsection{Simpler Environment}
+% \label{appen:simpler}
+% \paragraph{Results}
+
+\end{document}

@@ -1,0 +1,17 @@
+\input{figs/qualitative}
+
+\section{Evaluation Benchmark}
+\label{sec:eval}
+
+We develop a set of held-out (i.e., completely unseen) episode types that evaluate models on Movement, Grounding, Memory, Building, and Consistency capabilities. We compute FID~\cite{heusel2017gans} to measure overall visual quality and introduce a ``VLM as a judge'' metric for measuring semantic adherence to the task: we ask the VLM judge a verifiable question about a generated video, which varies by task. If its answer matches the known expected answer (e.g. the VLM indeed judges there is a player moving to the left), we count the generated video as accurate. Please see~\cref{sec:appendix_eval} for further details, including text prompts and which frames are sent to the VLM judge. Below, we describe the five evaluation tasks on which we benchmark our models and how the VLM judge is used in each of them.
+
+\textbf{Movement.} We test the model's ability to render visually consistent agent translation (WASD movement) and camera rotation (mouse commands) from both agents' views. In an episode, one bot is moving, and the other one is observing. We use the VLM to judge the position in the observer view.
+
+\textbf{Grounding.} We assess the model's ability to remember the position of the player in the world through the observation of the other player. To this end, we design an episode in the ``Superflat'' world in which two agents are near each other and facing each other. One player turns away and no longer sees the other agent, pauses, and then turns back to its original orientation. Since the turning agent is constantly observed by the stationary player, it should know its position in the world in relation to the other player. The VLM evaluates whether the turning agent sees the other player in its view after it has turned back, and whether the turning agent does not see the other player while it has turned away.
+
+\textbf{Memory.} We assess the model's ability to remember the environment and objects across time. To this end, we design an episode in the ``Superflat'' world in which two agents are near and facing each other. They both turn away from each other, pause, and then return to their original orientations. We ask the VLM whether both agents see the other player in their view after they have turned back, and whether both agents do not see the other player while they have both turned away.
+
+\textbf{Building.} We test the model's ability to reflect environmental changes caused by agents' actions. Specifically, we design a simple block-building episode in the ``Superflat'' world. We begin with two agents near each other. One bot, the builder, builds a simple pre-defined shape (square or strip). The other bot, the observer, watches as the building continues. The players look at the structure and the VLM evaluates whether the observer sees a built structure.
+
+\textbf{Consistency.} We wish to test how well the model understands the correlation between co-visible regions in the two agents' field-of-view. In a real 3D environment, if two agents located near each other turn to look at a previously unseen region, they should see the same region. Therefore, we design an episode in the ``Normal'' world in which two agents are near and facing each other. They then simultaneously turn 90 degrees to either the same side or opposite sides. The VLM judges whether their views are similar (for same-side turning) or different (for opposite-side turning).
+

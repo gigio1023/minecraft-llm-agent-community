@@ -1,0 +1,84 @@
+\section{Additional Results}
+\label{appx:extra-results}
+
+\subsection{Results with ``Oracle'' Retrieval}
+\input{tables/appx/oracle-results}
+Using the ``oracle'' retrieval method described in Section~\ref{sec:experimental-setup:input-formulation}, we show the general performance results in Table~\ref{table:main-results-oracle}. Naturally, providing only the files edited by the reference solution's pull request, model performance improves compared to the noisier BM25 retrieval setting.
+
+\subsection{Evaluation Test Set}
+\input{tables/appx/main-results-repo}
+We include a repository-by-repository breakdown of model performance in Table~\ref{table:main-results-repo} that corresponds to Figure~\ref{fig:per-repo-oracle-fig} in the main paper. As discussed, in the main paper, performance differs heavily across repositories.
+
+\subsection{GPT-4 Evaluation Subset Results}
+In this section, we present the statistics shown in Table~\ref{table:main-results} for the $25$\% random subset that GPT-4 was tested in Table~\ref{table:main-results-20}.
+As the selection of the subset is random, we find that the \% Resolved and \% Apply rates are consistent with the main results, and not significantly skewed towards being simpler or more difficult than the general evaluation set.
+
+\input{tables/appx/main-results-20}
+
+\subsection{Extended Temporal Analysis}
+
+In this section, we present an extended temporal analysis of task instances solved by year that follows the analysis shown in Table~\ref{table:temporal-results} of the evaluation section in the main paper.
+In Table~\ref{appx:temporal-results-extended}, we present the \% Resolved statistic across models under the ``Oracle" retrieval setting for $6$ different temporal partitions that group tasks by the years in which the issues were created.
+It is evident from the table that there is no consistent correlation between model performance and year, supporting our conclusion that despite having potentially seen older versions of code within its pre-training datasets, understanding and implementing in fixes in \benchmark{} is a difficult task that requires understanding and cannot be accomplished feasibly or consistently via memoization of observed data.
+
+\input{tables/appx/temporal-results-extended}
+
+\subsection{F2P, P2P Rate Analysis}
+
+In the main paper results, we present the ``\% Resolved" statistic that indicates how many task instances were \textit{completely} solved by the different models.
+In this section, we provide more fine-grained insight into the gap of task instances where 1. The model's patch generation was applied successfully and 2. The task instance was not resolved.
+Assuming a patch is applied successfully, we define $6$ cases in Table~\ref{table:six-outcome-cases} that fully capture the distribution of all possible outcomes based on the pass/fail results of F2P and P2P tests.
+In addition to the ``Resolved" outcome that has been established, we introduce five new terms.
+The ``Breaking Resolved" outcome refers to when the desired behavior of the issue has been accomplished (all F2P tests pass), but not all prior behavior is maintained (not all P2P tests pass).
+``Partially Resolved" refers to when prior behavior of a codebase was maintained (all P2P tests pass); however, the desired behavior is not fully accomplished (not all F2P tests pass).
+The ``Work in Progress" case is when the desired behavior is not fully accomplished (not all F2P tests pass) and the prior behavior of the codebase is not maintained (not all P2P tests pass).
+A ``No-Op" is when a code change does not have any effect on the original codebase; prior behavior is maintained (all P2P tests pass) but the issue remains completely unresolved ($0$ F2P tests pass).
+Finally, if the issue is unresolved ($0$ F2P tests pass) and prior working behavior is reverted (some P2P tests fail), the codebase is left in a worse state, which we define to be a ``Regression".
+
+\input{tables/appx/six-outcome-cases}
+
+In Table~\ref{table:six-outcome-stats}, we categorize patch generations that successfully applied according to these six cases.
+We find that of non-``Resolved" issues, the majority of patch generations proposed by the model do not solve a single F2P test case from the corresponding task instance (``No-Op" and ``Regression").
+Within the subset of these cases, the majority ($60\%$ to $70\%$) of cases are a No-Op, while the model breaks existing behavior for the remainder of these situations.
+
+\input{tables/appx/six-outcome-stats}
+
+Generally, the cases where model generations pass some, but not all tests (``Breaking Resolved", ``Partially Resolved", ``Work in Progress") cumulatively represent a smaller subset of problems relative to the other three categories.
+From manual inspection of several of these cases, it is clear that the model demonstrates some understanding of the task requirements.
+However, due to the baseline methods' limited view of the codebase that does not include information such as inter-file dependencies and functions' relationships, for many of these task instances often fail because a change that correctly resolves the immediate issue does not account for other modules that use and are affected by the changed entity.
+We include several case studies that directly highlight these shortcomings in Section~\ref{appx:extra-results:quality-in-depth}
+Overall, these results highlight not just the difficulty of \benchmark{}, but also point to the potential value of providing feedback via an execution environment that would allow models to run fixes against existing tests, then decide whether to continue editing or submit the patch for review.
+
+\subsection{Patch Generation Extended Analysis}
+In this section, we present a statistics to quantify various facets of patch generations following the metrics laid out in Table~\ref{table:quantitative-analysis-gens}.
+In Table~\ref{table:quantitative-analysis-gens-all}, we recalculate these values for \textit{all} patch generations in the oracle retrieval setting for all models, regardless of whether or not the patch was applied successfully.
+Across all metrics, we find that patch generations across models are much closer in size to the characteristics of average gold edits.
+While some models still generate fewer lines relative to the corresponding Gold edit (e.g., Claude-2, ChatGPT-3.5, GPT-4), the SWE-Llama models edits are on average longer in most respects..
+When considering both Table~\ref{table:quantitative-analysis-gens} and Table~\ref{table:quantitative-analysis-gens-all}, it becomes clear that models struggle with generating longer output sequences to be correctly formatted patches.
+Further inspection of such occurrences, as shown in our case studies in Section~\ref{appx:extra-results:quality-in-depth}, indicate that hallucinations, abiding to existing code style/structure, and referencing long range dependencies correctly are common errors that surface more frequently in longer generations.
+
+\input{tables/appx/quantiative-analysis-gens-all}
+
+\subsection{Software Engineering Metrics}
+We perform preliminary evaluations that explore using \textit{software engineering} metrics to evaluate the efficiency and complexity of large code blocks integrated within a complex codebase.
+Unlike semantic similarity scoring functions for evaluating fluency and surface form likeness that are popular with traditional NLP benchmarks and have been adopted for code generation, metrics such as Cyclomatic complexity~\cite{mccabe1976complexity} and Halstead complexity measures~\cite{Halstead1977ElementsOS} are founded upon logical abstractions (e.g., Abstract Syntax Trees) and software principles to quantify the complexity, efficiency, and readability of code as a scalar value.
+The patch generations and \benchmark{} evaluation logs are rich sources of information that software engineering metrics and static analyzers can readily be applied to.
+Unlike small, code contest benchmarks where the insights of software engineering metrics are not meaningful due to the minuscule scope of the target functionality, \benchmark{}'s task is complex enough that practitioners can use these tools to gain well-structured, rigorous, and wide-ranging feedback signals on the complexity of a patch generation's change and its effect on the rest of the codebase.
+
+\input{figures/swe-metrics-study}
+
+We include our exploratory work here that demonstrates how software engineering metrics can reliably capture characteristics of code quality, and how comparing these statistics across two patches can provide automatic observations about model capabilities.
+We use the Radon package\footnote{Radon \href{https://radon.readthedocs.io/en/latest/}{Documentation}, open-source \href{https://github.com/rubik/radon}{codebase}}, a library for computing different software engineering metrics directly from source code.
+
+We look specifically at successfully applied Claude 2 patch predictions in the ``Oracle" retrieval setting for the \texttt{psf/requests} repository, which several models perform best at as reflected in Figure~\ref{fig:per-repo-oracle-fig}.
+Per prediction, we apply the patch to the codebase, then calculate the Cyclomatic complexity and Halstead complexity scores for the modified functions.
+Cyclomatic complexity quantifies the control flow of a function, counting the number of independent execution paths through the source code~\citep{mccabe1976complexity}.
+A higher Cyclomatic complexity score suggests a more complex function that has higher likelihood of defects and usually suggests difficult maintainability.
+Halstead complexity counts the number of operators and operands in a program~\citep{Halstead1977ElementsOS}.
+Per prediction, we also perform the same set of steps for the corresponding gold patch.
+
+We find that software engineering metrics provides automatic qualitative insights into model performance.
+Consider the following simple case study in Figure~\ref{fig:swe-metrics-comparison}.
+While the model patch prediction (left) is fewer lines ($6$ instead of $11$) and modifies fewer files ($1$ instead of $2$) compared to the gold reference solution (right), the model's edit places a conditional within a relatively complex and widely used \texttt{HTTPAdapter} class.
+This introduces two new potential execution outcomes, raising the Cyclomatic complexity of \texttt{HTTPAdapter} from $3$ to $5$.
+In contrast, while longer, the reference solution imports intra-module dependencies, modifies a logically simpler function in \texttt{get\_connection}, and defines a new error type \texttt{InvalidProxyURL} to capture the novel bug described by the issue.

@@ -1,0 +1,102 @@
+
+
+
+
+
+Recall that when we specialize to the maximum-likelihood sharpening self-reward, the
+\bestofnalg algorithm takes the form \iclr{$\pihatbon = \argmax_{\pi \in \Pi}\sum_{i=1}^{n}\log\piref (\ybon_i\mid{}x_i\givebase)$,}
+\arxiv{\[
+    \pihatbon = \argmax_{\pi \in \Pi}\sum_{i=1}^{n}\log\piref (\ybon_i\mid{}x_i\givebase),
+\]}
+where
+$\ybon_i=\argmax_{j\in\brk{N}}\crl*{\log\piref(y_{i,j}\mid{}x_i\givebase)}$
+for $y_{i,1},\ldots,y_{i,N}\sim\piref(\cdot\mid{}x_i)$.
+
+To analyze \bestofnalg, we first make a realizability
+  assumption. Let $\pin(x)$ be the distribution of the
+random variable
+$\ybon_N(x)\sim\argmax\crl*{\log\piref(y_i\mid{}x)\mid{}y_1,\ldots,y_N\sim\piref(x)}$.
+\begin{assumption}\label{assumption:bon-realizability}
+  The model class $\Pi$ satisfies $\pin\in\Pi$.
+\end{assumption}
+Our main guarantee for \bestofnalg is as follows.\loose
+\iclr{
+  \begin{theorem}[Sample complexity of \bestofnalg]
+  \label{thm:bestofn}
+  Let $\eps,\delta,\deltafail\in(0,1)$ be given, and suppose we
+  set $n=c\cdot\frac{\log(\abs{\Pi}\deltaf^{-1})}{\delta\eps}$ and
+  $\Nstar=c\cdot\frac{\Cstar \log(2\delta^{-1})}{\eps}$ for an
+  appropriate constant $c>0$. Then with probability at least
+  $1-\deltafail$, \bestofnalg produces a model $\pihat$ such that that $  \bbP_{x\sim\cdist}\brk*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}
+  \leq \eps$, and has total sample complexity\footnote{We focus on
+    finite classes for simplicity, following a convention in
+    reinforcement learning theory
+    \citep{agarwal2019reinforcement,foster2023foundations}, but our
+    results extend to infinite classes through standard
+     arguments.\loose}
+\begin{align}
+  \label{eq:bestofn_sample}
+  m = O\left(\frac{\Cstar\log(\abs{\Pi}\delfail^{-1})\log(\delta^{-1})}{\delta\eps^2}\right).
+\end{align}
+\end{theorem}}
+\arxiv{
+  \begin{theorem}[Sample complexity of \bestofnalg]
+  \label{thm:bestofn}
+  Let $\delfail,\delta\in(0,1)$ be given, and suppose we set
+  $N=\Nstar\log(2\delta^{-1})$ for a parameter $\Nstar\in\bbN$. If
+  \cref{assumption:bon-realizability} holds, then
+  for any $n\in\bbN$, \bestofnalg produces a model $\pihat$ such that with probability at least $1-\delfail$, 
+  \begin{align}
+    \bbP_{x\sim\cdist}\brk*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}
+    \approxleq{} \frac{1}{\delta}\cdot{}\frac{\log(\abs{\Pi}\delfail^{-1})}{n} + \frac{\Cstar}{\Nstar}.
+  \end{align}
+In particular, given $(\eps,\delta)$, by setting
+$n=c\cdot\frac{\log\abs{\Pi}}{\delta\eps}$ and $\Nstar=c\cdot\frac{\Cstar}{\eps}$ for an appropriate constant $c>0$,
+we are guaranteed that $  \bbP_{x\sim\cdist}\brk*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}
+  \leq \eps$, 
+and have total sample complexity
+\begin{align}
+  \label{eq:bestofn_sample}
+  m = O\left(\frac{\Cstar\log(\abs{\Pi}\delfail^{-1})\log(\delta^{-1})}{\delta\eps^2}\right).
+\end{align}
+\end{theorem}}
+This result shows that \bestofnalg, via \cref{eq:bestofn_sample}, is minimax
+  optimal in the \framework framework when $\delta$ is constant. In
+particular, the sample
+complexity bound in \cref{eq:bestofn_sample} matches the lower bound
+in \cref{thm:lower} up to polynomial dependence on $\delta$ and
+logarithmic factors. Whether the $1/\delta$ factor in
+\cref{eq:bestofn_sample} can be removed is an interesting technical question,
+but may not be practically consequential because---as discussed in \cref{sec:sample}---the regime $\delta<1/2$ is
+most meaningful for autoregressive language modeling.
+
+\begin{remark}[On realizability and coverage]\label{rmk:realizability}
+  Realizability assumptions such as
+  \cref{assumption:bon-realizability} (which asserts that the class $\Pi$ is powerful
+  enough to model the distribution of the \bestofn responses) are
+  standard in learning theory
+  \citep{agarwal2019reinforcement,\arxiv{lattimore2020bandit,}foster2023foundations},
+  though certainly non-trivial (see \cref{sec:hardness} for a natural
+  example where they may not hold). The coverage assumption, while
+  also standard, when combined with the hypothesis that
+  high-likelihood responses are desirable, suggests that $\pibase$ generates high-quality responses with
+  reasonable probability. In general, doing so may require leveraging non-trivial \emph{serial} computation at inference time via procedures such as Chain-of-Thought~\citep{wei2022chain}. Although recent work shows that such serial computation \emph{cannot} be amortized~\citep{li2024chain,malach2023auto}, \sftalg instead amortizes the \emph{parallel} computation of \bestofn sampling, and thus has different representational considerations. 
+\end{remark} 
+  
+
+\paragraph{Benefits of adaptive sampling}
+\bestofnalg is optimal in the \framework
+framework, but we show in \cref{sec:adaptive} that a variant which selects
+the number of responses adaptively based on the prompt $x$ can bypass
+this lower bound, improving the $\eps$-dependence in
+\cref{eq:bestofn_sample} from $\frac{1}{\eps^2}$ to $\frac{1}{\eps}$.\loose
+
+\iclr{
+\paragraph{Empirical validation} In \Cref{app:experiments}, we empirically investigate the benefits of \bestofn on a variety of model-dataset pairs.  Our results are summarized in \Cref{tab:performance} and
+  \cref{fig:training_curve_phi,fig:training_curve_mistral}, and broadly show that the benefits incurred through the inference-time sharpening described above can be, to a certain extent, amortized into training time.
+}
+
+
+
+
+

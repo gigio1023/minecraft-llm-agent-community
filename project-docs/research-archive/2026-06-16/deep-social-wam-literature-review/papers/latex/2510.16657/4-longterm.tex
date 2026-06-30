@@ -1,0 +1,65 @@
+\section{Iterative Retraining  Converges to the Verifier's Knowledge Center}
+
+
+\textcolor{black}{
+Having established that a single round of verifier-based retraining can improve estimation through a bias--variance trade-off, a natural question arises:
+\emph{can this improvement be sustained over multiple rounds, and what is the eventual outcome?}
+To contextualize our long-term analysis within the broader literature on model collapse, we first formalize these widely discussed empirical phenomena within our linear regression setting.
+Specifically, we define \textbf{Model Degradation/Collapse} as $\limsup_{k \to \infty} \text{MSE}(\hat{\theta}^k)> \text{MSE}(\hat{\theta}^0)$,
+and \textbf{Model Improvement} as $\limsup_{k \to \infty} \text{MSE}(\hat{\theta}^k) < \text{MSE}(\hat{\theta}^0)$.
+}
+
+
+Our key finding is that both behaviors can occur in long-term iterative retraining. 
+The outcome depends critically on three factors: the growth rate of synthetic data, the verifier's bias, and the verifier's capability (i.e., its ability to reduce variance). 
+Over time, iterative retraining injects increasingly more verifier knowledge into the estimator, while the contribution from the original data gradually decays. 
+As a result, the verifier and the generative model family eventually dominate the limit behavior, driving the estimator $\hat{\theta}^k$ toward a fixed point, which corresponds to the verifier's knowledge center $\theta_c$. 
+
+This dynamic gives rise to three distinct phases of long-term behavior: \textbf{(1) Unbiased verifier:} If the verifier is unbiased (i.e., $\theta_c= \theta^\star$), iterative retraining yields continuous improvement and the estimator converges to the true parameter.
+\textbf{(2) Mildly biased verifier:} With small bias, iterative retraining can improve performance in the short term by reducing variance, but performance eventually plateaus or deteriorates as verifier bias accumulates.
+\textbf{(3) Strongly biased verifier:} With large bias, iterative retraining leads to degradation and may even cause collapse in the limit.
+\textcolor{black}{Among these, the mildly biased case is the most practically relevant.
+It highlights a cautionary message:
+while synthetic retraining can initially boost accuracy, a perfectly unbiased verifier is unrealistic; consequently, this inherent bias will ultimately prevent sustained improvement.}
+
+Formally, the following theorem characterizes the long-term behavior of the estimator $\hat{\theta}^k$ in linear regression under   verifier-based synthetic retraining.
+
+\begin{theorem}\label{thm:linear:long_term}  
+% Assume $X^0$ satisfies the same conditions as in Theorem~\ref{thm:linear:one_step}.
+There exist synthetic retraining processes (e.g., Algorithm~\ref{alg:linear_retraining}) and a constant $0<\rho < 1$ such that:
+\vspace{-3mm}
+\begin{align}
+\mathbb{E} \|\hat{\theta}^k-\theta_c\|^2 \leq \rho^{2k} \mathbb{E}\|\hat{\theta}^0-\theta_c\|^2 + p\sigma^2\sum_{j=0}^{k-1}\frac{\rho^{2(k-j)-1}}{n_j}. \label{equ:linear:mse_long_term}
+\end{align}
+
+where $n_1 \leq n_2 \leq \cdots \leq n_k \cdots$ denote the number of verified synthetic samples per direction at each iteration.
+In particular, if $\lim_{k \to \infty} n_k = \infty$, then $\lim_{k \to \infty} \mathbb{E}\|\hat{\theta}^k - \theta_c\|^2 = 0$.
+\end{theorem}
+
+
+
+The proof of Theorem~\ref{thm:linear:long_term} is provided in Appendix~\ref{app:linear}, utilizing concentration bounds and supermartingale inequalities to establish convergence.
+Here we focus on the main intuition and highlight the key novelty of our analysis.  
+
+The central observation to establish Theorem~\ref{thm:linear:long_term} is that the iterative retraining procedure (see Figure~\ref{fig:pipeline}) induces a \emph{Markov process}: the next state $\hat{\theta}^{k+1}$ depends only on the current state $\hat{\theta}^k$.  
+Formally, the update can be expressed as
+\begin{align}
+\hat{\theta}^{k+1} = T(\hat{\theta}^k) + \eta_{k+1}, \label{equ:linear:intuition}
+\end{align}
+where $T(\cdot)$ is a deterministic mapping determined by verifier filtering, and $\eta_{k+1}$ is a sub-Gaussian noise term due to the randomness of synthetic samples at iteration $k+1$.  
+Crucially, we show that $T(\cdot)$ is a \emph{contraction mapping}, and that the variance of the noise decays at the rate $\Var(\eta_{k+1}) \asymp 1/n_{k+1}$. This perspective allows us to view \eqref{equ:linear:intuition} as a discretized stochastic differential equation (SDE).  
+As $n_k \to \infty$, the noise term vanishes and the dynamics are dominated by the deterministic contraction $T(\hat{\theta}^k)$, which drives the recursion toward its fixed point---the verifier's knowledge center $\theta_c$.  
+The presence of the verifier is therefore \emph{essential}: it is precisely what transforms the update rule into a contraction, guaranteeing convergence.
+
+By contrast, in prior work on model collapse without a verifier (e.g., \citet{gerstgrasser2024model, xu2025probabilistic}), the update reduces to the identity mapping.  
+In that case, increasing the synthetic sample size can suppress noise accumulation and ensure bounded error (i.e., $\text{MSE}(\hat{\theta}^k) < \infty$), but there is no contraction and hence no convergence or sustained improvement. 
+%The critical difference between $T(\cdot)$ and the identity is exactly the knowledge extracted from the verifier through synthetic data.
+\textcolor{black}{The knowledge extracted from the verifier is precisely what elevates $T(\cdot)$ beyond an identity mapping.}
+Our analysis is the first to formally show that the verifier fundamentally alters the long-term dynamics: it continuously injects knowledge, iteration by iteration, so that the estimator moves closer to $\theta_c$ over time.  
+
+This contribution also clarifies a common misconception: even with a perfect verifier ($\theta_c = \theta^\star$) and infinitely many synthetic samples in one iteration, convergence cannot occur in a single step.  
+As shown in Theorem~\ref{thm:linear:one_step}, while infinite samples remove the synthetic variance term, the verification error term persists.  
+Thus, convergence requires the \emph{iterative} action of the verifier, which gradually aligns the estimator with the truth.
+
+
+

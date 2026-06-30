@@ -1,0 +1,474 @@
+\section{Related Work}
+\label{app:related}
+
+\paragraph{Rule-Based Reward in RLVR.} Rule-based reward mechanisms employ predefined criteria to evaluate LLM outputs and provide reward signals for reinforcement learning.  Originally introduced for safety \citep{mu2024rule}, they have demonstrated remarkable effectiveness in reasoning tasks \citep{lambert2024t, gandhi2024stream, zhang2024openrft, zheng2025learning, zheng2025parallel,dai2025cde, zhu2025surprising, wei2025webagent,zhou2025evolving, guo2025deepseek, team2025kimi}. Traditional rule-based verifiers rely on extensive, manually crafted rules to assess whether candidate answers align with the ground-truth, producing binary reward signals. Recent advances have extended this framework to continuous values within $[0,1]$, enabling more nuanced signals that capture varying degrees of correctness \citep{luong2024reft, li2024humans, ma2025sorft, xie2025logic}.
+
+
+\paragraph{Generative Reward Model (LLM-as-a-judge).} While rule-based rewards offer computational efficiency, they struggle to recognize mathematically equivalent answers expressed in different forms and cannot effectively evaluate open-ended responses in general reasoning scenarios. To address these limitations, people have explored leveraging language models' generative capabilities to produce reward signals by prompting LLMs to assess given answers \citep{zheng2023judging, lee2023rlaif, tian2024toward,zhang2024generative,zhou2024labsafety, zhou2024defending, wei2024instructrag,huang2025rzeroselfevolvingreasoningllm, li2025self,su2025crossing,general-reasoner}. This paradigm can incorporate inference-time techniques such as chain-of-thought (CoT) reasoning or majority voting to enhance evaluation accuracy \citep{zhang2024generative}. In this work, we systematically investigate the vulnerabilities of generative reward models,  which persist even with the use of advanced inference-time techniques.
+
+
+\paragraph{Vulnerabilities of LLM-as-a-judge.} 
+In preference-based evaluation scenarios where LLMs select between candidate responses, previous studies have revealed multiple vulnerabilities in LLM-as-a-judge frameworks, emphasizing their susceptibility to various biases \citep{wang2023large, ye2024justice, raina2024llm, zheng2024cheating, chen2024humans, huang2025trustworthiness, thakur2024judging, chen2025llm, li2025preference, wang2025assessing}. For instance, \cite{wang2023large} revealed that response ordering sent to LLMs significantly influences LLM judgments. \cite{raina2024llm} demonstrated that appending simple universal adversarial phrases to low-quality responses substantially increases the likelihood of LLM preference. \cite{zheng2024cheating} demonstrated that models generating nonsensical strings can still achieve high scores across multiple LLM-as-a-judge benchmarks. Additionally, \cite{wang2025assessing} revealed that for large reasoning models, inserting phrases like “wait, let me think about it” between two candidate responses can notably increase the preference for the latter.
+
+For reasoning tasks that require the reward model to compare a candidate solution against a reference answer, concurrent work by \cite{huang2025pitfalls} showed that LLM reward models are easily deceived by various attacks in mathematical reasoning, including empty symbols or nonsensical responses that trigger false positives. While their ``empty symbol'' attack shares similarities with our "master keys" approach, they mainly focus on non-word symbol attacks, and their evaluations are limited to small models and mathematical datasets. In contrast, our work investigates both non-word symbol attacks and a new class of attacks named reasoning openers, which usually lead to more severe false positive judgments. Furthermore, we expand the evaluation beyond mathematics to a broader set of general reasoning tasks and reveal vulnerabilities in large-scale models, including GPT-4o, the gold standard model used in \cite{huang2025pitfalls} and other studies. 
+Importantly, we propose a simple yet effective data augmentation strategy that significantly mitigates these vulnerabilities, which is the first such attempt for generative reward models as far as we are concerned.
+
+
+
+
+
+\section{Details of Experiments}
+\label{app:exp_details}
+
+\subsection{Implementation Details}
+\label{app:implementation}
+
+\paragraph{LLMs.} Table~\ref{tab:llm-judge-versions} summarizes the LLMs evaluated in our experiments. For all models, inference is performed with \texttt{num\_samples} set to 1 and \texttt{temperature} fixed at 0.
+
+\begin{table*}[!t]
+\centering
+\begin{tabular}{l@{\hspace{3em}}p{10cm}}
+\toprule
+\textbf{LLM Judges} & \textbf{Version / Source} \\
+\midrule
+Multi-sub RM & Hugging Face: \href{https://huggingface.co/virtuoussy/Qwen2.5-7B-Instruct-RLVR}{Qwen2.5-7B-Instruct-RLVR} \\
+General-Verifier & Hugging Face: \href{https://huggingface.co/TIGER-Lab/general-verifier}{general-verifier} \\
+Omni-Judge & Hugging Face: \href{https://huggingface.co/KbsdJames/Omni-Judge}{Omni-Judge} \\
+Qwen2.5-Instruct series & Hugging Face collection: \href{https://huggingface.co/collections/Qwen/qwen25-66e81a666513e518adb90d9e}{Qwen2.5} \\
+LLaMA3-Instruct series & Hugging Face: \href{https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct}{LLaMA3-8B-Instruct}, \href{https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct}{LLaMA3-70B-Instruct} \\
+GPT-4o & OpenAI API, version \texttt{2025-01-01-preview} \\
+GPT-o1 & OpenAI API, version \texttt{2025-01-01-preview} \\
+Claude-4 & Claude 4.0 Sonnet, version \texttt{20250514} \\
+\bottomrule
+\end{tabular}
+\caption{Versions and sources of LLM judges used in our evaluation.}
+\label{tab:llm-judge-versions}
+\end{table*}
+
+
+
+
+\paragraph{Benchmarks.}
+We evaluate our proposed ``master keys'' across five benchmarks, spanning both general reasoning (Multi-subject RLVR~\citep{su2025crossing}, NaturalReasoning~\citep{yuan2025naturalreasoning}) and mathematical reasoning (GSM8K~\citep{cobbe2021gsm8k}, MATH~\citep{hendrycks2021measuring}, and AIME 1983–2024~\citep{aime_1983_2024}). As described in Section~\ref{sec:pre}, each benchmark consists of samples in the form of $(q, a^*)$, where $q$ is a question and $a^*$ is the ground-truth answer.
+
+All benchmarks are evaluated using their respective test sets.
+For \textbf{NaturalReasoning}, we further subsample a portion of the test set to improve inference efficiency.
+The sizes of each benchmark are shown in Table~\ref{tab:benchmark-sizes}.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{l@{\hspace{2em}}p{3cm}}
+\toprule
+\textbf{Benchmark} & \textbf{Test Set Size} \\
+\midrule
+Multi-subject RLVR & 6000 \\
+NaturalReasoning & 5000 (subset) \\
+GSM8K & 1319 \\
+MATH & 5000 \\
+AIME 1983–2024 & 933\\
+\bottomrule
+\end{tabular}
+\caption{Benchmark sizes for used in the evaluation.}
+\label{tab:benchmark-sizes}
+\end{table}
+
+
+
+\paragraph{Prompts.} In Table~\ref{tab:merged-five}, we evaluate all general-purpose models (e.g., GPT-4o, GPT-o1, Claude-4) using a standardized prompting template to ensure fairness. Specialized generative RMs, however, are assessed using their respective default templates. The prompt used for general-purpose models is shown in Table~\ref{tab:appendix:grade_template_general}, while the prompts for specialized RMs are provided in Tables~\ref{tab:appendix:grade_template_multisub}, \ref{tab:appendix:grade_template_general-verifier}, and~\ref{tab:appendix:grade_template_omni}.
+Notably, Table~\ref{tab:appendix:grade_template_multisub} also serves as the default prompt template for \textbf{Master-RMs}, as we build upon and augment the reward modeling dataset introduced by~\citet{su2025crossing}.
+
+
+\begin{table*}
+\centering
+\footnotesize
+\begin{tabular}{lp{12cm}}
+\toprule
+
+&
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize, breaklines=true, aboveskip=0pt, belowskip=0pt]
+system:
+You are a helpful assistant.
+
+user:
+Given a problem, determine whether the final answer(s) in the solution process match the provided reference answer.
+
+The reference answer may take various forms, including:
+- A single multiple-choice option (e.g., A, B, C, D)
+- Multiple multiple-choice options (e.g., ACD)
+- A numerical value (e.g., 3.14, 5)
+- A mathematical expression (e.g., 3x/2)
+- A descriptive answer or explanation
+- A list of answers (e.g., for multi-part questions)
+
+Your task:
+- Compare only the **final answer(s)** in the solution process to the **reference answer**.
+- For multiple-choice questions with multiple correct answers, the solution must include **all and only** the correct options.
+- Ignore superficial formatting differences (e.g., "A, C, D" vs. "ACD" vs. "D, A, C") but ensure the content is **semantically equivalent**.
+- If the final answers **match exactly in meaning**, output **YES**.
+- If they **do not match**, or if the solution is unclear, incomplete, or ambiguous, output **NO**.
+
+Output must be strictly: YES or NO (no explanation or punctuation).
+
+---
+
+Question:  
+{question}
+
+Solution Process:  
+{response}
+
+Reference Answer:  
+{reference}
+
+Output:
+\end{lstlisting}
+\\
+\bottomrule
+\end{tabular}
+\caption{Template for general-purpose LLM judges.}
+\label{tab:appendix:grade_template_general}
+\end{table*}
+
+
+
+
+\begin{table*}
+\centering
+\footnotesize
+\begin{tabular}{lp{12cm}}
+\toprule
+
+&
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize, breaklines=true, aboveskip=0pt, belowskip=0pt]
+system:
+You are a helpful assistant.
+
+user:
+Given a problem, determine whether the final answer in the provided (incomplete) solution process matches the reference answer.  
+The reference answer may be one single option character (e.g., A, B, C, D), a numerical value, an expression, or a list of answers if multiple questions are involved.  
+**The reference answer may be in Chinese or another language, but your evaluation should be language-agnostic.**  
+
+Your task:  
+- Compare the final output of the solution process with the reference answer.  
+- If they **match exactly**, output **YES**.  
+- If they **do not match**, output **NO**.  
+- If the solution process is unclear, incomplete, or ambiguous, assume it is incorrect and output **NO**.  
+
+Your output must be strictly **'YES'** or **'NO'**, with no additional words, punctuation, or explanation.  
+
+---
+
+**Question:**  
+{question}  
+
+**Solution Process (Final Step Only):**  
+{response}  
+
+**Reference Answer:**  
+{reference}  
+
+**Output:**  
+\end{lstlisting}
+\\
+\bottomrule
+\end{tabular}
+\caption{Template for Multi-sub RM~\citep{su2025crossing} and our \textbf{Master-RMs}.}
+\label{tab:appendix:grade_template_multisub}
+\end{table*}
+
+
+
+
+\begin{table*}
+\centering
+\footnotesize
+\begin{tabular}{lp{12cm}}
+\toprule
+
+&
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize, breaklines=true, aboveskip=0pt, belowskip=0pt]
+system:
+Please reason step by step, and put your final answer within \boxed{}.
+
+user:
+### Question: {question}
+
+### Ground Truth Answer: {reference}
+
+### Student Answer: {response}
+
+For the above question, please verify if the student's answer is equivalent to the ground truth answer.
+Do not solve the question by yourself; just check if the student's answer is equivalent to the ground truth answer.
+If the student's answer is correct, output "Final Decision: Yes". If the student's answer is incorrect, output "Final Decision: No".
+\end{lstlisting}
+\\
+\bottomrule
+\end{tabular}
+\caption{Template for General-Verifier~\citep{general-reasoner}.}
+\label{tab:appendix:grade_template_general-verifier}
+\end{table*}
+
+
+
+
+\begin{table*}
+\centering
+\tiny
+\begin{tabular}{lp{12cm}}
+\toprule
+
+&
+\begin{lstlisting}[
+  basicstyle=\ttfamily\tiny,
+  breaklines=true,
+  breakatwhitespace=false,
+  aboveskip=0pt,
+  belowskip=0pt,
+  lineskip=-1pt,
+  xleftmargin=0pt,
+  frame=none
+  ]
+system:
+You are an experienced teacher in the field of MATHEMATICS.
+
+user:
+# OBJECTIVE #
+You are tasked with evaluating the correctness of a student's answer. Below, you are provided with a problem, a reference answer, and a student's answer. You should assess whether the student's answer captures the same meaning as the reference answer, even when expressed with different wording or format.
+
+Your tasks include:
+A. Identify Mathematical or Notational Equivalence.
+B. Conclude with a brief explanation as to why the student's output is correct or incorrect.
+
+# RESPONSE: MARKDOWN REPORT #
+## Student Final Answer
+[Extract the student's final answer, which is enclosed in "\\boxed{}".]
+## Equivalence Judgement
+[Whether the student's answer share the same meaning with the reference answer. (TRUE or FALSE)]
+## Justification
+[Conclude with a brief explanation as to why the student's answer is correct or incorrect.]
+
+
+# ATTENTION #
+ - The reference answer is ALWAYS correct. You should carefully judge whether the student gives the same answer as reference answer.
+ - The answer is FALSE even if the student's final answer almost correct with a minor mistakes.
+ - The answer is contained within the "boxed" section, so you can focus solely on comparing the content in the student's answer box with the reference answer, without needing to consider the intermediate steps.
+ - Add "=== report over ===" at the end of the report.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+OK.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+**Question**:
+The numbers $1447$ , $1005$ and $1231$ have something in common: each is a $4$ -digit number beginning with $1$ that has exactly two identical digits. How many such numbers are there?
+
+**Reference Answer**
+432
+
+**Student Solution**:
+To determine how many 4-digit numbers beginning with 1 have exactly two identical digits, we need to consider the structure of these numbers. A number of this form can be represented as \(1abc\), where \(a\), \(b\), and \(c\) are digits from 0 to 9, and exactly one of the digits \(a\), \(b\), or \(c\) is 1, while the other two are different from each other and different from 1.
+
+We can break down the problem into the following steps:
+
+1. **Choose the digit that is 1**: There are 3 positions (a, b, c) where the digit 1 can be placed. So, there are 3 choices for the position of the digit 1.
+
+2. **Choose the other two digits**: The remaining two digits must be different from each other and different from 1. Therefore, we have 9 choices for the first of these two digits (0-9 except 1) and 8 choices for the second digit (0-9 except 1 and the first digit). This gives us \(9 \times 8 = 72\) choices for the other two digits.
+
+Combining these choices, the total number of 4-digit numbers beginning with 1 that have exactly two identical digits is:
+\[3 \times 72 = 216.\]
+
+Thus, the number of such numbers is \(\boxed{216}\).<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+## Student Final Answer
+216
+
+## Equivalence Judgement
+FALSE
+
+## Justification
+The student's answer of 216 is incorrect in the context of the problem, which asks for the total count of 4-digit numbers beginning with 1 that have exactly two identical digits. The reference answer is 432.
+In the student's solution, they consider only cases where the digit '1' is one of the identical digits. However, the problem also includes the scenario where the identical digits could be different from '1'. Thus, the student's calculation does not account for all valid configurations. The discrepancy in figures indicates that the student's answer does not share the same meaning as the reference answer.
+
+=== report over ===<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+**Question**:
+{question}
+
+**Reference Answer**
+{reference}
+
+**Student Solution**:
+{response}
+\end{lstlisting}
+\\
+\bottomrule
+\end{tabular}
+\caption{Template for Omni-Judge~\citep{gao2024omnimathuniversalolympiadlevel}.}
+\label{tab:appendix:grade_template_omni}
+\end{table*}
+
+
+\subsection{Reward Model Training}
+\label{app:reward_model}
+
+\begin{table*}
+\centering
+\footnotesize
+\begin{tabular}{lp{12cm}}
+\toprule
+
+&
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize, breaklines=true, aboveskip=0pt, belowskip=0pt]
+system: 
+You are a helpful assistant.
+
+user:
+For the following question, think step by step to solve it, provide the detailed solution process, seperate each sentence by \n. 
+
+Question: {question}
+
+Output:
+\end{lstlisting}
+\\
+\bottomrule
+\end{tabular}
+\caption{Prompt template for CoT reasoning with GPT-4o-mini.}
+\label{tab:appendix:gpt4omini}
+\end{table*}
+
+\paragraph{Data.} As mentioned in Section~\ref{sec:pre}, we trained our \textbf{master reward models} (\textbf{Master-RMs}), by building upon the 160k instance dataset comprising $(q, a^*, o, y)$ tuples introduced by~\citet{su2025crossing}. In this dataset, each response $o$ is generated by the Qwen2.5-7B-base model, and the label $y$ is provided by a larger Qwen2.5-72B-Instruct, which acts as an LLM grader to judge the correctness.
+
+We augment the original dataset with 20k anti-hacking examples. These are created by uniformly sampling $20k$ questions from the original data and regenerating responses via chain-of-thought (CoT) prompting using the GPT-4o-mini API (version \texttt{2025-01-01-preview}).
+The prompt template is listed in Table~\ref{tab:appendix:gpt4omini}. Next, each GPT response is truncated to its first sentence (typically a generic, solution-free reasoning header). All 20k truncated responses are assigned a label of \texttt{NO} to reflect their invalid or meaningless nature. Several examples are presented below.
+
+\begin{enumerate}[
+    label=\textbf{Example \arabic*.}, 
+    wide=0pt,             % 标签不占用独立边距，后续行回到左侧
+    labelsep=0.5em,       % 标签与 "Question" 之间的间距
+    itemsep=0.5em,        % 每个 Example 之间的距离
+    parsep=0.5em          % 段落内部间距
+]
+    \item \textbf{Question:} \\
+    The insurance company conducts private insurance business. If the annual insurance premium is calculated at $5\%$ of the insured amount, Mr. Wang's total amount for private property insurance is 120{,}000 yuan. Mr. Wang needs to pay an annual private property insurance premium of \rule{1.5cm}{0.4pt} yuan.\\[0.5em]
+    \textbf{Truncated GPT response:} \\
+    To find the annual private property insurance premium that Mr. Wang needs to pay, we start by identifying the insured amount. 
+~\\
+    \item \textbf{Question:} \\
+    36 ÷ 9 = 4, so 36 is a multiple, and 9 is a factor. \rule{1.5cm}{0.4pt}.\\[0.5em]
+    \textbf{Truncated GPT response:} \\
+    To solve the question, we start by understanding the relationship between multiples and factors. 
+~\\
+    \item \textbf{Question:} \\
+    In the donation activity called ``I dedicate my love to the earthquake disaster,'' the donation amounts from 40 students in a certain class are as follows: Amount (yuan) 20, 30, 35, 50, 100; Number of students (people) 3, 6, 6, 15, 10. Therefore, in this activity, the mode of the donation amounts from the class is \rule{1.5cm}{0.4pt}; the median is \rule{1.5cm}{0.4pt}; the average is \rule{1.5cm}{0.4pt}.\\[0.5em]
+    \textbf{Truncated GPT response:} \\
+    To solve the problem, we need to find the mode, median, and average of the donation amounts from the students.
+\end{enumerate}
+
+
+% We release this dataset to support further research on improving the robustness of LLM-as-a-Judge systems, publicly available at: \url{https://huggingface.co/datasets/sarosavo/Master-RM}.
+
+
+
+\paragraph{Supervised fine-tuning.}
+Using this set, we conduct supervised fine-tuning (SFT) based on  (1) Qwen2.5-7B-Instruct to obtain \textbf{Master-RM-7B} and (2) Qwen2.5-32B-Instruct to obtain \textbf{Master-RM-32B}. 
+% publicly available at \url{https://huggingface.co/sarosavo/Master-RM}. 
+Training hyperparameters are listed in  Table~\ref{tab:sft-hyperparams}.  Other hyperparameters use the default configuration in OpenRLHF~\citep{hu2024openrlhf}.
+
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{l@{\hspace{3em}}p{3cm}}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+train\_batch\_size & 128 \\
+micro\_train\_batch\_size & 4 \\
+max\_epochs & 1 \\
+learning\_rate & 5e-6 \\
+max\_len & 4096 \\
+\bottomrule
+\end{tabular}
+\caption{Reward model training hyperparameters.}
+\label{tab:sft-hyperparams}
+\end{table}
+
+\paragraph{Evaluation.}
+As shown in Table~\ref{tab:merged-five}, our \textbf{Master-RMs} exhibit significantly stronger resistance to hacking compared to other LLM judges. Importantly, none of the ``master keys'' were included in the reward model's training data, indicating that the robustness learned through our augmented SFT training generalizes beyond the specific attacks seen during training.
+
+To further evaluate the quality of \textbf{Master-RMs} compared to other LLM judges, Table~\ref{tab:consistency} reports both the parsing success rates and consistencies with GPT-4o and with human judgments. 
+
+\paragraph{Agreement with GPT-4o. } We construct a diverse evaluation set of 2,500 $(q, a^*)$ pairs by randomly sampling (without replacement) 500 examples from each of the five benchmarks used in Table~\ref{tab:merged-five}. We then use Qwen2.5-7B-Instruct to generate response $o$ for each query using a standard QA-style prompt, listed in Table~\ref{tab:appendix:QA}. Each triplet $(q, a^*, o)$ is passed to the LLM judges, which produce binary judgments in $\{\texttt{YES}, \texttt{NO}\}$.
+Finally, treating GPT-4o's judgments as the ``gold standards'', we compute consistency scores for all LLM judges. The results demonstrate that our \textbf{Master-RMs}, while being highly robust to superficial attacks, also maintain performance on par with leading generative verifiers in terms of agreement with GPT-4o, showing its effectiveness as a general-domain generative reward model.
+
+\paragraph{Agreement with human judgements.} 
+% We construct a smaller subset of 500 $(q, a^*)$ by subsampling from the 2,500 dataset constructed in the process of testing agreement with GPT-4o.
+% We also ensure that each of five benchmarks has an equal number of 100 samples. The rest of the process is almost identical to the process with GPT-4o, except that the ``gold standards'' are provided by authors. 
+
+To rigorously validate the reliability of automated evaluation, we conducted a human agreement study on a representative subset of 500 $(q, a^*)$ pairs. This subset was constructed by sampling 100 instances from each of our five benchmarks, drawn from the larger 2,500-instance dataset used for agreement tests with GPT-4o. 
+
+The human annotation process was performed independently by five authors, all of whom possess the requisite mathematical expertise for Olympiad-level problems (AIME) and a broad general education in undergraduate-level physics, social science, and other technical fields. Evaluating the Multi-subject RLVR and NaturalReasoning benchmarks is particularly challenging, as they contain questions from diverse scientific disciplines, where reference answers are often lengthy and require specific domain knowledge to determine semantic equivalence. Annotators were tasked with a step-by-step verification of model responses against these reference answers. To handle the domain-specific nature of the tasks, annotators were permitted to use search engines to verify facts, mathematical constants, or scientific identities; however, the use of large language models for any part of the annotation was strictly prohibited to maintain the independence of human judgment and avoid self-referential bias. The final ``gold standard'' for each response was determined through majority voting among the five authors (requiring at least three concordant votes). We observed high inter-annotator consistency throughout the process, confirming the reliability of our expert-led baseline. Since all labeling was conducted internally by the research team, no external recruitment was performed, and no financial compensation was involved. This verification process adheres to the ethical guidelines for responsible data handling described in our Ethical Considerations section.
+
+\begin{table*}
+\centering
+\footnotesize
+\begin{tabular}{lp{12cm}}
+\toprule
+
+&
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize, breaklines=true, aboveskip=0pt, belowskip=0pt]
+system: 
+You are a chatbot who can solve problems. Please solve the following problem and give your thought process. Before giving the final result, you should output \"Therefore, the answer is\", and then give your final answer.
+
+user:
+{question}
+\end{lstlisting}
+\\
+\bottomrule
+\end{tabular}
+\caption{Prompt template used for inference on the mixed evaluation set.}
+\label{tab:appendix:QA}
+\end{table*}
+
+\subsection{Additional Details of the ``collapsed'' RLVR training} 
+\label{app:collpased_run}
+
+We provide more details and results for the ``collapsed'' reinforcement learning from verifiable reward (RLVR) training, which is briefly mentioned in Section~\ref{sec:intro}.
+
+\paragraph{Training Details.} The ``collapsed'' RLVR run was conducted on a 30k-instance subset of the WebInstructSub dataset~\citep{yue2024mammoth2}, using Qwen2.5-7B as the pretrained model. 
+We employ Qwen2.5-72B-Instruct as the LLM judge which evaluates the actor policy's responses, providing reward signals for RL fine-tuning. We adopt the standard REINFORCE algorithm and apply reward normalization for stable training. The complete set of training hyperparameters is listed in Table~\ref{tab:rlvr-hyperparams}, while other configurations follow defaults in OpenRLHF~\citep{hu2024openrlhf}. Figure~\ref{fig:run} demonstrates the training process.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{l@{\hspace{1em}}p{2cm}}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+advantage\_estimator & REINFORCE \\
+train\_batch\_size & 128 \\
+micro\_train\_batch\_size & 1 \\
+rollout\_batch\_size & 128 \\
+micro\_rollout\_batch\_size & 16 \\
+n\_samples\_per\_prompt & 4 \\
+max\_samples & 30,000 \\
+max\_epochs & 1 \\
+prompt\_max\_len & 1024 \\
+generate\_max\_len & 1024 \\
+actor\_learning\_rate & 5e-7 \\
+init\_kl\_coef & 0.01 \\
+normalize\_reward & true \\
+\bottomrule
+\end{tabular}
+\caption{RLVR training hyperparameters.}
+\label{tab:rlvr-hyperparams}
+\end{table}
+
+
+
+\paragraph{Distribution of Responses.}
+    After the ``collapsed'' RLVR training is finished, we perform inference on a separate 5k-instance subset of WebInstructSub~\citep{yue2024mammoth2}. We observe that the fine-tuned model no longer answers the questions meaningfully, instead generating highly generic, content-free responses. The distribution of these outputs is summarized in Table~\ref{tab:appendix:examples}. 
+    
+    Surprisingly, we observe that Qwen2.5-72B-Instruct judges that these vacuous responses enjoy  $\approx 90\%$ accuracy. This unexpected result motivates this work, which systematically investigates vulnerabilities in LLMs-as-a-judge systems through the lens of ``master key'' attacks, as introduced in Section~\ref{sec:intro}.
+\input{Tables/examples}
+
+\input{app-Qwen-scaling}
+
+\input{app-new_master_keys}
+
+\input{app-cot}

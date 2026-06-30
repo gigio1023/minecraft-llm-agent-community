@@ -1,0 +1,176 @@
+We have also explored whether AI-learned tax policies improve social outcomes in economic simulations with human participants who earn real money.
+To do so, we conducted experiments on the Amazon Mechanical Turk (MTurk) platform, with participants based in the US.
+We find that the AI Economist tax policy can  transfer to simulations with people  without extensive recalibration or fine-tuning. The AI Economist achieves equality-productivity trade-offs that are competitive with the strongest baseline, the Saez tax policy (Equation \ref{eq:saezformula}), and achieves higher inverse income-weighted social welfare.
+
+\subsection{Experimental Methodology}
+\paragraph{Simulation Environment for Human Participants.}
+We used the same world layout as in the AI experiments. The world map features four quadrants, mostly separated from each other by water. Each quadrant contains only stone, wood, both resources, or neither resource.
+Each participant controls an agent with a fixed skill, set as the mean of the quartiles of a Pareto distribution with exponent $a=4$ and scale $m=1$, and each starting in one of the four corners. This starting location was randomized for each episode.
+
+We make several modifications to account for human response times, allowing  for an acceptable experiment duration and simplified controls:
+\begin{itemize}
+ \item We disable trading. We experimented with several trade inferfaces, but found none that were usable enough. Even without trading, humans experienced the same economic drivers, namely utility-maximization and diminishing returns, as the AI agents.
+ \item The only kind of action that is associated with a labor cost is the  build action. Moving around the environment and collecting resources has zero cost. To compensate for this, the cost of building a house is 50\% higher than in the AI experiment (15 vs.~10 labor units per house).
+ \item Each episode lasts five minutes. To allow for acceptable human response times we set the frame rate to ten frames per second (each frame corresponds to a new world state).
+ This provides participants with enough time to achieve reasonable performance, partially correcting for the lower response times compared with AIs.
+ \item Each episode lasts 3000 timesteps rather than 1000 timesteps, with each tax period consisting of $300$ timesteps (keeping ten tax periods in each episode).
+\end{itemize}
+\paragraph{Graphical User Interface.}
+We developed a web-based interface to let people operate in an economic simulation similar to the one used in the AI experiments. For a full visualization of the experimental flow and pages, see Appendix \ref{app:human_exp_details}.
+The interface (Figure \ref{fig:human_exp_gui}) displays agents' endowments (coin, stone, wood, houses), the remaining episode time, the last change in coin endowment, the bonus in USD, the tax schedule, the current active tax rate (which depends on the income in the current tax period), and the remaining time in the current tax period.
+
+We also provide participants with the number of profitable houses left to build (i.e., for how many more houses in the current tax period will it still remain profitable to build). This decision aid helped participants to better understand the economic environment, leading to less variance in the experimental results across trials.
+Despite this guidance, participants frequently scored lower utility than in the AI experiments. Sometimes this would come about because of adversarial behavior of others, especially resulting from people blocking other people from accessing areas with resources, or finding ways to trap people in corners.
+\paragraph{Zero-shot Transfer of Tax Models.}
+The tax models  were transfered from the AI-only setting.
+The US Federal tax rates were unchanged.
+For the Saez model, we used the average tax rate observed during an episode once training has converged.
+For the AI Economist, we identified an effective AI-driven tax schedule from the AI experiments conducted with low planner policy entropy regularization.\footnote{This model was chosen from a set of AI models that performed as well as or better than the baselines tax models.
+In particular, we found that planner policies with high entropy did not generalize as well in the zero-shot transfer setting.
+We did not retrain or fine tune the AI tax model.}
+The particular tax schedule that we use has a \camelback{} style shape, and is depicted in Figure~\ref{fig:tax_rates_with_camelback}.
+The effective taxes after redistribution are shown in Figure \ref{fig:effective_tax_camelback}.
+The \camelback{} policy achieves competitive equality-productivity and weighted social welfare (Equation \ref{eq:inv_income_weighted_utility}) in the AI-only simulations, compared to the Saez tax model.
+
+The productivity was lower in experiments with people. This is due to suboptimal human behavior, as well as lower human response times compared to AI agents.
+To ensure that all tax policies could still make use of the full range of tax brackets, we calibrated the income bracket cutoffs to approximately match the income bracket occupancy rates to those in the AI experiments, achieving this by scaling the income cutoffs down by a factor of three.
+\paragraph{The Experimental Protocol.}
+We ran all experiments with US-based participants on Amazon Mechanical Turk.
+Participants performed HITs (Human Intelligence Task). Each HIT consists of a sequence of four episodes, with a tutorial before each episode, and a post-episode survey. For detailed descriptions and visualizations of the experiment modules, see the appendix.
+
+HITs were announced  in batches of 40-60, where each unique participant could accept one assignment from each batch (but could perform more than one HIT across different batches).
+Batches were sized so that all assignments in the batch were completed within two hours, accounting for participant availability.
+Participants were instructed not to communicate with each other. Experiments were conducted during 10am-12pm and 7-10pm, Pacific Time.
+All participants were grouped into groups of four. Each group went through a sequence of four episodes, with each episode corresponding to a different tax policy (free market, US federal, Saez, and AI), these applied in random order to control for learning effects.
+\paragraph{Payment.}
+Each participant received \$5 base pay and a variable bonus of at most \$10 for each HIT. The bonus was proportional to the utility achieved by the participant, reflecting the post-tax income and the labor cost at the end of each episode.
+The US dollar (USD) bonus was computed as
+\eq{
+ \textrm{USD bonus} = \textrm{Utility} \times 0.06,
+}
+where utility was measured in units of Coins achieved by the participant in the episode.
+The effect is an average payment per HIT of \$11.26.
+Since the average duration of a HIT was approximately 30 minutes, the effective income (approximately \$20/hour)  is substantially above the US federal minimum wage (\$7.25/hour). As such, we believe that the stakes should be high enough to encourage participants to try to maximize their bonus and avoid behaviors that result in a decrease in utility.
+
+We use a set of qualification HITs to build a pool of around 300 qualified participants who are familiar with the instructions and the simulation environment.
+Qualification HITs used exactly the same rules and environment as in the main task, with the only exception being that no information about taxes was given. For instance, in the qualification, participants did not observe what the tax schedule was, nor an explanation in the tutorial as to how taxes were applied.
+In the main task, participants completed a tutorial that explained that taxes affected the income gained per house, and how this impacted their utility (and payments for the HIT).
+In an exit survey, participants were asked about their strategy, why they thought they won or lost, and what was confusing about the experiment.
+\subsection{Results}
+\paragraph{Experiment Data.}
+We report results on two batches of experiments.
+In the first batch, groups were formed with the participants who were available at the end of an episode. This allowed as many users as possible to complete four episodes (we found during qualification batches that some participants experienced technical issues that prevented them from completing four episodes in sequence).
+In the second batch, each group of 4 workers was fixed during a sequence of 4 episodes with 4 different tax models.
+The first batch consisted of 57 episodes with 58 participants.
+The second batch consisted of 68 episodes with 57 participants.
+
+Feedback from participants and manual inspection of movement patterns in rollouts suggested that there were episodes in which one or more participants suffered from connectivity issues (as evidenced by extreme lag or disconnections), did not move around the world, or in which there were other factors that severely affected proper participation.
+As such, we dropped  episodes from the analysis in which the overall productivity was less than 1000 Coin. This excluded 6 out of 57 episodes from the first batch and 8 out of 68 episodes from the second batch for our analysis.
+\paragraph{Statistical Analysis.}
+For the first batch, we test whether the difference in the social welfare  between the tax models is statistically significant. In particular, for each participant $a$,
+we compute the mean value $Z_{ai}$ of the social objective (e.g., $\equality\times\productivity$) under each tax model $i$.
+We then perform a two-sided t-test for the alternate hypothesis $Y_{a;vw}\neq 0$, with $p = 0.05$. The data consists of the differences $\brckcur{Y_{a;vw} = Z_{av} - Z_{aw}}$ for each pair of tax models $v$ and $w$, for each participant $a$ that experiences both models.
+
+For the second batch, where group consistency was enforced, we perform this test at the group level. For each group $g$, we compute the mean value $Z_{gi}$ of the social objective (e.g., $\equality\times\productivity$) under each tax model $i$.
+We then use a two-sided t-test to test the alternate hypothesis $Y_{g;vw}\neq 0$ with $p = 0.05$ on the set of differences $\brckcur{Y_{g;vw} = Z_{gv} - Z_{gw}}$, for each pair of tax models $v$ and $w$.
+\begin{figure}[t!]
+ \begin{center}
+  \begin{minipage}[b]{0.43\linewidth}
+   \begin{small}
+    \begin{center}
+     \includegraphics[width=\linewidth]{figures/human_exp_gui.jpg}
+    \end{center}
+    \caption{The web graphical user interface that human participants used in experiments.}
+    \label{fig:human_exp_gui}
+   \end{small}
+  \end{minipage}
+  \hspace{0.01\linewidth}
+  \begin{minipage}[b]{0.48\linewidth}
+   \begin{small}
+    \begin{center}
+     \includegraphics[width=\textwidth]{figures/marginal-rate-schedules-camelback-fixed.pdf}
+    \end{center}
+    \caption{The \camelback{} model used in experiments with human participants. It features higher tax rates for incomes between 39 and 160 Coins compared to baselines.}
+    \label{fig:tax_rates_with_camelback}
+    \begin{center}
+     \includegraphics[width=\textwidth]{figures/absolute-tax-schedules-camelback.pdf}
+    \end{center}
+    \caption{The effective taxes payable as a function of income under the \camelback{} schedule. The taxes grow faster under the Saez and AI Economist schedules. Note that these do not include the effect of subsidies. In effect, lower income workers receive net subsidies.
+    }
+    \label{fig:effective_tax_camelback}
+   \end{small}
+  \end{minipage}
+ \end{center}
+\end{figure}
+\begin{figure}[t!]
+ \begin{center}
+ \begin{minipage}[t]{0.6\linewidth}
+  \begin{small}
+   \begin{center}
+    \includegraphics[width=\linewidth]{figures/postprocessed/prod_eq_welfare_human.pdf}
+   \end{center}
+   \caption{Social outcomes with 58 human participants in 51 episodes (first batch episodes with productivity of at least 1000 Coin). Each episode involves four participants. The AI Economist achieves competitive equality-productivity trade-offs with Saez and US Federal, and statistically significantly outperforms the free market (at $p=0.05$). These results suggest a similar trend of improvement in equality-productivity trade-off as in the AI experiments.}
+   \label{fig:eq_prod_human}
+  \end{small}
+ \end{minipage}
+ \hspace{0.01\linewidth}
+ \begin{minipage}[t]{0.375\linewidth}
+  \begin{small}
+   \begin{center}
+    \includegraphics[width=\linewidth]{figures/postprocessed/inv_income_weighted_utility.pdf}
+   \end{center}
+   \caption{Weighted average social welfare with 51 human participants in 60 episodes (second batch episodes with productivity of at least 1000 Coin). Each episode involves four participants. The AI Economist achieves significantly higher weighted social welfare than all baselines (statistically significant at $p=0.05$).
+}
+   \label{fig:inv_income_weighted_utility_humans}
+  \end{small}
+ \end{minipage}
+ \end{center}
+\end{figure}
+\paragraph{Improved Social Outcomes.}
+In experiments with human participants, the \camelback{} tax schedule achieves an equality-productivity trade-off that is comparable to the Saez model, and with better equality-productivity performance than the US Federal and free-market approaches (see Figure \ref{fig:eq_prod_human}). We observed large variance in productivity across episodes, which can be attributed to adversarial behavior and other factors that we discuss below.
+
+We also evaluate the social welfare at the end of an episode,
+using inverse post-tax endowments as social welfare weights:
+\eq{\label{eq:omega_human_exp}
+\socialwelfare_\eplen(\Money_\eplen,\vlabor_\eplen) = \sum_{i=1}^N \socialwelfareweight_i \cdot \util_i\brck{ \money_{i,\eplen}, \labor_{i,\eplen} },\quad
+\socialwelfareweight_i = \fr{\tilde{\socialwelfareweight}_i }{ \sum_j \tilde{\socialwelfareweight}_j },\quad
+\tilde{\socialwelfareweight}_i = \fr{1}{\money_{i,H}},
+}
+where $\money_{i, H}$ is the post-tax endowment of agent $i$ at the end of the episode of length $\eplen$, and $\socialwelfareweight$ is normalized such that $\sum_i \socialwelfareweight_i = 1$.
+This evaluation objective
+places more weight on agents with lower endowments  than those with higher endowments, considering
+agent endowments at the end of an episode, and thus the cumulative effect of tax
+policy over a sequence of ten tax periods.\footnote{This objective is related  to the choice we make about the tax policy objective  when  instantiating the Saez  framework, while deviating in a couple of important ways. First, the Saez framework  considers economies with a single tax period and does not consider the effect of taxation policy on the cumulative endowment.
+Second, the particular choice we make in regard to the social marginal welfare weights, $\socialmarginalwelfareweight_i = \frac{1}{\income_i}$, when using Saez's framework to derive an optimal tax policy, does not  correspond directly to even the single period version of this inverse-income weighted objective, since by setting $\socialmarginalwelfareweight_i = \frac{1}{\income_i}$ it is as if  $\frac{d\utility_i}{d\money_i}=1$, and thus as if an agent's utility function is linear.}
+
+The results of the experiment with respect to this objective are shown in Figure \ref{fig:inv_income_weighted_utility_humans}.
+We can see that the \camelback{} tax schedule  significantly outperforms all baselines for this social
+welfare objective.
+
+
+Overall, the  relative  performance of the AI Economist compared with the various baselines
+is similar for the experiments with AI agents and the experiments with human participants. In particular, even though the \camelback{} tax schedule is qualitatively different than the tax schedule that results from the Saez framework, it yields a competitive equality-productivity tradeoff in comparison with the schedule coming from the Saez model.
+\subsection{Discussion}
+The experiments with human participants are conducted in a zero-shot learning transfer setting, and the AI Economist performs well, even though there are a number of differences between the two settings.
+Besides the modifications to the environments, other factors affecting the transfer from the AI environment to the human environment include:
+\begin{itemize}
+\item {\em AI and human behavior differs substantially}. For example, we have observed that humans display a higher frequency of adversarial behavior, such as blocking other people. These kinds of behaviors are socially suboptimal, but might seem optimal to people (keeping resources to oneself).
+This can be partially attributed to a lack of trading, but also hints at a common human intuition that blocking off regions with resources should be an effective strategy. In contrast, the AI agents learn a strategy that does not include blocking: they might profit from trading and should not waste time on building houses to block off regions.
+\item {\em Learning effects}. As human participants experience multiple episodes, their strategy improves, as observed, for example, through lower average productivity and worse social metrics during qualification rounds.
+This learning effect is partially controlled for by randomizing the order of tax models presented to participants
+and only using experimental episodes
+where participants
+have already participated in one or more qualification rounds.
+\item We set the payoff per house for each human agent using a preset skill.
+For real people, this is not the only factor that affects the expected average payoff. For instance, people can have different strategies in the simulation, which affects their average payoff and hence their implied skill. Hence, varying skill and payoff as a simulation setting only partially emulates the effect of skill on the expected payoff and utility that people experience.
+\end{itemize}
+
+Considering all  these factors, we find these results for the AI Economist in the presence of human participants  encouraging. The AI-driven tax model did not require knowledge of economic theory, did not require that we estimate the tax elasticity of labor, and was nevertheless able to learn a well-performing tax policy for use with human participants \emph{tabula rasa}. We were able to apply the model without requiring recalibration of tax rates. The only calibration was to scale down the income brackets by a factor of three to adjust for the relative productivity of human and AI agents and enable all income brackets to be exercised.
+
+\medskip
+
+\emph{We emphasize that we do not endorse the particular tax schedule determined by the AI Economist for use in the real economy.}
+
+\medskip
+
+Still, the encouraging transfer performance suggests there is potential for building AI-driven tax models that can find application to the real world, as a new tool to be used by governments. Moreover, given that the AI tax policy, which is dynamic in that its tax schedule changes across tax periods, substantially outperforms the Saez formula in the AI simulations, an interesting direction for future research is to develop experiments that can inform ways with which dynamic tax models can be applied to human settings.

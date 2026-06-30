@@ -1,0 +1,66 @@
+\input{tables/dataset_characteristics}
+
+\section{Related Works}
+
+\paragraph{Reinforcement Learning from Human Feedback}
+Using Reinforcement Learning to align language models with human feedback or preferences \citep{christiano2017deep, ziegler2019fine} has led to improved chat models such as ChatGPT \citep{ChatGPT} and Llama2 \citep{touvron2023llama}. Incorporating human feedback into models in this way has been used to improve summarization \citep{stiennon2020learning, wu2021recursively}, question answering \citep{nakano2021webgpt}, image models~\citep{lee2023aligning} and instruction following in general \citep{ouyang2022training}. 
+
+RLHF often focuses on aspects of preference, where aspects could be more general concepts like \textit{helpfulness} or \textit{harmlessness}~\citep{bai2022training}, or more fine-grained ones~\citep{wu2023fine}, among others. 
+In general, RLHF involves training a reward model on preference data collected from crowdworkers~\citep{wang2024secrets} (or from LM selected responses~\citep{bai2022constitutional}). 
+Given a reward model, a policy can be learned using RL algorithms like PPO~\citep{schulman2017proximal}, which has been shown to work well for language policies~\citep{Ramamurthy2022IsRL}. 
+Another option is to directly optimize a policy with chosen and rejected pairs, using DPO~\citep{rafailov2023direct}. Some reward modeling extensions include process reward models~\citep{luo2023wizardmath,lightman2023let} and step-wise reward models~\citep{havrilla2024glore}, which are primarily used for reasoning tasks.% to provide a correctness label for each of the steps in a reasoning chain.
+
+% Despite RLHF's impressive results, the approach has also been shown to lead to overoptimization~\citep{gao2023scaling} and divergence from the initial data distribution~\citep{marks2024training}.
+% Such reward hacking might be partially, but not fully, mitigated using RM ensembles~\citep{coste2023reward, eisenstein2023helping}, weight averaging~\citep{rame2024warm}, or constrained optimization~\citep{moskovitz2023confronting}.
+\paragraph{Reward Model \& RLHF Evaluation}
+Preference tuned models can be evaluated using downstream evaluations, for example using AlpacaFarm \citep{dubois2024alpacafarm}, where LMs are used to simulate human preferences by comparing a model generated output with that of a reference model. 
+The reported metric is the win-rate of the model over the reference model. Similarly, MT-Bench \citep{zheng2023judging}, evaluates chatbots on multi-turn conversations that are judged by LMs as proxy for human judgments and Chatbot Arena~\citep{zheng2023judging} crowdsources the preferences between two different model outputs.
+These types of setups only indirectly evaluate the reward model. 
+Other works, directly analyze the reward model, such as \citet{singhal2023long}, who found a strong correlation between output length and rewards by looking at the training dynamics of RMs. 
+%In their study they found a strong correlation between output length and rewards. 
+Another analysis looked at reward inconsistencies, by creating a benchmark of contrasting instructions \citep{shen2023trickle}. 
+\citet{clymer2023generalization} study reward model performance under distribution shift.
+% Most importantly they found that reward model inconsistency also affects the RLHF training and resulting RLHF'ed model.
+
+\section{Background}
+\label{sec:back}
+\paragraph{Reward Modeling}
+
+% \paragraph{Data collection}
+The first step of training a reward model, and therefore doing RLHF, is collecting preference data from a group of human labelers.
+Individuals are presented with \textit{prompts}, $x$, akin to a question or task, and asked to choose between a set of \textit{completions}, $y_i$, answering the request.
+The most common case is for only two completions to be shown with measurement of preference, such as win-loss-tie or a Likert scale indicating the magnitude of preference between completions~\citep{bai2022training}, though other methods for labeling exist, such as ranking in a batch of 4+ answers~\citep{ouyang2022training}.
+The resulting data is transformed into a set of prompt-chosen-rejected trios, where the \textit{chosen} completion is preferred over the \textit{rejected} completion for training. 
+% \paragraph{Model training}
+Training a reward model involves training a classifier to predict the human preference probability, $p^*$, between two answers, as modeled by a Bradley-Terry model~\citep{BradleyTerry}:
+\begin{equation}
+    p^*(y_{1} \succ y_x \ | \ x) = \frac{\text{exp}(r^*(x, y_1))}{\text{exp}(r^*(x, y_1)) + \text{exp}(r^*(x, y_2))}.
+\end{equation}
+Then, estimate the parameters of the RM by optimizing the maximum likelihood loss as follows: % In order to approximate this probability, an estimate of the human reward $r^*$ is learned by increasing the distance between the predicted reward of the chosen completion and the rejected completion: \yejin{I have a problem with the preceding sentence because we eq (2) is not approximating (1) per say... the softmax function used in eq (1) is essentially identical to the logistic function used in eq (2) if you just rewrite it... perhaps we should instead say, ...``we estimate the parameters of the reward model by optimizing the maximum likelihood loss''...}
+$
+\mathcal{L}(\theta, \mathcal{D}) = \mathbb{E}_{(x,y_\text{chosen}, y_\text{rejected}) \sim \mathcal{D}} \big[ \text{log}( 1+e^{r_\theta(x, y_\text{rejected}) \ - \ r_\theta(x, y_\text{chosen})} ) \big].
+% \label{eq:pm_loss}
+$For language models, the RM is often implemented by appending a linear layer to predict one logit or removing the final decoding layers and replacing them with a linear layer.
+At inference time, a trained reward model returns a scalar, such that $P(y_1 \succ y_2 \,|\, x) \propto  \text{e}^{r(x,y_1)}$ (which intuitively is the probability that the completion would be a preferred response, but is trained indirectly via the pairwise loss).
+Thus, a win between completions $y_1$ and $y_2$ is achieved when $r(x,y_1) > r(x,y_2)$.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/HERM_temp.pdf}
+    \vspace{-6pt} % account for some white space in DPF
+    \caption{The scoring method of the \name~evaluation suite. 
+    Each prompt is accompanied by a chosen and rejected completion which are independently rated by a reward model.}
+    \label{fig:method}
+\end{figure}
+
+\paragraph{Direct Preference Optimization}
+Direct Preference Optimization solves the RLHF problem without needing to learn a separate reward model.
+It achieves this by reparameterizing the preference-based reward function using only the policy models~\citep{rafailov2023direct}
+The implicit reward used in DPO is a function of the policy model probabilities (i.e. the model being trained), $\pi(y|x)$, a regularization constant, $\beta$, the base model probabilities, $\pi_\text{ref}(y|x)$, and a partition function $Z(x)$:
+\begin{equation}
+    r(x,y) = \beta \, \text{log}\frac{\pi(y|x)}{\pi_\text{ref}(y|x)} + \beta \ \text{log} \ Z(x).
+\end{equation}
+Given two completions to a prompt, we compare the rewards $r(x,y_1)$ and $r(x,y_2)$ as follows, where the score is computed via the log ratios of $\pi$:
+$
+ \text{log}\frac{\pi(y_1|x)}{\pi_{\text{ref}}(y_1|x)} > \text{log}\frac{\pi(y_2|x)}{\pi_{\text{ref}}(y_2|x)}.
+$

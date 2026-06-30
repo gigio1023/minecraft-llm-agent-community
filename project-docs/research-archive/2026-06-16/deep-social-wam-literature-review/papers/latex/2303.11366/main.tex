@@ -1,0 +1,816 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2020
+
+% ready for submission
+\PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2023
+
+
+% ready for submission
+% \usepackage{neurips_2023}
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+    \usepackage[preprint]{neurips_2023}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2020}
+
+% to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{neurips_2023}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{todonotes}
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{soul}
+\usepackage{tabularx}
+\usepackage{pifont}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage[normalem]{ulem}
+
+\definecolor{green}{RGB}{36, 214, 36}
+\definecolor{red}{RGB}{235, 30, 30}
+\definecolor{lightredshade}{HTML}{dea9a9}
+\definecolor{lightgreenshade}{HTML}{bce3bd}
+\definecolor{lightblueshade}{HTML}{cacbe8}
+\definecolor{MyDarkBlue}{rgb}{0,0.08,1}
+\definecolor{MyDarkGreen}{rgb}{0.02,0.6,0.02}
+\definecolor{MyDarkRed}{rgb}{0.8,0.02,0.02}
+\definecolor{MyDarkOrange}{rgb}{0.40,0.2,0.02}
+\definecolor{MyPurple}{RGB}{111,0,255}
+\definecolor{MyRed}{rgb}{1.0,0.0,0.0}
+\definecolor{MyGold}{rgb}{0.75,0.6,0.12}
+\definecolor{MyDarkgray}{rgb}{0.66, 0.66, 0.66}
+
+\definecolor{MyYellow}{rgb}{254, 246, 170}
+\definecolor{MyBlue}{rgb}{170, 217, 251}
+
+\newcommand{\greencheck}{\textcolor{green}{\ding{51}}}
+\newcommand{\redcross}{\textcolor{red}{\ding{55}}}
+
+\newcommand{\ns}[1]{\textcolor{MyDarkOrange}{[Noah: #1]}}
+\newcommand{\sy}[1]{\textcolor{MyDarkBlue}{[Shunyu: #1]}}
+\newcommand{\kn}[1]{\textcolor{MyPurple}{[Karthik: #1]}}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{gray},
+  % stringstyle=\color{darkgreen},
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=5pt,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4
+}
+
+
+\title{Reflexion: Language Agents with \\ Verbal Reinforcement Learning}
+
+\author{
+  Noah Shinn \\
+  Northeastern University \\
+  \texttt{noahshinn024@gmail.com} \\
+  \And
+  Federico Cassano \\
+  Northeastern University \\
+  \texttt{cassano.f@northeastern.edu} \\
+  \And
+  Edward Berman \\
+  Northeastern University \\
+  \texttt{berman.ed@northeastern.edu} \\
+  \And
+  Ashwin Gopinath \\
+  Massachusetts Institute of Technology \\
+  \texttt{agopi@mit.edu} \\
+  \And
+  Karthik Narasimhan\\
+  Princeton University \\
+  \texttt{karthikn@princeton.edu} \\
+  \And
+  Shunyu Yao \\
+  Princeton University \\
+  \texttt{shunyuy@princeton.edu} \\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+Large language models (LLMs) have been increasingly used to interact with external
+environments (e.g., games, compilers, APIs) as goal-driven agents. However, it
+remains challenging for these language agents to quickly and efficiently learn from
+trial-and-error as traditional reinforcement learning methods require extensive
+training samples and expensive model fine-tuning. We propose \emph{Reflexion}, a
+novel framework to reinforce language agents not by updating weights, but instead
+through linguistic feedback. Concretely, Reflexion agents verbally reflect on
+task feedback signals, then maintain their own reflective text in an episodic
+memory buffer to induce better decision-making in subsequent trials. Reflexion is
+flexible enough to incorporate various types (scalar values or free-form
+language) and sources (external or internally simulated) of feedback signals,
+and obtains significant improvements over a baseline agent across diverse tasks
+(sequential decision-making, coding, language reasoning). For example, Reflexion
+achieves a 91\% pass@1 accuracy on the HumanEval coding benchmark, surpassing
+the previous state-of-the-art GPT-4 that achieves 80\%. We also conduct ablation
+and analysis studies using different feedback signals, feedback incorporation
+methods, and agent types, and provide insights into how they affect performance.
+We release all code, demos, and datasets at \url{https://github.com/noahshinn024/reflexion}.
+
+\end{abstract}
+
+\section{Introduction}
+
+Recent works such as ReAct~\cite{yao2023react}, SayCan~\cite{ahn2022can},
+Toolformer~\cite{schick2023toolformer}, HuggingGPT~\citep{shen2023hugginggpt},
+generative agents~\citep{park2023generative}, and WebGPT~\citep{nakano2021webgpt}
+have demonstrated the feasibility of
+autonomous decision-making agents that are built on top of a large language
+model (LLM) core. These methods use LLMs to generate text and `actions`
+that can be used in API calls and executed in an environment. Since they
+rely on massive models with an enormous number of parameters, such approaches
+have been so far limited to using in-context examples as a way of teaching
+the agents, since more traditional optimization schemes like reinforcement
+learning with gradient descent require substantial amounts of compute and
+time. 
+
+In this paper, we propose an alternative approach called \textit{Reflexion} that uses verbal reinforcement to help agents learn from prior failings. Reflexion converts binary or scalar feedback from the environment into verbal feedback in the form of a textual summary, which is then added as additional context for the LLM agent in the next episode. This self-reflective feedback acts as a `semantic' gradient signal by providing the agent with a concrete direction to improve upon, helping it learn from prior mistakes to perform better on the task. This is akin to how humans iteratively learn to accomplish complex tasks in a few-shot manner -- by reflecting on their previous failures in order to form an improved plan of attack for the next attempt. For example, in figure~\ref{fig:reflexion_tasks}, a Reflexion agent learns to
+optimize its own behavior to solve decision-making, programming, and reasoning tasks through
+trial, error, and self-reflection.
+
+Generating useful reflective feedback is challenging since it requires a good understanding of where the model made mistakes (i.e. the credit assignment problem~\citep{Sutton1998}) as well as the ability to generate a summary containing actionable insights for improvement. We explore three ways for
+doing this -- simple binary environment feedback, pre-defined heuristics for common failure
+cases, and self-evaluation such as binary classification using LLMs (decision-making) or
+self-written unit tests (programming). In all implementations, the evaluation signal is
+amplified to natural language experience summaries which can be stored in long-term memory. 
+
+Reflexion has several advantages compared to more traditional RL approaches like policy or value-based learning: 1) it is lightweight and doesn't require finetuning the LLM, 2) it allows for more nuanced forms of feedback (e.g. targeted changes in actions), compared to scalar or vector rewards that are challenging to perform accurate credit assignment with, 3) it allows for a more explicit and interpretable form of episodic memory over prior experiences, and 4) it provides more explicit hints for actions in future episodes. At the same time, it does have the disadvantages of relying on the power of the LLM's self-evaluation capabilities (or heuristics) and not having a formal guarantee for success. However, as LLM capabilities improve, we only expect this paradigm to get better over time. 
+
+We perform experiments on (1) decision-making tasks to test sequential action choices over long
+trajectories, (2) reasoning tasks to test knowledge-intensive, single-step generation
+improvement, and (3) programming tasks to teach the agent to effectively use external
+tools such as compilers and interpreters. Across all three types of tasks, we observe
+Reflexion agents are better decision-makers, reasoners, and programmers. More concretely,
+Reflexion agents improve on decision-making AlfWorld~\citep{ALFWorld20} tasks over strong baseline approaches by
+an absolute 22\% in 12 iterative learning steps, and 
+on reasoning questions in HotPotQA~\citep{yang2018hotpotqa} by 20\%, and Python programming
+tasks on HumanEval~\citep{chen2021evaluating} by as much as 11\%.
+
+To summarize, our contributions are the following:
+\begin{itemize}
+    \item We propose Reflexion, a new paradigm for `verbal` reinforcement that parameterizes a policy as an
+        agent's memory encoding paired with a choice of LLM parameters.
+    \item We explore this emergent property of \emph{self-reflection} in LLMs and empirically
+        show that self-reflection is extremely useful to learn complex tasks over a handful of trials.
+    \item We introduce LeetcodeHardGym, a code-generation RL gym environment consisting
+        of 40 challenging Leetcode questions (`hard-level`) in 19 programming languages.
+    \item We show that Reflexion achieves improvements over strong baselines across several tasks, and achieves state-of-the-art results on various code generation benchmarks. 
+\end{itemize}
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/reflexion_tasks.pdf}
+\caption{Reflexion works on decision-making \ref{sec:decisionmaking},
+    programming \ref{sec:programming}, and reasoning \ref{sec:reasoning} tasks.}
+\label{fig:reflexion_tasks}
+\end{figure}
+
+\section{Related work}
+
+\paragraph{Reasoning and decision-making}
+Self-Refine \citep{madaan2023self} employs an iterative framework for
+self-refinement to autonomously improve generation through self-evaluation.
+These self-evaluation and self-improvement steps are conditioned on
+given task constraints, such as "How can this generation be written
+in a more positive way". Self-Refine is effective
+but is limited to single-generation reasoning tasks. \citet{pryzant2023automatic}
+performs a similar semantic prompt-writing optimization, but is
+also limited to single-generation tasks.
+\citet{paul2023refiner} fine-tune critic models to provide intermediate
+feedback within trajectories to improve reasoning responses.
+\citet{xie2023decomposition} use stochastic beam search over actions to
+perform a more efficient decision-making search strategy which allows
+the agent to use foresight advantage due to its self-evaluation component.
+\citet{yoran2023answering} and \citet{nair2023dera} use decider models
+to reason over several generations. \citet{kim2023language} use a
+retry pattern over a fixed number of steps without an evaluation step.
+\citet{goodman2023meta} perform a qualitative evaluation step that
+proposes optimizations to the previous generation. In this paper, we show that several
+of these concepts can be enhanced with \emph{self-reflection} to
+build a persisting memory of self-reflective experiences which allows
+an agent to identify its own errors and self-suggest lessons to learn
+from its mistakes over time.
+
+\paragraph{Programming}
+Several past and recent works employ variations of test-driven development
+or code debugging practices. AlphaCode~\citep{li2022competition}
+evaluates a set of generations on hidden test cases. CodeT~\citep{chen2022codet}
+uses self-generated unit tests that are used to score generated function
+implementations.
+Self-Debugging~\citep{chen2023teaching} employs a debugging component that is used
+to improve existing implementations given feedback from a code
+execution environment. CodeRL~\citep{le2022coderl} sets the problem
+in an RL framework using an actor-critic setup to debug programs given
+feedback from an execution environment. AlphaCode, Self-Debugging and CodeRL
+are effective in fixing less-complex program bugs, but they rely
+upon ground truth test cases that invalidate pass@1 eligibility,
+and do not use self-reflection to bridge the gap between error
+identification and implementation improvement. CodeT does not access
+hidden test cases but does not implement a self-learning step to
+improve code writing.
+
+
+\begin{table}[t]
+    \centering
+    % \resizebox{\columnwidth}{!}{%
+
+    \small
+    % \begin{tabularx}{\textwidth}{llXXll}
+    \begin{tabular}{lccccc}
+        \toprule
+        \multicolumn{6}{c}{Related work on reasoning and decision-making} \\
+        \toprule
+        \textbf{ Approach} &
+        \textbf{Self} &
+        \textbf{ Hidden } &
+        \textbf{Decision } &
+        \textbf{Binary } & 
+        \textbf{Memory} \\
+        & \textbf{refine} & \textbf{constraints} & \textbf{making} & \textbf{reward} & \\
+        \midrule
+         Self-refine \citep{madaan2023self} & \greencheck & \redcross & \redcross & \redcross & \redcross \\
+         Beam search \citep{xie2023decomposition} & \greencheck & \greencheck & \greencheck & \greencheck & \redcross \\
+         \textbf{Reflexion (ours)} & \greencheck & \greencheck & \greencheck & \greencheck & \greencheck \\
+    % \end{tabularx}
+    \end{tabular}
+    % }
+    \centering
+    \small
+    \begin{tabular}{lccccc}
+        \toprule
+        \multicolumn{6}{c}{Related work on programming} \\
+        \midrule
+        \textbf{Approach} &
+        \textbf{Test} &
+        \textbf{Debugging} &
+        \textbf{Self-generated} & 
+        \textbf{Multiple} & 
+        \textbf{Self-reflection} \\
+        \textbf{Test execution} &
+        \textbf{execution} &
+        \textbf{} & 
+        \textbf{tests} & 
+        \textbf{languages} \\
+        \midrule
+        AlphaCode \citep{li2022competition} & \greencheck & \redcross & \redcross & \greencheck & \redcross \\
+        \hline
+        CodeT \citep{chen2022codet} & \greencheck & \redcross & \greencheck & \redcross & \redcross \\
+        \hline
+        Self-debugging \citep{chen2023teaching} & \greencheck & \greencheck & \redcross & \redcross & \redcross \\
+        \hline
+        CodeRL \citep{le2022coderl} & \greencheck & \greencheck & \redcross & \redcross & \redcross \\
+        \hline
+        \textbf{Reflexion (ours)} & \greencheck & \greencheck & \greencheck & \greencheck & \greencheck \\
+        \bottomrule
+    \end{tabular}
+    \vspace{-10pt}
+\end{table}
+
+
+\section{Reflexion: reinforcement via verbal reflection}
+
+\begin{figure}[t]
+    \begin{minipage}{.48\textwidth} \label{fig:reflexion:rl}
+        \centering
+        \includegraphics[width=\textwidth]{figures/reflexion_rl.pdf}
+        \label{fig:diagram}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{.48\textwidth} 
+    \begin{algorithm}[H]
+     \caption{Reinforcement via self-reflection}
+      \begin{algorithmic}
+        \State Initialize Actor, Evaluator, Self-Reflection:
+        \State $M_a$, $M_e$, $M_{sr}$
+        \State Initialize policy $\pi_{\theta}(a_i | s_i)$, $\theta = \{M_a, mem\}$
+        \State Generate initial trajectory using $\pi_{\theta}$
+        \State Evaluate $\tau_0$ using $M_e$
+        \State Generate initial self-reflection $sr_0$ using $M_{sr}$
+        \State Set $mem \gets [sr_0]$
+        \State Set $t = 0$
+        
+        \While{$M_e$ not pass or $t <$ max trials}
+            \State Generate $\tau_t = {[a_0, o_0, \dots a_i, o_i]}$ using $\pi_{\theta}$
+            \State Evaluate $\tau_t$ using $M_e$
+            \State Generate self-reflection $sr_t$ using $M_{sr}$
+            \State Append $sr_t$ to $mem$
+            \State Increment $t$
+        \EndWhile
+        
+        \State \Return
+      \end{algorithmic}
+      \label{alg:reflexion}
+      \end{algorithm}
+    \end{minipage}
+    \caption{(a) Diagram of Reflexion. (b) Reflexion reinforcement algorithm}
+    \vspace{-10pt}
+\end{figure}
+
+
+We develop a modular formulation for Reflexion, utilizing three distinct models:
+an \textit{Actor}, denoted as $M_a$, which generates text and actions;
+an \textit{Evaluator} model, represented by $M_e$, that scores the outputs produced
+by $M_a$; and a \textit{Self-Reflection} model, denoted as $M_{sr}$,
+which generates verbal reinforcement cues to assist the Actor in
+self-improvement. We provide a detailed description of each of these models and
+subsequently elucidate their collaborative functioning within the Reflexion
+framework.
+
+\paragraph{Actor}
+The Actor is built upon a large language model (LLM) that is specifically
+prompted to generate the necessary text and actions conditioned on the state
+observations. Analogous to traditional policy-based RL setups, we sample an action
+or generation, $a_t$, from the current policy $\pi_{\theta}$ at time $t$, receive
+an observation from the environment $o_t$. We explore various Actor models,
+including Chain of Thought~\cite{wei2022chain} and ReAct~\cite{yao2023react}.
+These diverse generation models allow us to explore different aspects of text and
+action generation within the Reflexion framework, providing valuable insights into
+their performance and effectiveness. In addition, we also add a memory component
+\emph{mem} that provides additional context to this agent. This adaption
+was inspired by \citet{brooks2022context}, who suggest a policy iteration approach using in-context learning. Details on how this
+is populated are provided below.
+
+\paragraph{Evaluator}
+The Evaluator component of the Reflexion framework plays a crucial role in assessing
+the quality of the generated outputs produced by the Actor. It takes as input a
+generated trajectory and computes a reward score that reflects its performance within
+the given task context. Defining effective value and reward functions that apply
+to semantic spaces is difficult, so we investigate several variants of the
+Evaluator model. For reasoning tasks, we explore reward functions based on exact
+match (EM) grading, ensuring that the generated output aligns closely with the
+expected solution. In decision-making tasks, we employ pre-defined heuristic
+functions that are tailored to specific evaluation criteria. Additionally, we
+experiment with using a different instantiation of an LLM itself as an Evaluator,
+generating rewards for decision-making and programming tasks. This multi-faceted
+approach to Evaluator design allows us to examine different strategies for scoring
+generated outputs, offering insights into their effectiveness and suitability
+across a range of tasks.
+
+\paragraph{Self-reflection}
+The Self-Reflection model instantiated as an LLM, plays a crucial role in the
+Reflexion framework by generating verbal self-reflections to provide valuable
+feedback for future trials. Given a sparse reward signal, such as a binary
+success status (success/fail), the current trajectory, and its persistent memory
+\emph{mem}, the self-reflection model generates nuanced and specific feedback.
+This feedback, which is more informative than scalar rewards, is then stored
+in the agent's memory (\emph{mem}). For instance, in a multi-step decision-making
+task, when the agent receives a failure signal, it can infer that a specific
+action $a_i$ led to subsequent incorrect actions $a_{i+1}$ and $a_{i+2}$. The
+agent can then verbally state that it should have taken a different action,
+$a_i'$, which would have resulted in $a_{i+1}'$ and $a_{i+2}'$, and store
+this experience in its memory. In subsequent trials, the agent can leverage
+its past experiences to adapt its decision-making approach at time $t$ by
+choosing action $a_i'$. This iterative process of trial, error, self-reflection,
+and persisting memory enables the agent to rapidly improve its decision-making
+ability in various environments by utilizing informative feedback signals.
+
+\paragraph{Memory} \label{sec:reflexion:memory}
+Core components of the Reflexion process are the notion of short-term and
+long-term memory. At inference time, the Actor conditions its decisions on
+short and long-term memory, similar to the way that humans remember fine-grain
+recent details while also recalling distilled important experiences from long-term memory.
+In the RL setup, the trajectory history serves as the short-term memory while
+outputs from the Self-Reflection model are stored in long-term memory. These two
+memory components work together to provide context that is specific but
+also influenced by lessons learned over several trials, which is a key
+advantage of Reflexion agents over other LLM action choice works.
+
+
+\paragraph{The Reflexion process} \label{sec:overall_process}
+Reflexion is formalized as an iterative optimization process in \ref{alg:reflexion}.
+In the first trial, the Actor produces a trajectory $\tau_0$ by
+interacting with the environment. The Evaluator then produces a score $r_0$
+which is computed as $r_t = M_e(\tau_0)$. $r_t$ is only a scalar
+reward for trial $t$ that improves as task-specific performance increases.
+After the first trial, to amplify $r_0$ to a feedback form that can be used
+for improvement by an LLM, the Self-Reflection
+model analyzes the set of $\{\tau_0, r_0\}$ to produce a summary
+$sr_0$ which is stored in the memory \emph{mem}. $sr_t$ is a verbal
+experience feedback for trial $t$. The Actor, Evaluator, and Self-Reflection
+models work together through trials in a loop until the Evaluator deems $\tau_t$ to
+be correct. As mentioned in \ref{sec:reflexion:memory}, the memory component of
+Reflexion is crucial to its effectiveness. After each trial $t$, $sr_t$, is appended
+\emph{mem}. In practice, we bound \emph{mem} by a maximum number of stored experiences, $\Omega$
+(usually set to 1-3) to adhere to max context LLM limitations.
+
+\section{Experiments}
+
+We evaluate various natural language RL setups on decision-making, reasoning,
+and code generation tasks. Specifically, we challenge an agent to perform
+search-based question answering on HotPotQA \citep{yang2018hotpotqa}, multi-step
+tasks in common household environments in AlfWorld \citep{ALFWorld20}, and code
+writing tasks in competition-like environments with interpreters and
+compilers in HumanEval \citep{chen2021evaluating}, MBPP \citep{austin2021program},
+and LeetcodeHard, a new benchmark. Most notably, Reflexion improves performance
+over strong baselines by 22\% in AlfWorld, 20\% in HotPotQA, and 11\% on HumanEval.
+
+\subsection{Sequential decision making: ALFWorld} \label{sec:decisionmaking}
+AlfWorld is a suite of text-based environments that challenge an agent to solve
+multi-step tasks in a variety of interactive environments based on TextWorld
+\citep{cote2019textworld}. Following \citet{yao2023react}, we run the agent in
+134 AlfWorld environments across six different tasks, including finding hidden
+objects (e.g., finding a spatula in a drawer), moving objects (e.g., moving a
+knife to the cutting board), and manipulating objects with other objects (e.g.,
+chilling a tomato in the fridge). We use ReAct \citep{yao2023react} as the
+action generator as \citet{yao2023react} has shown success in long trajectory
+decision-making using explicit intermediate thoughts. AlfWorld tasks naturally
+require a self-evaluation step as the environment can only signal if a task
+is complete. To achieve fully autonomous behavior, we implement two self-evaluation
+techniques: natural language classification using an LLM and a hand-written
+heuristic. The heuristic is simple: if the agent executes the
+same action and receives the same response for more than 3 cycles, or if the
+number of actions taken in the current environment exceeds 30 (inefficient
+planning), we self-reflect. In the baseline runs, if self-reflection is suggested, we
+skip the self-reflection process, reset the environment, and start a new trial.
+In the Reflexion runs, the agent uses self-reflection to find its mistake,
+update its memory, reset the environment, and start a new trial. To avoid
+very long prompt windows that may exceed the maximum limit, we truncate the
+agent's memory to the last 3 self-reflections (experiences).
+
+To avoid syntactic errors, we provide two
+domain-specific few-shot trajectories to the agent. We use the same few-shot
+trajectory examples as \citet{yao2023react} with GPT-3 for the LLM. AlfWorld
+tasks, ReAct few-shot prompts, and Reflexion examples are included in the
+appendix.
+
+\paragraph{Results}
+
+\begin{figure}[htbp]
+    \begin{subfigure}{.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/alfworld_success.pdf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/alfworld_failure.pdf}
+    \end{subfigure}
+    \caption{(a) AlfWorld performance across 134 tasks showing cumulative
+        proportions of solved tasks using self-evaluation techniques of (Heuristic)
+        and (GPT) for binary classification. (b) Classification of AlfWorld trajectories by reason of
+        failure.}
+     \label{fig:decisionmaking:alfworld}
+\end{figure}
+
+ReAct + Reflexion significantly outperforms ReAct by completing 130 out of 134 tasks
+using the simple heuristic to detect hallucinations and inefficient planning. Further,
+ReAct + Reflexion learns to solve additional tasks by learning in 12 consecutive
+trials. In the ReAct-only approach, we see that performance increase halts between
+trials 6 and 7.
+
+\paragraph{Analysis}
+A common error in baseline failed AlfWorld trajectories is when an agent
+thinks that it has possession of an item but does not actually have the item. The
+agent proceeds to execute several actions in a long trajectory and is not able to
+backtrack its actions to find the mistake. Reflexion eliminates almost all of
+these cases by using self-reflection to distill long, failed trajectories
+into relevant experiences that can are used as "self-hints" in the future.
+There are two main cases in which long-term memory helps an agent in AlfWorld:
+1) An early mistake in a long trajectory can be easily identified. The agent
+can suggest a new action choice or even a new long-term plan.
+2) There are too many surfaces/containers to check for an item. The agent can
+exploit its experience memory over several trials to thoroughly search a room.
+In \ref{fig:decisionmaking:alfworld}, the learning curve suggests that
+the learning process occurs over several experiences, meaning that the agent
+is successfully balancing cases 1 and 2 shown in the immediate spike in
+the improvement between the first two trials, then a steady increase over the
+next 11 trials to a near-perfect performance. On the other hand, \ref{fig:decisionmaking:alfworld}
+shows a ReAct-only agent converging at a hallucination rate of 22\% with
+no signs of long-term recovery.
+
+\subsection{Reasoning: HotpotQA} \label{sec:reasoning}
+
+HotPotQA \citep{yang2018hotpotqa} is a Wikipedia-based dataset with 113k
+question-and-answer pairs that challenge agents to parse content and reason
+over several supporting documents.
+To test improvement in reasoning \textit{only} ability, we implement Reflexion
++ Chain-of-Thought (CoT) \citep{wei2022chain} for step-by-step $Q \rightarrow A$ and
+$Q$, $C_{gt} \rightarrow A$ implementations, where $Q$ is the question, $C_{gt}$
+is the ground truth context from the dataset, and $A$ is the final answer.
+Since CoT is not a multi-step
+decision-making technique, we give $C_{gt}$ to the agent so that we can isolate
+the reasoning behavior over large sections of the provided text. To test holistic
+question and answering ability, which requires reasoning and action choice, we
+implement a Reflexion + ReAct \citep{yao2023react} agent that can retrieve
+relevant context using a Wikipedia API and infer answers using step-by-step
+explicit thinking. For CoT implementations, we
+use 6-shot prompting; for ReAct, we use 2-shot prompting, and for self-reflection,
+we use 2-shot prompting. All examples can be found in the appendix.
+
+Robustly evaluating natural language answers is a long-standing problem in NLP.
+Therefore, between trials, we use exact match answer grading using the environment
+to give a binary success signal to the agent. After each trial,
+the self-reflection loop is employed to amplify the binary signal, similar to
+the decision-making setup \ref{sec:decisionmaking} in AlfWorld with a
+memory size of 3 experiences.
+
+\paragraph{Results}
+\begin{figure}[htbp] 
+    \begin{subfigure}{.3\textwidth}
+    \centering
+        \includegraphics[width=\textwidth]{figures/hotpotqa_success.pdf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{.3\textwidth}
+    \centering
+        \includegraphics[width=\textwidth]{figures/hotpotqa_cot_gt.pdf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/hotpotqa_ablation.pdf}
+    \end{subfigure}
+    \caption{Chain-of-Thought (CoT) and ReAct. Reflexion improves search, information
+        retrieval, and reasoning capabilities on 100 HotPotQA questions. (a) Reflexion
+        ReAct vs Reflexion CoT (b) Reflexion CoT (GT) for reasoning only (c) Reflexion
+        vs episodic memory ablation.}
+    \label{fig:reasoning:hotpotqa}
+\end{figure}
+
+Reflexion outperforms all baseline approaches by significant margins over several
+learning steps. Furthermore, ReAct-only, CoT-only, and CoT (GT)-only implementations
+fail to probabilistically improve on any tasks, meaning that no failed
+tasks from the first trial from any of the baseline approaches were able to be solved
+in subsequent trials using a temperature of 0.7
+In the Reflexion runs, we allowed the agent to gather
+experience and retry on failed tasks until it produced 3 consecutive failed attempts
+on the particular task. Naturally, the CoT (GT) achieved higher accuracy scores
+as it was given access to the ground truth context of the question. Still,
+the CoT (GT) agent is unable to correctly infer the correct answer for 39\% of
+the questions, but Reflexion helps the agent to correct its mistakes without
+access to the ground truth answer to improve its accuracy by 14\%.
+
+\paragraph{Analysis}
+We perform an ablation experiment to isolate the advantage of the self-reflective
+step for reasoning using CoT (GT) as the baseline approach \ref{fig:reasoning:hotpotqa}.
+Recall that CoT (GT)
+uses Chain-of-Thought reasoning with provided ground truth context, which tests
+reasoning ability over long contexts. Next, we add an element of episodic memory
+(EPM) by including the most recent trajectory. For the Reflexion agent, we
+implement the standard self-reflection step as a final pass. Intuitively, we
+test if the agent is iteratively learning more effectively by using verbal
+explanation using language written in the first person. \ref{fig:reasoning:hotpotqa}
+shows that self-reflection improves learning by an 8\% absolute
+boost over the episodic memory learning advantage. This result
+supports the argument that refinement-only approaches are not as effective as
+self-reflection-guided refinement approaches.
+
+\subsection{Programming} \label{sec:programming}
+We evaluate the baseline and Reflexion approaches on Python and Rust code
+writing on MBPP \citep{austin2021program}, HumanEval \citep{chen2021evaluating},
+and LeetcodeHardGym, our new dataset. MBPP and HumanEval measure function body
+generation accuracy given natural language
+descriptions. We use a benchmark language compiler, MultiPL-E \citep{cassano2022multiple},
+to translate subsets of HumanEval and MBPP to the Rust language. MultiPL-E
+is a collection of small compilers that can be used to translate Python
+benchmark questions to 18 other languages. We include experiments for Rust
+code generation to demonstrate that Reflexion implementations for code
+generation are language-agnostic and can be used for interpreted and compiled
+languages. Lastly, we introduce
+a new benchmark, LeetcodeHardGym, which is an interactive programming gym
+that contains 40 Leetcode hard-rated questions that have been released after
+October 8, 2022, which is the pre-training cutoff date of GPT-4 \citep{openai2023gpt4}.
+
+The task of programming presents a unique opportunity to use more grounded
+self-evaluation practices such as self-generated unit test suites. Thus, our
+Reflexion-based programming task implementation is eligible for pass@1
+accuracy reporting. To generate a test suite, we use Chain-of-Thought prompting
+\citep{wei2022chain}
+to produce diverse, extensive tests with corresponding natural language descriptions.
+Then, we filter for syntactically valid test statements by attempting to
+construct a valid abstract syntax tree (AST) for each proposed test. Finally, we
+sample $n$ tests from the collection of generated unit tests to produce a
+test suite $T$, denoted as $\{t_0, t_1, \dots, t_n\}$. We set $n$ to a maximum
+of 6 unit tests. Aside from the unit test suite component,
+the setup for the learning loop for a Reflexion programming agent is identical
+to the reasoning and decision-making agents with a max memory limit of 1
+experience.
+
+\paragraph{Results}
+
+\begin{table}[htbp] 
+  \centering
+  \begin{tabular}{llll}
+    \cmidrule(r){1-4}
+    \textbf{Benchmark + Language} &
+    \textbf{Prev SOTA Pass@1} &
+    \textbf{SOTA Pass@1} &
+    \textbf{Reflexion Pass@1} \\
+    \midrule
+    HumanEval (PY) & 65.8 (CodeT \citep{chen2022codet} + GPT-3.5) & 80.1 (GPT-4) &
+        \textbf{91.0} \\
+    HumanEval (RS) & -- & 60.0 (GPT-4) & \textbf{68.0} \\
+    MBPP (PY) & 67.7 (CodeT \citep{chen2022codet} + Codex \citep{chen2021evaluating})
+        & \textbf{80.1} (GPT-4) & 77.1 \\
+    MBPP (RS) & -- & 70.9 (GPT-4) & \textbf{75.4} \\
+    Leetcode Hard (PY) & -- & 7.5 (GPT-4) & \textbf{15.0} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pass@1 accuracy for various model-strategy-language combinations. The
+  base strategy is a single code generation sample. All instruction-based models
+  follow zero-shot code generation.}
+  \label{tbl:programming:success}
+\end{table}
+\vspace{-10pt}
+
+\begin{table}[htbp] 
+  \centering
+  \begin{tabular}{lllllll}
+    \toprule
+    \textbf{Benchmark + Language} &
+    \textbf{Base} &
+    \textbf{Reflexion} &
+    \textbf{TP} &
+    \textbf{FN} &
+    \textbf{FP} &
+    \textbf{TN} \\
+    \midrule
+    HumanEval (PY) & 0.80 & \textbf{0.91} & 0.99 & 0.40 & 0.01 & 0.60 \\
+    MBPP (PY) & \textbf{0.80} & 0.77 & 0.84 & 0.59 & 0.16 & 0.41 \\
+    HumanEval (RS) & 0.60 & \textbf{0.68} & 0.87 & 0.37 & 0.13 & 0.63 \\
+    MBPP (RS) & 0.71 & \textbf{0.75} & 0.84 & 0.51 & 0.16 & 0.49 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Overall accuracy and test generation performance for HumanEval and
+      MBPP. For Rust, HumanEval is the hardest 50 problems from HumanEval Python
+      translated to Rust with MultiPL-E \citep{cassano2022multiple}. TP: unit
+      tests pass, solution pass; FN: unit tests fail, solution pass; FP: unit
+      tests pass, solution fail; TN: unit tests fail, solution fail.}
+    \label{tbl:programming:failures}
+\end{table}
+
+Reflexion outperforms all baseline accuracies and sets new state-of-the-art standards
+on all benchmarks for Python and Rust except for MBPP Python \ref{tbl:programming:success}.
+We further investigate the inferior performance of Reflexion on MBPP Python.
+
+\paragraph{Analysis}
+We acknowledge that self-reflecting code-generation agents are bound to their ability
+to write diverse, comprehensive tests. Therefore, in the case in which the model
+generates a flaky test suite, it is possible that all tests pass on an incorrect
+solution and lead to a false positive label on a code completion \citep{flaky-tests}.
+On the other hand, if the model produces an incorrectly written test suite, it is
+possible for some of the tests to fail on a correct solution, leading to a
+self-reflection generation that is conditioned on a false negative code completion.
+Given the implementation of Reflexion, false negatives are preferred over false
+positives as the agent may be able to use self-reflection to identify the incorrect
+test(s) and prompt itself to keep the original code completion intact. On the other
+hand, if an invalid test suite returns a false positive completion (all internal
+test cases pass but the implementation is incorrect), the agent will prematurely
+report an invalid submission. In \ref{tbl:programming:failures}, various conditions
+are measured to analyze performance beyond pass@1 accuracy. Previously, we
+displayed the inferior performance of Reflexion to the baseline GPT-4 on MBPP
+Python. In \ref{tbl:programming:failures}, we observe a notable discrepancy between
+the false positive labels produced by internal test execution, P(not pass@1
+generation correct | tests pass). That is, the probability that a submission
+will fail given that it passes all unit tests. For HumanEval and MBPP Python,
+the baseline pass@1 accuracies are relatively similar, 82\% and 80\%, respectively.
+However, the false positive test execution rate for MBPP Python is 16.3\% while
+the rate for HumanEval Python is a mere 1.4\%, leading to 91\% overall accuracy
+\ref{tbl:programming:success}.
+
+\paragraph{Ablation study}
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{llll}
+    \cmidrule(r){1-4}
+    \textbf{Approach} & 
+    \textbf{Test Generation} &
+    \textbf{Self-reflection} &
+    \textbf{Pass@1 (Acc)} \\
+    \midrule
+     Base model & False & False & 0.60 \\
+     Test generation omission & False & True & 0.52 \\
+     Self-reflection omission & True & False & 0.60 \\
+     \textbf{Reflexion} & True & True & \textbf{0.68} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pass@1 accuracy for various compromised approaches on the
+  Reflexion approach using GPT-4 as the base model on HumanEval Rust
+  - 50 hardest problems}
+  \label{tbl:programming:ablation} \end{table} \vspace{-10pt}
+
+We test the composite approach of Reflexion for test generation and self-reflection
+cooperation on a subset of the 50 hardest HumanEval Rust problems. Our Rust
+compiler environment provides verbose error logs and helpful debugging hints,
+therefore serving as a good playground for compromised approaches. First, we
+omit internal test generation and execution steps, which test the agent to
+self-reflect without guidance from
+current implementations. \ref{tbl:programming:ablation} shows an inferior
+52\% vs 60\% (baseline) accuracy, which suggests that the agent
+is unable to determine if the current implementation is correct without unit tests.
+Therefore, the agent must participate in all
+iterations of the run without the option to return early, performing
+harmful edits to the implementation.
+
+Next, we test self-reflection contribution by omitting the natural
+language explanation step following failed unit test suite evaluations. Intuitively,
+this challenges the agent to combine the tasks of error identification and implementation
+improvement across all failed unit tests. Interestingly, the compromised agent
+does not improve performance over the baseline run. We observe that the test
+generation and code compilation steps are able to catch syntax and logic
+errors, but the implementation fixes do not reflect these indications.
+These empirical results suggest that several recent works that propose \textit{blind}
+trial and error debugging techniques without self-reflection are ineffective
+on harder tasks such as writing complex programs in Rust.
+
+\section{Limitations} \label{sec:limitations}
+
+At its core, Reflexion is an optimization technique that uses natural language
+to do policy optimization. Policy optimization is a powerful approach to improve
+action choice through experience, but it may still succumb to non-optimal local
+minima solutions. In this study, we limit long-term memory
+to a sliding window with maximum capacity, but we encourage future work to
+extend the memory component of \textit{Reflexion} with more advanced structures
+such as vector embedding databases or traditional SQL databases. Specific to code
+generation, there are many practical limitations to test-driven
+development in specifying accurate input-output mappings such as non-deterministic
+generator functions, impure functions that interact with
+APIs, functions that vary output according to hardware specifications, or functions
+that invoke parallel or concurrent behavior that may be difficult to predict.
+
+
+\section{Broader impact}
+
+Large language models are increasingly used to interact with external
+environments (e.g.\,the Internet, software, robotics, etc.) and humans.
+Our work has the potential of reinforcing and empowering these agents
+toward greater automation and work efficiency, but it also amplifies
+the risks when these agents were put into misuse. We believe that this
+direction of research will need more effort in safety and ethical
+considerations.
+
+On the other hand, reinforcement learning has suffered from its black-box
+policy and optimization setups in which interpretability and alignment have
+been challenging. Our proposed ``verbal'' reinforcement learning might
+address some of the issues and turn autonomous agents more interpretable
+and diagnosable. For example, in the case of tool-usage that may be too
+hard for humans to understand, self-reflections could be monitored to
+ensure proper intent before using the tool.
+
+\section{Conclusion}
+In this work, we present \emph{Reflexion}, an approach that leverages verbal reinforcement
+to teach agents to learn from past mistakes. We empirically show that Reflexion agents
+significantly outperform currently widely-used decision-making approaches by utilizing
+self-reflection. In future work, Reflexion could be used to employ more advanced
+techniques that have been thoroughly studied in traditional RL settings, such as value
+learning in natural language or off-policy exploration techniques. 
+
+% \begin{ack}
+% \end{ack}
+
+\section{Reproducibility}
+% We release all code, datasets, and log files at \url{https://github.com/noahshinn024/reflexion}.
+We highly advise others to use isolated execution environments when running autonomous code
+writing experiments as the generated code is not validated before execution.
+
+\newpage
+
+\bibliographystyle{apalike}
+\bibliography{main}
+
+\newpage
+
+\appendix
+
+\section{Evaluation with additional models} \label{appendix:othermodels}
+\input{additional_information/othermodels}
+
+\section{Decision-making} \label{appendix:decisionmaking}
+\input{additional_information/decisionmaking}
+
+\section{Programming} \label{appendix:programming}
+\input{additional_information/programming}
+
+\section{Reasoning} \label{appendix:reasoning}
+\input{additional_information/reasoning}
+
+\end{document}

@@ -1,0 +1,31 @@
+\section{Separated rejector}\label{sec:separated_rejector}
+
+Separated rejectors operate by filtering out unlikely examples. They are typically used for novelty rejection though there are some examples of using them for ambiguity rejection~\citep{Asif2020}. 
+Because the rejector does not use the predictor's output in any way, it is typically a function of the examples: $r \colon \mathcal{X} \to \mathbb{R}$. Formally, the separated architecture yields the following model:
+\begin{equation}
+m(x) = 
+\begin{cases}
+\rr{} & \text{if } r(x) < \tau \\
+h(x)	  & \text{otherwise.}
+\end{cases}
+\label{eq:separated_rejector}
+\end{equation}
+If the rejector $r$ outputs a value less than $\tau$, then the model $m$ rejects the example ($\rr{}$). Otherwise, $m$ uses the predictor $h$ to make a prediction.  
+
+The separation between predictor and rejector means that the rejector is learned independently of the predictor. The learning task involves learning the rejector itself as well as setting the threshold $\tau$. To align with its goal of identifying unlikely or unexpected examples, a common choice is to use anomaly/outlier, out-of-distribution, or novelty detection algorithms. Three categories of methods can be used for this goal: models that 1) estimate $p(X)$, 2) are one-class classifiers, and 3) quantify the degree of novelty using a data-driven score function.
+
+\paragraph{\textbf{Learning a separated rejector.}} 
+A first option to learn a separated rejector is to use a probabilistic model that estimates the marginal density $p(X)$ and to reject a test example $x$ if $p(x)<\tau$. These probabilistic models often make assumptions about the distribution of the examples and are trained to maximize the likelihood of the training dataset~\citep{Vasconcelos1993}. For instance, \citet{Landgrebe2004} proposes a locally normal distribution assumption and uses a Gaussian Mixture Model (GMM) to estimate $p(X)$ with a specified number of components whereas others have considered Variational Autoencoders~\citep{Wang2020} and Normalizing Flows~\citep{Nalisnick2019}.
+
+Another option to learn a separated rejector is by employing a one-class classification model. Generally, they enclose the dataset into a specific surface and flag any example that falls outside such region as novelty. For instance, a typical approach is to use a \gls{ocsvm} to encapsulate the training data through a hypersphere~\citep{Coenen2020,Homenda2014}. By adjusting the size of the hypersphere, the proportion of non-rejected examples can be increased~\citep{Wu2007}. 
+
+Alternatively, some models assign scores that represent the degree of novelty of each example (i.e., the higher the more novel), such as $LOF$~\citep{VanderPlas2023} or Neural Networks~\citep{Hsu2020}. When dealing with these methods, one often initially transforms the scores into novelty probabilities using heuristic functions, such as sigmoid and squashing~\citep{Vercruyssen2018}, or Gaussian Processes~\citep{Martens}. Then, the rejection threshold can be set to reject examples with high novelty probability.
+
+\paragraph{\textbf{Learning the rejection threshold $\tau$.}} The rejection threshold $\tau$ is a crucial parameter that determines whether an example is rejected or not. In many cases, the threshold is set based on domain knowledge. For instance, one can introduce adversarial examples and set a threshold to reject them all~\citep{Hosseini2017}. In case the number of novelties is unknown, one can use existing methods to estimate the contamination factor, i.e. the proportion of novelties, and set the threshold accordingly~\citep{Perini2022,Perini2022a}. Otherwise, heuristics can be employed, such as rejecting examples falling within the first or second percentiles of correctly classified training examples~\citep{Wang2020}. 
+
+\paragraph{\bf{Benefits and drawbacks of a separated rejector.}} Using a separated rejector has several \emph{benefits}. First, the rejector is predictor agnostic. Hence, it can be combined with any type of predictor. Second, because the rejector can be trained independently of the predictor, it is possible to augment an existing predictor with a reject option using this architecture. 
+Third, by serving as a filter, the predictor makes fewer predictions. This is particularly advantageous when there is a high computational cost associated with using the predictor.
+Finally, this architecture is generally simpler to operationalize compared to rejectors that interact with the predictor.
+However, there are two evident \emph{drawbacks}. First, not sharing information between the predictor and the rejector results often in sub-optimal rejection performance~\citep{Homenda2014}. 
+Second, this architecture is typically only used for novelty rejection because it is naturally related to assessing whether $x$ is rare or not while ambiguity rejection requires information on $p(Y|X)$, which is often estimated through the predictor's output.
+

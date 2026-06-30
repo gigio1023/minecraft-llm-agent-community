@@ -1,0 +1,110 @@
+\section{Accumulating Data Avoids Model Collapse in Linear Models}
+\label{sec:theoretical_setup}
+
+To gain mathematical understanding and intuition, we employ an analytical framework 
+introduced in prior work \citep{mobahi2020self, dohmatob2024model} to understand 
+the difference between data accumulation and data replacement. We will show that it predicts the 
+same types of test error behaviors for these two data-use strategies
+that were measured empirically.
+The framework considers a sequence of linear models that are fit to the synthetic data sampled from the linear generative model model based on the previously fit linear models.
+Within this framework, \citet{dohmatob2024model} showed that \replace{if data are replaced} across model-fitting iterations, \replace{then the test squared error increases linearly}\footnote{To echo an earlier footnote, an approach `halfway' between the `replace' and `accumulate' approaches would replace the previous dataset with a pure synthetic dataset of size $iT$ at the $i$-th iteration. Analyzing this goes mostly in parallel, except the $1/i^2$ mentioned in running text now becomes $1/i$ for the `halfway' approach. Consequently, the MSE scaling becomes $MSE \asymp O(\log(n))$; the `halfway' approach with pure synthetic data but more of it, again has test error growing unboundedly with iterations. Thanks to Elvis Dohmatob, Yunzhen Feng and Julia Kempe for communicating this observation. See Appendix \ref{app:sec:linear_reg_replace_multiple} for an extended discussion.} with the number of iterations $n$. Here, we extend \citet{dohmatob2024model}'s argument to show that \accumulate{if data instead accumulate across model-fitting iterations, then} the test squared error is upper bounded by a relatively small constant, meaning \accumulate{model collapse is avoided}\footnote{In this theoretical section, we identify the term \textit{model collapse} with the situation where test error diverges to infinity (at any rate) as iterations progress. Other authors may employ similar terminology while identifying it with different properties of test error. For example, \cite{alemohammad2023self} use the term MAD to refer to the situation where the distance between the distribution of the original data and that of the subsequent generative models grow farther apart, without necessarily diverging.}.
+
+The content in this section relies heavily on the framework and pioneering contributions of \citet{dohmatob2024model}. Our contribution is to study a  {\it different way to use synthetic data in training}, namely accumulate, which seems to better align with certain real-world considerations. We show that our empirical results could have been anticipated on theoretical grounds, by applying the same analysis framework as in \citet{dohmatob2024model}, but instead to this specific training dataset pattern. We use the same framework to analyze some other ways that synthetic data might have be used, such as replace,  again the theory aligns with many empirical results.
+
+\subsection{Notation and Preliminaries}
+
+\paragraph{Original Data Distribution.} 
+
+We adapt notations from \cite{dohmatob2024model}. Define the distribution $P_{\Sigma,w,\sigma^2}$ on $\mathbb{R}^d \times \mathbb{R}$ given by $(x, y) \sim P_{\Sigma,w,\sigma^2} \quad \text{iff} \quad$:
+\begin{align*}
+\text{(Input)} \quad & x \sim \mathcal{N}(0, \Sigma), \\
+\text{(Noise)} \quad & \epsilon \sim \mathcal{N}(0, \sigma^2), \text{ independent of } x, \\
+\text{(Label)} \quad & y = x \cdot w^* + \epsilon.
+\end{align*}
+The positive integer $d$ is the input-dimension, the matrix $\Sigma \in \mathbb{R}^{d \times d}$ is the true covariance structure of the input $x$, the vector $w^*$ is the true linear relationship used to generate the original data and the scalar $\sigma$ is the level of label noise. We start at iteration $n=1$ with $T$ initial independent data points $(x_i, y_i)$ each following $P_{\Sigma, w^*, \sigma^2}$, that is, $y_i = x_i\cdot w^* + \epsilon_i$ for each $i=1,2,\cdots, T$. We form the design matrix $X\in\R^{T\times d}$ with $x_1^\top,\cdots, x_T^\top$ as rows. We also form the vectors $Y$ and $E$ with $i$-th coordinate $y_i$ and $\epsilon_i$ respectively. In whatever follows, we will assume that $X$ has full column rank, i.e., $T\geq d$, $X^\top X$ is invertible and the model is underparameterized.
+
+\paragraph{Synthetic Data Generation Process.}
+
+We generate synthetic data from the following sequence of distributions
+
+\begin{align*}
+P_{\Sigma,w^*,\sigma^2} \to P_{\Sigma,\hat{w}_1,\sigma^2} \to \ldots \to P_{\Sigma,\hat{w}_n,\sigma^2},
+\end{align*}
+where $n \in \mathbb{N}$ is the number of iterations. The scheme is outlined as follows.
+\begin{itemize}
+\item For $n=1$:
+\begin{itemize}
+\item Accumulating Covariates/Features: $\tilde{X}_1 \defeq X$
+\item Accumulating Targets: $\tilde{Y}_1 \defeq \hat{Y}_1 \defeq Xw^* + E_1$, where $E_1 \defeq E \sim \mathcal{N}(0, \sigma^2 I_T)$
+\item Fit linear model: $\hat{w}_1 = \tilde{X}_1^{\dagger} \tilde{Y}_1$
+\item Sample synthetic data for the next iteration: $\hat{Y}_2 \defeq X\hat{w}_1 + E_2$, where $E_2 \sim \mathcal{N}(0, \sigma^2 I_T)$
+\end{itemize}
+\item For $n \geq 2$:
+\begin{itemize}
+\item Accumulating Covariates/Features: $\tilde{X}_n^\top = [\tilde{X}_{n-1}^\top; X^\top] \in \mathbb{R}^{d \times nT}$
+\item Accumulating Targets: $\tilde{Y}_n^\top = [\tilde{Y}_{n-1}^\top; \hat{Y}_n^\top] \in \mathbb{R}^{1 \times nT}$
+\item Fit linear model: $\hat{w}_n \defeq \tilde{X}_n^{\dagger} \tilde{Y}_n$
+\item Sample synthetic data for the next iteration: $\hat{Y}_{n+1} \defeq X \hat{w}_n + E_{n+1}$, where $E_{n+1} \sim \mathcal{N}(0, \sigma^2 I_T)$
+\end{itemize}
+\end{itemize}
+Here, for a matrix $A$ with full column rank, $A^\dagger=(A^\top A)^{-1}A^\top$ is the Moore-Penrose pseudo-inverse of $A$. The noise terms $E_1, E_2, \ldots, E_n$ are independent of each other and of the covariates/features. Since $X$ has full column rank, so does $\tilde{X}_n$ for every $n\geq 1$.
+
+\paragraph{Test Error.}
+
+We are interested in the dynamics of the test error $E_{\text{test}}(\hat{w}_n)$ of this sequence of linear model $\hat{w}_1, \hat{w}_2, ...$. Note that evaluation of the model is done on the true distribution $P_{\Sigma,w^*,\sigma^2}$, even though the model is trained on the accumulated synthetic data. For any linear estimator $\hat{w}$ computed from the training data, we measure test error in the standard way:
+
+\begin{equation}
+    E_{test}(w) \defeq \mathbb{E}\left[(x_{test}^T w - y_{test})^2 \right] - \sigma^2 = \E[\|w - w^*\|_{\Sigma}^2]
+\end{equation}
+where the expectation is taken over the training data and $(x_{test}, y_{test})\sim P_{\Sigma,w^*,\sigma^2}$ independent of the training data.
+
+\paragraph{A Note on Extensions to Ridge Regression and Kernel Methods.}
+
+To reiterate a comment made previously by \citet{dohmatob2024model}, although we present our results in the context of ordinary linear regression in $\mathbb{R}^d$, our analysis can be readily extended to ridge regression and the kernel setting \citep{caponnetto2007optimal, simon2021neural, cui2021generalization, wei2022more}. We focus here on a simple useful model for studying model collapse.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/linear_regression/isotropic_features_linear_linear_lambda=0_d=32.pdf}
+    \caption{\textbf{Accumulating Data Avoids Model Collapse in Linear Regression.} We consider sequences of linear models recurrently fit to generated targets by previous iterations of models. Top: If each linear model is fit to the generated targets of \textit{only} the preceding linear model, i.e., data are replaced, then the test error grows linearly with the number of iterations $n$. Bottom: If each linear model is instead fit to the generate targets of \textit{all} the preceding linear models, i.e., data accumulate, then the test error has a finite upper bound independent of the number of iterations. This suggests that data accumulation might be a robust solution for mitigating model collapse. For log test error and higher iterations, see Appendix Fig. \ref{app:fig:accumulating_vs_nonaccumulating_isotropic_features_log_linear}.}
+    \label{fig:accumulating_vs_nonaccumulating_isotropic_features}
+\end{figure}
+
+\subsection{Precise Test Error Characterization Under Accumulating Data}
+\label{sec:exact_test_error_characterization}
+
+Our goal is to establish an analytic formula for the test error of the $n$th model in the data accumulation setting. We begin by characterizing the relationship between the fitted linear parameters $\hat{w}_n$ and the true parameters $w^*$. We remind the reader that we assume that $X$ has full column rank, i.e., $X^\top X$ is invertible. Proofs are deferred to App. \ref{app:sec:proofs}.
+
+\begin{theorem}
+In the data accumulation setting, $\forall n \geq 1$, the fitted linear parameters $\hat{w}_n$ can be expressed as:
+\begin{equation}
+\hat{w}_n = w^* + (X^\top X)^{-1} X^\top \left(\sum_{i=1}^n \frac{E_i}{i}\right)
+\end{equation}
+where, recall, $w^*$ is the true parameter, $X$ is the original design matrix, and $E_i$ is the extra noise added at the $i$'th iteration.
+\label{theorem:ridgeless_fitted_linear_parameters}
+\end{theorem}
+
+\begin{theorem}
+For an $n$-fold synthetic data generation process with $T \geq d + 2$ samples per iteration and isotropic features ($\Sigma \defeq I_d$), the test error for the ridgeless linear predictor $\hat{w}_n$ learned on the accumulated data up to iteration $n$ is given by:
+\begin{equation}
+E_{\text{test}}^{\text{Accum}}(\hat{w}_n) = \frac{\sigma^2 d}{T-d-1} \left(\sum_{i=1}^n \frac{1}{i^2} \right) \leq \frac{\sigma^2 d}{T-d-1} \times \frac{\pi^2}{6}
+\end{equation}
+where, recall, $\sigma^2$ is the noise variance of the fake data generation process, $d$ is the input dimension, and $T$ is the number of samples (i.e., data points) added per iteration.
+\label{thm:warmup_ridgeless_isotropic}
+\end{theorem}
+
+How does test error with accumulating data compare against test error with replacing data? Under otherwise identical assumptions, \citet{dohmatob2024model} proved \replace{in the data-replacing setting} that the test error is given by\footnote{For notational simplicity, we assume that \citet{dohmatob2024model}'s $T_0 \defeq T$ and $\sigma_0 \defeq \sigma$.}:
+\begin{equation}
+E_{\text{test}}^{\text{Replace}}(\hat{w}_n) = \frac{\sigma^2 d}{T - d -1} \times \color{red}n \color{black}
+\label{dohmatob2024thm4p1}
+\end{equation}
+
+When data are replaced, the test error grows linearly with the number of iterations $n$ (Fig \ref{fig:accumulating_vs_nonaccumulating_isotropic_features} top), with the rate of growth determined by a noise-to-signal ratio: the amount of noise per dimension $\sigma^2$ times the number of dimensions $d$, adjusted by the (per-iteration) sample size $T$. \accumulate{In contrast, when data accumulate}, Theorem \ref{thm:warmup_ridgeless_isotropic} shows the test error is upper bounded \textit{regardless of the number of iterations $n$}:
+\begin{equation*}
+E_{\text{test}}^{\text{Accum}}(\hat{w}_n) \leq \frac{\sigma^2 d}{T-d-1} \times \color{red}\frac{\pi^2}{6}\color{black}
+\end{equation*}
+
+This striking difference can be intuitively explained by the differences in the way data are handled across iterations. In the \replace{data replacement setting}, because previous data were discarded, the model is more strongly affected by the new noise that each iteration of generated data introduces, and adds that to the effects experienced in earlier iterations. But in the \accumulate{data accumulation setting}, because iteration $i$ contributes fraction $1/i$ to the training dataset, the additional noise from the $i$th iteration of synthetic data has its effect on the model MSE shrunken proportional to $1/i^2$ (due to squared error). The summability of $1/i^2$ prevents the test error from growing indefinitely. This suggests that accumulating generated data with real data can indeed avoid model collapse.
+
+\subsection{Numerical Confirmation of Analytical Results}
+
+To confirm the analytical results, we numerically simulate the setup. The numerics almost perfectly matched the analytics (Fig. \ref{fig:accumulating_vs_nonaccumulating_isotropic_features}): \replace{when data are replaced, the test error grows with the number of iterations $n$}, with the prefactor set by the noise-to-signal ratio $\sigma^2 d / (T - d -1)$, but \accumulate{when data accumulate, the test error rapidly plateaus} with the prefactor similarly set. For log test error and higher model-fitting iterations, see Appendix Fig. \ref{app:fig:accumulating_vs_nonaccumulating_isotropic_features_log_linear}.

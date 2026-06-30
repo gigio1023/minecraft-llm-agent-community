@@ -1,0 +1,81 @@
+\section{Introduction}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/introduction.png}
+    \caption{SFT on distilled deep-thinking trajectories suffers from overthinking and limited generalization.} 
+    \label{fig:introduction}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\linewidth]{figures/combined_teaser.pdf}
+    \caption{Main results (left) and reward trends over training steps for GRPO Cold Start across four models (right). GRPO Cold Start, equipped with our proposed reward design, consistently achieves the highest performance, with reward curves showing a rapid increase during training.}
+    \label{fig:teaser}
+\end{figure*}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \hongru{my first thought is the tool name is wrong but it still function. and I do not see these points from the figure easily.} \cheng{I add definition of task goal}
+
+Recent advances in Large Language Models (LLMs) have showcased remarkable capabilities in complex reasoning tasks~\citep{kumar2025llmreasoningsurvey}. Among the techniques that have significantly contributed to this progress, Reinforcement Learning (RL) has emerged as a powerful paradigm, enabling LLMs to develop emergent capabilities such as self-reflection, self-correction, and long-horizon planning~\citep{guo2025deepseek, team2025kimi}. These capabilities have been instrumental in the success of models like o1 and R1, particularly in mathematical and logical reasoning domains~\citep{qin2024o1, huang2024o1, li2025torl, kang2025t1}.
+
+Beyond traditional reasoning tasks, an increasingly important area is \textbf{Tool-Integrated Reasoning} (TIR). TIR involves LLMs interacting with external tools, such as search engines~\citep{jin2025search, zheng2025deepresearcher}, calculators~\citep{chen2023good, qin2023tool}, or code interpreters~\citep{gou2023tora, liao2024mario}, in a multi-step, feedback-driven loop to arrive at solutions. TIR is particularly important because it addresses core limitations of LLMs, such as outdated knowledge, calculation inaccuracy, and shallow reasoning. By integrating external tools that offer real-time access and specialized capabilities, TIR enables models to tackle complex tasks in a more grounded and goal-directed way. 
+
+Unlike textual reasoning, which primarily involves deduction and inference from static text, TIR additionally demands the model’s ability to select appropriate tools, interpret intermediate outputs, and adaptively refine its trajectory on the fly. These dynamic and interactive reasoning skills position TIR at the core of the emerging paradigm of LLMs-as-agents. As such, TIR enables a wide range of applications, including scientific discovery~\citep{roohani2024biodiscoveryagent, inoue2024drugagent}, research automation~\citep{baek2024researchagent, wang2024autosurvey}, embodied task completion~\citep{zhang2023building, huang2023embodied}, and everyday decision-making~\citep{ye2023rational, zhai2024enhancing}.
+% \hongru{but why this is important? and the difference between previous textual reasoning? I feel like it can be better introduced and justified and then make the motivation more clear.} \cheng{add some motivation}
+
+%Training LLMs for TIR tasks has largely relied on Supervised Fine-Tuning (SFT), where the model is trained on curated trajectories generated or distilled from stronger models or created by humans~\citep{deepseek2024r1distillqwen, deepseek2024r1distillllama}. 
+Training LLMs for TIR tasks has predominantly relied on Supervised Fine-Tuning (SFT), wherein existing approaches typically generate these integrated reasoning steps offline, followed by subsequent SFT on these trajectories~\citep{chen2023fireact, zeng2024agenttuning, chen2024agentflan, acikgoz2025coalm}. While SFT is effective to some extent, it struggles with generalization, exploration, and adaptability~\citep{chu2025sft, guo2025deepseek}. As illustrated in \Cref{fig:introduction}, a model trained with SFT on deep-thinking trajectories over-interprets the tool and fails to reject the inappropriate tool, merely imitating cues like ``but wait'' without engaging in genuine deep thinking. As such, SFT often fails to capture the strategic flexibility needed for optimal tool use, particularly in open-ended or multi-step settings. This motivates a fundamental research question: \textit{Can RL-based training methods better equip LLMs with agentic tool-using capabilities, and if so, what is the optimal RL design for TIR?}
+
+% \hongru{I do not see these from the figure.}
+% \hongru{add citations}
+% \heng{It will be good to have a teaser figure to illustrate these limitations with examples}
+
+Recent efforts such as Search-R1~\citep{jin2025search} and TORL~\citep{li2025torl} have begun to explore this direction. However, their focus is narrow: either constrained to search tools in question answering settings or code tools in math problem-solving. In contrast, our work aims to study RL-based training for \textit{general-purpose} tool selection and application, across diverse and complex tool sets with different task types.
+% \heng{reviewers might argue QA is for general-purpose} \cheng{QA is not generalize enough as only search tool is involved. The same problem applies to math reasoning, where only one code tool is involved.}
+
+For an RL algorithm to be effective, a well-designed \textbf{reward} is essential. Unlike math tasks with a single correct answer, Tool-Integrated Reasoning (TIR) tasks introduce multiple layers of complexity: they often involve multi-step interactions where each turn may require invoking multiple tools, each with carefully specified parameters. Designing effective reward signals to guide learning through this complexity remains an open and underexplored challenge. In this paper, we focus on the problem of reward design for TIR and propose a principled, generalizable framework that can be applied across various RL algorithms. While our reward design is algorithm-agnostic by nature, we empirically demonstrate its effectiveness using both Group Relative Policy Optimization (GRPO)~\citep{shao2024deepseekmath} and Proximal Policy Optimization (PPO)~\citep{schulman2017proximal}, showcasing its versatility and impact on improving tool use performance.
+% \xiusi{I feel like we don't have to entangle our contribution with one specific RL optimization algorithm - GRPO. Our reward design can be generalized to any RL algorithm instance, and we empirically demonstrate its effectiveness using GRPO and PPO.}
+% \emre{Mult-turn or Multi-step? If there is no multiple user interaction we should say multi-step.}
+% \hongru{this is a little uncomfortable as some reviewer may not believe this.}
+% \heng{need to elaborate a bit how GRPO works} \cheng{I think GRPO framework itself is not quite related here, we are adapting our design under this RL framework. Maybe can introduce about it in the first several sentences in related works section.}
+
+We begin by formalizing the TIR task, and outlining general principles for effective reward design. Building on this foundation, we show how RL algorithm can be leveraged to train LLMs for robust and context-aware tool selection and application. Empirical results demonstrate that our approach outperforms base models by 17\% and SFT models by 15\% across multiple tool use and QA benchmarks. Moreover, the trained model exhibits strong generalization to unseen scenarios and task objectives, along with emergent behaviors such as proactiveness and metacognitive reasoning.
+
+To identify optimal reward strategies, we next systematically explore a broad spectrum of reward configurations across four key dimensions: (1) reward type (what aspect to reward), (2) reward scale (how much to reward), (3) reward granularity (how detailed the reward signal is), and (4) reward dynamics (how rewards evolve over time). Through extensive experiments, we identify reward designs that best align with agentic tool use and uncover insights into what makes a reward ``useful'' for tool invoking LLMs. We summarize the core insights we derive as follows:
+\begin{itemize}[topsep=2pt, leftmargin=10pt, itemsep=-2pt]
+    \item Longer reasoning trace is not inherently better and length rewards can degrade performance.
+    \item Dynamic reward scale helps models transition smoothly from simple to complex behaviors.
+    \item Finegrained reward decomposition leads to more stable and effective learning.
+\end{itemize}
+% \heng{all of these dimensions need brief definitions in intro to make them easier to follow}
+We also summarize the overall contributions of our paper as follows:
+\begin{itemize}[topsep=2pt, leftmargin=10pt, itemsep=-2pt]
+    \item We present the first systematic study on RL-based training for general-purpose tool selection and application in LLMs.
+    \item We propose a principled reward design framework tailored for TIR and validate its effectiveness through RL algorithms including GRPO.
+    \item We conduct extensive experiments analyzing the effects of various reward strategies and distill actionable insights for future research on LLM-agent training.
+\end{itemize}
+This work pioneers the application of RL to general TIR and provides the first empirical roadmap for reward design in TIR, paving the way toward more capable and autonomous LLM agents.
+
+
+%% ===================================== %%
+
+% Recent development of Large Language Models (LLMs) have demonstrated their exceptional abilities in reasoning, especially Reinforcement Learning (RL) algorithms have show great potential in inspiring LLM's emergent capabilities, including self-reflection, self-correction, etc. These capabilities constitute to the success of o1 and R1 models, which greatly advances LLM's math and logical reasoning abilities.
+
+% In addition to math tasks, tool-integrated reasoning (TIR) has also emerged as an important aspect that comes to researcher's vision. In TIR, LLMs are supposed to wisely select and use tools to solve the given problem, always in a multi-turn manner, to reach the final successful state or answer. Apart from general reasoning and deduction abilities, TIR also tests LLM's ability to wisely make use of available external resources, and learn from the feedback LLMs get from the observation, which makes the reasoning process more integrated and challenging. In addition, TIR is also the foundation of LLM as agent, which inspires numerous applications in the field of science discovery, research automation, web browsing, and other everyday life scenarios.
+
+% Traditionally, the training of TIR is through supervised fine-tuning (SFT), which forces the language model to attend to the connection between tool's description and the given task. This is usually achieved through distilling trajectories of stronger models.  However, SFT faces inherent limitations in generalization and reasoning depth, and restricts the exploration of optimal tool calling strategies. This inspires our core research question: is RL method also applicable to train TIR and overcome the challenges that SFT possesses? If so, what's the best recipe for RL training with tools?
+
+% Recent studies like Search-R1 and TORL has investigated the possibility of integrating RL algorithm in tool using, but the scope of tools and task scenarios are limited, with the former one only focusing on search tool's application in QA settings, with the later one focusing on code tool's application in math problem-solving. Different from these studies, we aim to investigate the best way for RL-training on general tool selection and application tasks.
+
+% Diving into this, we capture one of the core of RL algorithm: reward design. Different from training on math problem, which has only one correct ground truth, tool integrated reasoning presents much more challenges as reasoning may involve multiple turns, each turn may involve multiple tools, and each tool entails multiple parameters, all which which makes the tool invocation itself and reward design more complicated. In this paper, we specifically dive into the reward design for TIR, and systematically explores the best way to reward the TIR training through Group Relative Policy Optimization (GRPO), the RL algorithm that leads to the success of R1 in deep reasoning ability.
+
+% We first present a general principle of reward design for general TIR tasks, and shows that GRPO could well-work on the general tool selection and application tasks, which forms the foundation of LLM's agentic ability. Next, we investigate what reward design gives the optimal tool using capabilities of LLMs. Specifically, we systematically explore and conduct extensive experiments on a variety of reward strategies, examining their types, values, scaling, granularity, temporal dynamics, and optimization policies. The analysis of each reward component has lighten up a transparent way of what's the best strategy to reward your tool. We here summarize the core insights we derive:
+% \begin{itemize}[topsep=2pt, partopsep=-5pt, leftmargin=8pt, itemsep=-4.5pt]
+% \item ...
+% \end{itemize}
+
+% In summary, we are the first work to validate the use of RL algorithm on general tool selection and application tasks, and we are also the first study to empirically and systematically illuminate a path for reward design in TIR.

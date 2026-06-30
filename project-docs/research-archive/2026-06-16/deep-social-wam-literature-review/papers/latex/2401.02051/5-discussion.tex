@@ -1,0 +1,117 @@
+\section{Discussion and Future Works}\label{sec:discussion}
+
+\subsection{Discussion}
+\paragraph{Interaction between Thoughts and Codes}
+We carry out the following experiments to demonstrate the benefits of the use of both thoughts and codes in EoH. The thought and code can be regarded as multiple views of the heuristic. We will show that the multi-view thought and code representation contribute to EoH. %and in our evolutionary prompt strategies, the code parts in the parent heuristics  contribute to the thought parts of new generated heuristics. 
+We compare EoH with the following three variants: 
+\begin{itemize}
+    \item \textbf{C2C:} It uses only code to represent a heuristic. There is no natural language (thought) representation.
+    \item \textbf{T2T2C:} It uses only thought for heuristic representation. Evolutionary prompts (i.e., E1-2, M1-3) only use thought representation to generate new heuristics. However, we still need to query LLMs to produce a code implementation for each heuristic for performance evaluation.  
+    \item \textbf{T\&C2T2C:} It uses both thought and code representations of input heuristics in evolutionary prompts. We query LLMs with these prompts (i.e., E1-2, M1-3) to give only a natural language presentation of the produced heuristic. As in T2T2C, we need to request LLMs to produce a code implementation for each produced heuristic for performance evaluation.
+    
+%    \item \textbf{EoH:} It uses both thoughts and codes are used for individual representation. It prompts LLM to first present the thought of the design heuristic based on reasoning on the thoughts\&codes, then implement the code for the thought based on all the previous information. The main 1e6difference between EoH to T\&C2T2C is that code generation is based on not only the thoughts but also all the reasoning and the parent thoughts\&codes in the in-context information. 
+
+%% to avoid repetation. 
+
+
+\end{itemize}
+
+Table~\ref{tab:interaction} lists comparison results (average gap (\%) to lb) of EoH with the above three variants on the online bin packing Weibull test instances. All experiments are carried out in the same experimental settings three times on the online bin packing problem.
+
+It is evident that only use of codes (C2C) or thoughts (T2T2C) in evolutionary prompts is much worse than EoH. Thus, we can claim that the evolution of both codes and thoughts does make significant contribution to EoH. EoH is also better than T\&C2T2C. It implies that letting these prompts output both the codes and thoughts are helpful for the quality of the produced heuristics.  
+
+\begin{table}[t]
+\centering
+\caption{Study of the effect of evolution of both thoughts and codes. Average gap (\%) to lb on online bin packing problem 5k Weibull instances. \label{tab:interaction}
+}
+\renewcommand{\arraystretch}{1.2}
+\resizebox{0.4\textwidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+ Setting          & Run 1 & Run 2 & Run 3 & Average \\
+\midrule
+ C2C      &  2.92	& 1.25	&3.53	&2.57 
+   \\
+ T2T2C    & 3.72  & 1.66  & 1.00  & 2.13       \\
+T\&C2T2C    & 0.79  & 0.76  & 1.00  & 0.85      \\
+ EoH                              & 0.68  & 0.67  & 0.62  & 0.66       \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\paragraph{Different LLMs} 
+We compare four commonly used LLMs: GPT3.5, Gemini Pro, CodeLlama, and Deepseek. All experiments are carried out in the same experimental settings three times on the online bin packing problem. In general, EoH can generate good-performance heuristics using these different LLMs. EoH using different LLMs with 2,000 queries to LLMs performs better than randomly querying GPT3.5 10,000 times. Nevertheless, our experimental results also show the benefits of using more powerful LLMs, e.g., GPT3.5 and Gemini Pro outperform other LLMs. 
+%This could be attributed to the EoH's demands on both language comprehension and code generation, posing difficulties for smaller or domain-specific LLMs.
+
+\begin{table}[t]
+\centering
+\caption{Comparison of EoH with different LLMs. Average gap (\%) to lb on online bin packing problem 5k Weibull instances. \label{tab:LLM}}
+\renewcommand{\arraystretch}{1.2}
+\resizebox{0.48\textwidth}{!}{%
+\begin{tabular}{llllll}
+\toprule
+Method & LLM           & Run 1 & Run 2 & Run 3 & Average \\
+\midrule
+Sampling      & GPT3.5  & 2.76  & 1.92  & 2.65  & 2.44  \\
+EoH    & CodeLlama & 0.93  & 0.62  & 1.66  & 1.07        \\
+EoH    & Deepseek      & 1.01  & 1.47  & 1.75  & 1.41       \\
+EoH    & Gemini Pro    & 0.92  & 0.61  & 0.61  & 0.71         \\
+EoH    & GPT3.5        & 0.68  & 0.67  & 0.62  & 0.66       \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+    
+\paragraph{Use of Expert Heuristic}
+We investigate the impact of the use of existing heuristics (expert heuristics) in EoH. Take the bin packing problem as an example, we adopt the heuristic provided in FunSearch paper~\cite{romera2024mathematical} as the existing expert heuristic and put it into the initial population of EoH. The rest of the initial heuristics are randomly generated. The results are given in Table~\ref{fig:expert}. We term the EoH with an expert in the initial population EoH expert and compare it to the original EoH and FunSearch. The results show that the adoption of elite expert heuristic benefits in the population benefits the final results in our test case. The EoH expert clearly surpasses both FunSearch and EoH. The knowledge of expert heuristics can be inherited and evolved during evolution to produce better heuristics. 
+
+\begin{table}[t]
+\centering
+\caption{Study of the effect of using an existing expert heuristic in EoH. Average gap (\%) to lb on online bin packing problem 5k Weibull instances.}~\label{fig:expert}
+\renewcommand{\arraystretch}{1.2}
+\resizebox{0.4\textwidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+Method     & Run 1 & Run 2 & Run 3 & Average \\
+\midrule
+FunSearch  & 0.94  & 0.82  & 1.15  & 0.97    \\
+EoH        & 0.68  & 0.67  & 0.62  & 0.66    \\
+EoH expert & 0.57  & 0.55  & 0.52  & 0.55   \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+\subsection{Future Works}
+
+%We also need to point out that other parameters such as the population size and the number of parent heuristics in these prompt strategies should be investigated as well, which will be our future work. 
+
+
+%\paragraph{Complete Automatic Design of Algorithms}
+%EoH requires very little domain knowledge for algorithm design, it designs some key heuristic components in a given algorithmic framework. Complete automatic design of algorithms remains a big challenge. Much effort should be made along this direction. We believe that the rapid advance in AI will provide many possible approach for addressing this challenge.  
+%Training an LLM agent as a decision-maker is believed to be effective in addressing complex tasks~\cite{hong2023metagpt}.
+
+It should be pointed out that the development of the evolution of heuristics using LLMs is still in its very early infancy. This paper and other research~\cite{romera2024mathematical} show that it is very promising for automatic algorithm design. Much effort should be made to advance this area. 
+
+\paragraph{Pre-trained domain LLM}
+Instead of using a general pre-trained LLM with linguistic and code generation capability, it is worthwhile studying how to train an LLM specifically for automatic algorithm design. Domain knowledge can be used for this purpose.  
+
+%For example, a solver for combinatorial optimization or evolutionary computation.
+
+\paragraph{Understanding of search space of heuristics}
+EoH directly does its search on the space of heuristics. It is different from classic optimization algorithms which conduct their search in a well-defined math space such as $R^n$. It should be very important to study and understand search spaces of heuristics for further establishing theory and basic principles for the automatic design of algorithms.  
+
+
+% evolution algorithm, where the evolution of solution is performed on hard-coded solution search space. A principled way to the formulation of heuristic search space will benefit the understanding of the heuristic evolution behavior and the designing of advanced search methods. 
+
+
+\paragraph{Interaction with human experts}
+A LLM in EoH can be regarded as an intelligent agent. During the process of EoH, It is straightforward to let human experts to replace LLM for generating, modifying, and evaluating heuristics at some stage. It should be interesting to study how to implement efficient and effective interaction with human experts in EoH. Ideas and techniques in collective intelligence~\cite{malone2022handbook} should be used for this purpose.
+
+
+%EoH on three combinatorial optimization problems. The general idea behind EoH is applicable in many other tasks including other algorithm design scenarios~\cite{}, science discovery~\cite{shojaee2024llm}, and decision-making processes~\cite{}.
+
+\vspace{1pt}

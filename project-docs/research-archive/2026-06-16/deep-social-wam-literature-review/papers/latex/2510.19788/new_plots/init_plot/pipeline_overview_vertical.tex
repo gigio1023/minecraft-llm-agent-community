@@ -1,0 +1,238 @@
+% Pipeline overview diagram composed from existing fragments
+% - Uses example env thumbnails from example_envs.tex in the selector box
+% - Uses prebuilt PDF of the interaction fragment (interaction_phase_preview.pdf)
+% - Uses separate test phase fragment from test_phase.tex
+% This file is a fragment intended to be \subimport'ed or \input into a figure/tikzpicture
+% Example standalone preview provided in pipeline_overview_preview.tex
+
+% Dependencies: \usepackage{tikz}, \usepackage{import}
+\usetikzlibrary{arrows.meta,calc,shapes.callouts}
+
+\providecommand{\pipelineArrowHeadLength}{3mm}
+\providecommand{\pipelineArrowHeadWidth}{2.2mm}
+\providecommand{\ipArrowHeadLength}{3mm}
+\providecommand{\ipArrowHeadWidth}{2.2mm}
+\providecommand{\ipLabelFont}{\normalsize}
+\providecommand{\pipelineSectionTitleFont}{\small\bfseries}
+\providecommand{\pipelineSectionTitleYOffset}{0.2cm}
+\providecommand{\pipelineSectionFrameLineWidth}{0.8pt}
+\providecommand{\pipelineSectionFrameCorner}{6pt}
+\providecommand{\pipelineSectionPadX}{0.15cm}
+\providecommand{\pipelineSectionPadYBottom}{0.05cm}
+\providecommand{\pipelineSectionPadYTop}{0.0cm}
+\providecommand{\pipelineTestPhaseXShift}{4.2cm}
+\providecommand{\pipelineTestPhaseScale}{0.95}
+\providecommand{\pipelineAgentLabelYOffset}{0.40cm}
+\providecommand{\pipelineActorArrowXOffset}{1.3}
+\providecommand{\pipelineArrowLabelFill}{labelBg}
+
+% Styles - Updated to match interaction phase format
+\tikzset{
+% Match interaction phase arrow style exactly
+pipeline/arrow/.style={draw=black, line width=1pt, line cap=round, line join=round, -{Stealth[length=\pipelineArrowHeadLength,width=\pipelineArrowHeadWidth]}, shorten <=1.6mm, shorten >=1.6mm, preaction={draw=white, line width=2.2pt, opacity=0.9}},
+pipeline/label/.style={font=\normalsize, text=black},
+pipeline/descbox/.style={rounded corners=2pt, draw=none, inner sep=2pt, text width=3.2cm, align=left}
+}
+
+% Colors for task description boxes
+\colorlet{CDColor}{cyan!18}
+\colorlet{PLColor}{orange!20}
+\colorlet{MFPColor}{green!20}
+% Lavender color for agent box
+\definecolor{lavender}{RGB}{230, 230, 250}
+\definecolor{lightbulb}{RGB}{255,235,59}
+
+% Unified thumbnail height for task grids (smaller & equal-sized)
+\newcommand{\TaskThumbH}{3cm}
+
+% Provide defaults required by the grid fragments
+\providecommand{\maraGridLineColor}{black!10}
+\providecommand{\maraGridBorderColor}{black!30}
+\providecommand{\maraGridLineWidth}{0.4pt}
+\providecommand{\maraBorderLineWidth}{3pt}
+\providecommand{\maraBorderRadius}{2pt}
+
+% Default label background
+\providecolor{labelBg}{HTML}{F7F4EE}
+
+% Coordinate system (units: cm)
+\begin{scope}[x=1cm,y=1cm]
+
+  % Padding for the example envs dashed box. The envs container is shifted down
+  % by \pipelineEnvTopShift so the dashed border doesn't hug the grids while
+  % the title still aligns with "Test Phase" in y.
+  % Match the horizontal padding of the interaction-phase box so the two
+  % dashed boxes can share the exact same left x coordinate.
+  \providecommand{\pipelineEnvSectionPadX}{\pipelineSectionPadX}
+  \providecommand{\pipelineEnvSectionPadYBottom}{0.05cm}
+  \providecommand{\pipelineEnvSectionPadYTop}{0.15cm}
+  \providecommand{\pipelineEnvTopShift}{0.15cm}
+
+  % Test phase (right) - rendered first so its top can anchor the example envs row
+  \begin{scope}[shift={(\pipelineTestPhaseXShift,0)}, scale=\pipelineTestPhaseScale, local bounding box=tpbb]
+    % \clip (0,0) rectangle (6cm, 10cm);
+    \subimport{.}{test_phase_vertical.tex}
+  \end{scope}
+
+  % Enclose the test phase with a dashed line box
+  \draw[dashed, line width=\pipelineSectionFrameLineWidth, rounded corners=\pipelineSectionFrameCorner]
+  ([xshift=-\pipelineSectionPadX,yshift=-\pipelineSectionPadYBottom]tpbb.south west)
+  rectangle
+  ([xshift=\pipelineSectionPadX,yshift=\pipelineSectionPadYTop]tpbb.north east);
+
+  % Label above the test phase
+  \node[pipeline/label, font=\pipelineSectionTitleFont]
+  at ([yshift=\pipelineSectionTitleYOffset]tpbb.north) {Test Phase};
+
+  % Interaction elements (left) - rendered before the envs container so we can
+  % anchor the envs dashed box left edge to ipbb.west for x-alignment.
+  \begin{scope}[shift={(0,-0.3)}, scale=0.9, local bounding box=ipbb]
+    \subimport{.}{interaction_phase.tex}
+  \end{scope}
+
+  % Enclose the interaction phase with a dashed line box
+  \draw[dashed, line width=\pipelineSectionFrameLineWidth, rounded corners=\pipelineSectionFrameCorner]
+  ([xshift=-\pipelineSectionPadX,yshift=-\pipelineSectionPadYTop]ipbb.south west)
+  rectangle
+  ([xshift=\pipelineSectionPadX,yshift=\pipelineSectionPadYTop]ipbb.north east);
+
+  % Select env thumbnails (top-left). Wrap the imported scope in a node so its
+  % top can be anchored at the same y as the test phase's top, and its dashed
+  % box left aligned with the interaction phase dashed box left.
+  \node[anchor=north west, inner sep=0pt] (envscontainer)
+    at ([yshift=-\pipelineEnvTopShift]ipbb.west |- tpbb.north) {%
+    \begin{tikzpicture}
+      % Local override: more breathing room between each grid and its caption.
+      % poster.tex defines this globally, so use \renewcommand (group-local).
+      \renewcommand{\maraCaptionGap}{0.3cm}
+      \begin{scope}[scale=0.46, local bounding box=exbb]
+        \subimport{.}{example_envs.tex}
+      \end{scope}
+    \end{tikzpicture}%
+  };
+  % Enclose the example environments with a dashed line box. Left edge is taken
+  % directly from ipbb's dashed box so the two left edges coincide.
+  \draw[dashed, line width=\pipelineSectionFrameLineWidth, rounded corners=\pipelineSectionFrameCorner]
+  ([xshift=-\pipelineEnvSectionPadX,yshift=-\pipelineEnvSectionPadYBottom]envscontainer.south west)
+  rectangle
+  ([xshift=\pipelineEnvSectionPadX,yshift=\pipelineEnvSectionPadYTop]envscontainer.north east);
+  % Label above the example envs block (same y as the Test Phase title:
+  % envscontainer.north sits \pipelineEnvTopShift below tpbb.north, so we
+  % add that back here so the title lands at tpbb.north + \pipelineSectionTitleYOffset)
+  \node[pipeline/label, font=\pipelineSectionTitleFont]
+  at ([yshift=\pipelineSectionTitleYOffset+\pipelineEnvTopShift]envscontainer.north) {AutumnBench Environments};
+
+  % Label above the interaction phase
+  \node[pipeline/label, font=\pipelineSectionTitleFont]
+  at ([yshift=\pipelineSectionTitleYOffset]ipbb.north) {Interaction Phase};
+
+  % (Yellow callout notes removed for poster use.)
+  \coordinate (betweenPhasesMid) at ($ (ipbb.east)!0.5!(tpbb.west) $);
+
+  % Ensure interaction-phase styles/colors exist outside the imported scope
+  \tikzset{
+  ip/box/.style={draw, rounded corners=6pt, minimum width=4.2cm, minimum height=3.0cm, line width=0.8pt, align=center, font=\large},
+  ip/arrow/.style={line width=1pt, line cap=round, line join=round, -{Stealth[length=\ipArrowHeadLength,width=\ipArrowHeadWidth]}, shorten <=1.6mm, shorten >=1.6mm, preaction={draw=white, line width=2.2pt, opacity=0.9}},
+  ip/label/.style={font=\ipLabelFont, fill=labelBg, inner sep=2pt, rounded corners=2pt}
+  }
+  \colorlet{IPRightBg}{red!30!brown!35}
+
+  % Explorer/agent interaction loop (moved from interaction_phase)
+  % Two actor icons (LLM or Human) with an "OR" between them
+  % Positioned near previous agent location
+  % Background containers (used for fitting and arrow anchors) - moved higher
+  \begin{scope}[shift={(0,-0.2)}]
+    \node[rounded corners=12pt, minimum width=1.0cm, minimum height=.8cm, draw=none] (llm) at (1.4,.6) {};
+    \node[rounded corners=12pt, minimum width=1.0cm, minimum height=.8cm, draw=none] (human) at (3.0,.6) {};
+
+    % Fit node around both actors to anchor arrows
+    \node[inner sep=1pt, fit=(llm) (human)] (actors) {};
+
+    % LLM robot icon via pic (drawn on top of background)
+    \subimport{.}{pic_llm_icon.tex}
+    \pic[scale=0.02] at (llm.center) {llm_icon};
+
+    % Human icon via pic (drawn on top of background)
+    \subimport{.}{pic_human_icon.tex}
+    \pic[scale=0.05] at (human.center) {human_icon};
+
+    % Agents dashed box enclosing both icons (narrower horizontally)
+    \draw[dashed, line width=\pipelineSectionFrameLineWidth, rounded corners=\pipelineSectionFrameCorner]
+    ([xshift=-0.05cm,yshift=-0.2cm]actors.south west)
+    rectangle
+    ([xshift= 0.05cm,yshift= 0.2cm]actors.north east);
+    % Label above the agents box.
+    \node[pipeline/label, font=\pipelineSectionTitleFont]
+    at ([yshift=\pipelineAgentLabelYOffset]actors.north) {Agent};
+
+    % OR separator: slashed line with label above
+    \draw[draw=black, line width=0.9pt] (2.05,0.25) -- (2.35,0.95);
+
+    % CURVED arrow system between boxes
+    % Get the actual bounds of the stack and actors boxes
+    \coordinate (stackBottom) at ($ (stack.south) + (0,-0.5) $);
+    \coordinate (agentTop) at (actors.north);
+
+    % Horizontal offsets for the two arrow columns from the center
+    \def\ArrowXOffset{\pipelineActorArrowXOffset}
+
+    % State arrow (left side): Environment state flows DOWN to agent - CURVED
+    \draw[ip/arrow]
+    ($ (stackBottom)+(-\ArrowXOffset + 0.2, 0) $)
+    .. controls +(-0.4, -0.3) and +(-0.4, 0.5) ..
+    coordinate[pos=0.5] (obsMid)
+    ($ (agentTop)+(-\ArrowXOffset, 0) $);
+    \node[ip/label, fill=\pipelineArrowLabelFill, text=black] at (obsMid) {observation};
+
+    % Action arrow (right side): Agent actions flow UP to environment - CURVED
+    \draw[ip/arrow]
+    ($ (agentTop)+(\ArrowXOffset, 0) $)
+    .. controls +(0.4, 0.3) and +(0.1, -0.3) ..
+    coordinate[pos=0.5] (actMid)
+    ($ (stackBottom)+(\ArrowXOffset, 0) $);
+    \node[ip/label, fill=\pipelineArrowLabelFill, text=black] at (actMid) {action};
+
+    % Arrows connecting the pipeline phases
+    % Arrow from examples to interaction phase with broken line and label in the break
+    \def\arrowOneStartX{1.8}
+    \def\arrowOneStartY{6.8}
+    \coordinate (ip-north) at (ipbb.north);
+    \def\arrowOneLabelY{6.1} % midpoint for label placement
+
+    % First part of arrow (before break)
+    % \draw[pipeline/arrow, -] (\arrowOneStartX, \arrowOneStartY) -- (\arrowOneStartX, {\arrowOneLabelY+0.05});
+    % Label at the break (matching interaction phase label style)
+    % \node[font=\tiny, text=black] at (\arrowOneStartX, \arrowOneLabelY) {select environment};
+    % Second part of arrow (after break, with arrowhead)
+    % \draw[pipeline/arrow] (\arrowOneStartX, {\arrowOneLabelY-0.05}) -- (ip-north);
+
+    % % Arrow from interaction phase to test phase  
+    % \draw[pipeline/arrow] (ipbb.east) -- (tpbb.west);
+
+    % Also draw observation/action arrows between actors and the test phase
+    % Define convenient anchors (offset so start/end points differ)
+    \coordinate (actorsRight) at (actors.east);
+    \coordinate (actorsObs) at ($ (actorsRight)+(0, 0.25) $);
+    \coordinate (actorsAct) at ($ (actorsRight)+(0,-0.25) $);
+    % Project test-phase west edge to the same y-levels as actors for horizontal arrows
+    \coordinate (testObs) at ($ (tpbb.west |- actorsObs) $);
+    \coordinate (testAct) at ($ (tpbb.west |- actorsAct) $);
+
+    % Observation (from test phase to actors) - arched upward
+    \draw[ip/arrow]
+    (testObs)
+    .. controls +(-0.6, 0.6) and +(0.6, 0.6) ..
+    coordinate[pos=0.5] (phaseObsMid)
+    (actorsObs);
+    \node[ip/label, fill=\pipelineArrowLabelFill, text=black] at (phaseObsMid) {observation};
+
+    % Action (from actors to test phase) - arched downward
+    \draw[ip/arrow]
+    (actorsAct)
+    .. controls +(0.6, -0.6) and +(-0.6, -0.6) ..
+    coordinate[pos=0.5] (phaseActMid)
+    (testAct);
+    \node[ip/label, fill=\pipelineArrowLabelFill, text=black] at (phaseActMid) {action};
+  \end{scope}
+
+\end{scope}

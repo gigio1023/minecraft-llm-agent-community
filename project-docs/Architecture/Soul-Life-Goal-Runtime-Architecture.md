@@ -18,6 +18,14 @@ runtime.
 
 Original proposal date: 2026-05-23.
 
+Research-direction update, 2026-06-18: this Soul/LifeGoal layer remains the
+actor frame for the active Advisory Social-Material WAM direction. The runtime
+may ask an advisory predictor what physical, material, and social consequences
+a candidate action is likely to produce, but the Actor Turn remains responsible
+for action selection and the Mineflayer runtime remains responsible for
+execution and outcome checks. Verification is expected runtime hygiene, not the
+research contribution.
+
 ## Core Decision
 
 This repo is not building a bot that simply completes an external task string.
@@ -35,10 +43,11 @@ The ordinary decision path is:
 ```text
 ActorSoul + LifeGoal
 -> current observation, memory, relationships, PlanBead hints, Evidence Trace
+-> optional advisory social-material prediction for candidate actions
 -> Active Episode / branch-time Deliberation only when needed
 -> Actor Turn function-tool selection
 -> runtime validation and Mineflayer execution or generated-action trial
--> verifier-backed evidence
+-> checked runtime outcome evidence
 -> CycleJudgment, memory, relationships, and PlanBead updates
 ```
 

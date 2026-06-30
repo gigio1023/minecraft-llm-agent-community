@@ -1,0 +1,69 @@
+\section{Text Conditioning}
+\label{appendix:text_conditioning}
+
+Goal-conditioned policies~\cite{andrychowicz2017hindsight,schaul2015universal} make it possible for a single agent to perform a wide variety of goals in a single environment, which is particularly relevant in open-ended environments such as Minecraft. In recent work, goal specification has increasingly taken the form of domain specific languages~\cite{team2021open}, or even natural language~\cite{luketina2019survey,team2021creating}. The benefits of language-conditioned agents can be tremendous, especially \emph{natural}-language-conditioned agents, as their goal space contains a wide variety of potentially very complex tasks. Text conditional models have shown an amazing ability to perform tasks zero-shot (or learn them few-shot) including generalizing in impressive ways via the compositional and combinatorial possibilities allowed by natural language (e.g.\ GPT\cite{brown2020language} and DALL·E 2\cite{ramesh2022hierarchical}). We hypothesize that we should expect similar capabilities to emerge with natural-language-conditioned virtual agents, if they are similarly trained on enormous amounts of data (that goes from a natural language description to a sequence of actions that completes the specified goal). In this section we take preliminary steps toward that future. Our preliminary experiments provide evidence that it is possible to pretrain a natural-language-conditioned model for Minecraft using the general approach presented in this paper (VPT) plus conditioning on the speech that often accompanies videos.
+
+
+In online videos, the human actor sometimes indicates their intent in their verbal commentary (e.g.\ ``Let's go chop some trees to make a wooden axe'' or ``now let's learn how to crop photos in Photoshop''). Conditioning on this closed caption data could produce a \emph{steerable} pre-trained model: i.e., it may later be possible to condition the model with text such as ``I am going to craft a wooden pickaxe'' or ``I am going to build a house,'' and have the agent perform those tasks specifically rather than simply follow typical human behavior (as was investigated in the rest of this paper). An alternate way to produce a steerable agent is via RL fine-tuning, which we could have done in Section \ref{section:RL_finetuning} by adding a bit indicating the task to be completed, as has been done in prior work \cite{kanitscheider2021multi}. However, conditioning on natural language offers many benefits over that approach. First, it is flexible and powerful, being able to express any task. Second, one does not need to preconceive of the task to be completed ahead of time. This would allow for general, capable, zero-shot agents like GPT, but extending those capabilities to embodied tasks such as completing tasks on computers or in simulated 3D worlds. Third, text conditioning can be used even when tasks are difficult to specify via reward functions (e.g.\ ``Let's build a house'' or--if the agent is capable of doing it--more complex things like ``I will now build a castle surrounded by a moat''). In the limit, VPT+text could conceivably produce powerful, capable, natural-language-conditional agents with the powers of GPT to meta-learn, follow instructions, and complete tasks zero or few shot, but in the form of agents that can act in virtual worlds, complete tasks on computers, and in other similar embodied sequential decision domains. We do not reach those lofty goals in this work, but we began a first step towards exploring in that direction. 
+
+Many Minecraft videos feature audio commentary from the player. This commentary is sometimes present in the form of closed captions for the videos, or could be extracted post-hoc using automated speech recognition (ASR).\cite{yu2016automatic} Our dataset features about 17k
+%\ale{FYI: more exact number = 17651. The jsonnet says 15597 for some reason} 
+hours of content with associated closed captions.
+
+
+We fine-tuned the 220 million parameter VPT foundation model used in the RL-fine-tuning experiments  (chosen vs.\ 0.5B for the same reason: to reduce compute costs) 
+%\ale{Note: a model is named here, we should keep the name up to date with whatever we end up doing. Exact name of the base model for context: \texttt{bowen-yt-bc-2xw-allyt-20220311-1}.}
+with an additional text-conditioning input on the subset of our data for which closed captions are available. To obtain the conditioning input, we first split videos into 30 second chunks. The same text is associated with every frame in a given chunk, and is made up of all the closed captions occurring within that chunk, as well as the line of text preceding and following the chunk (if any). Because the vast majority (around 95\%) of our closed caption data lacks capitalization and punctuation, it is punctuated using the rpunct library\cite{Daulet2021rpunct}. We then obtain a text embedding vector of length 4,096 from the OpenAI embedding API\cite{neelakantan2022text}, which is processed by a randomly initialized multi-layer perceptron (MLP) with two hidden layers of size 2,048. The resulting activations are added for each frame to the pretrained model activations before the transformer layers (\texttt{pretransformerActivations += mlp(textEmbedding)}).
+The model is fine-tuned for four epochs.
+
+\begin{figure}[htbp]
+\begin{center}
+\begin{overpic}[width=0.42\linewidth]{assets/a_2/a_2_distance_max_xz.pdf}
+\put(0, 78){\tiny(\textbf{a})}
+\end{overpic}
+\hspace{5mm}
+\begin{overpic}[width=0.42\linewidth]{assets/a_2/a_2_pickup.wheat_seeds.pdf}
+\put(0, 78){\tiny(\textbf{b})}
+\end{overpic}\\
+\vspace{5mm}
+\begin{overpic}[width=0.42\linewidth]{assets/a_2/a_2_pickup.oak_log.pdf}
+\put(0, 78){\tiny(\textbf{c})}
+\end{overpic}
+\hspace{5mm}
+\begin{overpic}[width=0.42\linewidth]{assets/a_2/a_2_pickup.dirt.pdf}
+\put(0, 78){\tiny(\textbf{d})}
+\end{overpic}
+\end{center}
+\caption{Evidence for conditioning. In each plot, the variants expected to stand out are shown in bold. The strings corresponding to each variant are shown in Table~\ref{tab:cond_strings}. Statistics are measured over 5 minute episodes.
+\textbf{(a)} Distance traveled by the agent . Both ``explore'' and ``water'' text strings should encourage a steerable agent to move more than when doing other tasks, which is what occurs. Grass (which is needed to get seeds) is not present in all biomes, which is likely why the ``seed'' condition produces more travel (as the agent sometimes needs to move to a biome with grass). The travel distance is the Euclidean distance from the spawn point to the farthest point the agent reached during the episode on the horizontal (x-z) plane. 
+\textbf{(b)} Collection of wheat seeds. The ``seed'' variant collects substantially more than other variants, as expected of a steerable agent.
+\textbf{(c)} Collection of oak (the most common type of wood) logs. The ``wood'' variant collects significantly more oak logs, as is to be expected of a steerable agent (we speculate that the ``water'' variant collects less because there are no trees in water). 
+\textbf{(d)} Collection of dirt. The ``dirt'' and ``dig'' variants collect a large amount, and are the variants that are (indirectly in the case of ``dig'') conditioned to collect dirt. It is easy to mistakenly aim at the ground rather than at grass or trees when collecting seeds or wood, which likely explains the slightly higher amount of dirt collected by these variants. In all cases, the error bars are 95\% confidence intervals of the mean, over 1,000 episodes per conditioning variant. Treatments for which the bars in each bar plot do not overlap are statistically significantly different at a $p<0.05$ level. }
+\label{fig:cond_travel_xz}
+\end{figure}
+
+\begin{table}[htbp]
+\begin{center}
+    \begin{tabular}{|c|c|}
+        \hline
+        \textbf{Variant name} & \textbf{String} \\
+        \hline
+        dig & I'm going to dig as far as possible \\
+        dirt & I'm going to collect dirt \\
+        explore & I'm going to explore \\
+        house & I'm going to make a house \\
+        seed & I'm going to collect seeds \\
+        water & I'm going to find water \\
+        wood & I'm going to chop wood \\
+        \hline
+    \end{tabular}
+\end{center}
+\caption{Strings corresponding to each conditioning variant.}
+\label{tab:cond_strings}
+\end{table}
+
+Our model shows evidence of steerability. When conditioned on sentences that incite the agent to explore (such as ``I'm going to explore'' and ``I'm going to find water'') the agent travels significantly farther from its spawn point (Figure~\ref{fig:cond_travel_xz}a). Additionally, we can steer the agent to preferentially collect early game items such as seeds, wood, and dirt by conditioning with text such as ``I'm going to collect seeds/chop wood/collect dirt'' (Figure~\ref{fig:cond_travel_xz}b,c,d).
+
+While our results show some level of steerability, more work is required to increase it. For example, we were not able to successfully steer agents to gather flowers or to hunt, both of which are possible in the early game, but less common (and, in the case of hunting animals, much more difficult) than gathering dirt, wood, or seeds. Likewise, an experiment in which the agent is presented with a crafting window and various resources, and conditioned to craft a given item (e.g.\ ``I'm going to craft a wooden axe'') failed to show that the conditioning had a significant effect on which items got crafted. Instead, it seemed the agent was more influenced by the prior, unconditional probability of what human players would craft next given the resources available, which is not too surprising since in Minecraft, especially in the early game, there is a relatively consistent path to gathering resources in a specific order go produce more powerful tools (Fig.~\ref{fig:rlft_curriculum}). For example, if the agent had the resources to make a stone pickaxe and we asked it instead to make a (weaker) wooden pickaxe, it often would make the stone pickaxe anyway. Finally, looking at videos of agent behaviors failed to convince us that the ``house'' conditioning causes the agents to take more steps towards building a house than other variants. 
+
+Thus, our results show that it is possible to train a somewhat steerable natural-language-conditioned agent. However, its steerability is still too weak to be practically useful, and it is far from what we believe could be accomplished with more research, data, and training compute. Another exciting research direction is to have the model predict future text as well as just the next action.

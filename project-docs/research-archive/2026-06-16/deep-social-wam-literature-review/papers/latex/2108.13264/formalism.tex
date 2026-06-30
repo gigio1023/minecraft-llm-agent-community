@@ -1,0 +1,53 @@
+
+
+We consider the setting in which a reinforcement learning algorithm is evaluated on $M$ tasks. For each of these tasks, we perform $N$ independent runs\footnote{A run can be different from using a fixed random seed. Indeed, fixing the seed may not be able to control all sources of randomness such as non-determinism of ML frameworks with GPUs~(\eg~\figref{fig:fixed_seeds}). } which each provide a scalar, \emph{normalized score} $x_{m,n}$, $m = 1, \dots, M$ and $n = 1, \dots, N$. These normalized scores are obtained by linearly rescaling per-task scores\footnote{Often the average undiscounted return obtained during an episode (see \citet{sutton18reinforcement} for an explanation of the reinforcement learning setting).}
+based on two reference points; for example, performance on the Atari games is typically normalized with respect to a random agent and an average human, who are assigned a normalized score of 0 and 1 respectively~\citep{mnih2015human}. We denote the set of normalized scores by $x_{{1:M}, {1:N}}$.
+
+
+In most experiments, there is inherent randomness in the scores obtained from different runs. This randomness can arise from stochasticity in the task, exploratory choices made during learning, randomized initial parameters, but also software and hardware considerations such as non-determinism in GPUs and in machine learning frameworks~\citep{zhuang2021randomness}. Thus, we model the algorithm's normalized score on the $m^{th}$ task as a real-valued random variable $X_{m}$. Then, the score $x_{m, n}$ is a realization of the random variable $X_{m,n}$, which is identically distributed as $X_{m}$. For $\tau \in \mathbb{R}$, we define the tail distribution function of $X_m$ as $\cdfi(\tau) = \Pr(X_m > \tau)$. For any collection of scores $y_{1:K}$, the \emph{empirical tail distribution function} is given by $\hat F(\tau; y_{1:K}) = \tfrac{1}{K} \sum_{k=1}^{K} \mathbbm{1}[y_k > \tau]$.
+% \begin{equation*}
+    % \hat F(\tau; y_{1:K}) = \frac{1}{K} \sum_{k=1}^{K} \mathbbm{1}[y_k > \tau] .
+% \end{equation*}
+In particular, we write $\ecdfi(\tau) = \hat F(\tau; x_{m, 1:N})$.
+
+The \emph{aggregate performance} of an algorithm maps the set of normalized scores $x_{{1:M}, {1:N}}$ to a scalar value. 
+% for example the mean normalized score $(NK)^{-1} \sum_{i=1}^N \sum_{k=1}^K x_i^k$.
+Two prevalent aggregate performance metrics are the mean and median normalized scores. If we denote
+by $\avgxi = \tfrac{1}{N} \sum_{n=1}^N x_{m,n}$ the average score on task $m$ across $N$ runs, then these aggregate metrics are $\text{Mean}({\bar x}_{1:M})$ and $\text{Median}({\bar x}_{1:M})$.
+% \vspace{-0.2cm}
+% \begin{equation}
+%     \text{Mean}({\bar x}_{1:M}) = \frac{1}{M} \sum_{m=1}^M \avgxi, \qquad
+%     \text{Median}({\bar x}_{1:M}) = \tau_0\ \text{such\ that}\ {\hat F}  \big (\tau_0; {\bar x}_{1:M} \big) = 0.5 . \label{eqn:mean_and_median}
+% \end{equation}
+More precisely, we call these \emph{sample mean} and \emph{sample median} over the task means since they are computed from a finite set of $N$ runs. Since $\avgxi$ is a realization of the random variable $\avgXi = \tfrac{1}{N} \sum_{n=1}^N X_{m,n}$, the sample mean and median scores are \emph{point estimates} of the random variables $\text{Mean}({\bar X}_{1:M})$ and $\text{Median}({\bar X}_{1:M})$ respectively.
+We call \emph{true mean} and \emph{true median} the metrics that would be obtained if we had unlimited experimental capacity ($N \to \infty$), given by $\smash{\text{Mean}(\expected{[X_{1:M}]})}$ and $\smash{\text{Median}({\expected[X_{1:M}]})}$ respectively.
+
+
+
+
+% \begin{align}
+%     \text{Mean}({\bar x}^{(K)}_{1:N}) &= \frac{1}{N} \sum_{i=1}^N \avgxi \nonumber \\
+%     \text{Median}({\bar x}^{(K)}_{1:N}) &= {\hat F}_K \big (0.5; {\bar x}^{(K)}_{1:N} \big). \label{eqn:mean_and_median}
+% \end{align}
+
+% We are interested in evaluating aggregate performance across a diverse suite of $N$ tasks given the performance metrics for each task and a normalization scheme. Typically, the average sum of rewards obtained by an agent is used for measuring task performance in RL. The normalization scheme maps the performance metric for a given task to a normalized score, which has a common scale for all tasks. For example, performance on Atari games
+
+
+% To easily summarize relative performance of algorithms, usually \emph{scalar aggregate} scores are reported by aggregating average scores across tasks. Widely used aggregate normalized scores include $\text{Mean}(\{ \avgxi \}_{i=1}^{N})$ and 
+% $\text{Median}(\{ \avgxi\}_{i=1}^{N})$, where $ \avgxi = \sum_{k=i}^K x_i^s/K$ is the average score on task $i$ over $K$ independent runs. Since performing well on a single task can result in extremely high mean scores without providing much information about performance across other tasks, median normalized scores are preferred as they are \emph{robust} to outlier tasks. 
+
+\textbf{Confidence intervals}~(CIs) for a finite-sample score can be interpreted as an estimate of plausible values for the true score.  A $\alpha \times 100\%$ CI computes an interval such that if we rerun the experiment and construct the CI using a different set of runs, the fraction of calculated CIs (which would differ for each set of runs) that contain the true score would tend towards $\alpha \times 100\%$, where $\alpha \in [0, 1]$ is the nominal coverage rate. 95\% CIs are typically used in practice. If the true score lies outside the 95\% CI, then a sampling event has occurred which had a probability of 5\% of happening by chance. 
+
+\textbf{Remark}. Following \citet{amrhein2019scientists, wasserstein2019moving, romer2020praise}, we recommend using confidence intervals for measuring the uncertainty in results and showing effect sizes~(\eg performance improvements over baseline) that are compatible with the given data. Furthermore, we emphasize using statistical thinking but avoid statistical significance tests~(\eg $p$-value < $0.05$) because of their dichotomous nature~(significant \versus not significant) and common misinterpretations~\citep{greenland2016statistical, gigerenzer2018statistical, mcshane2019abandon} such as 1) lack of statistically significant results does not demonstrate the absence of effect~(\figref{fig:variability_in_median}, right), and 2) given enough data, any trivial effect can be statistically significant but may not be practically significant.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.63\linewidth]{new_figures/median-dist-vs-reported-replacement-small_final.pdf}
+    \includegraphics[width=0.33\linewidth]{new_figures/cis_iqm_vs_median_all_algos.pdf}
+    \caption{\textbf{Left}. \textbf{Distribution of median normalized scores} computed using 100,000 different sets of $N$ runs subsampled uniformly with replacement from 100 runs.  For a given algorithm, the sampling distribution shows the variation in the median scores when re-estimated using a different set of runs. The reported \emph{point estimates} of median in publications, as shown by dashed lines, do not provide any information about the variability in median scores and severely overestimate or underestimate the expected median. We use the same number of runs as reported by publications: $N=5$ runs for \der, \otr\ and \drq, $N=10$ runs for \spr\ and $N=20$ runs for \curl.
+    \textbf{Right}. \textbf{95\% CIs} for median and IQM scores~(\Secref{sec:aggregate_metrics_robust}) for varying $N$. There is a substantial uncertainty in median scores even with 50 runs. IQM has much smaller CIs than median. %While improvement from \spr\ over \drq\ with  $10$ runs is not statistically significant, evaluating more runs indeed shows that the improvement is significant. 
+    Note that when CIs overlap, properly accounting for uncertainty entails computing CIs for score differences~(\figref{fig:diff_medians}).
+    }
+    \label{fig:variability_in_median}
+    \vspace{-0.3cm}
+\end{figure}

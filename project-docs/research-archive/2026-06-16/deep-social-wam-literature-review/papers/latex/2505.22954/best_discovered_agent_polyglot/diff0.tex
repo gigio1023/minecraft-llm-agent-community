@@ -1,0 +1,193 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/coding_agent.py b/coding_agent.py
+index 04ffb36..6639abd 100644
+--- a/coding_agent.py
++++ b/coding_agent.py
+@@ -4,6 +4,9 @@ import logging
+ from logging.handlers import RotatingFileHandler
+ import os
+ import threading
++import json
++from dataclasses import dataclass
++from typing import List, Optional
+ 
+ from llm_withtools import CLAUDE_MODEL, OPENAI_MODEL, chat_with_agent
+ from utils.git_utils import diff_versus_commit, reset_to_commit, apply_patch
+@@ -42,6 +45,14 @@ TEST_COMMANDS = {
+ # Thread-local storage for logger instances
+ thread_local = threading.local()
+ 
++@dataclass
++class SolutionAttempt:
++    """Class to store information about a solution attempt."""
++    patch: str  # The patch content
++    test_output: str  # Raw test output
++    test_success: bool  # Whether tests passed
++    test_stats: dict  # Test statistics (e.g., number of passed/failed tests)
++
+ def get_thread_logger():
+     """
+     Get the logger instance specific to the current thread.
+@@ -102,7 +113,8 @@ class AgenticSystem:
+             chat_history_file='./chat_history.md',
+             test_description=None,
+             self_improve=False,
+-            language='python'
++            language='python',
++            max_attempts=3
+         ):
+         self.problem_statement = problem_statement
+         self.git_tempdir = git_tempdir
+@@ -111,6 +123,7 @@ class AgenticSystem:
+         self.test_description = test_description
+         self.self_improve = self_improve
+         self.language = language
++        self.max_attempts = max_attempts
+ 
+         # Set the code model based on whether self-improvement is enabled
+         self.code_model = OPENAI_MODEL if not self_improve else CLAUDE_MODEL
+@@ -137,11 +150,63 @@ class AgenticSystem:
+         ]
+         return new_msg_history
+ 
++    def run_tests(self) -> tuple[bool, str, dict]:
++        """Run tests and return success status, output, and test statistics."""
++        success = False
++        output = ""
++        stats = {"passed": 0, "failed": 0, "errors": 0, "total": 0}
++
++        try:
++            for command in TEST_COMMANDS.get(self.language, []):
++                proc = subprocess.run(
++                    command, 
++                    cwd=self.git_tempdir,
++                    capture_output=True,
++                    text=True,
++                    check=False
++                )
++                output += f"$ {' '.join(command)}\n{proc.stdout}\n{proc.stderr}\n"
++                success = proc.returncode == 0
++                if not success:
++                    break
++
++            # Try to extract test statistics from output
++            # This is a simple example; you might want to add more sophisticated parsing
++            stats["passed"] = output.count("PASS") + output.count("ok")
++            stats["failed"] = output.count("FAIL") + output.count("not ok")
++            stats["errors"] = output.count("ERROR") + output.count("panic:")
++            stats["total"] = stats["passed"] + stats["failed"] + stats["errors"]
++            
++        except Exception as e:
++            output = f"Error running tests: {str(e)}"
++            success = False
++
++        return success, output, stats
++
++    def analyze_test_results(self, attempts: List[SolutionAttempt]) -> str:
++        """Analyze test results and create a summary for the agent."""
++        summary = "# Test Results Analysis\n\n"
++        
++        for i, attempt in enumerate(attempts, 1):
++            summary += f"## Attempt {i}\n"
++            summary += f"Test Success: {attempt.test_success}\n"
++            summary += f"Test Stats: {json.dumps(attempt.test_stats, indent=2)}\n"
++            summary += "Key test output:\n```\n"
++            # Extract relevant parts of test output (e.g., error messages)
++            key_output = "\n".join(line for line in attempt.test_output.split("\n") 
++                                 if "FAIL" in line or "ERROR" in line or "PASS" in line)
++            summary += f"{key_output}\n```\n\n"
++
++        return summary
++
+     def forward(self):
+         """
+-        The forward function for the AgenticSystem.
++        The forward function for the AgenticSystem with multiple solution attempts.
+         """
+-        task = f"""I have uploaded a code repository in the directory {self.git_tempdir}. Help solve the following problem.
++        attempts: List[SolutionAttempt] = []
++        best_attempt: Optional[SolutionAttempt] = None
++
++        base_task = f"""I have uploaded a code repository in the directory {self.git_tempdir}. Help solve the following problem.
+ 
+ <problem_description>
+ {self.problem_statement}
+@@ -149,8 +214,52 @@ class AgenticSystem:
+ 
+ Your task is to make changes to the files in the {self.git_tempdir} directory to address the <problem_description>. I have already taken care of the required dependencies.
+ """
+-        instruction = f"{task}\n\nPlease analyze the problem description carefully. Then make edits to the code files to complete the instruction."
+-        init_edit = chat_with_agent(instruction, model=self.code_model, msg_history=[], logging=safe_log)
++
++        for attempt_num in range(self.max_attempts):
++            # Reset to base commit for each attempt
++            reset_to_commit(self.git_tempdir, self.base_commit)
++            
++            # Prepare the instruction based on previous attempts
++            instruction = base_task
++            if attempts:
++                # Add analysis of previous attempts
++                instruction += "\n\nPrevious solution attempts have been made. Here are the results:\n\n"
++                instruction += self.analyze_test_results(attempts)
++                instruction += "\nPlease analyze these results and provide an improved solution that addresses the issues found."
++            else:
++                instruction += "\n\nPlease analyze the problem description carefully. Then make edits to the code files to complete the instruction."
++
++            # Get the solution attempt
++            chat_with_agent(instruction, model=self.code_model, msg_history=[], logging=safe_log)
++            
++            # Capture the current patch
++            current_patch = diff_versus_commit(self.git_tempdir, self.base_commit)
++            
++            # Run tests and collect results 
++            test_success, test_output, test_stats = self.run_tests()
++            
++            # Create and store attempt
++            attempt = SolutionAttempt(
++                patch=current_patch,
++                test_output=test_output,
++                test_success=test_success,
++                test_stats=test_stats
++            )
++            attempts.append(attempt)
++            
++            # Update best attempt if this one is better
++            if test_success and (best_attempt is None or 
++                               attempt.test_stats["passed"] > best_attempt.test_stats["passed"]):
++                best_attempt = attempt
++            
++            # If tests pass perfectly, we can stop
++            if test_success and attempt.test_stats["failed"] == 0 and attempt.test_stats["errors"] == 0:
++                break
++        
++        # Apply the best solution if found, otherwise use the last attempt
++        final_attempt = best_attempt or attempts[-1]
++        reset_to_commit(self.git_tempdir, self.base_commit)
++        apply_patch(self.git_tempdir, final_attempt.patch)
+ 
+ def main():
+     parser = argparse.ArgumentParser(description='Process repository with an agentic system.')
+@@ -162,6 +271,7 @@ def main():
+     parser.add_argument('--test_description', default=None, required=False, help='Description of how to test the repository')
+     parser.add_argument('--self_improve', default=False, action='store_true', help='Whether to self-improve the repository or solving swe')
+     parser.add_argument('--language', required=False, default="python", choices=['cpp', 'java', 'python', 'go', 'rust', 'javascript'], help='Task\'s programming language')
++    parser.add_argument('--max_attempts', type=int, default=3, help='Maximum number of solution attempts')
+     args = parser.parse_args()
+ 
+     # Process the repository
+@@ -173,6 +283,7 @@ def main():
+         test_description=args.test_description,
+         self_improve=args.self_improve,
+         language=args.language,
++        max_attempts=args.max_attempts,
+     )
+ 
+     # Run the agentic system to try to solve the problem
+@@ -185,4 +296,4 @@ def main():
+         f.write(model_patch)
+ 
+ if __name__ == "__main__":
+-    main()
++    main()
+\ No newline at end of file
+\end{lstlisting}

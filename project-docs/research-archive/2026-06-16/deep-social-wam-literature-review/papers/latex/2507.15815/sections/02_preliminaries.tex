@@ -1,0 +1,104 @@
+\section{Preliminaries}
+\label{sec:preliminaries}
+We model optimal taxation as a repeated Stackelberg game between a \textit{planner} $\mathcal{P}$ and a population of \textit{workers} $\mathcal{W}=\{\mathcal{W}_{1},\dots,\mathcal{W}_{N}\}$.  
+Time is divided into daily steps $t=0,\dots,T-1$ and tax years of fixed length $K$; the current tax year is $k=\lfloor t/K\rfloor$.
+
+\paragraph{Economic environment.}
+Each worker $i$ has a latent skill $s^{i}>0$ and chooses labor $l_{t}^{i}\in\mathcal{A}$ hours.
+Pre-tax income is  
+\[
+z_{t}^{i}=s^{i}\,l_{t}^{i}.
+\]
+At the start of each year $k$, the planner selects a piecewise-linear marginal tax schedule $\tau_{k}\in\mathcal{T}=\{\tau\in\mathbb{R}^{B}:\tau_{\min}\le\tau_b\le\tau_{\max}\}$ that is parameterized so that $\tau_{k}=0$ is a flat tax.  
+Given~$\tau_{k}$, the tax paid is $T_{\tau_{k}}(z)$; post-tax income is  
+\[
+\hat z_{t}^{i}=z_{t}^{i}-T_{\tau_{k}}(z_{t}^{i})+R_{t},
+\]
+where the lump-sum rebate $R_t = \frac{1}{N}\sum_{i=1}^N T_{\tau_k}(z_t^i)$ is split evenly among the populace.
+
+\paragraph{Preferences and objectives.}
+Each worker has an utility function $u(\hat{z}, l)$. Our general framework does not rely on a specific utility choice. 
+Social welfare at step~$t$ is  
+\[
+\texttt{SWF}(o_{t},\mathbf{l}_{t},\tau_{k})
+=\sum_{i=1}^{N}w(z_{t}^{i})\,u_{i}(\hat z_{t}^{i},l_{t}^{i}),
+\]
+where $w(z_{t}^{i}) = \frac{1}{z_{t}^{i}}$ encodes distributional weights and $u^i, \hat{z}^i, l^i$ are utility, post-tax income and labor of the $i$-th worker.  
+The planner maximizes undiscounted social welfare
+\begin{equation}
+\mathcal{J}_{\mathcal{P}}(\boldsymbol{\tau})
+=\mathbb{E}\!\Bigl[\sum_{t=0}^{T-1}\,
+      \texttt{SWF}(o_{t},\mathbf{l}_{t},\tau_{\lfloor t/K\rfloor})\Bigr],
+\label{eq:planner}
+\end{equation}
+and each worker maximizes
+\begin{equation}
+\mathcal{J}_{\mathcal{W}_{i}}(\mathbf{l}^{i};\boldsymbol{\tau})
+=\mathbb{E}\!\Bigl[\sum_{t=0}^{T-1}\,
+      u_{i}(\hat z_{t}^{i},l_{t}^{i})\Bigr].
+\label{eq:worker}
+\end{equation}
+where the expectation is taken over the joint distribution of
+latent skills, environment noise, and stochastic policy sampling.
+
+\paragraph{Why a utility-based objective?}
+Mirrlees’s non-linear tax model \citep{mirrlees1971exploration,mirrlees1976optimal} maximizes\\
+$\int w(u)\,dF(u)$ rather than post-tax income, a practice retained by
+all subsequent optimal-tax work \citep{diamond1971optimal,saez2001using,saez2016generalized}.
+The optimal marginal rate depends on labor elasticity, upper-tail
+thickness, and the social marginal utility of consumption—three objects
+defined only in utility space.  We therefore track utility directly,
+using the standard isoelastic form (Eq.~\ref{eq:isoelastic}) for
+comparability and closed-form benchmarks \citep{mankiw2009optimal}, and a
+bounded-rational variant (Eq.~\ref{eq:bounded}) that penalizes
+dissatisfaction to better emulate synthetic humans.  This preserves
+theoretical fidelity while enabling token-level learning and calibration.
+
+% Following the Mirrleesian tradition, we adopt a welfare objective that is an explicit function of individual utility rather than of post-tax income alone.  
+% In Mirrlees’s seminal model of optimal income taxation \citep{mirrlees1971exploration,mirrlees1976optimal} the government chooses a non-linear tax schedule to maximize a social-welfare function
+% \(\int w(u)\,dF(u)\)  
+% subject to incentive constraints that arise because skills are privately observed.  
+% Diamond \citep{diamond1971optimal} and Saez \citep{saez2001using,saez2016generalized} extend this framework, showing that the optimal marginal rate at any income level depends on \textit{(i)} the compensated elasticity of labor supply, \textit{(ii)} the thickness of the income distribution’s upper tail, and \textit{(iii)} the social marginal utility of consumption.  
+% Because all three objects are defined in utility space, a welfarist planner must track utility directly, not merely cash transfers.
+
+% Isoelastic utility (equation~\ref{eq:isoelastic}) is the canonical choice in this literature: it imposes constant relative risk aversion, yields closed-form comparative-statics, and separates the consumption–labor trade-off in a way that preserves tractability under heterogeneous skills \citep{mankiw2009optimal}.  
+% Retaining that structure in a learning simulator lets us \textit{(i)} benchmark against analytical results such as the Saez formula, \textit{(ii)} interpret social-welfare changes in consumption-equivalent units, and \textit{(iii)} calibrate dissatisfaction penalties \(\phi\) on the same cardinal scale.  
+% Consequently, the utility-based objective in \eqref{eq:planner} is not merely convenient for machine-learning optimization; it is the standard normative criterion used throughout optimal-tax theory. In this work, we consider bounded rational utility (see equation~\ref{eq:bounded} to more accurately model synthetic humans.
+
+
+% \paragraph{Stackelberg equilibrium.}
+% Let $\boldsymbol{\tau}=(\tau_{0},\dots,\tau_{\lfloor T/K\rfloor-1})$ and  
+% $\mathbf{l}^{i}=(l_{0}^{i},\dots,l_{T-1}^{i})$.  
+% A Stackelberg equilibrium satisfies
+% \[
+% \boldsymbol{\tau}^{*}\in
+% \arg\max_{\boldsymbol{\tau}}\,
+%   \mathcal{J}_{\mathcal{P}}\!\bigl(\boldsymbol{\tau};\{\mathbf{l}^{i*}(\boldsymbol{\tau})\}_{i=1}^{N}\bigr),\qquad
+% \mathbf{l}^{i*}(\boldsymbol{\tau})\in
+% \arg\max_{\mathbf{l}^{i}}\mathcal{J}_{\mathcal{W}_{i}}(\mathbf{l}^{i};\boldsymbol{\tau}),
+% \quad i \in\{1, \dots, N\}.
+% \]
+% \chijin{are we sure we want to define the equilibirum over multiple time step? this is a bit unnecessarily complicated. Since the it's a naive sum over $t$, the true equilibirum will just collapse to agents using the same strategy across all time. The standard way is the define utility in equation (2)(3) as well as equilibrium for each step. (or for simplicity of the notation, we can do so without time index, as it's the same for all time)}
+
+\paragraph{Stackelberg equilibrium.}
+Because preferences and objectives are time‑homogeneous and additive, the optimal responses are without loss of generality \emph{stationary}: the planner fixes a yearly schedule $\tau\!\in\!\mathcal{T}$ and each worker follows a policy $l^{i}$.  A pair $(\tau^{*},\{l^{i*}\}_{i=1}^{N})$ is a stationary Stackelberg equilibrium if
+\[
+\tau^{*}\in\arg\max_{\tau}
+      \mathbb{E}[\texttt{SWF}(\mathbf{l},\tau)],\qquad
+l^{i*}(\tau)\in\arg\max_{l^i}
+      \mathbb{E}[u_{i}(\hat z^{i},l^{i})],\; i=1,\dots,N.
+\]
+Simulating these stationary policies forward for $T$ days reproduces the cumulative objectives in Eqs.~(\ref{eq:planner})–(\ref{eq:worker}).
+
+
+\paragraph{Connection to Saez optimal taxation.}
+In a one-shot model with fixed elasticity~$e$, \citet{saez2001using} derive the marginal tax rate  
+\[
+T'(z)=\frac{1-G(z)}{1-G(z)+a(z)e},
+\]
+where $G$ is the social-welfare weight and $a$ is the local Pareto parameter.  
+When tax policy changes, both $e$ and $a$ adjust endogenously, so static formulas no longer apply.  
+Framing taxation as the dynamic game in~\eqref{eq:planner}–\eqref{eq:worker} lets the planner implicitly re-estimate elasticities online through in-context reinforcement learning, recovering Saez as the stationary solution of a sequential decision problem. 
+Without the LLM Economist to provide a local solution to perturb, traditional Saez would not be able to find the Stackelberg equilibrium solution. Saez makes impractical assumptions such as assuming a purely rational utility function and assuming there is no cross tax bracket behavioral dependence.
+
+This section establishes the notation and economic setting used throughout the paper, grounding our LLM-based analysis in the classic work of \citet{diamond1971optimal}, \citet{mirrlees1976optimal}, and \citet{mankiw2009optimal}.

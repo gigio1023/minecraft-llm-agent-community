@@ -1,0 +1,1389 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+\documentclass[11pt]{article}
+\usepackage{amsmath} 
+\usepackage{algorithm}
+\usepackage{enumitem}
+\usepackage{amssymb}
+\usepackage{acl}
+\usepackage{enumitem}
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+% \usepackage[preprint]{acl}
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{booktabs} 
+\usepackage{footmisc}
+\usepackage{float}
+% \usepackage{caption}
+% \usepackage{captionsetup}
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+% \usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+% \usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+% \usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+
+\usepackage{multirow}
+\usepackage{array}
+% \usepackage{pgfplots}
+% \pgfplotsset{compat=1.18}
+% \usepackage{tabularx}
+\usepackage{caption}
+%\usepackage{adjustbox} 
+\usepackage{pifont}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\newcommand{\xmark}{\ding{55}}
+\usepackage[T1]{fontenc} % For better handling of special characters like underscores
+\usepackage[utf8]{inputenc} % Should be default in modern LaTeX, but good to have
+\usepackage[english]{babel} % Assuming English content for prompts
+\usepackage[most]{tcolorbox}
+\usepackage{appendix}
+\usepackage{lipsum} 
+\newtcolorbox{promptcontentbox}{
+    colback=black!5!white,    % Background color: very light grey (5% black)
+    colframe=black,           % Frame color: black
+    boxrule=0.5pt,            % Frame thickness
+    arc=0mm,                  % Corner radius: 0mm for sharp corners
+    outer arc=0mm,            % Outer corner radius
+    breakable,                % Allows the box to break across pages if content is long
+    left=5pt,                 % Left padding inside the box
+    right=5pt,                % Right padding inside the box
+    top=5pt,                  % Top padding inside the box
+    bottom=5pt,               % Bottom padding inside the box
+    width=0.48\textwidth,         % Box width will be the full text width
+    before skip=\medskipamount, % Vertical space before the box
+    after skip=\medskipamount   % Vertical space after the box
+}
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{Memory OS of AI Agent}
+
+
+
+
+
+
+
+
+
+\author{  
+  Jiazheng Kang \\
+  Beijing University of Posts \\ and  Telecommunications \\
+  % Beijing, China \\
+  \texttt{kjz@bupt.edu.cn}
+  \And
+  Mingming Ji \\
+  Tencent AI Lab \\
+  % Beijing, China \\
+  \texttt{matthhewj@tencent.com}
+  \AND 
+  Zhe Zhao \\
+  Tencent AI Lab \\
+  % Beijing, China \\
+  \texttt{nlpzhezhao@tencent.com}
+  \And
+  Ting Bai \thanks{ Corresponding author.}\\
+  Beijing University of Posts \\ and Telecommunications \\
+  % Beijing, China \\
+  \texttt{baiting@bupt.edu.cn}
+}
+
+
+% Author information can be set in various styles:
+% For several authors from the same institution:
+
+% if the names do not fit well on one line use
+%         Author 1 \\ {\bf Author 2} \\ ... \\ {\bf Author n} \\
+% For authors from different institutions:
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \And  ... \And
+%         Author n \\ Address line \\ ... \\ Address line}
+% To start a separate ``row'' of authors use \AND, as in
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \AND
+%         Author 2 \\ Address line \\ ... \\ Address line \And
+%         Author 3 \\ Address line \\ ... \\ Address line}
+
+% \author{Ting Bai \\
+%   Beijing University of Posts and Telecommunications \\
+%   % Affiliation / Address line 2 \\
+%   % Affiliation / Address line 3 \\
+%   \texttt{baiting@bupt.edu.cn} \\\And
+%   Second Author \\
+%   Affiliation / Address line 1 \\
+%   Affiliation / Address line 2 \\
+%   Affiliation / Address line 3 \\
+%   \texttt{email@domain} \\}
+
+
+%\author{
+%  \textbf{First Author\textsuperscript{1}},
+%  \textbf{Second Author\textsuperscript{1,2}},
+%  \textbf{Third T. Author\textsuperscript{1}},
+%  \textbf{Fourth Author\textsuperscript{1}},
+%\\
+%  \textbf{Fifth Author\textsuperscript{1,2}},
+%  \textbf{Sixth Author\textsuperscript{1}},
+%  \textbf{Seventh Author\textsuperscript{1}},
+%  \textbf{Eighth Author \textsuperscript{1,2,3,4}},
+%\\
+%  \textbf{Ninth Author\textsuperscript{1}},
+%  \textbf{Tenth Author\textsuperscript{1}},
+%  \textbf{Eleventh E. Author\textsuperscript{1,2,3,4,5}},
+%  \textbf{Twelfth Author\textsuperscript{1}},
+%\\
+%  \textbf{Thirteenth Author\textsuperscript{3}},
+%  \textbf{Fourteenth F. Author\textsuperscript{2,4}},
+%  \textbf{Fifteenth Author\textsuperscript{1}},
+%  \textbf{Sixteenth Author\textsuperscript{1}},
+%\\
+%  \textbf{Seventeenth S. Author\textsuperscript{4,5}},
+%  \textbf{Eighteenth Author\textsuperscript{3,4}},
+%  \textbf{Nineteenth N. Author\textsuperscript{2,5}},
+%  \textbf{Twentieth Author\textsuperscript{1}}
+%\\
+%\\
+%  \textsuperscript{1}Affiliation 1,
+%  \textsuperscript{2}Affiliation 2,
+%  \textsuperscript{3}Affiliation 3,
+%  \textsuperscript{4}Affiliation 4,
+%  \textsuperscript{5}Affiliation 5
+%\\
+%  \small{
+%    \textbf{Correspondence:} \href{mailto:email@domain}{email@domain}
+%  }
+%}
+% \author{Jiazheng Kang\\
+%         Beijing University of Posts and Telecommunications, Beijing, China \\
+%         \texttt{kjz@bupt.edu.cn}
+% }
+% \author{Ting Bai\\
+%         Beijing University of Posts and Telecommunications, Beijing, China \\
+%         \texttt{kjz@bupt.edu.cn}
+% }
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+
+Large Language Models (LLMs) face a crucial challenge from fixed context windows and inadequate memory management, leading to a severe shortage of long-term memory capabilities and limited personalization in the interactive experience with AI agents.
+To overcome this challenge, we innovatively propose a \textbf{Memory} \textbf{O}perating \textbf{S}ystem, i.e., \textbf{MemoryOS},  to achieve comprehensive and efficient memory management for AI agents. Inspired by the memory management principles in operating systems, MemoryOS designs a hierarchical storage architecture and consists of four key modules: Memory Storage, Updating, Retrieval, and Generation. Specifically, the architecture comprises three levels of storage units: short-term memory, mid-term memory, and long-term personal memory. Key operations within MemoryOS include dynamic updates between storage units: short-term to mid-term updates follow a dialogue-chain-based FIFO principle, while mid-term to long-term updates use a segmented page organization strategy.
+Our pioneering MemoryOS enables hierarchical memory integration and dynamic updating. Extensive experiments on the LoCoMo benchmark show an average improvement of 49.11\% on F1 and 46.18\% on BLEU-1 over the baselines on GPT-4o-mini, showing contextual coherence and personalized memory retention in long conversations. The implementation code is open-sourced at \url{https://github.com/BAI-LAB/MemoryOS}.
+
+
+% Large Language Models (LLMs) face a crucial challenge from fixed context windows and inadequate memory management, leading to a severe shortage of long-term memory capabilities and limited personalization in the interactive experience with AI agents. To overcome this challenge, we innovatively propose a Memory Operating System, i.e., MemoryOS,  to achieve comprehensive and efficient memory management for AI agents. Inspired by the memory management principles in operating systems, MemoryOS designs a hierarchical storage architecture and consists of four key modules: memory Storage, Updating, Retrieval, and Generation. Specifically, the architecture comprises three levels of storage units: short-term memory, mid-term memory, and long-term personal memory. Key operations within MemoryOS include dynamic updates between storage units: short-term to mid-term updates follow a dialogue-chain-based FIFO principle, while mid-term to long-term updates use a segmented page organization strategy. Our pioneering MemoryOS enables hierarchical memory integration and dynamic updating. Extensive experiments on the LoCoMo benchmark show an average improvement of 49.11% on F1 and 46.18% on BLEU-1 over the baselines on GPT-4o-mini, showing contextual coherence and personalized memory retention in long conversations.
+
+
+\end{abstract}
+
+
+
+% \begin{table*}[htbp]
+% \centering
+% \caption{Comparison on GVD Dataset}
+% \begin{tabular}{llccc}
+% \toprule
+% \textbf{Model} & \textbf{Method} & \textbf{Retrieval Acc.} & \textbf{Correctness} & \textbf{Coherence}\\
+% \midrule
+% \multirow{4}{*}{GPT\textendash4o-mini}
+%   & TiM         & 84.5 & 78.8 & 91.3 \\
+%   & MemGPT      & 89.9 & 83.2 & 89.6 \\
+%   & MemoryBank  & 78.4 & 73.3 & 91.4 \\
+%   & \textbf{Ours} & \textbf{93.3} & \textbf{91.2} & \textbf{92.3} \\
+% \midrule
+% \multirow{4}{*}{Qwen2.5\textendash7B}
+%   & TiM         & 82.2 & 73.2 & 85.5 \\
+%   & MemGPT      & 85.1 & 80.2 & 87.8 \\
+%   & MemoryBank  & 76.3 & 70.3 & 82.7 \\
+%   & \textbf{Ours} & \textbf{91.8} & \textbf{82.3} & \textbf{90.5} \\
+% \bottomrule
+% \end{tabular}
+% \label{tab:gvd_results}
+% \end{table*}
+
+
+% \section{Introduction}
+% Modern Large Language Models (LLMs) demonstrate remarkable text comprehension and generation capabilities, yet their fixed context windows impose fundamental constraints on sustained dialogue coherence. As conversations extend beyond memory boundaries, critical contextual details gradually escape the model's awareness, manifesting as repetitive responses, factual inconsistencies, and diminished personalization in long-term interactions. This memory bottleneck becomes particularly acute in scenarios requiring persistent user adaptation, multi-session knowledge retention, and consistent persona maintenance across hundreds of dialogue turns.
+
+% To address these limitations, we propose \textbf{Memory OS}, a hierarchical memory architecture inspired by operating system memory management principles. Unlike existing approaches that treat memory as a flat retrieval space, our framework establishes a three-layer cognitive structure: a transient short-term buffer, structured mid-term storage, and persistent persona profiles. This stratified design enables dynamic context management while preserving computational efficiency—a critical requirement for real-world deployment.
+
+% The architecture comprises three core memory mechanisms: The \textbf{Short-Term Memory (STM)} maintains the latest $N$ dialogue turns through a sliding window, ensuring immediate responsiveness in conversational flow processing. \textbf{The Mid-Term Memory (MTM)} employs a segmented architecture to organize conversation histories into topical sessions, further structuring each dialogue turn into pages. It achieves structured storage through mechanisms such as topic summarization and keyword extraction. Additionally, it introduces heat metrics to prioritize critical thematic segments based on access frequency, recency, and engagement depth. Moreover, MTM incorporates dialogue chains between different dialogue pages, which enables better handling of cases where the semantic coherence of the dialogue is disrupted but the thematic coherence is maintained.The \textbf{Persona Moudle} maintains stable identity anchors across dialogue sessions through dual-channel persistent profiles capturing user attributes/preferences and assistant behavioral characteristics.
+
+% The key contributions of this work are summarized as follows:
+% \begin{itemize}
+% \item A novel hierarchical memory system comprising Short-Term Memory (STM), Mid-Term Memory (MTM), and a Persona Module, which collectively address context retention, topic-based organization, and long-term personalization, overcoming the limitations of fixed context windows in LLMs.
+% \item An efficient memory management mechanism inspired by operating system design, featuring dynamic updates, heat-based eviction, and semantic retrieval, achieving significant compression of dialogue history while maintaining accessibility.
+% \item The method demonstrates excellent performance through extensive experiments, significantly outperforming existing methods in terms of memory accuracy, response correctness, and coherence across multiple benchmarks.
+% \end{itemize}
+\section{Introduction}
+
+Large Language Models (LLMs) demonstrate impressive capabilities in text comprehension and generation, but face inherent limitations in sustaining dialogue coherence due to their reliance on fixed-length contextual windows for memory management.
+This fixed-length design inherently struggles to preserve continuity in dialogues with significant temporal gaps, often resulting in disjointed memory that manifests as factual inconsistencies and reduced personalization. 
+Long-term memory coherence is critical in scenarios requiring persistent user adaptation, multi-session knowledge retention, or stable persona representation across extended interactions, where the limitations of fixed-length memory management in default LLMs become particularly acute, constituting a significant open challenge in the field.
+
+% As interactions progress beyond fixed memory boundaries, essential contextual information is often lost, leading to repetitive responses, factual inconsistencies, and reduced personalization. These issues are particularly significant in scenarios demanding persistent user adaptation, multi-session knowledge retention, and stable persona representation across numerous conversational exchanges.
+
+To address this challenge, current memory mechanisms in default LLMs can be broadly categorized into three methodological types:
+(1) \emph{Knowledge-organization} methods~\cite{xu2025mem,liu2023think}, such as A-Mem structure memory into interconnected semantic networks or notes to enable adaptive management and flexible retrieval; (2) \emph{Retrieval mechanism-oriented} approaches~\cite{emotional,zhong2024memorybank,li2024hello}, e.g., MemoryBank integrates semantic retrieval with a memory forgetting curve mechanism to allow long-term memory updating; and (3) \emph{Architecture-driven} methods~\cite{packer2023memgpt,chhikara2025mem0}, such as MemGPT use hierarchical structures with explicit read and write operations to dynamically manage context.
+% and enable adaptive retrieval of conversational information via memory extraction and update mechanisms.
+% Tim and A-mem 
+% Knowledge-organization frameworks~\cite{}, such as A-Mem structure memory into interconnected semantic networks or notes to enable adaptive management and flexible retrieval.
+% % 补充引用，memorybank, emotionalRAG
+% Retrieval mechanism-oriented approaches~\cite{}: e.g., MemoryBank integrates semantic retrieval with a memory forgetting curve mechanism, allowing long-term personalized memory retention and updating.
+% % 补充，mem0, memGPT
+% Architecture-driven approaches~\cite{chhikara2025mem0} use hierarchical structures with explicit read/write operations to dynamically manage context and extend LLM capacity, enabling adaptive retrieval of conversational information via memory extraction and update mechanisms. 
+% While these diverse strategies typically operate in isolation, focusing on single dimensions like storage structure, retrieval efficiency, or update strategies. No unified operating system has been proposed to integrate all memory management operations for AI agents. 
+Although these diverse strategies typically operate in isolation, i.e., each focusing on single dimensions such as storage structure, retrieval machinism, or update strategies, no unified operating system has been proposed to enable systematic and comprehensive memory management for AI agents.
+
+Inspired by memory management principles in operating systems, we pioneer the proposal of a comprehensive memory operating system, termed \textbf{MemoryOS}.
+% In our work, inspired by operating system principles, we pioneer propose a comprehensive memory operation system, termed \textbf{MemoryOS}.
+As illustrated in Fig.~\ref{fig}, MemoryOS comprises four core functional modules: memory \emph{Storage, Updating, Retrieval, and Generation}. 
+Through their coordinated collaboration, the system establishes a unified memory management framework encompassing hierarchical storage, dynamic updating, adaptive retrieval, and contextual generation. 
+Specifically, \emph{Memory Storage} organizes information into short-term, mid-term, and long-term storage units. \emph{Memory Updating} dynamically refreshes via a segmented paging architecture based on the dialogue-chain and heat-based mechanisms. \emph{Memory Retrieval} leverages semantic segmentation to query these tiers, then \emph{Response Generation} integrates retrieved memory information to generate coherent and personalized responses.
+This synergistic workflow ensures holistic management of long-term conversational memory, enabling contextual coherence and personalized recall in extended dialogues.
+The primary contributions of our work are summarized as:
+\begin{itemize}
+\item We make the first innovative attempt to introduce a systematic operating system, termed MemoryOS, for memory management, empowering AI agents with long-term conversational coherence and user persona persistence in long conversational interactions.
+
+\item 
+MemoryOS introduces a pioneering three-tier hierarchical memory storage architecture and integrates four core functional modules (i.e, storage, updating, retrieval, and generation) for memory management, enabling dynamic capture and evolution of user preferences across extended dialogues.
+% MemoryOS  integrates four core modules (storage, updating, retrieval, generation) within a three-tier hierarchical memory store architecture (STM-MTM-LPM) for memory management. It dynamically captures and evolves user preferences over extended dialogues, enabling a deeply personal interaction experience.
+
+\item 
+Comprehensive experiments validate MemoryOS's effectiveness and efficiency in maintaining response correctness and coherence across diverse benchmark datasets, demonstrating its capability to handle long conversational interactions.
+% Comprehensive experiments demonstrate MemoryOS's effectiveness and efficiency in ensuring response correctness and coherence across various long-conversation benchmarks, validating the model's capability to handle extended interactions with optimal performance.
+% Comprehensive experiments demonstrate superior performance of MemoryOS in response correctness and coherence across various long-conversation benchmarks.
+\end{itemize}
+
+
+% enabling holistic management of long-term conversational memory to ensure contextual coherence and personalized memory in long-form dialogues.
+
+% Specifically, Memory Storage organizes information into STM, MTM, and LPM tiers, which Memory Updating dynamically refreshes via conversation-chain and heat-based mechanisms. During interaction, Memory Retrieval leverages semantic segmentation to query these tiers, while Response Generation integrates retrieved context to craft coherent, personalized outputs. This synergistic workflow ensures holistic management of long-term conversational memory, enabling contextual coherence and personalized recall in extended dialogues.
+
+
+% As illustrated in Fig.~\ref{fig}, MemoryOS is structured into four core functional modules: memory storage, memory updating, memory retrieval, and response generation.  
+% Through coordinated collaboration of these four core modules, MemoryOS achieves a unified memory management framework that integrates hierarchical storage organization, dynamic updating, adaptive retrieval, and contextual generation, thereby enabling comprehensive management of long conversational memory.
+
+
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth=0.9]{latex/figure/mem_pipline.pdf} % Replace with the actual file name and path
+    \caption{The overview architecture of MemoryOS, including memory Store, Updating, Retrieval, Response.}
+    \label{fig}
+\end{figure*}
+
+
+% \textbf{Memory Storage}: This module is responsible for effectively organizing and persistently storing diverse types of information, ensuring memory integrity and optimized storage utilization.
+% Memory storage is implemented via a hierarchical structure consisting of three store units, i.e., Short-Term Memory (STM) for timely conversations, Mid-Term Memory (MTM) for recurring topic summaries, and Long-term Personal Memory (LPM) for stable user/agent preferences. 
+
+% \textbf{Memory Updating}: It takes charge of dynamically refreshing and modifying the stored memory. 
+% Key updating operations within MemoryOS include updates between STM to MTM storage units, which is governed by a conversation-chain-based FIFO principle, as well as MTM to LPM units, that is implemented via a segmented page organization strategy with segment-based heat replacement mechanism.
+
+
+% \textbf{Memory Retrieval}: It sifts through the stored memory, retrieving the most appropriate information based on specific queries.
+% Retrieval operations involve a two-tiered approach within MTM, first identifying relevant segments through semantic relevance, followed by retrieving the most pertinent dialogue pages. Concurrently, related persona attributes from MPL and contextual information in STM are retrieved for the generation stages.
+
+% \textbf{Response Generation}: This module processes the data and generates appropriate responses. It integrates retrieval outcomes from STM, MTM, and LPM into a coherent prompt, enabling the generation of contextually appropriate and personalized responses.
+
+
+
+\section{Related Work}
+\subsection{Memory for LLM Agents}
+
+% Recent advancements in memory systems for Large Language Models (LLMs) aim to overcome limitations posed by fixed-context windows~\cite{chhikara2025mem0}. \textbf{MemGPT} \cite{packer2023memgpt} introduces an OS-like hierarchical structure with explicit read-write operations to dynamically manage context, effectively extending the LLM context capacity. \textbf{A-Mem} \cite{xu2025mem} proposes an agentic memory system, structuring knowledge into interconnected notes forming a semantic network, facilitating adaptive memory management and flexible retrieval. Similarly, \textbf{Self-Controlled Memory (SCM)} \cite{wang2025scmenhancinglargelanguage} employs dual-buffer management to handle long interactions efficiently, incorporating a memory controller for selective content recall.
+
+% Additionally, frameworks like \textbf{Think-in-Memory (TiM)} ~\cite{liu2023think} leverage meta-cognitive processes, storing and dynamically updating reasoning outcomes in memory to minimize redundancy and enhance consistency. \textbf{MemoryBank} ~\cite{zhong2024memorybank} integrates semantic embedding retrieval with a forgetting curve mechanism, allowing long-term personalized memory retention and updating user-specific knowledge bases. Furthermore, generative agents ~\cite{park2023generative} maintain comprehensive experiential records and periodically synthesize reflections to support coherent long-term behaviors. A recent survey by Zhang et al. ~\cite{zhang2024survey} highlights a trend towards modular, flexible memory components emphasizing adaptive memory update and retrieval mechanisms for enhanced long-term interaction capabilities.
+
+% Compared with these systems, \textbf{Memory OS} advances memory flexibility and efficiency through its hierarchical segmentation, dynamic heat-based prioritization, and structured mid-term memory (MTM), enabling precise, context-aware memory management and retrieval tailored for extended conversational coherence and personalization.
+
+% Research on memory design in LLM applications can be summarized into two main categories. The first captures and stores intermediate states from past model reasoning as memory content. For instance, MemTRM~\cite{memtrm2023} maintains past key–value pairs and uses the current query vector to conduct K-nearest-neighbor searches with mixed attention over input and memory, while LongMEM~\cite{longmem2024} separates memory storage and retrieval processes to mitigate memory obsolescence during training. The second category provides memory support via an external memory library. MemoryBank~\cite{zhong2024memorybank} stores past conversations, event summaries, and user characteristics in a vector database for fast similarity-based retrieval, and AI-town~\cite{aitown2024} preserves memory in natural language and introduces a reflection mechanism—under relevance, recency, and importance constraints—to transform observations into higher-order reflections.
+
+% Building on these schemes, recent advancements in memory systems for Large Language Models (LLMs) aim to overcome limitations posed by fixed-context windows~\cite{chhikara2025mem0}. \textbf{MemGPT}~\cite{packer2023memgpt} introduces an OS-like hierarchical structure with explicit read/write operations to dynamically manage context and effectively extend LLM context capacity. \textbf{A-Mem}~\cite{xu2025mem} proposes an agentic memory system structuring knowledge into interconnected notes forming a semantic network for adaptive memory management and flexible retrieval. Similarly, \textbf{Self-Controlled Memory (SCM)}~\cite{wang2025scmenhancinglargelanguage} employs dual-buffer management and a memory controller for selective content recall during long interactions.
+
+% Frameworks like \textbf{Think-in-Memory (TiM)}~\cite{liu2023think} leverage meta-cognitive processes by storing and dynamically updating reasoning outcomes to minimize redundancy and enhance consistency. \textbf{MemoryBank}~\cite{zhong2024memorybank} integrates semantic embedding retrieval with a forgetting curve mechanism for long-term personalized memory retention and user-specific knowledge base updates. Generative agents maintain comprehensive experiential records and periodically synthesize reflections to support coherent long-term behaviors~\cite{park2023generative}.Hello again~\cite{li2024hello} introduces a dual-agent module for both the assistant and the user to better understand the user’s emotions. A recent survey by Zhang et al.~\cite{zhang2024survey,wu2025human,du2025rethinking} highlights a trend towards modular, flexible memory components emphasizing adaptive update and retrieval mechanisms for enhanced long-term interaction capabilities.
+
+% Compared with these systems, \textbf{Memory OS} advances memory flexibility and efficiency through its hierarchical segmentation, dynamic heat-based prioritization, and structured mid-term memory (MTM), enabling precise, context-aware memory management and retrieval tailored for extended conversational coherence and personalization.
+% Research on memory design in LLMs falls into two main categories. The first captures and stores intermediate states from model reasoning, such as MemTRM~\cite{memtrm2023} which maintains key-value pairs and uses K-nearest-neighbor searches with mixed attention, and LongMEM~\cite{longmem2024} which separates storage and retrieval processes to mitigate memory obsolescence. The second category provides support via an external memory library, like MemoryBank~\cite{zhong2024memorybank} which stores conversations, events, and user characteristics in a vector database, and AI-town~\cite{aitown2024} which preserves memory in natural language and introduces a reflection mechanism.
+
+% To overcome the limitations of fixed-context windows~\cite{chhikara2025mem0}, recent advancements include: MemGPT~\cite{packer2023memgpt} which introduces an OS-like hierarchical structure with explicit read/write operations to manage context; A-Mem~\cite{xu2025mem} which proposes an agentic memory system structuring knowledge into interconnected notes forming a semantic network; and Self-Controlled Memory (SCM)~\cite{wang2025scmenhancinglargelanguage} which employs dual-buffer management and a memory controller for selective content recall.
+
+% Other frameworks like Think-in-Memory (TiM)~\cite{liu2023think} store and dynamically update reasoning outcomes to enhance consistency. MemoryBank~\cite{zhong2024memorybank} also integrates semantic embedding retrieval with a forgetting curve mechanism. Generative agents~\cite{park2023generative} maintain experiential records and synthesize reflections. Hello again~\cite{li2024hello} introduces a dual-agent module for understanding user emotions. Surveys by Zhang et al.~\cite{zhang2024survey,wu2025human,du2025rethinking} highlight a trend towards modular, flexible, and adaptive memory components.
+
+% Compared to these systems, \textbf{Memory OS} enhances memory flexibility and efficiency through its hierarchical segmentation, dynamic heat-based prioritization, and structured mid-term memory (MTM), enabling precise, context-aware memory management and retrieval tailored for extended conversational coherence and personalization.
+
+Existing Large Language Models (LLMs) face fundamental challenges in handling complex scenarios requiring long-term coherence. These challenges stem from the inherent limitations of fixed-length designs, which struggle to maintain continuity in dialogues with significant temporal gaps, resulting in fragmented memory that manifests as factual inconsistencies and diminished personalization. 
+% Advancements in memory systems for Large Language Models (LLMs)  address the limitations of fixed-context windows.Advancements in memory systems of LLMs addressing this problem can be broadly grouped into three categories:
+Advancements in memory systems of LLMs addressing this problem can be broadly grouped into three categories: knowledge-organization, retrieval mechanism-oriented, and architecture-driven frameworks~\cite{zhang2024survey,wu2025human,du2025rethinking}.
+\emph{Knowledge-organization} methods focus on capturing and structuring the intermediate reasoning states of large language models. For example, Think-in-Memory (TiM)~\cite{liu2023think} stores evolving chains-of-thought, enabling consistency through continual updates. A-Mem~\cite{xu2025mem} organizes knowledge into an interconnected note network that spans sessions. Grounded Memory~\cite{ocker2025ground} integrates vision-language models for perception, knowledge graphs for structured memory representation to enable context-aware reasoning in smart personal assistants.
+\emph{Retrieval mechanism–oriented} approaches enrich the model with an external memory library. MemoryBank~\cite{zhong2024memorybank} logs conversations, events, and user traits in a vector database and refreshes them using a forgetting-curve schedule; AI-town~\cite{aitown2024} keeps memories in natural language and adds a reflection loop for relevance filtering. EmotionalRAG~\cite{emotional} retrieves memory entries by combining semantic similarity with the agent’s current emotional state using a hybrid strategy.
+\emph{Architecture-driven} designs alter the core control flow to manage context explicitly. For example, MemGPT~\cite{packer2023memgpt} adopts an OS-like hierarchy with dedicated \texttt{read}/\texttt{write} calls, while Self-Controlled Memory (SCM)~\cite{wang2025scmenhancinglargelanguage} introduces dual buffers and a memory controller that gates selective recall.
+
+% Long-conversation handling is addressed separately by systems that prioritise dialogue-length scalability.  Hello again~\cite{li2024hello} deploys a dual-agent module to track user emotions across extended exchanges; Mem-0~\cite{chhikara2025mem0} tackles the fixed-context bottleneck through segmented windows plus dynamic compression. 
+% Surveys by Zhang~\cite{zhang2024survey}, Wu~\cite{wu2025human}, and Du~\cite{du2025rethinking} observe an overall shift toward modular, flexible, and adaptive memory components that combine these perspectives.
+
+% Compared with prior art, Memory OS advances flexibility and efficiency through hierarchical segmentation, heat-based prioritisation, and a structured mid-term memory that together yield fine-grained, context-aware retrieval for prolonged, personalised conversation.
+
+\subsection{Memory Management in OS}
+
+% Modern operating systems employ combined segment-page memory management to balance logical memory structuring with efficient physical memory utilization. Classic segmented-paging approaches, such as those in Multics ~\cite{bensoussan1972multics}, provide logical memory segments organized into pages, facilitating efficient management, protection, and sharing. Segment metadata includes size, access permissions, and logical organization, enabling effective segmentation and preventing external fragmentation issues ~\cite{bensoussan1972multics}. Meanwhile, paging ensures efficient physical memory allocation, reducing internal fragmentation and simplifying allocation ~\cite{denning1970virtual}.
+
+% Advanced OS techniques employ priority-based page eviction algorithms like Least Recently Used (LRU) and working-set models to maintain frequently accessed (hot) data in memory while evicting less critical (cold) data ~\cite{denning1970virtual}. Recent developments by Zheng et al. ~\cite{zheng2020segmentpage} highlight segment-page combined management for efficient memory handling on many-core processors, emphasizing reduced overhead through coarse-grained segmentation coupled with fine-grained page-level control.
+
+% \textbf{Memory OS} borrows these robust principles, structuring its MTM into logical segments representing conversation topics, subdivided into manageable pages. It adopts OS-inspired heat-based prioritization for memory retention, dynamically identifying and maintaining relevant content while efficiently discarding or archiving less accessed information. This OS-inspired design significantly enhances conversational context management, enabling Memory OS to deliver superior long-term coherence and adaptive conversational personalization.
+Modern operating systems (OS) use combined segment-page memory management to balance logical structure with efficient physical utilization.
+Classic approaches like Multics ~\cite{bensoussan1972multics} organize memory into segments divided into pages, supporting efficient management, protection, and sharing. Segment metadata (size, access permissions) prevents external fragmentation ~\cite{bensoussan1972multics}, while paging reduces internal fragmentation ~\cite{denning1970virtual}. Advanced OS use priority-based eviction (e.g., LRU, working-set models) to maintain hot data ~\cite{denning1970virtual}, and Zheng et al. ~\cite{zheng2020segmentpage} show that combining coarse-grained segmentation with fine-grained paging minimizes overhead on many-core processors.
+
+Inspired by the management in OS, our MemoryOS applies these principles by structuring its memory into logical segments (conversation topics) subdivided into pages. It uses heat-based prioritization to retain relevant content and efficiently discard or archive less-accessed information, enhancing context management and personalization.
+
+
+\section{MemoryOS}
+MemoryOS is a comprehensive memory management system for AI agents that dynamically updates memory and retrieves semantically relevant context, ensuring coherent and personalized interactions in long conversations.
+% It uses a hierarchical memory structure—Short-Term Memory (STM), Mid-Term Memory (MTM), and a Persona Module—to store and organize context. STM captures immediate interactions, MTM maintains topic-segmented dialogue history with dynamic heat-based prioritization, and the Persona Module retains user and assistant traits. 
+
+\subsection{Overview Architecture}
+% MemoryOS is a comprehensive memory management system for AI agents, 
+The overview architecture of MemoryOS is illustrated in Fig.~\ref{fig}. It consists of four modules: memory storage, update, retrieval, and generation. 
+% The system dynamically updates memory and retrieves context with semantic relevance, ensuring a coherent and personalized interaction experience in long conversations with AI agents.
+
+
+
+\paragraph{Memory Storage:} This module is responsible for organizing and storing memory information by a three-tier hierarchical structure: Short-Term Memory (STM) for timely conversations, Mid-Term Memory (MTM) for recurring topic summaries, and Long-term Personal Memory (LPM) for user or agent preferences, ensuring memory integrity and effective utilization.
+\paragraph{Memory Updating:} This module manages dynamic memory refreshing, including STM-to-MTM updates via dialogue-chain FIFO and MTM-to-LPM updates using a segmented page strategy with heat-based replacement.
+\paragraph{Memory Retrieval:} This module retrieves relevant memory via specific queries, employing a two-tiered approach in MTM: semantic relevance identifies segments first, followed by retrieving pertinent dialogue pages. Finally, it combines persona attributes from LPM and contextual information from STM to generate responses, integrating all relevant memories for response generation.
+\paragraph{Response Generation:} It processes the data and generates appropriate responses. It integrates retrieval outcomes from STM, MTM, and LPM into a coherent prompt, enabling the generation of contextually coherent and personalized responses.
+% \begin{itemize}
+% \item \textbf{Memory Storage}. 
+% This module is responsible for organizing and storing memory information by a three-tier hierarchical structure: Short-Term Memory (STM) for timely conversations, Mid-Term Memory (MTM) for recurring topic summaries, and Long-term Personal Memory (LPM) for user or agent preferences, ensuring memory integrity and effective utilization.
+% \item \textbf{Memory Updating}. This module manages dynamic memory refreshing, including STM-to-MTM updates via dialogue-chain FIFO and MTM-to-LPM updates using a segmented page strategy with heat-based replacement.
+% \item \textbf{Memory Retrieval}. 
+% This module retrieves relevant memory via specific queries, employing a two-tiered approach in MTM: semantic relevance identifies segments first, followed by retrieving pertinent dialogue pages. Finally, it combines persona attributes from LPM and contextual information from STM to generate responses, integrating all relevant memories for response generation.
+% \item \textbf{Response Generation}. This module processes the data and generates appropriate responses. It integrates retrieval outcomes from STM, MTM, and LPM into a coherent prompt, enabling the generation of contextually coherent and personalized responses.
+% \end{itemize}
+
+
+
+
+\subsection{Memory Storage Module}
+% This module fundamentally supports the Updating module’s dynamic memory refresh and enhances the Retrieval module’s ability to delivers consistent and personalized responses.
+Memory storage module is implemented via a hierarchical structure consisting of three type store units, i.e., Short-Term Memory (STM), Mid-Term Memory (MTM), and Long-term Personal Memory (LPM) store units. 
+
+% \subsubsection{Short-Term Memory (STM)}.
+
+% Our system employs a hierarchical memory architecture consisting of a short-term memory (STM), a mid-term memory (MTM), and a persona module.
+
+\paragraph{Short-Term Memory (STM):} 
+It stores real-time conversation data in units called \emph{dialogue pages}. Each dialogue page contains the user's query $Q$, the model's response $R$, and the timestamp $T$, structured as $page_i = \{Q_i, R_i, T_i\}$.
+To ensure contextual coherence, a dialogue chain is constructed for each page to maintain contextual information in short-term continuous dialogue exchanges and ensure consistent context tracking. A \textbf{dialogue page} is defined as: 
+\begin{equation}
+page^{chain}_i= \{Q_i, R_i, T_i, meta^{chain}_i\},
+\end{equation}
+where the meta information 
+is generated by an LLM in two steps: first, evaluating a new page’s contextual relevance to prior pages to determine chain linkage or resetting to the current page if semantically discontinuous; second, summarizing all chain pages into $meta^{chain}_i$.
+
+
+%The dialogue pages are stored in a queue with fixed length $L_{Page}$.  
+
+
+% -------------------------
+% To maintain contextual coherence across topically diverse but semantically related dialogue pages, we construct the dialogue page chain.  It enables linking dialogue exchanges that share a common context, even when their topic content differs, ensuring consistent context tracking and logical dialogue progression. Specifically, we use LLM to assess whether it continues the previous conversational context and summarizes the meta information of a dialogue page with all information in the dialogue page chain. 
+
+% \begin{equation}
+% page_i= \{Q_i, R_i, T_i, Chian_i\}.
+% \end{equation}
+
+% When a Diague Page is popped from the short‑term memory queue, a Large Language Model~(LLM) assesses whether it continues the previous conversational topic.
+
+% Let $\mathcal{C}_{\text{new}}$ be the new content and $\mathcal{C}_{\text{prev}}$ the last content in the existing chain. Topic continuity is determined by
+% \begin{equation}
+% \text{is\_continued}=\operatorname{LLM}(\mathcal{P}_{\text{prev}},\mathcal{P}_{\text{new}}).
+% \end{equation}
+% If $\text{is\_continued}=\text{True}$, the system links $\mathcal{P}_{\text{new}}$ to $\mathcal{P}_{\text{prev}}$, updates the chain‑wide summary to incorporate $\mathcal{P}_{\text{new}}$, and propagates the summary along the chain; otherwise the new dialogue starts a fresh chain with its own standalone summary.
+
+
+
+% 更新方法
+% STM uses a First-In, First-Out (FIFO) management approach to ensure the total storage does not exceed the predefined capacity $N$. Once the STM reaches its capacity, the oldest dialogue page is removed to make room for new entries.
+
+\paragraph{Mid-Term Memory (MTM):} Inspired by the memory management principles in Operating Systems, it adopts a \emph{Segmented Paging} storage architecture. 
+% inspired by the memory management principles in Operating Systems. 
+Dialogue pages with the same topic are grouped into segments, each containing multiple pages for a unique topic. The \textbf{segment} in MTM is defined as:
+\begin{equation}
+\small
+\label{eq:insert}
+segment_i = \{page_i \mid \mathcal{F}_{\text{score}}(page_i,segment_i) > \theta \},
+\end{equation}
+where the content of a segment is summarized by a LLM based on the related dialogue pages.  $\mathcal{F}_{\text{score}}$ measures the similarity between the dialogue page and the segment based on both semantic and keyword similarities, defined as: 
+    \begin{equation}
+        \mathcal{F}_\text{score} = \cos(\mathbf{e}_s, \mathbf{e}_p) + \mathcal{F}_{Jacard}(K_s, K_p),
+    \label{eq:sim}
+    \end{equation}
+where $\mathbf{e}_s$ and $\mathbf{e}_p$ denote the embedding vectors of a segment and the dialogue page, $K_s$ and $K_p$ are the keyword sets summarized by LLMs in the segment and page, respectively.  $\mathcal{F}_{Jacard}$  is the Jacard similarity, defined as $\mathcal{F}_{Jacard} = \frac{|K_s \cap K_p|}{|K_s \cup K_p|}$.
+
+% Pages with similarity scores exceeding the threshold $\theta$ are clustered into the same segment, ensuring topic coherence and semantic consistency in one segment.
+Pages with similarity scores to a segment exceeding the threshold $\theta$ are merged into the same segment, ensuring topic coherence and semantic consistency within the segment.
+%  为了怎么样，提出 page 链
+% Each page stores Q\&A pairs along with their metadata (including timestamps and summaries of the conversation chain).
+% Each session segment is associated with corresponding topic keywords and brief summaries and is associated with a segment-level embedding vector that captures semantic content. 
+
+
+% The Dialogue Page Chain is established to maintain contextual coherence across semantically diverse but topically related dialogue pages. It enables linking dialogue exchanges that share a common theme, even when their semantic content differs, ensuring consistent context tracking and logical dialogue progression.
+
+
+
+
+
+%  更新放在更新的部分说
+% Each session is assigned a scalar heat value $H$, computed as:
+% % \begin{equation}
+% % H = \alpha \cdot N_{\text{visit}} + \beta \cdot L_{\text{interaction}} + \gamma \cdot R_{\text{recency}} Segmented Paging Storage Structure 
+% % \end{equation}
+% \begin{equation}
+% H = = N_{\text{visit}} + L_{\text{interaction}} + R_{\text{recency}} 
+% \end{equation}
+
+% Here, $N_{\text{visit}}$ is the number of times the session has been accessed, $L_{\text{interaction}}$ denotes the total number of user-agent exchanges (i.e., pages) within the session, and $R_{\text{recency}}$ reflects how recently the session was last visited. This recency factor is computed as an exponential decay:
+% \begin{equation}
+% R_{\text{recency}} = \exp\left(-\frac{\Delta t}{\tau}\right)
+% \end{equation}
+
+% where $\Delta t$ is the time elapsed since the last access, and $\tau$ is a configurable time constant. 
+% The coefficients $\alpha$, $\beta$, and $\gamma$ control the relative weight of each factor.
+% This structure enables efficient retrieval and organization of historical context for specific topics.
+
+\paragraph{Long-term Persona Memory (LPM):} 
+This module ensures that both the user and the assistant maintain a persistent memory of important personal details and characteristics, ensuring consistency and personalization over long-term interactions.
+It consists of two components: the User Persona and the AI Agent Persona. 
+\begin{itemize}
+\item \textbf{User Persona}.
+The \textbf{User Profile} comprises a static component with fixed attributes (gender, name, birth year), a User Knowledge Base (\textbf{User KB}) that dynamically stores factual information extracted and incrementally updated from past interactions, and \textbf{User Traits} that contains the evolving interests, habits, and preferences of users over time.
+
+% User static profile containing fixed attributes such as gender, name, and birth year. 
+% User Knowledge Base (User KB) is a dynamic repository that continuously extracts and stores private knowledge facts from past interactions, enriching with each engagement.
+% User Traits, which are dynamic attributes that evolve over time, reflecting the user's interests, habits, and preferences. 
+\item \textbf{Agent Persona}. It contains the \textbf{Agent Profile}, which includes fixed settings like the role the AI agent assistant plays or its character traits, providing a consistent self-description.
+The \textbf{Agent Traits} are dynamic attributes that develop through interactions with the user, potentially including new settings added by the user or interaction history, e.g., recommended items, during conversations.
+\end{itemize}
+% The \textbf{User Persona} includes a structured User Profile containing fixed attributes such as gender, name, and birth year. It also encompasses User Traits, which are dynamic attributes that evolve over time, reflecting the user's interests, habits, and preferences. Furthermore, the User Knowledge Base (User KB) is a dynamic repository that continuously extracts and stores private knowledge facts from past interactions, enriching with each engagement.
+
+% Conversely, the \textbf{Assistant Persona} contains the Assistant Profile, which includes fixed settings like the role the assistant plays or its character traits, providing a consistent self-description. The Assistant Traits are dynamic attributes that develop through interactions with the user, potentially including new settings added by the user or specific behaviors exhibited during conversations.
+
+
+
+
+% \subsection{Memory Update}
+% % 总结，三个模块如何转换update xxx, 每个模块转换策略，S: FIFO, M: XXX段-页 多粒度更新机制， P： xxx. 基于chain xxx
+% \paragraph{Conversation Chain Construction}
+% When a round of conversation is popped from the short-term memory queue, a Large Language Model (LLM) assesses whether it continues the previous conversational topic. Let \(\mathcal{C}_{\text{new}}\) be the new content and \(\mathcal{C}_{\text{prev}}\) be the last content in the existing chain. The continuity is determined by:
+% \begin{equation}
+% \text{is\_continued} \;=\; \text{LLM}(\mathcal{C}_{\text{prev}}, \mathcal{C}_{\text{new}})
+% \end{equation}
+
+% If \(\text{is\_continued} = \text{True}\), the system links \(\mathcal{C}_{\text{new}}\) to \(\mathcal{C}_{\text{prev}}\) via \textit{pre\_page} and \textit{next\_page} pointers, updates the chain-wide summary to incorporate \(\mathcal{C}_{\text{new}}\), and propagate the updated summary through the dialogue chain and update the meta\_info on the pages in the chain.
+
+% \paragraph{STM Update}  
+% With each new QA exchange, the Short-Term Memory (STM) is updated using a queue structure. The queue adheres to the First-In-First-Out (FIFO) principle, where each new QA pair (including the user query and assistant response) along with its timestamp is appended to the end of the queue. When the STM reaches its maximum capacity \( N \), a batch eviction is triggered, and the oldest QA pairs along with their timestamps are removed from the STM and transferred to the Mid-Term Memory (MTM).
+
+% \paragraph{MTM Update}
+% % 组织结构 页，段 
+% % short-middim  增加
+% % midim -> 淘汰
+% % mid-> person 
+
+
+% %-----------------chain  retrival 阶段，如何从middum 里面检索--------------------------------
+% Whenever a round of conversation is dequeued from the short-term memory dialogue queue, the system employs a Large Language Model (LLM) to conduct a multi-topic analysis of this conversation. The analysis identifies the summaries and keywords associated with each topic within this round of dialogue. Subsequently, based on each topic and the conversation itself, a dialogue page is constructed. Each dialogue page comprises the following elements: a summary of the dialogue page, keywords, pre\_page , next\_page , meta\_info (summary information of the dialogue chain), and an is\_analysis  (showing whether it has been analyzed by the personalization module). The newly generated dialogue page is then inserted into the medium-term memory.
+
+% For each dialogue page, the system attempts to merge it into the mid-term memory (MTM). This process is realized by computing a session matching score. The summaries of the session topic and the dialogue page are fed into an embedding model to obtain the embedding vectors \(\mathbf{e}_s\) and \(\mathbf{e}_h\), respectively. The keyword sets for the session and the dialogue page are \(K_s\) and \(K_h\). The match score is computed based on these elements. the match score is computed as:
+% % \begin{equation} \mathrm{F}(K_s, K_h) = 0.5 \times \left(\frac{|K_s \cap K_{s}|}{|K_h|} + \frac{|K_h \cap K_{s}|}{|K_{s}|}\right) \end{equation}
+% \begin{equation}
+% \mathrm{F}(K_s, K_h) = \frac{1}{2} \left( \frac{|K_s \cap K_h|}{|K_h|} + \frac{|K_s \cap K_h|}{|K_s|} \right)
+% \end{equation}
+
+% \begin{equation}
+% \text{score} = \cos(\mathbf{e}_s, \mathbf{e}_h) + \mathrm{F}(K_s, K_h)
+% \end{equation} If the best-matching session’s score exceeds a predefined threshold, the new pages are appended to that session; otherwise, a new session is created for the subtopic. After insertion, the session’s metadata—summary, keywords, interaction length, and timestamp—is updated accordingly.
+% When the number of sessions exceeds the MTM capacity (e.g., 200), the session with the lowest heat value is evicted. To preserve the structural continuity of dialogue chains, the system updates the `pre\_page` and `next\_page` pointers between neighboring pages in the evicted session. This ensures that upstream and downstream links across sessions remain connected and navigable. After eviction, the internal priority queue (heap) used to sort sessions by heat is also rebuilt to reflect the current state.
+
+
+% If \(\text{is\_continued} = \text{False}\), \(\mathcal{C}_{\text{new}}\) is treated as a new topic, with no linking to previous content and a standalone summary generated for \(\mathcal{C}_{\text{new}}\) only.
+% % \paragraph{Persona Model Update.}
+
+
+
+% % ------总结： update 哪些部分， xxxx. 
+% \paragraph{Persona Model Update.}
+% Persona updates are driven by the dynamic components within the Persona Module, specifically \textit{User Traits}, \textit{User KB}, and \textit{Assistant Traits}. All analysis and updates are conducted by the Large Language Model (LLM), which serves as the core reasoning engine for interpreting and evolving the persona content.
+
+% Among these components, \textit{User Traits} are incrementally refined by the LLM based on previously established traits and newly analyzed interactions. The update process draws on psychological modeling principles inspired by ALIGNX~\cite{mayipersona}, employing a comprehensive set of personality dimensions (detailed in the appendix) to guide trait extraction and revision.
+
+% For each update, the LLM (Large Language Model) integrates prior user traits and the content of new interactions to derive a more refined trait profile. Meanwhile, the LLM extracts information directly from the dialogue records and populates the User Knowledge Base (User KB) and Assistant Traits. These entries represent some knowledge content of the user or some settings/behaviors of the assistant that emerged in the dialogue. To control growth, both the User Knowledge Base and Assistant Traits maintain a queue of size 100, managed using the First-In, First-Out (FIFO) principle.
+
+% When the heat score $H$ of a mid-term memory (MTM) session exceeds a predefined threshold $\tau$, the persona extraction module is triggered. The heat score $H$ is computed from the interaction length $L_{\text{interaction}}$, defined as the number of unanalyzed pages within the session. The extraction module processes these pages using the LLM, updates the relevant dynamic persona components, and flags the content as analyzed.
+
+% As analyzed content increases, $L_{\text{interaction}}$ declines, which in turn reduces the heat score $H$. This decay ensures that only fresh, unprocessed interaction data continues to influence persona evolution.
+\subsection{Memory Update Module}
+% The update module takes charge of dynamically refreshing and modifying the stored memory. 
+Key updating operations include updates within each unit itself and the update mechanism from STM to MTM, MTM to LPM store units.
+%, which is governed by a conversation-chain-based FIFO principle, as well as MTM to LPM units, that is implemented via a segmented page organization strategy with segment-based heat replacement mechanism.
+
+
+\paragraph{STM-MTM Update:} 
+% STM uses a First-In, First-Out (FIFO) management approach to ensure the total storage does not exceed the predefined capacity $N$. Once the STM reaches its capacity, the oldest dialogue page is removed to make room for new entries.
+% The dialogue pages are stored in a queue with fixed length $L_{Page}$.  
+STM stores information in the form of dialogue pages in a queue with fixed length. We employ a First-In-First-Out (FIFO) update strategy for information migration to the Mid-Term Memory (MTM). 
+New dialogue page is appended to the queue's end. When the STM queue reaches its maximum capacity, the oldest dialogue page is transferred from the STM to the MTM according to the FIFO principle.
+% (containing the user query, assistant response, and timestamp) 
+% When the STM queue reaches its maximum capacity, the oldest dialogue page is transferred from the STM to the MTM according to the FIFO principle.
+
+% With each new QA exchange, the Short-Term Memory (STM) is updated using a queue structure. The queue adheres to the First-In-First-Out (FIFO) principle, where each new dialogue page (including the user query and assistant response along with its timestamp) is appended to the end of the queue. When the STM reaches its maximum capacity N, a batch eviction is triggered, and the oldest dialogue pages are removed from the STM and transferred to the Mid-Term Memory (MTM).
+
+
+% \paragraph{MTM Update} MTM organises the long dialogue history as \emph{segments} (topics) that contain ordered \emph{pages} (QA pairs). Updating MTM consists of three steps: (1) \emph{topic analysis \& page construction}, (2) \emph{session matching \& merging}, and (3) \emph{capacity control with heat‑based eviction}.  
+
+% \begin{enumerate}[leftmargin=*,noitemsep]
+%   \item \textbf{Topic analysis \& page construction.}  For every QA pair evicted from STM the LLM performs multi‑topic analysis, outputting one or more $(\text{summary},\,\text{keywords})$ tuples.  For each tuple the system builds a \emph{dialogue page} that stores the raw QA text, its summary, keywords, pointers $(\textit{pre\_page},\textit{next\_page})$, the chain \textit{meta\_info}, and an \textit{is\_analysis} flag.
+
+%   \item \textbf{Session matching \& merging.}  Let $\mathbf e_s$ and $\mathbf e_h$ denote the embedding of a candidate session summary and the new page, and let $K_s, K_h$ be their keyword sets.  We compute
+% \begin{equation}
+% \mathrm{F}(K_s, K_h) = \frac{1}{2} \left( \frac{|K_s \cap K_h|}{|K_h|} + \frac{|K_s \cap K_h|}{|K_s|} \right)
+% \end{equation}
+
+% \begin{equation}
+% \text{score} = \cos(\mathbf{e}_s, \mathbf{e}_h) + \mathrm{F}(K_s, K_h)
+% \end{equation}
+%   If the best matching session scores above a threshold, the page is appended to that session; otherwise a new session is created.  Session metadata (summary, keywords, interaction length, timestamp) is then refreshed.
+
+%   \item \textbf{Heat‑based capacity control.}  Each session is assigned a scalar heat value $H$.  When the number of sessions exceeds the MTM capacity (e.g.,~200) we evict the session with the lowest $H$.  To maintain chain continuity the neighbouring pages’ pointers are repaired before the internal heap (sorted by $H$) is rebuilt.
+% \end{enumerate}
+
+% \paragraph{Persona Model Update} Dynamic persona components---\emph{User Traits}, \emph{User KB}, and \emph{Assistant Traits}---are refreshed whenever an MTM session’s heat $H$ exceeds a threshold $\tau$; the LLM extracts new traits/knowledge, appends them (FIFO queue size 100), and marks the processed pages as analysed.
+
+% Persona updates are driven by the dynamic components within the Persona Module, specifically \emph{User Traits}, \emph{User KB}, and \emph{Assistant Traits}. All analysis and updates are conducted by the LLM, which serves as the core reasoning engine for interpreting and evolving persona content.
+
+% Among these components, \emph{User Traits} are incrementally refined by the LLM based on previously established traits and newly analysed interactions, following the personality dimensions in ALIGNX~\cite{mayipersona}.  The LLM also extracts factual entries for the User KB and Assistant Traits.  To bound growth, both queues are capped at 100 entries (FIFO).
+
+% When the heat score $H$ of a session exceeds $\tau$, the persona extraction module processes the session’s unanalyzed pages.  After extraction, $L_{\text{interaction}}$ diminishes, lowering $H$ and preventing repeated updates from stale content.
+
+\paragraph{MTM-LPM Update:}
+% The long dialogue history in MTM is organized through a segmented paging architecture. 
+MTM updates involve two operations, i.e., segment deletion and segment-to-LPM updates, both based on the Heat score of segments, defined as:
+\begin{equation}
+        Heat = \alpha \cdot N_{\text{visit}} + \beta \cdot L_{\text{interaction}} + \gamma \cdot R_{\text{recency}},
+       \label{eq:heat_formula}
+\end{equation}
+where coefficients $\alpha$, $\beta$, and $\gamma$ determine the relative importance of each factor. $N_{\text{visit}}$ is the number of times the segment has been retrieved, $L_{\text{interaction}}$ denotes the total number of dialogue pages within the segment, and $R_{\text{recency}}$ is the time decay coefficient represents the duration since the last retrieval time of the current segment, defined as:
+$R_{\text{recency}} = \exp \left(-\frac{\Delta t}{\mu}\right)$,
+% This recency factor is computed using exponential decay:
+%  \begin{equation}
+%         R_{\text{recency}} = \exp\left(-\frac{\Delta t}{\tau}\right)
+% \end{equation}
+where $\Delta t$ is the time elapsed since the last access, measured in seconds, and $\mu$ is a configurable time constant (i.e., 1e+7). 
+    
+
+These three metrics, i.e., retrieval count ($N_{\text{visit}}$), total dialogue pages ($L_{\text{interaction}}$), and time decay coefficient ($R_{\text{recency}}$), collectively represent the frequent access, high engagement, and recent use as core indicators of segment heat.
+When the length of segments exceeds the maximum capacity, segments with the lowest heat are evicted. This mechanism ensures that the content stored in MTM can retain topics with high engagement frequency in long user conversations, preserving detailed dialogue content under these topics through a segmented paging structure.   
+
+\paragraph{LPM Update:}
+Segments with heat exceeding a threshold $\tau$ (i.e., 5) are transferred to LPM. Segments and their dialogue pages update User Traits, User KB, and Agent Traits.
+Following the user traits in~\cite{mayipersona}, we construct personalized User Traits with 90 dimensions across three categories: basic needs and personality, AI alignment dimensions, and content platform interest tags. 
+Then, extract and update these dimensions from segments and dialogue pages to autonomously evolve traits by LLMs.
+% The update of \emph{User Traits} is autonomously determined by the LLM. The LLM browses the previously established traits and the current segment to be analyzed, and decides on its own whether to update the information in the traits. 
+% This process is based on three major dimensions and their corresponding 90 sub-dimensions~\cite{}: psychological models (basic needs and personality), AI alignment dimensions, and content platform interest tags. 
+Meanwhile, factual information relevant to the user and agent assistant is extracted and recorded into the User KB and Agent Traits, respectively. 
+Both the User KB and Assistant Traits maintain a fixed-size queue (i.e., 100), employing a First-In-First-Out (FIFO) strategy. 
+After memory transition, the number of pages $L_{interaction}$ in Eq.~\ref{eq:heat_formula} is reset to zero, causing the heat score of the segment to decline. This ensures continuous persona evolution without redundancy.
+% segment interaction lengths reduce, causing the heat score to decline, thus ensuring continuous persona evolution without redundancy.
+
+
+% This mechanism ensures that the content stored in MTM can retain topics with high engagement frequency in long user conversations, preserving detailed dialogue content under these topics through a segmented paging structure.     
+% When the number of sessions exceeds the MTM capacity (e.g., 200), we evict the session with the lowest heat value $H$.
+    
+    % To maintain dialogue chain continuity, the pointers of neighbouring dialogue pages are updated before the internal heap (sorted by $H$) is rebuilt.
+
+
+% Updating MTM consists of two key steps: (1) \emph{dialogue page insertion and session establishment}, and (2) \emph{capacity control with heat‑based eviction}.
+
+% \begin{enumerate}[leftmargin=*,noitemsep]
+
+%     \item \textbf{Capacity control with heat‑based eviction.} Each session is assigned a
+    
+    
+    % scalar heat value $H$, computed as:
+    
+% \end{enumerate}
+
+% \paragraph{LPM Update}
+% The LPM manages and updates dynamic persona components, including \emph{User Traits}, \emph{User Knowledge Base (KB)}, and \emph{Assistant Traits}, while the predefined \emph{User Profile} and \emph{Assistant Profile} remain static. 
+
+
+% Persona updates are triggered when an MTM session's heat score $H$ surpasses a predefined threshold $\tau$. Once triggered, the Large Language Model (LLM) analyzes unprocessed pages within that session.
+
+% The update of \emph{User Traits} is autonomously determined by the LLM. The LLM browses the previously established traits and the current session to be analyzed, and decides on its own whether to update the information in the traits. This process is based on three major dimensions and their corresponding 90 sub-dimensions: psychological models (basic needs and personality), AI alignment dimensions, and content platform interest tags. Meanwhile, factual information relevant to the user and behavioral insights about the assistant are extracted and recorded into the \emph{User KB} and \emph{Assistant Traits}, respectively. To manage storage efficiently, both the \emph{User KB} and \emph{Assistant Traits} maintain a fixed-size queue (maximum of 100 entries), employing a First-In-First-Out (FIFO) strategy. Post-analysis, session interaction lengths reduce, causing the heat score to decline, thus ensuring continuous persona evolution without redundancy.
+
+
+\subsection{Memory Retrieval Module}
+%  总结： 我们从哪些部分检索
+% stm, midi, person 
+% mid: 两阶段检索策略
+% 最后检索结果 【short, mid, person】
+The Memory Retrieval Module retrieves information from three parts: STM for recent context, MTM using a two-stage retrieval (segment and page level), and LPM for personalized knowledge.
+Given a query from the user, the memory retrieval module retrieves from the stored
+memory, i.e., STM, MTM, and LPM,  to return the most relevant information to generate the responses, defined as:
+\begin{equation}
+\mathcal{F}_\text{Retrieval}(STM, MTM, LPM | Q),
+\end{equation}
+where $\mathcal{F}_\text{Retrieval}$ is the retrieval strategies applied in three memory store units. 
+
+
+\paragraph{STM retrieval:} All dialogue pages are retrieved as STM holds the most recent contextual memory for the current conversation. 
+\paragraph{MTM retrieval:} Inspired by psychological memory recall mechanisms~\cite{yuan-etal-2024-generative}, a two-stage retrieval process is employed: first selecting segments via a matching score (defined in Eq.~\ref{eq:sim}) to select top-m candidate segments, then selecting the top-k most relevant dialogue pages within these segments based on semantic similarity.
+%along with their QA pairs and chain meta summaries, into a retrieval queue; 
+After retrieval, the segment’s visit counter $N_{\text{visit}}$ and recency factor $R_{\text{recency}}$ are updated. 
+\paragraph{LPM retrieval:} The User KB and Assistant Traits each retrieve the top-10 entries with the highest semantic relevance to the query vector as background knowledge. All information in the User Profile, Agent Profile, and User Traits is utilized, as they store user preference information, agent characteristic information, and user-specific trait information.
+
+% Specifically, in STM retrieval, all dialogue pages are retrieved as STM holds the most recent contextual memory for the current conversation. In MTM retrieval, inspired by psychological memory recall mechanisms~\cite{yuan-etal-2024-generative}, a two-stage retrieval process is employed: first selecting segments via a matching score (defined in Eq.~\ref{eq:sim}) to select top-m candidate segments, then selecting the top-k most relevant dialogue pages within these segments based on semantic similarity.
+% %along with their QA pairs and chain meta summaries, into a retrieval queue; 
+% After retrieval, the segment’s visit counter $N_{\text{visit}}$ and recency factor $R_{\text{recency}}$ are updated. In LPM retrieval, the User KB and Assistant Traits each retrieve the top-10 entries with the highest semantic relevance to the query vector as background knowledge. All information in the User Profile, Agent Profile, and User Traits is utilized, as they store user preference information, agent characteristic information, and user-specific trait information.
+% \begin{itemize}
+% \item Retrieval in STM: Since STM contains the most recent contextual memory information for the current conversation, all dialogue pages are retrieved.
+% \item Retrieval in MTM:  
+% Following the memory recall mechanisms in psychology~\cite{yuan-etal-2024-generative}, we propose a two-stage retrieval process for MTM retrieval, which involves two key steps: segment-level then page-level selections.
+% Specifically, the matching score in MTM retrieval is computed in the same way as in Eq.~\ref{eq:sim}, which is a combination of both semantic similarity and keyword matching. 
+% The top-$k$ sessions are selected as candidate contexts.
+% In the top-k segment, the dialogue pages are selected based on the semantic similarity.
+% The $k$ most relevant dialogue pages, along with their original QA pairs and chain meta summaries into a retrieval queue.
+% Once retrieval completes, the segment’s visit counter $N_{\text{visit}}$ and recency factor $R_{\text{recency}}$ are refreshed.
+% \item Retrieval in LPM: The User Knowledge Base (User KB) and Assistant Traits separately to retrieve the top 10 entries with the highest semantic relevance to the query vector as background knowledge.
+
+% \end{itemize}
+
+
+
+
+
+% When a new user query arrives, the retrieval module first sends the query to the LLM for keyword extraction, generating a keyword set $K_q$. Then it accesses both the mid-term memory (MTM) and persona (long-term) memory in parallel, retrieving relevant contextual information to enhance the assistant's response. The retrieved data from these modules are integrated into a comprehensive prompt for the language model.
+
+% \subsubsection{Mid-Term Memory Retrieval}
+
+% Given a user query $q$, we encode it into an embedding vector $\mathbf{e}_q$ using a predefined embedding model. The retrieval from MTM involves two key steps: segment-level and page-level top-$k$ selections.
+
+
+% \paragraph{Session-Level Retrieval}
+
+% Given a user query $q$, we first encode it into an embedding vector $\mathbf{e}_q$. Each session is represented by its summary embedding vector $\mathbf{s}i$ and associated keyword set $K{s_i}$. The relevance score for each session is calculated based on embedding similarity and keyword matching, combined with a temporal decay factor:
+
+% Embedding similarity: \begin{equation} \text{sim}(\mathbf{e}_q, s_i) = \frac{\mathbf{e}_q\cdot \mathbf{s}_i}{|\mathbf{e}_q||\mathbf{s}_i|} \end{equation}
+
+% Keyword matching score (Jaccard-like): \begin{equation} S_{top} = 0.5 \times \left(\frac{|K_q \cap K_{s_i}|}{|K_q|} + \frac{|K_q \cap K_{s_i}|}{|K_{s_i}|}\right) \end{equation}
+
+% Combined overall score:
+% \begin{equation} 
+% \text{overall}_i = R_{\text{recency}}\cdot( \text{sim}(\mathbf{e}_q, s_i) +  S_{top})
+% \end{equation}
+% % where:
+
+% % $\lambda_t = \exp(-\Delta t / \tau)$ denotes temporal decay.
+
+% All sessions are ranked by $\text{overall}_i$, and the top-$k$ sessions are selected as candidate contexts.
+% % \paragraph{Page-Level Retrieval}
+
+% % Within each of the top-$k$ selected sessions, individual pages are further evaluated. Each page embedding vector $\mathbf{e}_p$ is generated by concatenating the user input, assistant response, and timestamp of the QA pair. The similarity between the query embedding $\mathbf{e}_q$ and the page embedding $\mathbf{e}_p$ is computed as:
+
+% % \begin{equation} \text{sim}(\mathbf{e}_q, \mathbf{e}_p) = \cos(\mathbf{e}_q, \mathbf{e}_p) \end{equation}
+
+% % All pages from the candidate sessions are ranked by similarity, and the top-$k$ most relevant pages across sessions form a retrieval queue. Each retrieved page includes its original QA pair and the associated conversation chain overview (meta-summary).
+
+% % After retrieval, session usage statistics ($N_{visit}$ and recency $R_{recency}$) are updated.
+
+
+
+
+% \paragraph{Page-Level Retrieval}
+% Within each of the top\,$k$ candidate sessions, every dialogue page is transformed into a semantic embedding that blends the user utterance, the assistant response, and the timestamp. The system measures the cosine similarity between the query embedding and each page embedding, ranks all pages accordingly, and pushes the $k$ most relevant pages—along with their original QA pairs and chain meta‑summaries—into a retrieval queue. Once retrieval completes, the session’s visit counter $N_{\text{visit}}$ and recency factor $R_{\text{recency}}$ are refreshed.
+
+% \subsubsection{Persona Memory Retrieval}
+
+% In parallel with MTM retrieval, the persona module searches through the User Knowledge Base (User KB) and Assistant Traits separately to retrieve the top 10 entries with the highest semantic relevance to the query vector as background knowledge.
+
+% \subsection{Response Module}
+% % 给定Q, 检索回来的结果[XXX】, xxxx
+% The final prompt integrates short-term memory (STM), MTM retrieval results, and persona retrieval results. Specifically, it includes:
+
+
+% \begin{itemize}
+%   \item Recent dialogue from STM to maintain immediate context.
+%   \item Relevant QA pairs and their conversation chain meta-summaries retrieved from the top-$k$ pages in MTM.
+%   \item Pertinent persona entries from user and assistant persona mod to personalize the context.
+%   \item The question raised by the user
+% \end{itemize}
+
+% These contents will be used as the final prompt input to the LLM, which will generate the answer as the final response.
+\subsection{Response Generation Module}
+
+Given the user query, the final prompt is constructed by integrating the above three types of retrieved content from STM, MTM and LPM, along with the user's query, form the final prompt input for the LLM to generate the final response.
+The incorporation of memory from recent dialogue (STM), relevant conversation pages (MTM), and persona information (LPM)  ensures responses remain contextually coherent with current interactions, draw on historical dialogue details and summaries for depth, and align with user and assistant identities, respectively,  enabling coherent, accurate, and personalized interaction experiences of AI agent systems.
+
+% \begin{itemize}
+%   \item \textbf{Recent Dialogue (Short-Term Memory - STM):} Contains the context of the current conversation, ensuring coherent and contextually aware responses.
+  
+%   \item \textbf{Conversation Pages (Mid-Term Memory - MTM):} Retrieved from the top-$k$ most relevant pages, including specific user-assistant dialogue information and meta-summary of conversation chains.
+  
+%   \item \textbf{Persona Information (User and Assistant Personas):} Specific entries retrieved from the user and assistant persona modules, ensuring the response aligns with the personalized context.
+% \end{itemize}
+
+% These three components, along with the user's query, form the final prompt input for the LLM, which generates the final response.
+
+\section{Experiments}
+
+\subsection{Experimental Settings}
+
+\paragraph{Datasets.} 
+We conduct our experiments on GVD~\cite{zhong2024memorybank} and LoCoMo benchmark~\cite{maharana-etal-2024-evaluating} datasets. The GVD dataset consists of multi-turn dialogues simulated from interactions between 15 virtual users and an assistant over a 10-day period, covering at least two topics per day. 
+%While the original dataset includes both Chinese and English dialogues, our experiments exclusively utilize the English portion. 
+The LoCoMo benchmark is specifically designed for assessing long-term conversational memory capabilities, consisting of ultra-long dialogues averaging 300 turns and about 9K tokens per conversation. Questions are categorized into four types: Single-hop, Multi-hop, Temporal, and Open-domain, to systematically evaluate the memory abilities of LLMs.
+% \paragraph{Datasets} 
+% We conduct experiments on six representative long-dialogue datasets to validate the effectiveness of our approach.
+% \begin{itemize}
+%     \item \textbf{The GVD dataset \cite{zhong2024memorybank}:} This dataset consists of multi-turn dialogues simulated from interactions between 15 virtual users and an assistant over a 10-day period. Each day's interaction covers at least two topics. 
+%     % While the original dataset includes both Chinese and English dialogues, our experiments exclusively utilize the English portion.
+%     \item \textbf{The LoCoMo Benchmark \cite{maharana-etal-2024-evaluating}:} it is specifically designed for assessing long-term conversational memory and reasoning capabilities. It consists of ultra-long dialogues, averaging 300 turns and about 9K tokens per conversation. Questions within this benchmark are categorized into five categories: Single-hop, Multi-hop, Temporal, Open-domain, and Adversarial, to systematically evaluate different aspects of model memory and reasoning abilities.
+% \end{itemize}
+
+
+
+\paragraph{Evaluation Metrics.} 
+For the GVD dataset, we use three evaluation metrics: Memory Retrieval Accuracy (Acc.), Response Correctness (Corr.), and Contextual Coherence (Cohe.).
+Memory Retrieval Accuracy is evaluated as a binary indicator (0 or 1), while Correctness and Coherence are assessed on a three-point scale (0, 0.5, or 1). All evaluations on the GVD dataset are automatically scored by the DeepSeek-R1~\cite{deepseekai2025deepseekr1incentivizingreasoningcapability}. On the LoCoMo benchmark, standard F1 and BLEU-1~\cite{papineni2002bleu} are employed to evaluate the model’s performance.
+
+% \paragraph{Baselines} 
+% To validate the effectiveness of our method, we compare it with five representative memory-enhanced frameworks, each addressing long-context reasoning differently:
+% \textbf{TiM}~\cite{liu2023think} mimics human memory by storing reasoning outcomes rather than raw dialogue. It retrieves relevant results using locality-sensitive hashing (LSH) before response generation, and performs post-hoc reflection to update memory. TiM also manages memory via insertion, forgetting, and merging operations, reducing redundant reasoning and enhancing consistency.
+% \textbf{MemoryBank}~\cite{zhong2024memorybank} dynamically adjusts memory strength based on the Ebbinghaus Forgetting Curve, prioritizing important content over time. It further builds a user portrait through continuous interaction analysis to support personalized responses.
+% \textbf{MemGPT}~\cite{packer2023memgpt} introduces a dual-tier memory inspired by OS hierarchies: a main context for fast access and an external context for long-term storage. This design enables scalable memory extension beyond the fixed context window.\textbf{A-mem}~\cite{xu2025mem}The Agentic Memory system dynamically generates structured notes and links them to form interconnected knowledge networks, enabling continuous memory evolution and adaptive management for LLM agents
+
+
+
+\paragraph{Compared Methods.}
+% To validate the effectiveness of our method, 
+We compare MemoryOS with representative memory methods, including:
+
+\paragraph{TiM (Think-in-Memory)~\cite{liu2023think}:}
+This approach mimics human memory by storing reasoning outcomes instead of raw dialogues. It uses locality-sensitive hashing (LSH) to retrieve relevant context before generating responses and updates memory through post-hoc reflection. TiM manages memory via insertion, forgetting, and merging to reduce redundant reasoning and improve consistency.
+    % This approach mimics human memory by storing reasoning outcomes rather than raw dialogue. It retrieves relevant results using locality-sensitive hashing (LSH) before response generation and performs post-hoc reflection to update memory. TiM also manages memory via insertion, forgetting, and merging operations, aiming to reduce redundant reasoning and enhance consistency.
+\paragraph{MemoryBank~\cite{zhong2024memorybank}:} This framework dynamically adjusts memory strength based on the Ebbinghaus Forgetting Curve, prioritizing important content over time. It further builds a user portrait through continuous interaction analysis to support personalized responses.
+\paragraph{MemGPT~\cite{packer2023memgpt}:} This method introduces a dual-tier memory, featuring a main context for fast access and an external context for long-term storage. This design aims to enable scalable memory extension beyond the fixed context window of LLMs.
+\paragraph{A-Mem (Agentic Memory)~\cite{xu2025mem}:} it dynamically generates structured notes and links them to form interconnected knowledge networks, enabling continuous memory evolution and adaptive management for LLMs.
+\paragraph{\textbf{MemoryOS}:} It is a comprehensive memory management framework. Through coordinated collaboration with four core functional modules: memory Storage, Updating, Retrieval, and Generation. MemoryOS achieves dialogue coherence and user persona persistence in long interactions.
+
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{2.5pt}
+\caption{Comparison results on the GVD dataset.}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Model} & \textbf{Method} & \textbf{Acc. $\uparrow$} & \textbf{Corr. $\uparrow$} & \textbf{Cohe.$\uparrow$}\\
+\midrule
+\multirow{5}{*}{GPT-4o-mini}
+& TiM          & 84.5 & 78.8 & 90.8\\
+& MemoryBank   & 78.4 & 73.3 & 91.2\\
+& MemGPT       & 87.9 & 83.2 & 89.6\\
+& A-Mem        & \underline{90.4} & \underline{86.5} & \underline{91.4}\\
+& \textbf{Ours}& \textbf{93.3} & \textbf{91.2} & \textbf{92.3}\\
+\midrule
+\multicolumn{2}{c}{Improvement (\%)} &3.2$\%\uparrow$&5.4$\%\uparrow$&1.0$\%\uparrow$\\
+\midrule
+\multirow{5}{*}{Qwen2.5-7B}
+& TiM          & 82.2 & 73.2 & 85.5\\
+& MemoryBank   & 76.3 & 70.3 & 82.7\\
+& MemGPT       & 85.1 & 80.2 & 86.9\\
+& A-Mem        & \underline{87.2} & \underline{79.5} & \underline{87.8}\\
+& \textbf{Ours}& \textbf{91.8} & \textbf{82.3} & \textbf{90.5}\\
+\midrule
+\multicolumn{2}{c}{Improvement (\%)} &5.3$\%\uparrow$&3.5$\%\uparrow$&3.1$\%\uparrow$\\
+\bottomrule
+\end{tabular}
+\label{tab:gvd_results}
+\end{table}
+
+\begin{table*}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\caption{LoCoMo dataset comparison with per-category scores and average
+ranks. A-Mem refers to the results reported in the original paper. A-Mem* represents our implementation results under the same experimental environment as our model.}
+\begin{tabular}{ll|cc|cc|cc|cc|c|c}
+\toprule
+\multirow{2}*{\textbf{Model}} & \multirow{2}*{\textbf{Method}}
+& \multicolumn{2}{c|}{Single Hop}
+& \multicolumn{2}{c|}{Multi Hop}
+& \multicolumn{2}{c|}{Temporal}
+& \multicolumn{2}{c|}{Open Domain}
+& \textbf{Avg.\ Rank $\downarrow$} & \textbf{Avg.\ Rank $\downarrow$}\\
+& & F1 $\uparrow$ & BLEU-1 $\uparrow$ & F1 $\uparrow$& BLEU-1 $\uparrow$& F1 $\uparrow$& BLEU-1 $\uparrow$ & F1 $\uparrow$& BLEU-1 $\uparrow$
+& (F1) & (BLEU-1)\\
+\midrule
+\multirow{6}{*}{GPT-4o-mini}
+& TiM          & 16.25 & 13.12 & 18.43 & 17.35 &  8.35 &  7.32 & 23.74 & 22.05 & 3.8 & 4.0\\
+& MemoryBank   &  5.00 &  4.77 &  9.68 &  6.99 &  5.56 &  5.94 &  6.61 &  5.16 & 5.0 & 5.0\\
+& MemGPT       & \underline{26.65} & \underline{17.72} & 25.52 & 19.44 &  \underline{9.15} &  7.44 & \underline{41.04} & \underline{34.34} & 2.2 & 2.5\\
+& A-Mem        & 27.02 & 20.09 & 45.85 & 36.67 & 12.14 & 12.00 & 44.65 & 37.06 & --  & -- \\
+& A-Mem*  & 22.61 & 15.25 & \underline{33.23} & \underline{29.11} &  8.04 &  \underline{7.81} & 34.13 & 27.73 & 3.0 & 2.5\\
+& \textbf{Ours}& \textbf{35.27} & \textbf{25.22} & \textbf{41.15} & \textbf{30.76} & \textbf{20.02} & \textbf{16.52} & \textbf{48.62} & \textbf{42.99} & \textbf{1.0} & \textbf{1.0}\\
+\midrule
+\multicolumn{2}{c|}{Improvement (\%)} & 32.35\%$\uparrow$ & 42.33\%$\uparrow$ & 23.83\%$\uparrow$ &  5.67\%$\uparrow$ & 118.80\%$\uparrow$ & 111.52\%$\uparrow$ & 18.47\%$\uparrow$ & 25.19\%$\uparrow$ & -- & -- \\
+\midrule
+\multirow{6}{*}{Qwen2.5-3B}
+& TiM          &  4.37 &  5.01 &  2.54 &  3.21 &  6.20 &  5.37 &  6.35 &  7.34 & 4.3 & 3.5\\
+& MemoryBank   &  3.60 &  3.39 &  1.72 &  1.97 &  6.63 &  6.58 &  4.11 &  3.32 & 4.8 & 4.8\\
+& MemGPT       &  5.07 &  4.31 &  2.94 &  2.95 &  7.04 &  7.10 &  7.26 &  5.52 & 2.8 & 3.8\\
+& A-Mem        & 12.57 &  9.01 & 27.59 & 25.07 &  7.12 &  7.28 & 17.23 & 13.12 & --  & -- \\
+& A-Mem*       & \underline{10.31} &  \underline{8.76} & \underline{16.31} & \underline{11.07} &  \underline{6.94} &  \underline{7.31} & \underline{12.34} & \underline{10.62} & 2.3 & 2.0\\
+& \textbf{Ours}& \textbf{23.26} & \textbf{15.39} & \textbf{21.44} & \textbf{14.95} & \textbf{10.18} &  \textbf{8.18} & \textbf{26.23} & \textbf{22.39} & \textbf{1.0} & \textbf{1.0}\\
+\midrule
+\multicolumn{2}{c|}{Improvement (\%)} &125.61$\%\uparrow$ & 75.68$\%\uparrow$ & 31.45$\%\uparrow$ & 35.05$\%\uparrow$ & 46.69$\%\uparrow$ & 11.90$\%\uparrow$ & 112.56$\%\uparrow$ & 110.83$\%\uparrow$ & -- & -- \\
+\bottomrule
+\end{tabular}
+\label{tab:LoCoMo_results}
+\end{table*}
+
+\begin{table}
+\centering
+% \setlength{\tabcolsep}{4.5pt}
+\small
+\caption{Efficiency analysis on LoCoMo benchmark (quantified by LLM call and recalled tokens counts).}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Tokens} & \textbf{Avg.Calls}& \textbf{Avg. F1} \\
+\midrule
+MemoryBank & 432 & 3.0&6.84 \\
+TiM & 1,274 & 2.6 &18.01\\
+MemGPT & 16,977 & 4.3&29.13 \\
+A-Mem* & 2,712 & 13.0 &26.55\\
+\textbf{Ours} & \textbf{3,874} & \textbf{4.9} &\textbf{36.23} \\
+\bottomrule
+\end{tabular}
+\label{tab:consumption_analysis}
+\end{table}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.95\linewidth]{latex/figure/abla.pdf}
+    \caption{The ablation study on the GVD and LoCoMo benchmark datasets.}
+    \label{fig:ablation_gvd}
+\end{figure*}
+
+
+\paragraph{Implementation Details.}
+The experiments are conducted on hardware equipped with 8-H20 GPUs.
+The fixed length of the dialogue page queue in STM is 7. 
+The maximum length of segments in MTM is set to 200.
+The maximum capacity for both the User KB and Agent Traits is set to 100 entries.
+The predefined $Heat$ threshold $\tau$, which controls the information from the MTM to the LPM, is set to 5. 
+The values of $\alpha$, $\beta$, and $\gamma$ in Eq.~\ref{eq:heat_formula} are equality set to 1. 
+For memory retrieval, the number of retrieval top-$m$ segments was set to 5, and the hyperparameter top-$k$ for retrieved dialogue page was set to 5 and 10 on the GVD and LoCoMo datasets. 
+% For other comparison methods, the number of retrieved memories is also set according to the above configuration.
+The similarity value of $\theta$ in Eq.~\ref{eq:insert} is 0.6, and the time constant $\mu$ is 1e+7.  
+% Additionally, the hyperparameter $m$, which determines the number of retrieval segments, was uniformly set to 5 across both datasets. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Main Results}
+The experimental resutls in GVD and LoCoMo benchmark datasets are shown in Table~\ref{tab:gvd_results} and Table~\ref{tab:LoCoMo_results}. We have the following observations:
+
+% (1) % memoryBank 效果最差，只是经过处理记忆的衰减，
+% %  其他方法结果的insight A-mem> memGPT > Tim 
+
+% (2) % 跟其他对记忆进行长短期管理xx, ours 最好，
+% % 任务难易，我们模型提升多少
+
+% (3) % 效率分析   调用次数，和检索回来tokens 数的长度
+(1) Among all memory methods, MemoryBank performs the worst. This indicates that simply applying memory decay mechanisms is insufficient for managing conversational memory effectively. 
+TiM outperforms MemoryBank by mitigating repetitive reasoning by saving ``thoughts" rather than raw turns, but its single-stage hash retrieval cannot preserve cross-topic dependencies. 
+
+(2) A-Mem and MemGPT demonstrate relatively strong performance in long-form dialogue, But both of them lack systematic memory management mechanisms, giving rise to certain issues. For instance, MemGPT extends context via OS-style paging, yet its flat FIFO queue causes topic mixing as dialogue length grows; A-Mem organizes memories into a graph that enriches semantics, but the heavy, multi-step link generation inflates latency and error accumulation.
+By contrast, our Memory OS fuses a hierarchical STM/MTM/LPM architecture via segmented paging with heat-based eviction and a persona module, thereby ensuring that topic-aligned content remains accessible while maintaining consistency with users' specific preferences.
+% Other methods perform better due to their richer semantic memory structuring capabilities, with a clear performance hierarchy observed as A-Mem > MemGPT > TiM>Memorybank. 
+
+(3) Our proposed MemoryOS achieves superior performance across all benchmark datasets due to its hierarchical storage design, semantic retrieval capabilities, and persona-driven dynamic updating, which ensure coherent and accurate memory management. 
+% Our proposed Memory OS method surpasses these methods because of its comprehensive hierarchical storage design, semantic retrieval capabilities, and persona-driven dynamic updating mechanisms, which enhance the coherence and accuracy of memory management.
+Notably, the model’s advantages are particularly pronounced in more challenging memory management tasks. For example, on the LoCoMo benchmark with gpt-4o-mini, it achieves average improvements of 49.11\%  on  F1 score and 46.18\%  on BLEU-1,  while on the easier GVD dataset, in which all methods achieve higher baseline accuracy, our MemoryOS still surpasses the SOTA baseline A-Mem by 3.2\%  in accuracy, showing robust handling of complex long-context tasks requiring semantic consistency.
+% and hierarchical retrieval.
+% These results demonstrate Memory OS's effectiveness in long-dialogue memory management, particularly in robust handling of complex long-context tasks requiring semantic consistency and hierarchical retrieval.
+
+
+
+% These results underscore Memory OS’s exceptional robustness in handling complex, long-context memory tasks.
+
+% on the LoCoMo benchmark, it achieves average improvements of xxx pp, while on the easier GVD dataset, in which all methods achieve higher accuracy , MemoryOS still surpasses the SOTA baseline method.
+% This design brings tangible gains: on the easier GVD benchmark we still surpass the strongest baseline A-Mem, boosting accuracy by 2.9 pp (GPT-4o-mini) along with notable correctness and coherence gains; on the more demanding LoCoMo benchmark we improve Single-Hop reasoning by Avg.8.06 pp, Temporal reasoning by Avg.9.79 pp, and lead the Open-Domain category, underscoring Memory OS’s robustness on complex long-context tasks. =
+
+
+% (2) Compared with the other frameworks for short- and long-term memory management, our Memory OS yields the best overall results on both benchmarks. TiM mitigates repetitive reasoning by saving “thoughts’’ rather than raw turns, but its single-stage hash retrieval cannot preserve cross-topic dependencies; MemGPT extends context via OS-style paging, yet its flat FIFO queue causes topic mixing as dialogue length grows; A-Mem organizes memories into a Zettelkasten-like graph that enriches semantics, but the heavy, multi-step link generation inflates latency and error accumulation; MemoryBank leverages forgetting curves to personalise responses, though its lack of mid-term segmentation makes it prone to topic drift. 
+% By contrast, Memory OS fuses hierarchical STM/MTM segmentation with heat-based eviction and a persona module, so salient, topic-aligned content remains accessible while user-specific facts stay consistent. 
+% This design brings tangible gains: on the easier GVD benchmark we still surpass the strongest baseline A-Mem, boosting accuracy by 2.9 pp (GPT-4o-mini) along with notable correctness and coherence gains; on the more demanding LoCoMo benchmark we improve Single-Hop reasoning by Avg.8.06 pp, Temporal reasoning by Avg.9.79 pp, and lead the Open-Domain category, underscoring Memory OS’s robustness on complex long-context tasks. 
+
+(4) 
+To evaluate model efficiency, we employed two metrics: tokens consumed ( in memory retrieval) and average LLM calls in each response. As shown in Table \ref{tab:consumption_analysis}, our method outperforms the Top-2 baselines (i.e., MemGPT and A-Mem) in both aspects, requiring significantly fewer LLM calls than A-Mem* (4.9 vs.13) and much lower token consumption than MemGPT (3,874 vs. 16,977). 
+% These results demonstrate a balance between computational efficiency and performance.
+
+% Evaluate computational efficiency on the LoCoMo dataset using GPT-4o-mini, focusing on two metrics: (1) tokens consumed per response and (2) average LLM calls from user query to memory stabilization. Our method outperforms benchmarks (Table\ref{tab:consumption_analysis}), with significantly fewer LLM calls than A-Mem\* (3.9 vs.13) and much lower token consumption than MemGPT (3,874 vs. 16,977). This demonstrates an effective balance between efficiency and dialogue performance.
+
+% We analyze computational efficiency on the LoCoMo dataset using GPT-4o-mini as the backbone, evaluating two key dimensions: (1) tokens consumed per generated response, and (2) the average number of LLM calls from initiating a user query until memory insertion and stabilization. Results are summarized in Table~\ref{tab:consumption_analysis}.
+% As shown, our method achieves optimal performance across evaluation metrics (Table~\ref{tab:LoCoMo_results}) while maintaining moderate computational overhead. Specifically, our framework exhibits significantly fewer LLM calls compared to the strong baseline A-Mem* (3.9 vs. 13 calls) and substantially lower token consumption compared to MemGPT (3,874 vs. 16,977 tokens). These results highlight that our method effectively balances computational efficiency and dialogue performance.
+
+% \paragraph{Results on GVD Dataset}
+% Table~\ref{tab:gvd_results} summarizes performance on the GVD dataset.  
+% Our method consistently surpasses all baselines across the three evaluation
+% metrics.  With GPT-4o-mini, we improve Retrieval Accuracy by +2.9 pp and Correctness by +4.7 pp over the strongest
+% baseline (A-Mem).  For Qwen2.5-7B~\cite{qwen2025qwen25technicalreport}, the gains reach +4.6 pp in Retrieval Accuracy, confirming our approach is
+% model-agnostic and effective for memory retrieval, response correctness, and
+% contextual coherence.
+
+
+% \paragraph{Results on LoCoMo Dataset}
+
+% Our method achieves the best average rank across all evaluation categories for both backbone models. With GPT-4o-mini, we significantly outperform MemGPT, the second-best baseline, notably in Single Hop (+8.6 F1), Temporal (+10.9 F1), and Open Domain (+7.6 F1) tasks, while remaining competitive in Multi Hop and Adversarial scenarios. For Qwen2.5-3B, our method similarly obtains clear improvements over the strongest baseline (A-Mem*), particularly in Single Hop (+15.9 F1) and Open Domain (+13.9 F1). Note that results labeled A-Mem are from the original paper, while rankings are calculated using our reproduced baseline (A-Mem*).
+
+% \subsection{Ablation Study}
+
+% To assess the contribution of each module in our framework, we conduct an ablation study on the GVD dataset using the Qwen2.5 7B model as the base. We evaluate the performance impact of removing three core components individually: the Mid-Term Memory (MTM), the Persona Module, and the Conversation Chain. Results are summarized in Table~\ref{tab:ablation}.
+
+% \begin{table}[H]
+% \centering
+% \resizebox{1\linewidth}{!}{%
+% \begin{tabular}{l|ccc}
+% \hline
+% \textbf{Configuration} & Retrieval Acc. & Correctness & Coherence \\
+% \hline
+% Full Model & \textbf{91.8}& \textbf{82.3}& \textbf{90.5}\\ 
+% w/o Conversation Chain & 87.3 & 80.5 & 88.3 \\
+% w/o MTM & 46.4 & 44.6 & 66.0 \\
+% w/o Persona Module & 77.1 & 70.5 & 72.3 \\
+% \hline
+% \end{tabular}}
+% \caption{Ablation results on the GVD dataset with Qwen2.5 7B as the backbone model.}
+% \label{tab:ablation}
+% \end{table}
+
+
+% The results demonstrate that MTM is essential for maintaining long-range dialogue consistency, with its removal causing the most significant performance drop. The Persona Module also plays a key role in generating coherent and character-consistent responses. The Conversation Chain contributes to dialogue flow, with moderate performance degradation when omitted. Together, these components are critical to achieving strong performance across retrieval accuracy, correctness, and coherence.
+
+
+\begin{figure}
+\centering
+\includegraphics[width=\linewidth]{latex/figure/topk.pdf}
+\caption{Impact of hyperparameter $k$ (retrieved pages in MTM) on LoCoMo benchmark.}
+\label{fig:mem_topk}
+\end{figure}
+
+\begin{figure*}
+\centering
+\includegraphics[width=\linewidth]{latex/figure/mem_case.pdf}
+\caption{Case study demonstrating the positive impact of introducing our memory management system. Left: default LLMs; Right: with MemoryOS.}
+\label{fig:mem_case}
+\end{figure*}
+
+
+\subsection{Ablation Study}
+
+To assess the contribution of each core module in our framework, we perform an ablation study by individually removing three key components: the Mid-Term Memory (-MTM), the Long-term Persona Module (-LPM), and the Diague page Chain (-Chain) and the entire memory system (-MemoryOS).  The results are presented in Figure~\ref{fig:ablation_gvd}. 
+We can see that the memory system plays a pivotal role in the quality of responses during long dialogues. Without MemoryOS, the model's performance drastically reduces. In MemoryOS, the Mid-Term Memory (MTM) has the most significant impact, followed by the Long-Term Memory (LPM), while the Chain has the least impact. 
+% This consistent pattern across both datasets underscores MTM’s critical role in maintaining dialogue consistency.
+
+
+% the Mid-Term Memory (MTM) has the most significant impact on model performance, followed by the LPM, while the Chain has the least impact. This consistent pattern across both datasets highlights the critical role of MTM in maintaining dialogue consistency.
+
+
+
+
+% \begin{figure}[htbp]
+%     \centering
+% \includegraphics[width=1\linewidth]{latex/figure/abla_locomo.png}
+%     \caption{Ablation results on the LoCoMo dataset with GPT-4o-mini using the F1 score.}
+%     \label{fig:ablation_locomo}
+% \end{figure}
+
+
+\subsection{Hyperparameter Analysis}
+% We analyzed the influence of the number of dialogue pages.
+We analyze the impact of top-k retrieved dialogue pages from Mid-Term Memory (MTM) on model performance.
+As shown in Fig.~\ref{fig:mem_topk}, by setting the hyperparameter $k$ with different values $k=\{5,10,20,30,40\}$ on the LoCoMo benchmark, we can see that
+the model's performance improves as $k$ increases, but the improvements diminish when exceeding a threshold. Retrieving more pages can enhance model performance, but excessive content may introduce noise, adversely affecting performance. We set $k=10$ to achieve a relatively favorable performance while minimizing computational overhead.
+% The best value of $k$ is set to 30 on the LoCoMo benchmark.
+
+% The value of $K$ is influenced by the difficulty of the question, the greater the difficulty, the more dialogue pages need to be recalled. For example, the most significant improvements are observed in the Open-Domain and Adversarial settings, where the F1 scores are most affected by the changes in $K$.
+% The final values of $K$ were set to 7 and 30 in GVD and LoCoMo respectively.
+
+% with a retrieval accuracy of 92.2\% and correctness of 86.2\%. After that, the performance stabilizes.
+% We analyzed the impact of the hyperparameter $K$ by evaluating the model performance on the LoCoMo dataset with different values of $K$ ($K=5,10,20,30,40$). 
+% As summarized in Figure~\ref{fig:LoCoMo_topk},
+% the F1 scores across five categorie show an increasing trend with the increase of $K$. Notably, the most significant improvements are observed in the Open-Domain and Adversarial settings, where the F1 scores are most affected by the changes in $K$. In contrast, the performance growth in simpler tasks such as Similarity and Multi-Hop begins to saturate after $K=30$.
+
+% \begin{figure}[htbp]
+%     \centering
+%     \includegraphics[width=0.9\linewidth]{latex/figure/mem_topk.png}
+%    \caption{Impact of hyperparameter $K$ on Retrieval Accuracy and Correctness on the GVD dataset.}
+%     \label{fig:membank_topk}
+% \end{figure}
+
+
+
+
+% \subsection{Consumption Analysis}
+
+
+
+
+\subsection{Case Study}
+To visually demonstrate the role of our memory system, specifically how user long-term memory maintenance enhances conversational consistency. We present case studies in Fig.~\ref{fig:mem_case}. Based on the conversation history, we show the responses of default LLMs and our LLMs with MemoryOS. 
+We can see that MemoryOS exhibits excellent capabilities in recalling users' long-term conversations and preferences.
+For example, MemoryOS recalls details like "seeing the scenery, running, and spotting squirrels in the wetland park."  from the initially mentioned a few weeks ago,  “I went to the wetland park ...". 
+These details are retrieved through the interplay and mutual support of mid-term memory's segment-page storage and the dialogue page chain.
+In addition, since the system integrates a personalization module, it can remember the user's goal of “wanting to get fit” and later proactively reminds the user when they express a desire to eat a burger: “Don’t forget you want to get slimmer”. 
+This highlights the crucial role of the memory module in enhancing dialogue coherence and user experience.
+
+
+% the left side The left side shows the historical dialogue between the user and the AI, while the right side presents the performance of a large language model (LLM) with and without the memory os.
+
+% First, when the user initially mentioned, “I went to the wetland park; the scenery there was beautiful,” the system recorded this information and inserted it into a mid-term memory. Later, the user added more details, such as seeing squirrels and going for a run in the park. Our system was able to effectively recall details like "seeing the scenery, running, and spotting squirrels in the wetland park." Thanks to the segmented storage of mid-term memory, the information about running in the wetland park was stored in the same mid-term memory segment as the first-round input, making it retrievable by the system. Moreover, with the help of dialogue chain construction, these three rounds of conversation were linked together. Although the information about squirrels was not stored in the same segment due to semantic dissimilarity, the system still captured it through the dialogue chain.
+
+% In addition, since the system integrates a personalization module, it can remember the user's goal of “wanting to get fit” and later proactively reminds the user, when they express a desire to eat a burger, “Don’t forget you’ want to get slimmer” This highlights the crucial role of the memory module in enhancing dialogue coherence and user experience.
+
+
+
+\section{Conclusion}
+Inspired by memory management mechanisms in operating systems, we pioneers propose a novel memory management system, MemoryOS, for AI agents. Implemented by a hierarchical memory storage architecture, MemoryOS addresses the fixed context window limitations in long conversations.
+By adapting OS-style segment-paging storage for dialogue history, MemoryOS enables efficient memory storage, updating, and semantic retrieval using heat-driven eviction to dynamically prioritize critical information across memory tiers. 
+The integrated persona module captures evolving user preferences via personalized trait extraction, ensuring responses align with long conversation contexts.
+By bridging OS principles with AI memory management, MemoryOS empowers LLMs to sustain coherent, personalized conversations over extended interactions, enhancing human-like dialogue capabilities in real-world applications.
+
+
+% This paper proposes Memory OS, a novel memory operation system for AI agents. 
+% Memory OS consists of Short-Term Memory (STM), Mid-Term Memory (MTM), and a Persona Module, which collectively address the limitations of fixed context windows in Large Language Models (LLMs). The architecture enables efficient compression and access to dialogue history through dynamic updates, heat-driven eviction, and semantic retrieval.Through extensive experiments on the GVD and LoCoMo datasets, Memory OS demonstrates significant improvements in memory retrieval accuracy, response correctness, and contextual coherence compared to existing techniques. The ablation studies further confirm the critical role of MTM and the Persona Module in enhancing dialogue performance. Memory OS provides a robust solution for long-term, coherent, and personalized conversations, advancing the capabilities of AI agents in real-world applications.
+
+
+% \section{Limitation}
+% % 讨论现有方法的缺陷
+% While Memory OS represents a significant advancement in LLM-based agent memory management, several key limitations should be acknowledged. 
+% % First, the current system is exclusively designed for text-based memory and does not support multi-modal inputs such as images, audio, or video. This restricts its applicability in scenarios requiring cross-modal understanding, such as visual question answering or multimodal dialogue systems. Integrating multi-modal memory remains an important direction for future research.
+% First, the current design relies on empirically set parameters for critical memory capacities, such as the short-term memory window size and the number of mid-term memory segments, without theoretical grounding in cognitive models. Future work will explore human memory mechanisms to derive more principled capacity configurations. Second, the topic within memory segments currently depends on the LLM’s intrinsic extraction capabilities, lacking dynamic merging mechanisms to resolve redundancies arising from overlapping or evolving conversational themes. Future research may focus on developing adaptive merging strategies to refine segment organization and improve memory efficiency.
+% Despite these limitations, we believe MemoryOS provides a fundamental foundation for memory management in AI agents, addressing the challenges of long-term dialogue coherence and personalization to enable more intelligent and adaptive memory systems for future AI agents.
+
+% and addressing these challenges will pave the way for more capable and versatile systems.
+
+
+
+
+
+
+% Second, while the Mid-Term Memory (MTM) offers efficient topic-based organization, it lacks the ability to dynamically merge similar topics. In practice, conversations often involve overlapping or related themes. Implementing semantic-based merging of MTM sessions could further optimize memory usage and improve retrieval. Future work should focus on supporting multi-modal interactions and enhancing MTM’s dynamic management for more complex dialogue scenarios.
+
+\bibliography{Reference}
+% \newpage
+% \twocolumn
+% \begin{appendix} % More explicit way to start appendix sectioning using the 'appendix' package
+
+% \section{Prompt Templates and Examples} % This will be Appendix A
+% \subsection{Prompt Template for Summary and Keyword Extraction for STM-MTM Update}
+% \begin{promptcontentbox}
+% You are an expert in analyzing dialogue topics. No more than two topics.
+
+% Please analyze the following dialogue and generate multiple subtopic summaries (if applicable), with a maximum of two themes.
+% Each summary should include the subtopic name, keywords (separated by commas), and the summary text, formatted as a JSON array, with an example format as follows:
+% [
+%   \{"theme": "Business trip", "keywords": ["Business trip", "Itinerary", "Work"], "content": " User mentioned the troubles related to business trips."\},
+%   \{"theme": "Health", "keywords": ["Cold", "Uncomfortable", "Sick"], "content": "User reported feeling unwell due to a cold."\}
+% ]
+% Please directly output the JSON array, without adding any other content.
+% Conversation content:
+% [text to be summarized will be appended here]
+% \end{promptcontentbox}
+
+
+% % \subsection{PromptTemplate for Theme Extraction from Answer}
+% % \begin{promptcontentbox}
+% % You are an expert in extracting conversation topics.
+
+% % Please extract the theme summary from the following answer, and start the output with [Theme Extraction]:
+% % [answer\_text will be inserted here]
+% % \end{promptcontentbox}
+
+% % \subsection{PromptTemplate for Keyword Extraction}
+% % \begin{promptcontentbox}
+% % You are a keyword extraction expert. Please extract the keywords of the conversation topic.
+
+% % Please extract the keywords of the conversation topic from the following dialogue, separated by commas, and do not exceed three:
+% % [text to extract keywords from will be appended here]
+% % \end{promptcontentbox}
+
+% % \subsection{PromptTemplate for Conversation Continuity Detection}
+% % \begin{promptcontentbox}
+% % You are a conversation continuity detector. Return ONLY 'true' or 'false'.
+
+% % Determine if these two conversation pages are continuous (true continuation without topic shift).
+% % Return ONLY "true" or "false".
+
+% % Previous Page:
+% % User: \{prev\_user\}
+% % Assistant: \{prev\_agent\}
+
+% % Current Page:
+% % User: \{curr\_user\}
+% % Assistant: \{curr\_agent\}
+
+% % Continuous?
+% % \end{promptcontentbox}
+
+% % \subsection{PromptTemplate for Meta-Summary Update}
+% % \begin{promptcontentbox}
+% % You are a conversation meta-summary updater. Your task is to:
+% % 1. Preserve relevant context from previous meta-summary
+% % 2. Integrate new information from current dialogue
+% % 3. Output ONLY the updated summary (no explanations)
+
+% % Update the conversation meta-summary by incorporating the new dialogue while maintaining continuity.
+
+% % Guidelines:
+% % 1. Start from the previous meta-summary (if exists)
+% % 2. Add/update information based on the new dialogue
+% % 3. Keep it concise (1-2 sentences max)
+% % 4. Maintain context coherence
+
+% % Previous Meta-summary: \{last\_meta\}
+% % New Dialogue:
+% % \{new\_dialogue\}
+
+% % Updated Meta-summary:
+% % \end{promptcontentbox}
+
+% % \subsection{PromptTemplate for Combined Continuity Detection and Meta-Summary Update}
+% % \begin{promptcontentbox}
+% % You are a combined conversation continuity detector and meta-summary updater.
+% % Your task is to:
+% % \begin{enumerate}
+% %     \item Determine if the two conversation pages are continuous (i.e., a true continuation without a significant topic shift).
+% %     \item Based on this determination, provide a combined output as specified below.
+% % \end{enumerate}
+
+% % \textbf{Output Instructions:}
+% % \begin{itemize}
+% %     \item \textbf{If the conversation pages ARE continuous:}
+% %         \begin{itemize}
+% %             \item Preserve relevant context from the previous meta-summary.
+% %             \item Integrate new information from the current dialogue to update the meta-summary.
+% %             \item The meta-summary should be concise (1-2 sentences max).
+% %             \item Output \textbf{ONLY} the word "true" on the first line, followed by the updated meta-summary on the second line.
+% %         \end{itemize}
+% %     \item \textbf{If the conversation pages are NOT continuous} (i.e., there is a topic shift or it's a new conversation):
+% %         \begin{itemize}
+% %             \item Create a new concise meta-summary (1-2 sentences max) based \textbf{only} on the current dialogue (this will be the "current summary").
+% %             \item Output \textbf{ONLY} the word "false" on the first line, followed by this new current-page meta-summary on the second line.
+% %         \end{itemize}
+% %     \item Do NOT include any explanations, conversational filler, or any text other than "true" or "false" on the first line and the summary on the second line.
+% % \end{itemize}
+
+% % \textbf{Previous Page Context:}
+
+% % Previous Meta-summary: [lastmeta]
+
+% % User: [prevuser]
+
+% % Assistant: [prevagent]
+
+% % \textbf{Current Page Dialogue:}
+
+% % User: [curruser]
+
+% % Assistant: [curragent]
+
+% % \textbf{Combined Output (Continuity Status and Meta-Summary):}
+% % \end{promptcontentbox}
+
+
+
+% \subsection{Prompt Template for LPM Knowledge Extraction}
+% \begin{promptcontentbox}
+% You are an assistant knowledge extraction engine. Rules:
+% 1. Extract ONLY explicit statements about the assistant's identity or knowledge.
+% 2. Use concise and factual statements in the first person.
+% 3. If no relevant information is found, output "None".
+
+% \# Assistant Knowledge Extraction Task
+% Analyze the conversation and extract any fact or identity traits about the assistant.
+% If no traits can be extracted, reply with "None". Use the following format for output:
+% The generated content should be as concise as possible --- the more concise, the better.Must include time and event(s)
+% [Assistant Knowledge]
+% - [Fact 1]
+% - [Fact 2]
+% - (Or "None" if none found)
+
+% Few-shot examples:
+% 1. User: Can you recommend some movies.
+%    AI: Yes, I recommend Interstellar.
+%    Time: 2023-10-01
+%    [Assistant Knowledge]
+%    - I recommend Interstellar on 2023-10-01.
+
+% 2. User: That's interesting. I didn't know you could do that.
+%    AI: I'm glad you find it interesting!
+%    [Assistant Knowledge]
+%    - None
+
+% Conversation:
+% [conversation text will be appended here]
+% \end{promptcontentbox}
+% \subsection{Prompt Template for Response Generation}
+% \begin{promptcontentbox}
+% system prompt =
+% "You are role-playing as [speaker b] in a conversation with the user who is playing [speaker a].
+% Here are some of your character traits and knowledge:
+% [assistant knowledge text]
+% Any content referring to 'User' in the prompt refers to [speaker a]'s content, and any content referring to 'AI' or 'assistant' refers to [speaker b]'s content.
+% Your task is to answer questions about [speaker a] or [speaker b] in an extremely concise manner.
+% When the question is: 'What did the charity race raise awareness for?', you should not answer in the form of: 'The charity race raised awareness for mental health.' Instead, it should be: 'mental health', as this is more concise."
+
+% user prompt =
+% <CONTEXT>
+% Recent conversation between [speaker a] and [speaker b]:
+% [history text]<MEMORY> Relevant past conversations: [retrieval text] <CHARACTER TRAITS> Characteristics of [speaker a]: [background]
+% The question is: [query]
+% Your task is to answer questions about [speaker a] or [speaker b] in an extremely concise manner.
+% Please only provide the content of the answer, without including 'answer:'
+% For questions that require answering a date or time, strictly follow the format '17 July 2025' and provide a specific date whenever possible. For example, if you need to answer 'last year,' give the specific year of last year rather than just saying 'last year.' Only provide one year, date, or time, without any extra responses.
+% If the question is about the duration, answer in the form of several years, months, or days.
+% Generate answers primarily composed of concrete entities, such as Mentoring program, school speech, etc.
+% \end{promptcontentbox}
+% \subsection{Prompt Template for Detailed User Traits Analysis}
+% \begin{promptcontentbox}
+% ----
+% You are a professional user preference analysis assistant. Your task is to analyze and update a user's personality preferences based on 90 defined dimensions, using provided user-AI dialogue text. For each dimension:
+
+% 1.  Carefully read the dialogue to determine if the dimension is reflected.
+% 2.  If reflected, determine the user's preference level: High/Medium/Low, and briefly provide the reason or cite dialogue.
+% 3.  If not reflected, do not list the dimension.
+
+% The 90 dimensions and their explanations are as follows:
+
+% [Psychological Model (Basic Needs \& Personality)]
+
+% * **Extraversion:** Degree of preference for social activities.
+% * **Openness:** Degree of acceptance of new things and ideas.
+% * **Agreeableness:** Tendency towards friendliness and cooperation.
+% * **Conscientiousness:** Sense of responsibility and organizational planning ability.
+% * **Neuroticism:** Emotional stability and degree of sensitivity.
+% * **Physiological Needs:** Degree of focus on physiological comfort and satisfaction of basic needs.
+% * **Safety Needs:** Degree of emphasis on safety and stability.
+% * **Belongingness Needs:** Pursuit of a sense of group belonging.
+% * **Esteem Needs:** Need for respect and recognition.
+% * **Cognitive Needs:** Desire for knowledge and understanding.
+% * **Aesthetic Pursuit:** Degree of appreciation for beauty and art.
+% * **Self-Actualization Needs:** Pursuit of realizing one's own potential.
+% * **Order Needs:** Preference for environmental cleanliness and organization.
+% * **Independence Needs:** Preference for autonomous decision-making and action.
+% * **Dominance Needs:** Willingness to influence or control others.
+% * **Achievement Needs:** Degree of emphasis on achieving success.
+
+% [AI Alignment Dimensions]
+
+% * **Helpfulness:** Whether the AI response is practically helpful to the user.
+% * **Honesty:** Whether the AI response is truthful and credible.
+% * **Safety (Harmlessness):** Avoidance of sensitive content and negative information.
+% * **Instruction Following:** Strict adherence to the user's explicit instructions.
+% * **Truthfulness:** Accuracy and authenticity of the response content.
+% * **Coherence:** Clarity of expression logic and consistency.
+% * **Complexity:** Preference for detailed and complex information.
+% * **Conciseness:** Preference for simple and clear response methods.
+
+% [Content Platform Interest Tags]
+
+% * **Science Interest:** Interest in topics in the field of science.
+% * **Education Interest:** Focus on education and learning.
+% * **Psychology Interest:** Interest in psychology topics.
+% * **Family Focus:** Concern for family and parenting education.
+% * **Fashion Interest:** Love for the field of fashion.
+% * **Art Interest:** Attention to and participation in the field of art.
+% * **Health Focus:** Concern for physical health and lifestyle.
+% * **Financial Management Interest:** Focus on financial management and finance topics.
+% * **Sports Interest:** Interest in sports activities and exercise.
+% * **Foodie Interest:** Enthusiasm for cooking and gastronomy.
+% * **Travel Interest:** Interest in traveling and exploring new places.
+% * **Music Interest:** Interest in music appreciation or creation.
+% * **Literature Interest:** Focus on literature and reading.
+% * **Movie Interest:** Preference for movies and television.
+% * **Social Media Activity:** Frequency of use and interactivity on social media.
+% * **Technology Interest:** Degree of attention to technological developments.
+% * **Environmental Focus:** Concern for environmental protection and sustainable development.
+% * **History Interest:** Interest in historical knowledge and topics.
+% * **Political Focus:** Attention to political events and social issues.
+% * **Religious Interest:** Interest in religious beliefs and spiritual topics.
+% * **Gaming Interest:** Preference for video games and board games.
+% * **Animal Focus:** Concern for animal welfare and pets.
+% * **Emotional Expression:** Preference for direct emotional expression versus restraint.
+% * **Sense of Humor:** Tendency towards a humorous or serious communication style.
+% * **Information Density:** Preference for detailed and rich information versus concise and clear information.
+% * **Language Style:** Preference for formal and rigorous language versus casual and relaxed.
+% * **Practicality:** Preference for practical and concrete advice versus theoretical discussion.
+
+% Based on the above dimension definitions, analyze the following user-AI dialogue text. List only the preference dimensions that can be extracted, item by item, in the following format:
+
+% Dimension: Level (High/Medium/Low) [Reason: Briefly explain the reason or cite specific dialogue content as evidence]
+
+% If a dimension cannot be reflected in the dialogue, do not list it.
+
+% Known user personality (if any, please update based on this; otherwise, skip):
+% \{Insert known user personality information here\}
+
+% The latest user-AI dialogue text is as follows:
+% \{Insert the latest user-AI dialogue content here\}
+
+% Please begin the analysis.
+% ----
+% \end{promptcontentbox}
+
+
+% \end{appendix}
+
+\end{document}

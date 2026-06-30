@@ -1,0 +1,77 @@
+
+
+
+\section{Results}
+In this section, we summarise the experimental results. We denote LOLA and naive agents with exact policy updates as LOLA-Ex and NL-Ex respectively. We abbreviate LOLA and native agents with policy updates with LOLA-PG and NL-PG. We aim to answer the following questions:
+(1) How do pairs of LOLA-Ex agents behave in iterated games compared with pairs of NL-Ex agents? 
+(2) Using policy gradient updates instead, how to LOLA-PG agents and NL-PG agents behave?
+(3) How do LOLA-Ex agents fair in a round robin tournament involving a set of multi-agent learning algorithms from literature?
+(4) Does the learning of LOLA-PG agents scale to high-dimensional settings where the agents' policies are parameterised by deep neural networks?
+(5) Does LOLA-PG maintain its behavior when replacing access to the exact parameters of the opponent agent with opponent modeling?
+(6) Can LOLA agents be exploited by using higher order gradients, i.e., does LOLA lead to an arms race of ever higher order corrections or is LOLA / LOLA stable?
+
+We answer the first three questions in Sec.~\ref{subsec:iterated-results}, the next two questions in Sec.~\ref{subsec:coin-results}, and the last one in Sec.~\ref{subsec:higher-lola}.
+
+
+
+
+\subsection{Iterated Games}
+\label{subsec:iterated-results}
+We first compare the behaviors of LOLA agents with NL agents, with either exact policy updates or policy gradient updates.
+
+Figures~\ref{fig:fig_IPD}a and~\ref{fig:fig_IPD}b show the policy for both agents at the end of training under NL-Ex and LOLA-Ex when the agents have access to exact gradients and Hessians of $\{V^1, V^2\}$. Here we consider the settings of NL-Ex vs.\ NL-Ex and LOLA-Ex vs.\ LOLA-Ex. We study mixed learning of one LOLA-Ex agent vs.\ an NL-Ex agent in Section~\ref{subsec:higher-lola}. Under NL-Ex, the agents learn to defect in all states, indicated by the accumulation of points in the bottom left corner of the plot. However, under LOLA-Ex, in most cases the agents learn TFT. In particular agent 1 cooperates in the starting state $s_0$, $CC$ and $DC$, while agent 2 cooperates in $s_0$, $CC$ and $CD$. As a result, Figure~\ref{fig:fig_IPD}c) shows that the normalised discounted reward\footnote{We use following definition for the normalised discounted reward:  $ (1 - \gamma) \sum_{t=0}^T \gamma^t r_t $.} is close to $-1$ for LOLA-Ex vs.\ LOLA-Ex, corresponding to TFT, while NL-Ex vs.\ NL-Ex results in an normalised discounted reward of $-2$, corresponding to the fully defective ($DD$) equilibrium. Figure~\ref{fig:fig_IPD}d) shows the normalised discounted reward for NL-PG and LOLA-PG where agents learn via policy gradient. LOLA-PG also demonstrates cooperation while agents defect in NL-PG.
+
+We conduct the same analysis for IMP in Figure~\ref{fig:fig_IMP}. In this game, under naive learning the agents' strategies fail to converge. In contrast, under LOLA the agents' policies converge to the only Nash equilibrium, playing $50\% / 50\%$ heads / tails. 
+
+Table~\ref{tab:results} summarises the numerical results comparing LOLA with NL agents in both the exact and policy gradient settings in the two iterated game environments. In the IPD, LOLA agents learn policies consistent with TFT with a much higher probability and achieve higher normalised discounted rewards than NL ($-1.06$ vs $-1.98$). In IMP, LOLA agents converge to the Nash equilibrium more stably while NL agents do not. The difference in stability is illustrated by the high variance of the normalised discounted returns for NL agents compared to the low variance under LOLA ($0.37$ vs $0.02$).
+
+%%TOURNAMENT NEW
+% \subsection{Round-Robin tournament} \label{sec:round-robin}
+In Figure~\ref{fig:tournament} we show the average normalised return of our LOLA-Ex agent against a set of learning algorithms from the literature. We find that LOLA-Ex receives the highest normalised return in the IPD, indicating that it successfully shapes the learning outcome of other algorithms in this general sum setting. 
+
+In the IMP, LOLA-Ex achieves stable performance close to the middle of the distribution of results. 
+
+\begin{figure*}[t!]
+ 	\centering
+ 	\includegraphics[width=0.45\textwidth]{figures/coingame}
+ 	\hfil
+ 	\includegraphics[width=0.45\textwidth]{figures/coingame_return}
+%  	\vspace{-3ex}
+ 	\caption{The percentage of all picked up coins that match in colour (left) and the total points obtained per episode (right) for a pair of naive learners using policy gradient (NL-PG), LOLA-agents (LOLA-PG), and a pair of LOLA-agents with opponent modelling (LOLA-OM). Also shown is the standard error of the mean (shading), based on 10 training runs. While LOLA-PG and LOLA-OM agents learn to cooperate, LOLA-OM is less stable and obtains lower returns than LOLA-PG. Best viewed in colour.}
+ 	\label{fig:coin_game_results}
+\end{figure*}
+
+\subsection{Coin Game}
+\label{subsec:coin-results}
+We summarise our experimental results in the Coin Game environment. To examine the scalability of LOLA learning rules, we compare NL-PG vs.\ NL-PG to LOLA-PG vs.\ LOLA-PG. Figure~\ref{fig:coin_game_results} demonstrates that NL-PG agents collect coins indiscriminately, corresponding to defection. In contrast, LOLA-PG agents learn to pick up coins predominantly (around $80\%$) of their own colour, showing that the LOLA learning rule leads to cooperation in the Coin Game.
+
+Removing the assumption that agents can access the exact parameters of opponents, we examine LOLA agents with opponent modeling (Section~\ref{sec:om}). Figure~\ref{fig:coin_game_results} demonstrates that without access to the opponent's policy parameters, LOLA agents with opponent modeling pick up coins of their own colour around $60\%$ of the time, inferior to the performance of LOLA-PG agents. We emphasise that with opponent modeling neither agent can recover the exact policy parameters of the opponent, since  there is a large amount of redundancy in the neural network parameters. For example, each agent could permute the weights of their fully connected layers. Opponent modeling introduces noise in the opponent agent's policy parameters, thus increasing the variance and bias of the gradients~\eqref{eqn:f-lola-pg} during policy updates, which leads to inferior performance of LOLA-OM vs.\ LOLA-PG in Figure~\ref{fig:coin_game_results}.
+
+
+\subsection{Exploitability of LOLA}
+\label{subsec:higher-lola}
+In this section we address the exploitability of the LOLA learning rule. We consider the IPD, where one can calculate the exact value function of each agent given the policies. Thus, we can evaluate the higher-order LOLA terms. We pitch a NL-Ex or LOLA-Ex agent against NL-Ex, LOLA-Ex, and a 2nd-order LOLA agent. We compare the normalised discounted return of each agent in all settings and address the question of whether there is an arms race to incorporate ever higher orders of LOLA correction terms. 
+
+Table~\ref{tab:higherorder} shows that a LOLA-Ex learner can achieve higher payouts against NL-Ex. Thus, there is an incentive for either agent to switch from naive learning to first order LOLA. Furthermore, two LOLA-Ex agents playing against each other both receive higher normalised discounted reward than a LOLA-Ex agent playing against a NL-Ex. This makes LOLA a dominant learning rule in the IPD compared to naive learning. 
+We further find that 2nd-order LOLA provides no incremental gains when playing against a LOLA-Ex agent, leading to a reduction in payouts for both agents. These experiments were carried out with a $\delta$ of 0.5. While it is beyond the scope of this work to prove that LOLA vs LOLA is a dominant learning rule in the space of gradient-based rules, these initial results are encouraging.
+
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{c|c|c|c}
+\hline
+ & NL-Ex & LOLA-Ex & 2nd-Order \\
+\hline
+NL-Ex & (-1.99, -1.99) & (-1.54, -1.28) & (-1.46, -1.46) \\
+\hline
+LOLA-Ex & (-1.28, -1.54) & (-1.04, -1.04) & (-1.14, -1.17) \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Higher-order LOLA results on the IPD. A LOLA-Ex agent obtains higher normalised return compared to a NL-Ex agent. However in this setting there is no incremental gain from using higher-order LOLA in order to exploit another LOLA agent in the IPD. In fact both agents do worse with the 2nd order LOLA (incl. 3rd order corrections).}
+\label{tab:higherorder}
+\end{table}
+ 	\vspace{-6ex}
+
+
+
+

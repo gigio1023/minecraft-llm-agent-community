@@ -1,0 +1,87 @@
+\section{Polynomaly}
+
+\subsection{Benchmark Statistics}
+\label{app:benchmark_statistics}
+See Table~\ref{tab:bench-stats} for Polynomaly's statistics. 
+\begin{table*}[tbp]
+\makebox[\textwidth][c]{
+    \begin{tabular}{ccccc}
+\toprule
+Env. - Misspecification    &  \# Policies & \# Problematic & Rollout length  & Trusted policy size \\ \midrule
+\trafficm~- misweighting  & $10$ & $7$ & $270$ &  $[96, 96]$\\
+\trafficm~- scope & $16$ & $9$ & $270$ & $[16, 16]$ \\
+\trafficm~- ontological  & $23$ & $7$ & $270$ & $[4]$ \\
+\trafficb~- misweighting & $12$ & $9$ & $270$ & $[64, 64]$\\
+COVID - ontological &  $13$& $6$& $200$ & $[16, 16]$ \\
+\bottomrule
+\end{tabular}%
+}
+
+\caption{Benchmark statistics. We average over 5 rollouts in traffic and 32 rollouts in COVID.}
+\label{tab:bench-stats}%
+\end{table*}%
+
+\subsection{Receiver Operating Characteristic Curves} \label{app:roc}
+We plot the ROC curves for the detectors described in Section~\ref{subsec:baseline_detector}. Our detectors are calculated as follows.
+
+Let $P$ and $Q$ represent two probability distributions with $M = \frac{1}{2}(P + Q)$. Then the Jensen-Shannon divergence and the Hellinger distance between them is given by \begin{equation}\begin{aligned}\label{eqn:distance_metrics} \text{JSD}(P\vert\vert Q) \coloneqq \frac{1}{2} \text{KL}(P\vert\vert M) + \frac{1}{2}\text{KL}(Q \vert\vert M) \\ \text{Hellinger}(P, Q) \coloneqq \frac{1}{2} \int \left( \sqrt{dP} - \sqrt{dQ}\right)^2.
+\end{aligned}\end{equation}
+
+Our proposed detectors estimate the distance $\mathcal{D}(\pi_\text{trusted}, \pi_\text{unknown})$ between the trusted policy $\pi_\text{trusted}$ and unknown policy $\pi_\text{unknown}$ as follows: We generate $r$ rollouts of $\pi_\text{unknown}$, where $r = 5$ in the traffic environment and $r = 32$ in the COVID environment. Every $s$ steps of a rollout, where $s=10$ in the traffic environment and $s=1$ in the COVID environment, we set $P$ to be the action distribution of $\pi_\text{unknown}$ given the unknown agent's state at that timestep in the rollout and $Q$ to be the action distribution of $\pi_\text{trusted}$ given the unknown agent's state at that timestep in the rollout. Intuitively, if $P$ and $Q$ are far apart, then the trusted agent would have performed a different action than the unknown agent at that given timestep, indicating a possible case of reward hacking. We then compute either $\text{JSD}(P\|Q)$ or $\text{Hellinger}(P, Q)$ following Equation~\eqref{eqn:distance_metrics}. These distances are collected every $s$ steps over the entire rollout, and we calculate metrics on these distances (range, mean, etc.) to assign an anomaly score to the untrusted policy. %The baseline detection procedures are based on selecting a threshold on these metrics and labeling any policy above the chosen threshold to be an outlier. 
+
+
+\begin{figure}[htbp]
+\centering
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/accel_meanJS.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/accel_meanH.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/accel_rangeH.eps}}%
+\hfill
+\caption{ROC curves for \trafficm~- misweighting.}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/space_meanJS.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/space_meanH.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/space_rangeH.eps}}%
+\hfill
+\caption{ROC curves for \trafficm~- scope.}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/bus_meanJS.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/bus_meanH.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/bus_rangeH.eps}}%
+\hfill
+\caption{ROC curves for \trafficm~- ontological.}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/bottle_meanJS.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/bottle_meanH.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/bottle_rangeH.eps}}%
+\hfill
+\caption{ROC curves for \trafficb~- misweighting.}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/pandemic_meanJS.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/pandemic_meanH.eps}}%
+\hfill
+\subfloat[] {\includegraphics[scale=0.56]{figures/roc/pandemic_rangeH.eps}}%
+\hfill
+\caption{ROC curves for COVID - ontological.}
+\end{figure}
+

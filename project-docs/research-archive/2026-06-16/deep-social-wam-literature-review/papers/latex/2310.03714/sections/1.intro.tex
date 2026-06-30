@@ -1,0 +1,58 @@
+\section{Introduction}
+
+
+Language models (LMs) are enabling researchers to build NLP systems at higher levels of abstraction and with lower data requirements than ever before \citep{bommasani2021opportunities}. This is fueling an exploding space of ``prompting'' techniques---and lightweight finetuning techniques---for \textit{adapting} LMs to new tasks \citep{kojima2022large}, eliciting systematic \textit{reasoning} from them \citep{wei2022chain,wang2022self}, and \textit{augmenting} them with retrieved sources \citep{guu2020realm,lazaridou2022internet,khattab2022demonstrate} or with tools \citep{yao2022react,schick2023toolformer}. Most of these techniques are explored in isolation, but interest has been growing in building multi-stage \textit{pipelines} and \textit{agents} that decompose complex tasks into more manageable calls to LMs in an effort to improve performance \citep{qi2019answering,khattab2021baleen,karpas2022mrkl,dohan2022language,khot2022decomposed,khattab2022demonstrate,chen2022program,pourreza2023din,shinn2023reflexion}. 
+
+
+
+Unfortunately, LMs are known to be sensitive to how they are prompted for each task%
+, and this is exacerbated in pipelines where multiple LM calls have to \textit{interact} effectively. As a result, the LM calls in existing LM pipelines and in popular developer frameworks are generally implemented using hard-coded `prompt templates', that is, long strings of instructions and demonstrations that are hand crafted through manual trial and error. We argue that this approach, while pervasive, can be brittle and unscalable---conceptually akin to hand-tuning the weights for a classifier. A given string prompt might not generalize to different pipelines or across different LMs, data domains, or even inputs.
+
+
+
+
+
+
+
+Toward a more systematic approach to designing AI pipelines, 
+we introduce the \textbf{DSPy} programming model.%
+\footnote{DSPy is pronounced \emph{dee-ess-pie}. It's the second iteration of our earlier Demonstrate–Search–Predict framework (DSP; \citealt{khattab2022demonstrate}).
+This paper introduces the key concepts in DSPy.
+For more extensive and up-to-date documentation of the framework, we refer readers to \url{https://github.com/stanfordnlp/dspy}.
+}
+DSPy pushes building new LM pipelines away from manipulating free-form strings and closer to \textit{programming} (composing modular operators to build text transformation graphs) where a compiler automatically generates optimized LM invocation strategies and prompts from a program. We draw inspiration from the consensus that emerged around neural network abstractions \citep{bergstra2013making}, where (1) many general-purpose layers can be modularly \textit{composed} in any complex architecture and (2) the model weights can be \textit{trained} using optimizers instead of being hand-tuned.
+
+To this end, we propose the \textbf{DSPy programming model} (Sec~\ref{sec:dspy_programming_model}). We first translate string-based prompting techniques, including complex and task-dependent ones like Chain of Thought \citep{wei2022chain} and ReAct \citep{yao2022react}, into declarative modules that carry \textit{natural-language typed signatures}. DSPy modules are task-adaptive components---akin to neural network layers---that abstract any particular text transformation, like answering a question or summarizing a paper. We then parameterize each module so that it can \textit{learn} its desired behavior by iteratively bootstrapping useful demonstrations within the pipeline. Inspired directly by PyTorch abstractions~\citep{pytorch2019}, DSPy modules are used via expressive \textit{define-by-run} computational graphs. Pipelines are expressed by (1) declaring the modules needed and (2) using these modules in any logical control flow (e.g., \texttt{if} statements, \texttt{for} loops, exceptions, etc.)\ to logically connect the modules.
+
+
+We then develop the \textbf{DSPy compiler} (Sec~\ref{sec:compiler}), which optimizes any DSPy program to improve quality or cost. The compiler inputs are the program, a few training inputs with optional labels, and a validation metric. The compiler simulates versions of the program on the inputs and \textit{bootstraps} example traces of each module for self-improvement, using them to construct effective few-shot prompts or finetuning small LMs for steps of the pipeline. Optimization in DSPy is highly modular: it is conducted by \textit{teleprompters},\footnote{We derive the name \textit{tele-}prompters from the notion of abstracting and automating the task of prompting, in particular, such that it happens \textit{at a distance}, without manual intervention.} which are general-purpose optimization strategies that determine how the modules should learn from data. In this way, the compiler automatically maps the declarative modules to \textit{high-quality} compositions of prompting, finetuning, reasoning, and augmentation. 
+
+
+
+
+
+
+
+
+Programming models like DSPy could be assessed along many dimensions, %
+but %
+we focus on %
+the role of expert-crafted prompts in shaping system performance.
+We are seeking to reduce or even remove their role through DSPy modules (e.g., versions of popular techniques like Chain of Thought) and teleprompters.
+We report on two expansive case studies: math word problems (GMS8K; \citealt{cobbe2021training}) and multi-hop question answering (HotPotQA; \citealt{yang2018hotpotqa}) with explorations of chain of thought, multi-chain reflection, multi-hop retrieval, retrieval-augmented question answering, and agent loops. Our evaluations use a number of different compiling strategies effectively and show that straightforward DSPy programs outperform systems using hand-crafted prompts, while also allowing our programs to use much smaller and hence more efficient LMs effectively.
+
+
+
+
+Overall, this work proposes the first programming model that translates prompting techniques into parameterized declarative modules and introduces an effective compiler with general optimization strategies (teleprompters) to optimize arbitrary pipelines of these modules. Our main contributions are empirical and algorithmic: with DSPy, we have found that we can implement very short programs that can bootstrap self-improving multi-stage NLP systems using LMs as small as \llamaThirteenChat{} and \texttt{T5-Large} (770M parameters). Without hand-crafted prompts and within minutes to tens of minutes of compiling, compositions of DSPy modules can raise the quality of simple programs from 33\% to 82\% (Sec \ref{sec:mw}) and from 32\% to 46\% (Sec \ref{sec:qa}) for \gptThreeFive{} and, similarly, from 9\% to 47\% (Sec \ref{sec:mw}) and from 22\% to 41\% (Sec \ref{sec:qa}) for \llamaThirteenChat{}.
+
+
+
+
+
+
+
+
+
+
+

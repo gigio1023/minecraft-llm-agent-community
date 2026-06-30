@@ -226,7 +226,7 @@ Implementation checkpoint, 2026-06-03:
   11 provider calls and 60,414 total tokens, with projected day usage at about
   1.14M/9M tokens. It showed a materially better loop:
   `collectLogs -> craftPlanksAndSticks -> craftCraftingTable ->
-  placeCraftingTable`, with 7/8 cycles classified as verified progress and no
+  placeCraftingTable`, with 7/8 cycles classified as checked progress and no
   no-target `say:unavailable` attempts. This is `PARTIAL/PASS` for bounded
   single-actor competence and `FAIL` for social-plausibility proof, because no
   visible actor, request, relationship, or shared-storage interaction was in
@@ -703,7 +703,7 @@ Episode reviews should use these labels:
   selected PlanBeads, social pressure, or recorded branch reason;
 - `provider-repeat`: provider repeats blocked target and args;
 - `retry-gate-gap`: repeated blocker is not converted into a pre-execution gate;
-- `state-consolidation-gap`: verified progress does not update episode or
+- `state-consolidation-gap`: checked progress does not update episode or
   actor state;
 - `social-surface-gap`: no visible social signal despite social-simulation
   claims;

@@ -1,0 +1,938 @@
+\documentclass{article}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{iclr2024_conference,times}
+
+\input{math_commands.tex}
+
+\usepackage[colorlinks]{hyperref}
+\hypersetup{
+ colorlinks=True,
+ linkcolor=nhred,
+ citecolor=gray,
+ urlcolor=nhred}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{enumitem}
+\usepackage{colortbl}
+\usepackage{algorithm}
+\usepackage[noend]{algorithmic}
+\usepackage[normalem]{ulem}
+\usepackage[format=plain,
+            labelfont=it,
+            labelsep=period]{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{bbding}
+\usepackage{fancyvrb}
+\usepackage{titletoc}
+\usepackage{listings}
+\definecolor{codegreen}{rgb}{0,0.5,0}
+\definecolor{codered}{rgb}{0.7,0.1,0.1}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{1,1,1}
+\lstdefinestyle{python}{
+    language=Python,
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codered}\textit,
+    keywordstyle=\bfseries\color{codegreen},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\scriptsize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=4pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=1,
+    fancyvrb=true
+}
+\lstset{style=python}
+\newenvironment{codesnippet}
+  { \VerbatimEnvironment%
+    \begin{Verbatim} }
+  { \end{Verbatim}  }
+\definecolor{nhred}{HTML}{D62727}
+\definecolor{nhteal}{HTML}{66C2A4}
+\definecolor{rev}{HTML}{59A14F}
+\definecolor{cella}{rgb}{1.0, 0.92, 0.92}
+\newcommand{\colorcella}{\cellcolor{cella}}
+
+\vspace{-0.075in}
+\title{TD-MPC\textbf{\color{nhred}2}:\\Scalable, Robust World Models for Continuous Control}
+\vspace{-0.1in}
+\author{Nicklas Hansen\textcolor{gray}{${}^{\star}$},\hspace*{7pt}Hao Su\textcolor{gray}{${}^{\star\dagger}$},\hspace*{7pt}Xiaolong Wang\textcolor{gray}{${}^{\star\dagger}$}\\
+\textcolor{gray}{${}^{\star}$}University of California San Diego,\hspace*{7pt}\textcolor{gray}{${}^{\dagger}$}Equal advising\\
+{\footnotesize\texttt{\{nihansen,haosu,xiw012\}@ucsd.edu}}
+}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy
+\begin{document}
+
+\maketitle
+
+\begin{figure}[h]
+    \centering
+    \vspace{-0.275in}
+    $\textcolor{nhred}{\underline{\textsf{\textbf{Multi-task}}}}$~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~$\textcolor{nhred}{\underline{\smash{\textsf{\textbf{Single}}\textsf{\textbf{-}}\textsf{\textbf{task}}}}}$~~~~~~~~~~\\ \vspace{0.05in}
+    \includegraphics[width=0.39\textwidth]{figures/multitask.pdf}
+    \includegraphics[width=0.6\textwidth]{figures/singletask_barplot_6.pdf}
+    \vspace{-0.25in}
+    \caption{\textbf{Overview.} TD-MPC\textbf{2} compares favorably to existing model-free and model-based RL methods across $\mathbf{104}$ continuous control tasks spanning multiple domains, with a \emph{single} set of hyperparameters (\emph{right}). We further demonstrate the scalability of TD-MPC\textbf{2} by training a single $317$M parameter agent to perform $\mathbf{80}$ tasks across multiple domains, embodiments, and action spaces (\emph{left}).}
+    \label{fig:multitask}
+    \vspace{0.075in}
+\end{figure}
+
+\begin{abstract}
+TD-MPC is a model-based reinforcement learning (RL) algorithm that performs local trajectory optimization in the latent space of a learned implicit (decoder-free) world model. In this work, we present TD-MPC\textbf{2}: a series of improvements upon the TD-MPC algorithm. We demonstrate that TD-MPC\textbf{2} improves significantly over baselines across $\mathbf{104}$ online RL tasks spanning 4 diverse task domains, achieving consistently strong results with a single set of hyperparameters. We further show that agent capabilities increase with model and data size, and successfully train a single $317$M parameter agent to perform $\mathbf{80}$ tasks across multiple task domains, embodiments, and action spaces. We conclude with an account of lessons, opportunities, and risks associated with large TD-MPC\textbf{2} agents.
+\end{abstract}
+
+\begin{center}
+    \vspace{-0.125in}
+    \textbf{Explore videos, models, data, code, and more at \url{https://tdmpc2.com}}
+    \vspace{0.05in}
+\end{center}
+
+\section{Introduction}
+\label{sec:introduction}
+\vspace{-0.05in}
+Training large models on internet-scale datasets has led to generalist models that perform a wide variety of language and vision tasks \citep{Brown2020LanguageMA,he2022masked,kirillov2023segany}. The success of these models can largely be attributed to the availability of enormous datasets, and carefully designed architectures that reliably scale with model and data size. While researchers have recently extended this paradigm to robotics \citep{reed2022generalist,brohan2023rt}, a generalist embodied agent that learns to perform diverse control tasks via low-level actions, across multiple embodiments, from large uncurated (\emph{i.e.}, mixed-quality) datasets remains an elusive goal. We argue that current approaches to generalist embodied agents suffer from \emph{(a)} the assumption of near-expert trajectories for behavior cloning which severely limits the amount of available data \citep{reed2022generalist,lee2022multi,kumar2022should,schubert2023generalist,driess2023palm,brohan2023rt}, and \emph{(b)} a lack of scalable continuous control algorithms that are able to consume large uncurated datasets.
+
+Reinforcement Learning (RL) is an ideal framework for extracting expert behavior from uncurated datasets. However, most existing RL algorithms \citep{Lillicrap2016ContinuousCW, Haarnoja2018SoftAA} are designed for single-task learning and rely on per-task hyperparameters, with no principled method for selecting those hyperparameters \citep{zhang2021importance}. An algorithm that can consume large multi-task datasets will invariably need to be robust to variation between different tasks (\emph{e.g.}, action space dimensionality, difficulty of exploration, and reward distribution). In this work, we present TD-MPC\textbf{2}: a significant step towards achieving this goal. TD-MPC\textbf{2} is a model-based RL algorithm designed for learning generalist world models on large uncurated datasets composed of multiple task domains, embodiments, and action spaces, with data sourced from behavior policies that cover a wide range of skill levels, and without the need for hyperparameter-tuning.
+
+Our algorithm, which builds upon TD-MPC \citep{Hansen2022tdmpc}, performs local trajectory optimization in the latent space of a learned implicit (decoder-free) world model. While the TD-MPC family of algorithms has demonstrated strong empirical performance in prior work \citep{Hansen2022tdmpc, hansen2022modem, yuan2022euclid, yang2023movie, Feng2023Finetuning, chitnis2023iql, zhu2023repo, lancaster2023modemv2}, most successes have been limited to single-task learning with little emphasis on scaling. As shown in Figure~\ref{fig:multitask}, naïvely increasing model and data size of TD-MPC often leads to a net \emph{decrease} in agent performance, as is commonly observed in RL literature \citep{kumar2022offline}. In contrast, scaling TD-MPC\textbf{2} leads to consistently improved capabilities. Our algorithmic contributions, which have been key to achieving this milestone, are two-fold: \emph{(1)} improved algorithmic robustness by revisiting core design choices, and \emph{(2)} careful design of an architecture that can accommodate datasets with multiple embodiments and action spaces without relying on domain knowledge. The resulting algorithm, TD-MPC\textbf{2}, is scalable, robust, and can be applied to a variety of single-task and multi-task continuous control problems using a \emph{single} set of hyperparameters.
+
+\begin{figure}
+    \centering
+    \vspace{-0.225in}
+    \includegraphics[width=0.1175\textwidth]{visualizations/dog-trot.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/humanoid-run.png}~
+    \includegraphics[width=0.1175\textwidth]{visualizations/mw-hammer.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/mw-bin-picking.png}~
+    \includegraphics[width=0.1175\textwidth]{visualizations/pick-ycb-0.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/turn-faucet.png}~
+    \includegraphics[width=0.1175\textwidth]{visualizations/myo-obj-hold.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/myo-key-turn.png} \\ \vspace{-0.015in}
+    \includegraphics[width=0.1175\textwidth]{visualizations/finger-turn-hard.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/quadruped-run.png}~
+    \includegraphics[width=0.1175\textwidth]{visualizations/mw-stick-pull.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/mw-peg-insert-side.png}~
+    \includegraphics[width=0.1175\textwidth]{visualizations/pick-ycb-1.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/stack-cube.png}~
+    \includegraphics[width=0.1175\textwidth]{visualizations/myo-hand-reach.png}%
+    \includegraphics[width=0.1175\textwidth]{visualizations/myo-pen-twirl.png}%
+    \vspace{-0.05in}
+    \caption{\textbf{Tasks.} TD-MPC\textbf{2} performs $\mathbf{104}$ diverse tasks from (left to right) DMControl \citep{deepmindcontrolsuite2018}, Meta-World \citep{yu2019meta}, ManiSkill2 \citep{gu2023maniskill2}, and MyoSuite \citep{MyoSuite2022}, with a \emph{single} set of hyperparameters. See Appendix~\ref{sec:appendix-task-visualizations} for visualization of all tasks.}
+    \label{fig:task-overview}
+    \vspace{-0.15in}
+\end{figure}
+
+We evaluate TD-MPC\textbf{2} across a total of $\mathbf{104}$ diverse continuous control tasks spanning 4 task domains: DMControl \citep{deepmindcontrolsuite2018}, Meta-World \citep{yu2019meta}, ManiSkill2 \citep{gu2023maniskill2}, and MyoSuite \citep{MyoSuite2022}. We summarize our results in Figure~\ref{fig:multitask}, and visualize task domains in Figure~\ref{fig:task-overview}. Tasks include high-dimensional state and action spaces (up to $\mathcal{A} \in \mathbb{R}^{39}$), image observations, sparse rewards, multi-object manipulation, physiologically accurate musculoskeletal motor control, complex locomotion (\emph{e.g.} Dog and Humanoid embodiments), and cover a wide range of task difficulties. Our results demonstrate that TD-MPC\textbf{2} consistently outperforms existing model-based and model-free methods, using the \emph{same} hyperparameters across all tasks (Figure~\ref{fig:multitask}, \emph{right}). Here, ``Locomotion" and ``Pick YCB" are particularly challenging subsets of DMControl and ManiSkill2, respectively. We further show that agent capabilities increase with model and data size, and successfully train a single $317$M parameter world model to perform $\mathbf{80}$ tasks across multiple task domains, embodiments, and action spaces (Figure~\ref{fig:multitask}, \emph{left}). In support of open-source science, \textbf{we publicly release $\mathbf{300}$+ model checkpoints, datasets, and code for training and evaluating TD-MPC\textbf{2} agents, which is available at \url{https://tdmpc2.com}}. We conclude the paper with an account of lessons, opportunities, and risks associated with large TD-MPC\textbf{2} agents.
+
+
+\section{Background}
+\label{sec:background}
+\textbf{Reinforcement Learning} (RL) aims to learn a policy from interaction with an environment, formulated as a Markov Decision Process (MDP) \citep{Bellman1957MDP}. We focus on infinite-horizon MDPs with continuous action spaces, which can be formalized as a tuple $(\mathcal{S}, \mathcal{A}, \mathcal{T}, R, \gamma)$ where $\mathbf{s} \in \mathcal{S}$ are states, $\mathbf{a} \in \mathcal{A}$ are actions, $\mathcal{T \colon \mathcal{S} \times \mathcal{A} \mapsto \mathcal{S}}$ is the transition function, $\mathcal{R} \colon \mathcal{S} \times \mathcal{A} \mapsto \mathbb{R}$ is a reward function associated with a particular task, and $\gamma$ is a discount factor. The goal is to derive a control policy $\pi \colon \mathcal{S} \mapsto \mathcal{A}$ such that the expected discounted sum of rewards (return) $\mathbb{E}_{\pi}\left[ \sum_{t=0}^{\infty} \gamma^{t} r_{t} \right],~r_{t} = R(\mathbf{s}_{t}, \pi(\mathbf{s}_{t}))$ is maximized. In this work, we obtain $\pi$ by learning a \emph{world model} (model of the environment) and then select actions by planning with the learned model.
+
+\textbf{Model Predictive Control} (MPC) is a general framework for model-based control that optimizes action sequences $\mathbf{a}_{t:t+H}$ of finite length such that return is maximized (or cost is minimized) over the time horizon $H$, which corresponds to solving the following optimization problem:
+\begin{equation}
+    \label{eq:mpc}
+    \pi(\mathbf{s}_{t}) = \arg\max_{\mathbf{a}_{t:t+H}} \mathbb{E}\left[ \sum_{i=0}^{H} \gamma^{t+i} R(\mathbf{s}_{t+i}, \mathbf{a}_{t+i}) \right]\,.
+\end{equation}
+The return of a candidate trajectory is estimated by simulating it with the learned model \citep{negenborn2005}. Thus, a policy obtained by Equation~\ref{eq:mpc} will invariably be a (temporally) \emph{locally} optimal policy and is not guaranteed (nor likely) to be a solution to the general reinforcement learning problem outlined above. As we discuss in the following, TD-MPC\textbf{2} addresses this shortcoming of local trajectory optimization by bootstrapping return estimates beyond horizon $H$ with a learned terminal value function.
+
+
+\section{TD-MPC\textcolor{nhred}{\textbf{2}}}
+\label{sec:tdmpc2}
+Our work builds upon TD-MPC \citep{Hansen2022tdmpc}, a model-based RL algorithm that performs local trajectory optimization (planning) in the latent space of a learned implicit world model. TD-MPC\textbf{2} is a practical algorithm for training massively multitask world models. Specifically, we propose a series of improvements to the TD-MPC algorithm, which have been key to achieving strong algorithmic robustness (can use the same hyperparameters across all tasks) and scaling its world model to $\mathbf{300\times}$ more parameters than previously. We introduce the TD-MPC\textbf{2} algorithm in the following, and provide a full list of algorithmic improvements in Appendix~\ref{sec:appendix-tdmpc2-summary}.
+
+\subsection{Learning an Implicit World Model}
+\label{sec:tdmpc2-model}
+\begin{wrapfigure}[19]{r}{0.42\textwidth}
+\vspace*{-0.155in}
+\centering
+\includegraphics[width=0.42\textwidth]{figures/tdmpc2.pdf}
+\vspace{-0.2in}
+\caption{\textbf{The TD-MPC\textcolor{nhred}{2} architecture.} Observations $\mathbf{s}$ are encoded into their (normalized) latent representation $\mathbf{z}$. The model then recurrently predicts actions $\hat{\mathbf{a}}$, rewards $\hat{r}$, and terminal values $\hat{q}$, \emph{without} decoding future observations.}
+\label{fig:tdmpc2-architecture}
+\end{wrapfigure}
+Learning a generative model of the environment using a reconstruction (decoder) objective is tempting due to its rich learning signal. However, accurately predicting raw future observations (\emph{e.g.}, images or proprioceptive features) over long time horizons is a difficult problem, and does not necessarily lead to effective control \citep{lambert2020objective}. Rather than explicitly modeling dynamics using reconstruction, TD-MPC\textbf{2} aims to learn a \emph{maximally useful} model: a model that accurately predicts \emph{outcomes} (returns) conditioned on a sequence of actions. Specifically, TD-MPC\textbf{2} learns an \emph{implicit}, control-centric world model from environment interaction using a combination of joint-embedding prediction \citep{Grill2020BootstrapYO}, reward prediction, and TD-learning \citep{Sutton1988LearningTP}, \emph{without} decoding observations. We argue that this alternative formulation of model-based RL is key to modeling large datasets with modest model sizes. The world model can subsequently be used for decision-making by performing local trajectory optimization (planning) following the MPC framework.
+
+\textbf{Components.} The TD-MPC\textbf{2} architecture is shown in Figure~\ref{fig:tdmpc2-architecture} and consists of five components:
+\begin{equation}
+    \label{eq:tdmpc-components}
+    \begin{array}{lll}
+        \text{Encoder} & \mathbf{z} = h(\mathbf{s}, \mathbf{e}) & \color{gray}{\vartriangleright\text{Maps observations to their latent representations}}\\
+        \text{Latent dynamics} & \mathbf{z}' = d(\mathbf{z}, \mathbf{a}, \mathbf{e}) & \color{gray}{\vartriangleright\text{Models (latent) forward dynamics}}\\
+        \text{Reward} & \hat{r} = R(\mathbf{z}, \mathbf{a}, \mathbf{e}) & \color{gray}{\vartriangleright\text{Predicts reward $r$ of a transition}}\\
+        \text{Terminal value} & \hat{q} = Q(\mathbf{z}, \mathbf{a}, \mathbf{e}) & \color{gray}{\vartriangleright\text{Predicts discounted sum of rewards (return)}}\\
+        \text{Policy prior} & \hat{\mathbf{a}} = p(\mathbf{z}, \mathbf{e}) & \color{gray}{\vartriangleright\text{Predicts action $\mathbf{a}^{*}$ that maximizes $Q$}}
+    \end{array}
+\end{equation}
+where $\mathbf{s}$ and $\mathbf{a}$ are states and actions, $\mathbf{z}$ is the latent representation, and $\mathbf{e}$ is a learnable task embedding for use in multitask world models. For visual clarity, we will omit $\mathbf{e}$ in the following unless it is particularly relevant. The policy prior $p$ serves to guide the sample-based trajectory optimizer (planner), and to reduce the computational cost of TD-learning. During online interaction, TD-MPC\textbf{2} maintains a replay buffer $\mathcal{B}$ with trajectories, and iteratively \emph{(i)} updates the world model using data sampled from $\mathcal{B}$, and \emph{(ii)} collects new environment data by planning with the learned model.
+
+\textbf{Model objective.} The $h,d,R,Q$ components are jointly optimized to minimize the objective
+\begin{equation}
+    \label{eq:model-objective}
+    \mathcal{L}\left(\theta\right) \doteq \mathop{\mathbb{E}}_{\left(\mathbf{s}, \mathbf{a}, r, \mathbf{s}'\right)_{0:H} \sim \mathcal{B}} \left[ \sum_{t=0}^{H} \lambda^{t} \left( \mathcolor{nhred}{\underbrace{\mathcolor{black}{\|\ \mathbf{z}_{t}' - \operatorname{sg}(h(\mathbf{s}_{t}')) \|^{2}_{2}}}_{\text{Joint-embedding prediction}}} + \mathcolor{nhred}{\underbrace{\mathcolor{black}{\operatorname{CE}(\hat{r}_{t}, r_{t})}}_{\text{Reward prediction}}} + \mathcolor{nhred}{\underbrace{\mathcolor{black}{\operatorname{CE}(\hat{q}_{t}, q_{t})}}_{\text{Value prediction}}} \right) \right]\,,
+\end{equation}
+where $\operatorname{sg}$ is the \texttt{stop-grad} operator, $(\mathbf{z}_{t}',\hat{r}_{t},\hat{q}_{t})$ are defined in Equation \ref{eq:tdmpc-components}, $q_{t} \doteq r_{t} + \gamma \Bar{Q}(\mathbf{z}_{t}', p(\mathbf{z}_{t}'))$ is the TD-target at step $t$, $\lambda \in (0,1]$ is a constant coefficient that weighs temporally farther time steps less, and $\operatorname{CE}$ is the cross-entropy. $\Bar{Q}$ used to compute the TD-target is an exponential moving average (EMA) of $Q$ \citep{Lillicrap2016ContinuousCW}. As the magnitude of rewards may differ drastically between tasks, TD-MPC\textbf{2} formulates reward and value prediction as a discrete regression (multi-class classification) problem in a $\log$-transformed space, which is optimized by minimizing cross-entropy with $r_{t},q_{t}$ as soft targets \citep{bellemare2017distributional, kumar2022offline, hafner2023dreamerv3}.
+
+\textbf{Policy objective.} The policy prior $p$ is a stochastic maximum entropy \citep{ziebart2008maximum, Haarnoja2018SoftAA} policy that learns to maximize the objective
+\begin{equation}
+    \label{eq:policy-objective}
+    \mathcal{L}_{p}(\theta) \doteq \mathop{\mathbb{E}}_{(\mathbf{s}, \mathbf{a})_{0:H} \sim \mathcal{B}} \left[ \sum_{t=0}^{H} \lambda^{t} \left[ \alpha Q(\mathbf{z}_{t}, p(\mathbf{z}_{t})) - \beta \mathcal{H}(p(\cdot | \mathbf{z}_{t})) \right] \right],~\mathbf{z}_{t+1} = d(\mathbf{\mathbf{z}_{t},\mathbf{a}_{t}}),~\mathbf{z}_{0} = h(\mathbf{s}_{0})\,,
+\end{equation}
+where $\mathcal{H}$ is the entropy of $p$ which can be computed in closed form. Gradients of $\mathcal{L}_{p}(\theta)$ are taken wrt. $p$ only. As magnitude of the value estimate $Q(\mathbf{z}_{t}, p(\mathbf{z}_{t}))$ and entropy $\mathcal{H}$ can vary greatly between datasets and different stages of training, it is necessary to balance the two losses to prevent premature entropy collapse \citep{yarats2021drqv2}. A common choice for automatically tuning $\alpha,\beta$ is to keep one of them constant, and adjusting the other based on an entropy target \citep{Haarnoja2018SoftAA} or moving statistics \citep{hafner2023dreamerv3}. In practice, we opt for tuning $\alpha$ via moving statistics, but empirically did not observe any significant difference in results between these two options.
+
+\textbf{Architecture.} All components of TD-MPC\textbf{2} are implemented as MLPs with intermediate linear layers followed by LayerNorm \citep{Ba2016LayerN} and Mish \citep{Misra2019MishAS} activations. To mitigate exploding gradients, we normalize the latent representation by projecting $\mathbf{z}$ into $L$ fixed-dimensional simplices using a softmax operation \citep{Lavoie2022SimplicialEI}. A key benefit of embedding $\mathbf{z}$ as simplices (as opposed to \emph{e.g.} a discrete representation or squashing) is that it naturally biases the representation towards sparsity without enforcing hard constraints (see Appendix~\ref{sec:appendix-implementation-details} for motivation and implementation). We dub this normalization scheme \emph{SimNorm}. Let $V$ be the dimensionality of each simplex $\mathbf{g}$ constructed from $L$ partitions (groups) of $\mathbf{z}$. SimNorm then applies the following transformation:
+\begin{equation}
+    \label{eq:simnorm}
+    \mathbf{z}^{\circ} \doteq \left[ \mathbf{g}_{i}, \dots, \mathbf{g}_{L} \right],~ \mathbf{g}_{i} = \frac{e^{\mathbf{z}_{i:i+V}/\tau}}{\sum_{j=1}^{V} e^{\mathbf{z}_{i:i+V}/\tau}}\,,
+\end{equation}
+where $\mathbf{z}^{\circ}$ is the simplicial embedding of $\mathbf{z}$, $\left[ \cdot \right]$ denotes concatenation, and $\tau > 0$ is a temperature parameter that modulates the ``sparsity" of the representation. As we will demonstrate in our experiments, SimNorm is essential to the training stability of TD-MPC\textbf{2}. Finally, to reduce bias in TD-targets generated by $\Bar{Q}$, we learn an \emph{ensemble} of $Q$-functions using the objective from Equation~\ref{eq:model-objective} and maintain $\Bar{Q}$ as an EMA of each $Q$-function. We use $5$ $Q$-functions in practice. Targets are then computed as the minimum of two randomly sub-sampled $\Bar{Q}$-functions \citep{chen2021randomized}.
+
+\subsection{Model Predictive Control with a Policy Prior}
+\label{sec:tdmpc2-planning}
+TD-MPC\textbf{2} derives its closed-loop control policy by planning with the learned world model. Specifically, our approach leverages the MPC framework for local trajectory optimization using Model Predictive Path Integral (MPPI) \citep{Williams2015ModelPP} as a derivative-free optimizer with sampled action sequences $(\mathbf{a}_{t}, \mathbf{a}_{t+1}, \dots, \mathbf{a}_{t+H})$ of length $H$ evaluated by rolling out \emph{latent} trajectories with the model. At each decision step, we estimate parameters $\mu^*,\sigma^*$ of a time-dependent multivariate Gaussian with diagonal covariance such that expected return is maximized, \emph{i.e.},
+\begin{equation}
+    \label{eq:mppi}
+    \mu^*,\sigma^* = \arg\max_{(\mu,\sigma)} \mathop{\mathbb{E}}_{(\mathbf{a}_{t}, \mathbf{a}_{t+1}, \dots, \mathbf{a}_{t+H})\sim \mathcal{N}(\mu,\sigma^{2})}\left[ \gamma^{H} Q(\mathbf{z}_{t+H}, \mathbf{a}_{t+H}) + \sum_{h=t}^{H-1} \gamma^{h} R(\mathbf{z}_{h}, \mathbf{a}_{h}) \right]\,,
+\end{equation}
+where $\mu,\sigma \in \mathbb{R}^{H\times m},~\mathcal{A} \in \mathbb{R}^{m}$. Equation~\ref{eq:mppi} is solved by iteratively sampling action sequences from $\mathcal{N}(\mu,\sigma^{2})$, evaluating their expected return, and updating $\mu,\sigma$ based on a weighted average. Notably, Equation~\ref{eq:mppi} estimates the full RL objective introduced in Section~\ref{sec:background} by bootstrapping with the learned terminal value function beyond horizon $H$. TD-MPC\textbf{2} repeats this iterative planning process for a fixed number of iterations and executes the first action $\mathbf{a}_{t} \sim \mathcal{N}(\mu^{*}_{t}, \sigma^{*}_{t})$ in the environment. To accelerate convergence of planning, a fraction of action sequences originate from the policy prior $p$, and we warm-start planning by initializing $(\mu,\sigma)$ as the solution to the previous decision step shifted by $1$. Refer to \citet{Hansen2022tdmpc} for more details about the planning procedure.
+
+\subsection{Training Generalist TD-MPC\textcolor{nhred}{\textbf{2}} Agents}
+\label{sec:generalist-agents}
+\vspace{-0.025in}
+The success of TD-MPC\textbf{2} in diverse single-task problems can be attributed to the algorithm outlined above. However, learning a large generalist TD-MPC\textbf{2} agent that performs a variety of tasks across multiple task domains, embodiments, and action spaces poses several unique challenges: \emph{(i)} how to learn and represent task semantics? \emph{(ii)} how to accommodate multiple observation and action spaces without specific domain knowledge? \emph{(iii)} how to leverage the learned model for few-shot learning of new tasks? We describe our approach to multitask model learning in the following.
+
+\textbf{Learnable task embeddings.} To succeed in a multitask setting, an agent needs to learn a common representation that takes advantage of task similarities, while still retaining the ability to differentiate between tasks at test-time. When task or domain knowledge is available, \emph{e.g.} in the form of natural language instructions, the task embedding $\mathbf{e}$ from Equation~\ref{eq:tdmpc-components} may encode such information. However, in the general case where domain knowledge cannot be assumed, we may instead choose to \emph{learn} the task embeddings (and, implicitly, task relations) from data. TD-MPC\textbf{2} conditions all of its five components with a learnable, fixed-dimensional task embedding $\mathbf{e}$, which is jointly trained together with other components of the model. To improve training stability, we constrain the $\ell_{2}$-norm of $\mathbf{e}$ to be $\le 1$; this also leads to more semantically coherent task embeddings in our experiments. When finetuning a multitask TD-MPC\textbf{2} agent to a new task, we can choose to either initialize $\mathbf{e}$ as the embedding of a semantically similar task, or simply as a random vector.
+
+\textbf{Action masking.} TD-MPC\textbf{2} learns to perform tasks with a variety of observation and action spaces, without any domain knowledge. To do so, we zero-pad all model inputs and outputs to their largest respective dimensions, and mask out invalid action dimensions in predictions made by the policy prior $p$ during both training and inference. This ensures that prediction errors in invalid dimensions do not influence TD-target estimation, and prevents $p$ from falsely inflating its entropy for tasks with small action spaces. We similarly only sample actions along valid dimensions during planning.
+
+\begin{figure}
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=0.975\textwidth]{figures/singletask.pdf}
+    \vspace{-0.175in}
+    \caption{\textbf{Single-task RL.} Episode return (DMControl) and success rate (others) as a function of environment steps across $\mathbf{104}$ continuous control tasks spanning 4 diverse task domains. TD-MPC\textbf{2} achieves higher data-efficiency and asymptotic performance than existing methods, while using the \textbf{same} hyperparameters across all tasks. Mean and $95\%$ CIs over 3 seeds.}
+    \label{fig:single-task}
+    \vspace{-0.175in}
+\end{figure}
+
+\vspace{-0.025in}
+\section{Experiments}
+\label{sec:experiments}
+\vspace{-0.025in}
+We evaluate TD-MPC\textbf{2} across a total of $\mathbf{104}$ diverse continuous control tasks spanning 4 task domains: DMControl \citep{deepmindcontrolsuite2018}, Meta-World \citep{yu2019meta}, ManiSkill2 \citep{gu2023maniskill2}, and MyoSuite \citep{MyoSuite2022}. Tasks include high-dimensional state and action spaces (up to $\mathcal{A} \in \mathbb{R}^{39}$), sparse rewards, multi-object manipulation, physiologically accurate musculoskeletal motor control, complex locomotion (\emph{e.g.} Dog and Humanoid embodiments), and cover a wide range of task difficulties. We also include $\mathbf{10}$ DMControl tasks with visual observations. In support of open-source science, \textbf{we publicly release $\mathbf{300}$+ model checkpoints, datasets, and code for training and evaluating TD-MPC\textbf{2} agents, which is available at \url{https://tdmpc2.com}}.
+
+We seek to answer three core research questions through experimentation:
+\begin{itemize}[leftmargin=0.2in]
+    \item \vspace{-0.1in} \textbf{Comparison to existing methods.} How does TD-MPC\textbf{2} compare to state-of-the-art model-free (SAC) and model-based (DreamerV3, TD-MPC) methods for data-efficient continuous control?
+    \item \vspace{-0.04in} \textbf{Scaling.} Do the algorithmic innovations of TD-MPC\textbf{2} lead to improved agent capabilities as model and data size increases? Can a single agent learn to perform diverse skills across multiple task domains, embodiments, and action spaces?
+    \item \vspace{-0.04in} \textbf{Analysis.} How do the specific design choices introduced in TD-MPC\textbf{2} influence downstream task performance? How much does planning contribute to its success? Are the learned task embeddings semantically meaningful? Can large multi-task agents be adapted to unseen tasks?
+\end{itemize}
+
+\textbf{Baselines.} Our primary baselines represent the state-of-the-art in data-efficient RL, and include \emph{(1)} \textbf{Soft Actor-Critic} (SAC) \citep{Haarnoja2018SoftAA}, a model-free actor-critic algorithm based on maximum entropy RL, \emph{(2)} \textbf{DreamerV3} \citep{hafner2023dreamerv3}, a model-based method that optimizes a model-free policy with rollouts from a learned generative model of the environment, and \emph{(3)} the original version of \textbf{TD-MPC} \citep{Hansen2022tdmpc}, a model-based RL algorithm that performs local trajectory optimization (planning) in the latent space of a learned \emph{implicit} (non-generative) world model. Additionally, we also compare against current state-of-the-art visual RL methods \emph{(4)} \textbf{CURL} \citep{srinivas2020curl}, an extension of SAC that uses a contrastive auxiliary objective, and \emph{(5)} \textbf{DrQ-v2}, a model-free RL algorithm that uses data augmentation. SAC and TD-MPC use task-specific hyperparameters, whereas TD-MPC\textbf{2} uses the \textbf{same} hyperparameters across all tasks. Additionally, it is worth noting that both SAC and TD-MPC use a larger batch size of $512$, while $256$ is sufficient for stable learning with TD-MPC\textbf{2}. Similarly, DreamerV3 uses a high update-to-data (UTD) ratio of $512$, whereas TD-MPC\textbf{2} uses a UTD of $1$ by default. We use a $5$M parameter TD-MPC\textbf{2} agent in all experiments (unless stated otherwise). For reference, the DreamerV3 baseline has approx. $20$M learnable parameters. See Appendix \ref{sec:appendix-implementation-details} for more details.
+
+\begin{figure}
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=0.95\textwidth]{figures/dmcontrol_hard.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{High-dimensional locomotion.} Episode return as a function of environment steps in Humanoid ($\mathcal{A} \in \mathbb{R}^{21}$) and Dog ($\mathcal{A} \in \mathbb{R}^{38}$) locomotion tasks from DMControl. SAC and DreamerV3 are prone to numerical instabilities in Dog tasks, and are significantly less data-efficient than TD-MPC\textbf{2} in Humanoid tasks. Mean and $95\%$ CIs over 3 seeds. See Appendix~\ref{sec:appendix-additional-experimental-results} for more tasks.}
+    \label{fig:single-task-dmcontrol-hard}
+    \vspace{-0.1in}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/maniskill.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{Object manipulation.} Success rate ($\%$) as a function of environment steps on $5$ object manipulation tasks from ManiSkill2. \textit{Pick YCB} considers manipulation of all $74$ objects from the YCB \citep{Calli2015YCB} dataset. TD-MPC\textbf{2} excels at hard tasks. Mean and $95\%$ CIs over 3 seeds.}
+    \label{fig:single-task-maniskill}
+    \vspace{-0.15in}
+\end{figure}
+
+\subsection{Results}
+\label{sec:results}
+\textbf{Comparison to existing methods.} We first compare the data-efficiency of TD-MPC\textbf{2} to a set of strong baselines on $\mathbf{104}$ diverse tasks in an online RL setting. Aggregate results are shown in Figure \ref{fig:single-task}. We find that TD-MPC\textbf{2} outperforms prior methods across all task domains. The MyoSuite results are particularly noteworthy, as we did not run \emph{any} TD-MPC\textbf{2} experiments on this benchmark prior to the reported results. Individual task performances on some of the most difficult tasks (high-dimensional locomotion and multi-object manipulation) are shown in Figure~\ref{fig:single-task-dmcontrol-hard} and Figure~\ref{fig:single-task-maniskill}. TD-MPC\textbf{2} outperforms baselines by a large margin on these tasks, despite using the same hyperparameters across all tasks. Notably, TD-MPC sometimes diverges due to exploding gradients, whereas TD-MPC\textbf{2} remains stable. We provide per-task visualization of gradients in Appendix~\ref{sec:appendix-gradient-norm}. Similarly, we observe that DreamerV3 experiences occasional numerical instabilities (\emph{Dog}) and generally struggles with tasks that require fine-grained object manipulation (\emph{lift}, \emph{pick}, \emph{stack}). See Appendix~\ref{sec:appendix-additional-experimental-results} for the full single-task RL results.
+
+\begin{figure}%
+    \vspace*{-0.1in}
+    \centering
+    \includegraphics[height=1.55in]{figures/multitask_score.pdf}%
+    \includegraphics[height=1.55in]{figures/multitask_dmc30_score.pdf}%
+    \includegraphics[width=0.405\textwidth]{figures/task_embeddings.pdf}%
+    \vspace{-0.1in}
+    \caption{\textbf{Massively multi-task world models.} \emph{\textcolor{nhred}{(Left)}} Normalized score as a function of model size on the two 80-task and 30-task datasets. TD-MPC\textbf{2} capabilities scale with model size. \emph{\textcolor{nhred}{(Right)}} T-SNE \citep{vanDerMaaten2008} visualization of task embeddings learned by a TD-MPC\textbf{2} agent trained on 80 tasks from \textcolor{nhteal}{DMControl} and \textcolor{nhred}{Meta-World}. A subset of labels are shown for clarity.}
+    \label{fig:multitask-all}
+    \vspace{-0.2in}
+\end{figure}
+
+\begin{wraptable}[15]{r}{0.35\textwidth}
+    \vspace*{-14pt}
+    \captionof{table}{\textbf{Training cost.} Approximate TD-MPC\textbf{2} training cost on the $80$-task dataset, reported in GPU days on a single NVIDIA GeForce RTX 3090 GPU. We also list the normalized score achieved by each model at end of training.}
+    \label{tab:training-cost}
+    \vspace{-0.095in}
+    \resizebox{0.35\textwidth}{!}{%
+    \begin{tabular}[b]{ccc}
+    \toprule
+    Params (M)  & GPU days & Score  \\ \midrule
+    $1$     & $3.7$    & $16.0$    \\
+    $5$     & $4.2$    & $49.5$    \\
+    $19$    & $5.3$    & $57.1$    \\
+    $48$    & $12$   & $68.0$    \\
+    \colorcella $\mathbf{317}$   & \colorcella$\mathbf{33}$   & \colorcella $\mathbf{70.6}$    \\ \bottomrule
+    \end{tabular}
+    }
+\end{wraptable}
+
+\textbf{Massively multitask world models.} To demonstrate that our proposed improvements facilitate scaling of world models, we evaluate the performance of $5$ multitask models ranging from $1$M to $317$M parameters on a collection of $\mathbf{80}$ diverse tasks that span multiple task domains and vary greatly in objective, embodiment, and action space. Models are trained on a dataset of $545$M transitions obtained from the replay buffers of $240$ single-task TD-MPC\textbf{2} agents, and thus contain a wide variety of behaviors ranging from random to expert policies. The task set consists of all $50$ Meta-World tasks, as well as $30$ DMControl tasks. The DMControl task set includes $19$ original DMControl tasks, as well as $11$ new tasks. For completeness, we include a separate set of scaling results on the $30$-task DMControl subset ($345$M transitions) as well. Due to our careful design of the TD-MPC\textbf{2} algorithm, scaling up is straightforward: to improve rate of convergence we use a $4\times$ larger batch size ($1024$) compared to the single-task experiments, but make no other changes to hyperparameters.
+
+\begin{wrapfigure}[17]{r}{0.27\textwidth}
+\vspace*{-0.15in}
+\centering
+\includegraphics[width=0.27\textwidth]{figures/finetune_avg_barplot.pdf}
+\vspace{-0.3in}
+\caption{\textbf{Finetuning.} Score of a $19$M parameter TD-MPC\textbf{2} agent trained on $70$ tasks and finetuned online to each of $10$ held-out tasks for $20$k environment steps. 3 seeds.}
+\label{fig:finetune_avg}
+\end{wrapfigure}
+
+\textbf{Scaling TD-MPC\textcolor{nhred}{2} to $\mathbf{317}$M parameters.} Our scaling results are shown in Figure~\ref{fig:multitask-all}. To summarize agent performance with a single metric, we produce a normalized score that is an average of all individual task success rates (Meta-World) and episode returns normalized to the $[0, 100]$ range (DMControl). We observe that agent capabilities consistently increase with model size on both task sets. Notably, performance does not appear to have saturated for our largest models ($317$M parameters) on either dataset, and we can thus expect results to continue improving beyond our considered model sizes. We refrain from formulating a scaling law, but note that normalized score appears to scale linearly with the log of model parameters (gray line in Figure~\ref{fig:multitask-all}). We also report approximate training costs in Table~\ref{tab:training-cost}. The $317$M parameter model can be trained with limited computational resources. To better understand why multitask model learning is successful, we explore the task embeddings learned by TD-MPC\textbf{2} (Figure~\ref{fig:multitask-all}, right). Intriguingly, tasks that are semantically similar (\emph{e.g.}, Door Open and Door Close) are close in the learned task embedding space. However, embedding similarity appears to align more closely with task \emph{dynamics} (embodiment, objects) than objective (walk, run). This makes intuitive sense, as dynamics are tightly coupled with control.
+
+\textbf{Few-shot learning.} While our work mainly focuses on the \emph{scaling} and \emph{robustness} of world models, we also explore the efficacy of finetuning pretrained world models for few-shot learning of unseen tasks. Specifically, we pretrain a $19$M parameter TD-MPC\textbf{2} agent on $70$ tasks from DMControl and Meta-World, and naïvely finetune the full model to each of $10$ held-out tasks ($5$ from each domain) via online RL with an initially empty replay buffer and no changes to hyperparameters. Aggregate results are shown in Figure~\ref{fig:finetune_avg}. We find that TD-MPC\textbf{2} improves $\mathbf{2\times}$ over learning from scratch on new tasks in the low-data regime ($20$k environment steps\footnote{$20$k environment steps corresponds to $20$ episodes in DMControl and $100$ episodes in Meta-World.}). Although finetuning world models to new tasks is very much an open research problem, our exploratory results are promising. See Appendix~\ref{sec:appendix-few-shot-results} for experiment details and individual task curves.
+
+\begin{figure}
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_actor.pdf}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_mt80_actor.pdf}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_nonorm.pdf}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_mt80_nonorm.pdf}\\
+    \includegraphics[width=0.22\textwidth]{figures/ablation_regression.pdf}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_mt80_regression.pdf}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_numq.pdf}
+    \includegraphics[width=0.22\textwidth]{figures/ablation_mt80_numq.pdf}
+    \vspace{-0.125in}
+    \caption{\textbf{Ablations.} \textcolor{nhred}{\emph{(Curves)}} Normalized score as a function of environment steps, averaged across three of the most difficult tasks: \emph{Dog Run}, \emph{Humanoid Walk} (DMControl), and \emph{Pick YCB} (ManiSkill2). Mean and $95\%$ CIs over 3 random seeds. \textcolor{nhred}{\emph{(Bars)}} Normalized score of $19$M parameter multitask ($80$ tasks) TD-MPC\textbf{2} agents. Our ablations highlight the relative importance of each design choice; \textbf{\textcolor{nhred}{red}} is the default formulation of TD-MPC\textbf{2}. See Appendix~\ref{sec:appendix-additional-experimental-results} for more ablations.}
+    \label{fig:ablations}
+    \vspace{-0.15in}
+\end{figure}
+
+\textbf{Ablations.} We ablate most of our design choices for TD-MPC\textbf{2}, including choice of actor, various normalization techniques, regression objective, and number of $Q$-functions. Our main ablations, shown in Figure~\ref{fig:ablations}, are conducted on three of the most difficult online RL tasks, as well as large-scale multitask training ($80$ tasks). We observe that all of our proposed improvements contribute meaningfully to the robustness and strong performance of TD-MPC\textbf{2} in both single-task RL and multi-task RL. Interestingly, we find that the relative importance of each design choice is consistent across both settings. Lastly, we also ablate normalization of the learned task embeddings, shown in Appendix~\ref{sec:appendix-additional-ablations}. The results indicate that maintaining a normalized task embedding space ($\ell_{2}$-norm of $1$) is moderately important for stable multitask training, and results in more meaningful task relations.
+
+\begin{figure}
+    \centering
+    \vspace{0.05in}
+    \includegraphics[width=\textwidth]{figures/dmcontrol_vision.pdf}
+    \vspace{-0.3in}
+    \caption{\textbf{Visual RL.} Episode return as a function of environment steps on 10 image-based DMControl tasks. Mean and $95\%$ CIs over 3 random seeds. TD-MPC\textbf{2} is comparable to state-of-the-art.}
+    \label{fig:visual-rl}
+    \vspace{-0.15in}
+\end{figure}
+
+\textbf{Visual RL.} We mainly consider high-dimensional continuous control tasks with proprioceptive state observations in this work. However, TD-MPC\textbf{2} can be readily applied to tasks with other input modalities as well. To demonstrate this, we replace the encoder of TD-MPC\textbf{2} with a shallow convolutional encoder, and benchmark it against current state-of-the-art methods for visual RL on 10 DMControl tasks of varying difficulty. Results are shown in Figure~\ref{fig:visual-rl}. TD-MPC\textbf{2} performs comparably to the two best baselines, DrQ-v2 and DreamerV3, without \emph{any} changes to hyperparameters.
+
+
+\section{Lessons, Opportunities, and Risks}
+\label{sec:lessons}
+\textbf{Lessons.} Historically, RL algorithms have been notoriously sensitive to architecture, hyperparameters, characteristics of the task, and even random seed \citep{Henderson2018Deep}, with no principled method for tuning the algorithms. As a result, successful application of deep RL often requires large teams of experts with significant computational resources \citep{berner2019dota, schrittwieser2020mastering, ouyang2022training}. TD-MPC\textbf{2} -- along with several other contemporary RL methods \citep{yarats2021drqv2, ye2021mastering, hafner2023dreamerv3} -- seek to democratize use of RL (\emph{i.e.}, lowering the barrier of entry for smaller teams of academics, practitioners, and individuals with fewer resources) by improving robustness of existing open-source algorithms. \textbf{We firmly believe that improving algorithmic robustness will continue to have profound impact on the field.} A key lesson from the development of TD-MPC\textbf{2} is that the community has yet to discover an algorithm that truly masters \emph{everything} out-of-the-box. While \emph{e.g.} DreamerV3 \citep{hafner2023dreamerv3} has delivered strong results on challenging tasks with discrete action spaces (such as Atari games and Minecraft), we find that TD-MPC\textbf{2} produces significantly better results on difficult continuous control tasks. At the same time, extending TD-MPC\textbf{2} to discrete action spaces remains an open problem.
+
+\textbf{Opportunities.} Our scaling results demonstrate a path for model-based RL in which massively multitask world models are leveraged as \emph{generalist} world models. While multi-task world models remain relatively underexplored in literature, prior work suggests that the implicit world model of TD-MPC\textbf{2} may be better suited than reconstruction-based approaches for tasks with large visual variation \citep{zhu2023repo}. We envision a future in which implicit world models are used zero-shot to perform diverse tasks on \emph{seen} embodiments \citep{xu2022xtra, yang2023movie}, finetuned to quickly perform tasks on \emph{new} embodiments, and combined with existing vision-language models to perform higher-level cognitive tasks in conjunction with low-level physical interaction. Our results are promising, but such level of generalization will likely require several orders of magnitude more tasks than currently available. Lastly, we want to remark that, while TD-MPC\textbf{2} relies on rewards for task learning, it is useful to adopt a generalized notion of reward as simply a metric for task completion. Such metrics already exist in the wild, \emph{e.g.}, success labels, human preferences or interventions \citep{ouyang2022training}, or the embedding distance between a current observation and a goal \citep{eysenbach2022contrastive, ma2022vip} within a pre-existing learned representation. However, leveraging such rewards for large-scale pretraining is an open problem. To accelerate research in this area, we are releasing $\mathbf{300}$\textbf{+} TD-MPC\textbf{2} models, including 12 multitask models, as well as datasets and code, and we are beyond excited to see what the community will do with these resources.
+
+\textbf{Risks.} While we are excited by the potential of generalist world models, several challenges remain: \emph{(i)} misspecification of task rewards can lead to unintended outcomes \citep{Clark2016Faulty} that may be difficult to anticipate, \emph{(ii)} handing over unconstrained autonomy of physical robots to a learned model can result in catastrophic failures if no additional safety checks are in place \citep{lancaster2023modemv2}, and \emph{(iii)} data for certain applications may be prohibitively expensive for small teams to obtain at the scale required for generalist behavior to emerge, leading to a concentration of power. Mitigating each of these challenges will require new research innovations, and we invite the community to join us in these efforts.
+
+\vspace{-0.05in}
+\section{Related Work}
+\label{sec:related-work}
+\vspace{-0.05in}
+Multiple prior works have sought to build RL algorithms that are robust to hyperparameters, architecture, as well as variation in tasks and data. For example, \emph{(1)} Double $Q$-learning \citep{Hasselt2016DeepRL}, RED-Q \citep{chen2021randomized}, SVEA \citep{hansen2021stabilizing}, and SR-SPR \citep{doro2023sampleefficient} each improve the stability of $Q$-learning algorithms by adjusting the bias-variance trade-off in TD-target estimation, \emph{(2)} C51 \citep{bellemare2017distributional} and DreamerV3 \citep{hafner2023dreamerv3} improve robustness to the magnitude of rewards by performing discrete regression in a transformed space, and \emph{(3)} model-free algorithms DrQ \citep{kostrikov2020image} and DrQ-v2 \citep{yarats2021drqv2} improve training stability and exploration, respectively, through use of data augmentation and several other minor but important implementation details. However, all of the aforementioned works strictly focus on improving data-efficiency and robustness in single-task online RL.
+
+Existing literature that studies scaling of neural architectures for decision-making typically assume access to large datasets of near-expert demonstrations for behavior cloning \citep{reed2022generalist,lee2022multi,kumar2022should,schubert2023generalist,driess2023palm,brohan2023rt}. Gato \citep{reed2022generalist} learns to perform tasks across multiple domains by training a large Transformer-based sequence model \citep{vaswani2017attention} on an enormous dataset of expert demonstrations, and RT-1 \citep{brohan2023rt} similarly learns a sequence model for object manipulation on a single (real) robot embodiment by training on a large dataset collected by human teleoperation. While the empirical results of this line of work are impressive, the assumption of large demonstration datasets is impractical. Additionally, current sequence models rely on discretization of the action space (tokenization), which makes scaling to high-dimensional continuous control tasks difficult.
+
+Most recently, researchers have explored scaling of RL algorithms as a solution to the aforementioned challenges \citep{baker2022video, jia2022improving, xu2022xtra, kumar2022offline, hafner2023dreamerv3}. For example, VPT \citep{baker2022video} learns to play Minecraft by first pretraining a behavior cloning policy on a large human play dataset, and then finetuning the policy with RL. GSL \citep{jia2022improving} requires no pre-existing data. Instead, GSL iteratively trains a population of ``specialist" agents on individual task variations, distills them into a ``generalist" policy via behavior cloning, and then uses the generalist as initialization for the next population of specialists. However, this work considers strictly single-task RL and assumes full control over the initial state in each episode. Lastly, DreamerV3 \citep{hafner2023dreamerv3} successfully scales its world model in terms of parameters and shows that larger models generally are more data-efficient in an online RL setting, but does not consider multitask RL.
+
+\section*{Acknowledgements}
+This project was supported, in part, by grants from NSF CAREER Award (2240160), NSF TILOS AI Institute (2112665), NSF CCF-2112665 (TILOS), NSF 1730158 CI-New: Cognitive Hardware and Software Ecosystem Community Infrastructure (CHASE-CI), NSF ACI-1541349 CC*DNI Pacific Research Platform, and gifts from Qualcomm.
+
+
+\bibliography{iclr2024_conference}
+\bibliographystyle{iclr2024_conference}
+
+\clearpage
+\newpage
+
+\appendix
+\section*{Appendices}
+\startcontents[appendices]
+\printcontents[appendices]{l}{0}{\setcounter{tocdepth}{1}}
+\newpage
+
+
+\section{Summary of Improvements}
+\label{sec:appendix-tdmpc2-summary}
+
+We summarize the main differences between TD-MPC and TD-MPC\textbf{2} as follows:
+\begin{itemize}
+    \item \textbf{Architectural design.} All components of TD-MPC\textbf{2} are MLPs with LayerNorm \citep{Ba2016LayerN} and Mish \citep{Misra2019MishAS} activations after each layer. We apply SimNorm normalization to the latent state $\mathbf{z}$ which biases the representation towards sparsity and maintaining a small $\ell_{2}$-norm. We train an ensemble of $Q$-functions ($5$ by default) and additionally apply $1\%$ Dropout \citep{srivastava2014dropout} after the first linear layer in each $Q$-function. TD-targets are computed as the mininum of two randomly subsampled $Q$-functions \citep{chen2021randomized}. In contrast, TD-MPC is implemented as MLPs without LayerNorm, and instead uses ELU \citep{clevert2015fast} activations. TD-MPC does not constrain the latent state at all, which in some instances leads to exploding gradients (see Appendix~\ref{sec:appendix-gradient-norm} for experimental results). Lastly, TD-MPC learns only $2$ $Q$-functions and does not use Dropout. The architectural differences in TD-MPC\textbf{2} result in a $4$M net increase in learnable parameters ($5$M total) for our default single-task model size compared to the $1$M parameters of TD-MPC. However, as shown in Figure~\ref{fig:multitask-all}, naïvely increasing the model size of TD-MPC does not lead to consistently better performance, whereas it does for TD-MPC\textbf{2}.
+    \item \textbf{Policy prior.} The policy prior of TD-MPC\textbf{2} is trained with maximum entropy RL \citep{ziebart2008maximum, Haarnoja2018SoftAA}, whereas the policy prior of TD-MPC is trained as a deterministic policy with Gaussian noise applied to actions. We find that a carefully tuned Gaussian noise schedule is comparable to a policy prior trained with maximum entropy. However, maximum entropy RL can more easily be applied with task-agnostic hyperparameters. We only compute policy entropy over valid action dimensions in multi-task learning with multiple action spaces.
+    \item \textbf{Planning.} The planning procedure of TD-MPC\textbf{2} closely follows that of TD-MPC. However, we simplify planning marginally by not leveraging momentum between iteration, as we find it to produce comparable results. We also improve the throughput of planning by approx. $\mathbf{2\times}$ through a series of code-level optimizations.
+    \item \textbf{Model objective.} We revisit the training objective of TD-MPC and improve its robustness to variation in tasks, such as the magnitude of rewards. TD-MPC\textbf{2} uses discrete regression (soft cross-entropy) of rewards and values in a $\log$-transformed space, which makes the magnitude of the two loss terms independent of the magnitude of the task rewards. TD-MPC uses continuous regression which leads to training instabilities in tasks where rewards are large. While this issue can be alleviated by, \emph{e.g.}, normalizing task rewards based on moving statistics, in the single-task case, it is difficult to design robust reward normalization schemes for multi-task learning. TD-MPC\textbf{2} retains the continuous regression term for joint-embedding prediction as the latent representation is already normalized by SimNorm, and discrete regression is computationally expensive for high-dimensional spaces (requires $N$ bins for each dimension of $\mathbf{z}$).
+    \item \textbf{Multi-task model.} TD-MPC\textbf{2} introduces a framework for learning multi-task world models across multiple domains, embodiments, and action spaces. We introduce a normalized learnable task embedding space which all components of TD-MPC are conditioned on, and we accommodate multiple observation and action spaces by applying zero-padding and action masking during both training and inference. We train multi-task models on a large number of tasks, and finetune the model to held-out tasks (across embodiments) using online RL. TD-MPC only considers multi-task learning on a small number of tasks with shared observation and action space, and does not consider finetuning of the learned multi-task model.
+    \item \textbf{Simplified algorithm and implementation.} TD-MPC\textbf{2} removes momentum in MPPI \citep{Williams2015ModelPP}, and replaces prioritized experience replay sampling from the replay buffer with uniform sampling, both of which simplify the implementation with no significant change in experimental results. Finally, we also use a faster replay buffer implementation that uses multiple workers for sampling, and we increase training and planning throughput through code-level optimizations such as $Q$-function ensemble vectorization, which makes the wall-time of TD-MPC\textbf{2} comparable to that of TD-MPC despite a larger architecture ($5$M vs. $1$M).
+\end{itemize}
+
+
+\newpage
+
+
+\section{Task Visualizations}
+\label{sec:appendix-task-visualizations}
+
+\begin{figure}[h]
+    \centering
+    \vspace{-0.05in}
+    \includegraphics[width=0.88\textwidth]{visualizations/grid.png}
+    \vspace{-0.05in}
+    \caption{\textbf{Task visualizations.} Visualization of a random initial state for each of the $\mathbf{104}$ tasks that we consider. Tasks vary greatly in objective, embodiment, and action space. Visit \url{https://tdmpc2.com} for videos of TD-MPC\textbf{2} performing each task. See Appendix~\ref{sec:appendix-task-domains} for task details.}
+    \label{fig:task-visualization}
+\end{figure}
+
+
+\newpage
+
+
+\section{Task Domains}
+\label{sec:appendix-task-domains}
+
+We consider a total of $104$ continuous control tasks from 4 task domains: DMControl \citep{deepmindcontrolsuite2018}, Meta-World \citep{yu2019meta}, ManiSkill2 \citep{gu2023maniskill2}, and MyoSuite \citep{MyoSuite2022}. This section provides an exhaustive list of all tasks considered, as well as their observation and action dimensions. Environment details are listed at the end of the section. We provide (static) task visualizations in Appendix~\ref{sec:appendix-task-visualizations} and videos of TD-MPC\textbf{2} agents performing each task at \url{https://www.tdmpc2.com}.
+
+\begin{table}[h!]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{DMControl.} We consider a total of $39$ continuous control tasks in the DMControl domain, including $19$ original DMControl tasks and $11$ new (custom) tasks created specifically for TD-MPC\textbf{2} benchmarking and multitask training. We list all considered DMControl tasks below. The \emph{Locomotion} task set shown in Figure~\ref{fig:multitask} corresponds to the \emph{Humanoid} and \emph{Dog} embodiments of DMControl, with performance reported at $14$M environment steps.}
+\label{tab:appendix-dmcontrol-tasks}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Task} & \textbf{Observation dim} & \textbf{Action dim} & \textbf{Sparse?} & \textbf{New?} \\ \midrule
+Acrobot Swingup & $6$ & $1$ & N & N \\
+Cartpole Balance & $5$ & $1$& N & N \\
+Cartpole Balance Sparse & $5$ & $1$ & Y & N \\
+Cartpole Swingup & $5$ & $1$ & N & N \\
+Cartpole Swingup Sparse & $5$ & $1$ & Y & N \\
+Cheetah Jump & $17$ & $6$ & N & Y \\
+Cheetah Run & $17$ & $6$ & N & N \\
+Cheetah Run Back & $17$ & $6$ & N & Y \\
+Cheetah Run Backwards & $17$ & $6$ & N & Y \\
+Cheetah Run Front & $17$ & $6$ & N & Y \\
+Cup Catch & $8$ & $2$ & Y & N \\
+Cup Spin & $8$ & $2$ & N & Y \\
+Dog Run & $223$ & $38$ & N & N \\
+Dog Trot & $223$ & $38$ & N & N \\
+Dog Stand & $223$ & $38$ & N & N \\
+Dog Walk & $223$ & $38$ & N & N \\
+Finger Spin & $9$ & $2$ & Y & N \\
+Finger Turn Easy & $12$ & $2$ & Y & N \\
+Finger Turn Hard & $12$ & $2$ & Y & N \\
+Fish Swim & $24$ & $5$ & N & N \\
+Hopper Hop & $15$ & $4$ & N & N \\
+Hopper Hop Backwards & $15$ & $4$ & N & Y \\
+Hopper Stand & $15$ & $4$ & N & N \\
+Humanoid Run & $67$ & $24$ & N & N \\
+Humanoid Stand & $67$ & $24$ & N & N \\
+Humanoid Walk & $67$ & $24$ & N & N \\
+Pendulum Spin & $3$ & $1$ & N & Y \\
+Pendulum Swingup & $3$ & $1$ & N & N \\
+Quadruped Run & $78$ & $12$ & N & N \\
+Quadruped Walk & $78$ & $12$ & N & N \\
+Reacher Easy & $6$ & $2$ & Y & N \\
+Reacher Hard & $6$ & $2$ & Y & N \\
+Reacher Three Easy & $8$ & $3$ & Y & Y \\
+Reacher Three Hard & $8$ & $3$ & Y & Y \\
+Walker Run & $24$ & $6$ & N & N \\
+Walker Run Backwards & $24$ & $6$ & N & Y \\
+Walker Stand & $24$ & $6$ & N & N \\
+Walker Walk & $24$ & $6$ & N & N \\
+Walker Walk Backwards & $24$ & $6$ & N & Y \\ \bottomrule
+\end{tabular}%
+}
+\vspace{-0.1in}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{Meta-World.} We consider a total of $50$ continuous control tasks from the Meta-World domain. The Meta-World benchmark is designed for multitask and meta-learning research and all tasks thus share embodiment, observation space, and action space.}
+\label{tab:appendix-metaworld-tasks}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Task} & \textbf{Observation dim} & \textbf{Action dim} \\ \midrule
+Assembly & $39$ & 4 \\
+Basketball & $39$ & 4 \\ 
+Bin Picking & $39$ & 4 \\ 
+... & ... & ... \\ 
+Window Open & $39$ & 4 \\ \bottomrule
+\end{tabular}%
+}
+\vspace{-0.1in}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{ManiSkill2.} We consider a total of $5$ continuous control tasks from the ManiSkill2 domain. The ManiSkill2 benchmark is designed for large-scale robot learning and contains a high degree of randomization and task variations. The \emph{Pick YCB} task shown in Figure~\ref{fig:multitask} corresponds to the ManiSkill2 task of the same name, with performance reported at $14$M environment steps.}
+\label{tab:appendix-maniskill2-tasks}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Task} & \textbf{Observation dim} & \textbf{Action dim} \\ \midrule
+Lift Cube & $42$ & 4 \\
+Pick Cube & $51$ & 4 \\
+Pick YCB & $51$ & 7 \\
+Stack Cube & $55$ & 4 \\
+Turn Faucet & $40$ & 7 \\ \bottomrule
+\end{tabular}%
+}
+\vspace{-0.1in}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{MyoSuite.} We consider a total of $10$ continuous control tasks from the MyoSuite domain. The MyoSuite benchmark is designed for high-dimensional physiologically accurate muscoloskeletal motor control and involves particularly complex object manipulation with a dexterous hand. The MyoSuite domain consists of tasks with and without goal randomization. We consider both settings, and refer to them as \emph{Easy} (fixed goal) and \emph{Hard} (random goal), respectively.}
+\label{tab:appendix-maniskill2-tasks}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Task} & \textbf{Observation dim} & \textbf{Action dim} \\ \midrule
+Reach Easy & $115$ & $39$ \\
+Reach Hard & $115$ & $39$ \\
+Pose Easy & $108$ & $39$ \\
+Pose Hard & $108$ & $39$ \\
+Pen Twirl Easy & $83$ & $39$ \\
+Pen Twirl Hard & $83$ & $39$ \\
+Object Hold Easy & $91$ & $39$ \\
+Object Hold Hard & $91$ & $39$ \\
+Key Turn Easy & $93$ & $39$ \\
+Key Turn Hard & $93$ & $39$ \\ \bottomrule
+\end{tabular}%
+}
+\vspace{-0.1in}
+\end{table}
+
+\clearpage
+\newpage
+
+\textbf{Environment details.} We benchmark algorithms on DMControl, Meta-World, ManiSkill2, and MyoSuite without modification. All four domains are infinite-horizon continuous control environments for which we use a fixed episode length and no termination conditions. We list episode lengths, action repeats, total number of environment steps, and the performance metric used for each domain in Table~\ref{tab:appendix-environment-details}. In all experiments, we only consider an episode successful if the final step of an episode is successful. This is a stricter definition of success than used in some of the related literature, which \emph{e.g.} may consider an episode successful if success is achieved at \emph{any} step within a given episode. In tasks that require manipulation of objects, such as picking up an object, our definition of success ensures that an episode in which an object is picked up but then dropped again is not considered successful.
+
+\begin{table}[h]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{Environment details.} We list the episode length and action repeat used for each task domain, as well as the total number of environment steps and performance metrics that we use for benchmarking methods. All methods use the same values for all tasks.}
+\label{tab:appendix-environment-details}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{lcccc}
+\toprule
+& \textbf{DMControl} & \textbf{Meta-World} & \textbf{ManiSkill2} & \textbf{MyoSuite} \\ \midrule
+Episode length      & $1,000$ & $200$ & $200$ & $100$ \\
+Action repeat       & $2$ & $2$ & $2$ & $1$ \\
+Effective length    & $500$ & $100$ & $100$ & $100$ \\
+Total env. steps    & $4$M - $14$M & $2$M & $4$M - $14$M & $2$M \\
+Performance metric  & Reward & Success & Success & Success \\ \bottomrule
+\end{tabular}%
+}
+\vspace{-0.1in}
+\end{table}
+
+
+\vspace{0.4in}
+\begin{center}
+    \textcolor{gray}{\textbf{\textemdash~Appendices continue on next page~\textemdash}}
+\end{center}
+
+\clearpage
+\newpage
+
+
+\section{Single-task Experimental Results}
+\label{sec:appendix-additional-experimental-results}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/dmcontrol.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{Single-task DMControl results.} Episode return as a function of environment steps. The first $4$M environment steps are shown for each task, although the Humanoid and Dog tasks are run for $14$M environment steps; we provide those curves in Figure~\ref{fig:single-task-locomotion-appendix} as part of the ``Locomotion" benchmark. Note that TD-MPC diverges on tasks like \emph{Walker Stand} and \emph{Walker Walk} whereas TD-MPC\textbf{2} remains stable. We visualize gradients on these tasks in Appendix~\ref{sec:appendix-gradient-norm}. Mean and $95\%$ CIs over 3 seeds.}
+    \label{fig:single-task-dmcontrol}
+\end{figure}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/metaworld.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{Single-task Meta-World results.} Success rate ($\%$) as a function of environment steps. TD-MPC\textbf{2} performance is comparable to existing methods on easy tasks, while outperforming other methods on hard tasks such as \emph{Pick Place Wall} and \emph{Shelf Place}. DreamerV3 often fails to converge.}
+    \label{fig:single-task-metaworld}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/maniskill.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{Single-task ManiSkill2 results.} Success rate ($\%$) as a function of environment steps on $5$ object manipulation tasks from ManiSkill2. \textit{Pick YCB} is the hardest task and considers manipulation of all $74$ objects from the YCB \citep{Calli2015YCB} dataset. We report results for this tasks at $14$M environment steps, and $4$M environment steps for other tasks. TD-MPC\textbf{2} achieves a $>60\%$ success rate on the Pick YCB task, whereas other methods fail to learn within the given budget. Mean and $95\%$ CIs over 3 seeds.}
+    \label{fig:single-task-maniskill-appendix}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/dmcontrol_hard_all.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{Single-task high-dimensional locomotion results.} Episode return as a function of environment steps on all $7$ ``Locomotion" benchmark tasks. This domain includes high-dimensional Humanoid ($\mathcal{A} \in \mathbb{R}^{21}$) and Dog ($\mathcal{A} \in \mathbb{R}^{38}$) embodiments. Mean and $95\%$ CIs over 3 seeds.}
+    \label{fig:single-task-locomotion-appendix}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/myosuite.pdf}
+    \vspace{-0.15in}
+    \caption{\textbf{Single-task MyoSuite results.} Success rate ($\%$) as a function of environment steps. This task domain includes high-dimensional contact-rich musculoskeletal motor control ($\mathcal{A} \in \mathbb{R}^{39}$) with a physiologically accurate robot hand. Goals are randomized in tasks designated as ``Hard". TD-MPC\textbf{2} achieves comparable or better performance than existing methods on all tasks from this benchmark, except for \emph{Key Turn Hard} in which TD-MPC succeeds early in training.}
+    \label{fig:single-task-myosuite}
+\end{figure}
+
+
+\clearpage
+\newpage
+
+
+\section{Few-shot Experimental Results}
+\label{sec:appendix-few-shot-results}
+We finetune a $19$M parameter TD-MPC\textbf{2} agent trained on $70$ tasks to each of $10$ held-out tasks. Individual task curves are shown in Figure~\ref{fig:finetune}. We compare data-efficiency of the finetuned model to a baseline agent of similar model capacity trained from scratch. However, we find that performance of our $19$M parameter baselines trained from scratch are comparable to our $5$M parameter agents also trained from scratch. Our few-shot finetuning results suggest that the efficacy of finetuning is somewhat task-dependent. However, more research is needed to conclude whether this is due to task similarity (or rather lack thereof) or due to subpar task performance of the pretrained agent on the source task. We conjecture that both likely influence results.
+
+When finetuning to an unseen task, we initialize the learnable task embedding for the new task as the embedding of a semantically similar task from the pretraining dataset. We list the source task embedding used as initialization for each experiment in Table~\ref{tab:task-embedding-source}. We did not experiment with other initialization schemes, nor other task pairings.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/finetune.pdf}
+    \vspace{-0.325in}
+    \caption{\textbf{Few-shot learning.} Normalized episode return (DMControl) and success rate (Meta-World) as a function of environment steps while finetuning a $19$M parameter TD-MPC\textbf{2} agent trained on $70$ tasks to each of $10$ held-out tasks. $40$k steps corresponds to $40$ episodes in DMControl and $200$ in Meta-World. Mean and $95\%$ CIs over 3 seeds.}
+    \label{fig:finetune}
+\end{figure}
+
+\begin{table}[h]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{Initialization of task embeddings for few-shot learning.} We list the task embeddings used as initialization when finetuning our $19$M parameter TD-MPC\textbf{2} agent to held-out tasks. We did not experiment with other initialization schemes, nor other task pairings.}
+\label{tab:task-embedding-source}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Target task} & \textbf{Source task} \\ \midrule
+Walker Run & Walker Walk \\
+Cheetah Run & Cheetah Run Backwards \\
+Hopper Hop & Hopper Stand \\
+Pendulum Swingup & Pendulum Spin \\
+Reacher Hard & Reacher Easy \\
+Bin Picking & Pick Place \\
+Box Close & Assembly \\
+Door Lock & Door Open \\
+Door Unlock & Door Open \\
+Hand Insert & Sweep Into \\ \bottomrule
+\end{tabular}%
+}
+\vspace{-0.1in}
+\end{table}
+
+
+\clearpage
+\newpage
+
+
+\section{Additional Ablations}
+\label{sec:appendix-additional-ablations}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.28\textwidth]{figures/ablation_mt80_emb.pdf}
+\vspace{-0.1in}
+\caption{\textbf{Normalized task embeddings.} Normalized score of $19$M parameter multitask ($80$ tasks) TD-MPC\textbf{2} agents, with and without normalized task embeddings $\mathbf{e}$ as described in Section~\ref{sec:tdmpc2-model}. We find that normalizing $\mathbf{e}$ to have a maximum $\ell_{2}$-norm of $1$ improves multitask performance.}
+\label{fig:ablation_mt80_emb}
+\end{figure}
+
+\begin{figure}[h]
+    \vspace*{-0.1in}
+    \centering
+    \includegraphics[width=0.465\textwidth]{figures/task_embeddings.pdf}\quad
+    \includegraphics[width=0.465\textwidth]{figures/task_embeddings_noembnorm.pdf}
+    \vspace{-0.1in}
+    \caption{\textbf{T-SNE of task embeddings with and without normalization.} T-SNE \citep{vanDerMaaten2008} visualizations of task embeddings learned by TD-MPC\textbf{2} agent trained on 80 tasks from \textcolor{nhteal}{DMControl} and \textcolor{nhred}{Meta-World}. \textcolor{nhred}{\emph{(Left)}} \emph{with} normalization. \textcolor{nhred}{\emph{(Right)}} \emph{without} normalization. A subset of labels are shown for clarity. We observe that task embeddings are more semantically meaningful when normalized during training, \emph{e.g.}, ``Door Open" and ``Door Close" are close in embedding space on the left, but far apart on the right.}
+    \label{fig:appendix-task-embnonorm}
+\end{figure}
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.28\textwidth]{figures/ablation_activation.pdf}
+\includegraphics[width=0.28\textwidth]{figures/ablation_activation_gradnorm.pdf}
+\vspace{-0.1in}
+\caption{\textbf{Activation function.} Normalized score as a function of environment steps, averaged across three of the most difficult tasks: \emph{Dog Run}, \emph{Humanoid Walk} (DMControl), and \emph{Pick YCB} (ManiSkill2). Mean and $95\%$ CIs over 3 random seeds. We find that TD-MPC2 achieves comparable asymptotic performance and data-efficiency with either activation function, but that Mish \citep{Misra2019MishAS} leads to smoother gradients overall.}
+\label{fig:ablation_activation}
+\end{figure}
+
+\newpage
+
+\section{Gradient Norm and Training Stability}
+\label{sec:appendix-gradient-norm}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/dmcontrol_gradnorm.pdf}
+    \vspace{-0.325in}
+    \caption{\textbf{Gradient norm during training.} We compare the gradient norm (log-scale) of TD-MPC and TD-MPC\textbf{2} as a function of environment steps on five tasks from DMControl. TD-MPC is prone to exploding gradients, which can cause learning to diverge on some tasks (\emph{e.g.}, Walker Stand in Figure~\ref{fig:single-task-dmcontrol}). In comparison, the gradients of TD-MPC\textbf{2} remain stable throughout training. We only display 1 seed per task for visual clarity.}
+    \label{fig:gradnorm}
+\end{figure}
+
+\section{Implementation Details}
+\label{sec:appendix-implementation-details}
+
+\textbf{Architectural details.} All components of TD-MPC\textbf{2} are implemented as MLPs. The encoder $h$ contains a variable number of layers ($2-5$) depending on the architecture size; all other components are 3-layer MLPs. Intermediate layers consist of a linear layer followed by LayerNorm and a Mish activation function. The latent representation is normalized as a simplicial embedding. $Q$-functions additionally use Dropout. We summarize the TD-MPC\textbf{2} architecture for the $5$M parameter \texttt{base} (default for online RL) model size using PyTorch-like notation:
+\begin{codesnippet}
+Encoder parameters: 167,936                                                                                                                                                                                                                                            
+Dynamics parameters: 843,264                                                                                                                                                                                                                                           
+Reward parameters: 631,397                                                                                                                                                                                                                                             
+Policy parameters: 582,668                                                                                                                                                                                                                                             
+Q parameters: 3,156,985                                                                                                                                                                                                                                                
+Task parameters: 7,680                                                                                                                                                                                                                                                 
+Total parameters: 5,389,930
+
+Architecture: TD-MPC2 base 5M(                                                                                                                                                                                                                                                    
+  (task_embedding): Embedding(T, 96, max_norm=1)                                                                                                                                                                                                                           
+  (encoder): ModuleDict(                                                                                                                                                                                                                                              
+    (state): Sequential(                                                                                                                                                                                                                                               
+      (0): NormedLinear(in_features=S+T, out_features=256, act=Mish)                                                                                                                                                                                        
+      (1): NormedLinear(in_features=256, out_features=512, act=SimNorm)                                                                                                                                                                                     
+    )                                                                                                                                                                                                                                                                  
+  )                                                                                                                                                                                                                                                                    
+  (dynamics): Sequential(                                                                                                                                                                                                                                             
+    (0): NormedLinear(in_features=512+T+A, out_features=512, act=Mish)                                                                                                                                                                                          
+    (1): NormedLinear(in_features=512, out_features=512, act=Mish)
+    (2): NormedLinear(in_features=512, out_features=512, act=SimNorm)
+  )
+  (reward): Sequential(
+    (0): NormedLinear(in_features=512+T+A, out_features=512, act=Mish)
+    (1): NormedLinear(in_features=512, out_features=512, act=Mish)
+    (2): Linear(in_features=512, out_features=101,)
+  )
+  (pi): Sequential(
+    (0): NormedLinear(in_features=512+T, out_features=512, act=Mish)
+    (1): NormedLinear(in_features=512, out_features=512, act=Mish)
+    (2): Linear(in_features=512, out_features=2A, bias=True)
+  )
+  (Qs): Vectorized ModuleList(
+    (0-4): 5 x Sequential(
+      (0): NormedLinear(in_features=512+T+A, out_features=512, dropout=0.01, act=Mish)
+      (1): NormedLinear(in_features=512, out_features=512, act=Mish)
+      (2): Linear(in_features=512, out_features=101, bias=True)
+    )
+  )
+)
+\end{codesnippet}
+where \texttt{S} is the input dimensionality, \texttt{T} is the number of tasks, and \texttt{A} is the action space. We exclude the task embedding \texttt{T} from single-task experiments. The exact parameter counts listed above are for \texttt{S}$=39$, \texttt{T}$=80$, and \texttt{A}$=6$.
+
+
+\textbf{Hyperparameters.} We use the same hyperparameters across all tasks. Our hyperparameters are listed in Table~\ref{tab:tdmpc2-hparams}. We use the same hyperparameters for TD-MPC and SAC as in \citet{Hansen2022tdmpc}. DreamerV3 \citep{hafner2023dreamerv3} uses a fixed set of hyperparameters.
+
+\begin{table}[h]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{TD-MPC\textcolor{nhred}{2} hyperparameters.} We use the same hyperparameters across all tasks. Certain hyperparameters are set automatically using heuristics.}
+\label{tab:tdmpc2-hparams}
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Hyperparameter}         & \textbf{Value} \\ \midrule
+\textbf{\textcolor{nhred}{\underline{\smash{Planning}}}} \\
+Horizon ($H$)                   & $3$ \\
+Iterations                      & $6~(+ 2~\textnormal{if}~\|\mathcal{A}\| \ge 20)$ \\
+Population size                 & $512$ \\
+Policy prior samples            & $24$ \\
+Number of elites                & $64$ \\
+Minimum std.                    & $0.05$ \\
+Maximum std.                    & $2$ \\
+Temperature                     & $0.5$ \\
+Momentum                        & No \\
+\\
+\textbf{\textcolor{nhred}{\underline{\smash{Policy prior}}}} \\
+Log std. min.                   & $-10$ \\
+Log std. max.                   & $2$ \\
+\\
+\textbf{\textcolor{nhred}{\underline{\smash{Replay buffer}}}} \\
+Capacity                        & $1,000,000$ \\
+Sampling                        & Uniform \\
+\\
+\textbf{\textcolor{nhred}{\underline{\smash{Architecture (5M)}}}} \\
+Encoder dim                     & $256$ \\
+MLP dim                         & $512$ \\
+Latent state dim                & $512$ \\
+Task embedding dim              & $96$ \\
+Task embedding norm             & $1$ \\
+Activation                      & LayerNorm + Mish \\
+$Q$-function dropout rate       & $1\%$ \\
+Number of $Q$-functions         & $5$ \\
+Number of reward/value bins     & $101$ \\
+SimNorm dim ($V$)               & $8$ \\
+SimNorm temperature ($\tau$)    & $1$ \\
+\\
+\textbf{\textcolor{nhred}{\underline{\smash{Optimization}}}} \\
+Update-to-data ratio            & $1$ \\
+Batch size                      & $256$ \\
+Joint-embedding coef.           & $20$ \\
+Reward prediction coef.         & $0.1$ \\
+Value prediction coef.          & $0.1$ \\
+Temporal coef. ($\lambda$)      & $0.5$ \\
+$Q$-fn. momentum coef.          & $0.99$ \\
+Policy prior entropy coef.      & $1\times10^{-4}$ \\
+Policy prior loss norm.         & Moving $(5\%, 95\%)$ percentiles \\
+Optimizer                       & Adam \\
+Learning rate                   & $3\times10^{-4}$ \\
+Encoder learning rate           & $1\times10^{-4}$ \\
+Gradient clip norm              & $20$ \\
+Discount factor                 & Heuristic \\
+Seed steps                      & Heuristic \\ \bottomrule
+\end{tabular}%
+}
+\vspace{0.15in}
+\end{table}
+
+We set the discount factor $\gamma$ for a task using the heuristic
+\begin{equation}
+    \gamma = \operatorname{clip}(\frac{\frac{T}{5} - 1}{\frac{T}{5}},~[0.95, 0.995])
+\end{equation}
+where $T$ is the expected length of an episode \emph{after} applying action repeat, and $\operatorname{clip}$ constrains the discount factor to the interval $[0.95, 0.995]$. Using this heuristic, we obtain $\gamma = 0.99$ for DMControl ($T=500$), which is the most widely used discount factor for this task domain. Tasks with shorter episodes are assigned a lower discount factor, whereas tasks with longer episodes are assigned a higher discount factor. All of the tasks that we consider are infinite-horizon MDPs with fixed episode lengths. We use individual discount factors (set using the above heuristic) for each task in our multitask experiments. For tasks with variable or unknown episode lengths, we suggest using an empirical mean length, a qualified guess, or simply $\gamma=0.99$. While this heuristic is introduced in TD-MPC\textbf{2}, we apply the same discount factor for the TD-MPC and SAC baselines to ensure that comparison is fair across all task domains.
+
+We set the seed steps $S$ (number of environment steps before any gradient updates) for a task using the heuristic
+\begin{equation}
+    \label{eq:seed-steps}
+    S = \max(5T, 1000)
+\end{equation}
+where $T$ again is the expected episode length of the task after applying action repeat. We did not experiment with other heuristics nor constant values, but conjecture that Equation~\ref{eq:seed-steps} will ensure that the replay buffer $\mathcal{B}$ has sufficient data for model learning regardless of episode lengths.\\
+
+\textbf{Model configurations.} Our multitask experiments consider TD-MPC\textbf{2} agents with model sizes ranging from $1$M parameters to $317$M parameters. Table \ref{tab:model-configurations} lists the exact specifications for each of our model sizes. We scale the model size by varying dimensions of fully-connected layers, the latent state dimension $\mathbf{z}$, the number of encoder layers, and the number of $Q$-functions. We make no other modifications to the architecture nor hyperparameters across model sizes.
+
+\begin{table}[h]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{Model configurations.} We list the specifications for each model configuration (size) of our multitask experiments. \emph{Encoder dim} is the dimensionality of fully connected layers in the encoder $h$, \emph{MLP dim} is the dimensionality of layers in all other components, \emph{Latent state dim} is the dimensionality of the latent representation $\mathbf{z}$, \emph{\# encoder layers} is the number of layers in the encoder $h$, \emph{\# Q-functions} is the number of learned $Q$-functions, and \emph{Task embedding dim} is the dimensionality of $\mathbf{e}$ from Equation~\ref{eq:tdmpc-components}. TD-targets are always computed by randomly subsampling two $Q$-functions, regardless of the number of $Q$-functions in the ensemble. We did not experiment with other model configurations. \textbf{*}The default (\texttt{base}) configuration used in our single-task RL experiments has $5$M parameters.}
+\label{tab:model-configurations}
+\centering
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+& $\mathbf{1}$\textbf{M} & $\mathbf{5}$\textbf{M*} & $\mathbf{19}$\textbf{M} & $\mathbf{48}$\textbf{M} & $\mathbf{317}$\textbf{M} \\ \midrule
+Encoder dim & $256$ & $256$ & $1024$ & $1792$ & $4096$ \\
+MLP dim & $384$ & $512$ & $1024$ & $1792$ & $4096$ \\
+Latent state dim & $128$ & $512$ & $768$ & $768$ & $1376$ \\
+\# encoder layers & $2$ & $2$ & $3$ & $4$ & $5$ \\
+\# Q-functions  & $2$ & $5$ & $5$ & $5$ & $8$ \\
+Task embedding dim  & $96$ & $96$ & $96$ & $96$ & $96$ \\ \bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\textbf{Simplicial Normalization (SimNorm).} SimNorm is a simple method for normalizing the latent representation $\mathbf{z}$ by projecting it into $L$ fixed-dimensional simplices using a softmax operation \citep{Lavoie2022SimplicialEI}. A key benefit of embedding $\mathbf{z}$ as simplices (as opposed to \emph{e.g.} a discrete representation or squashing) is that it naturally biases the representation towards sparsity without enforcing hard constraints. Intuitively, SimNorm can be thought of as a \emph{"soft"} variant of the vector-of-categoricals approach to representation learning proposed by \citet{oord2017neural} (VQ-VAE). Whereas VQ-VAE represents latent codes using a set of discrete codes ($L$ vector partitions each consisting of a one-hot encoding), SimNorm partitions the latent state into $L$ vector partitions of continuous values that each sum to $1$ due to the softmax operator. This relaxation of the latent representation is akin to softmax being a relaxation of the $\arg\max$ operator. While we do not adjust the temperature $\tau \in [0,\infty)$ of the softmax used in SimNorm in our experiments, it is useful to note that it provides a mechanism for interpolating between two extremes. For example, $\tau \rightarrow \infty$ would force all probability mass onto single categories, resulting in the discrete codes (one-hot encodings) of VQ-VAE. The alternative of $\tau = 0$ would result in trivial codes (constant vectors; uniform probability mass) and prohibit propagation of information. SimNorm thus biases representations towards sparsity without enforcing discrete codes or other hard constraints. We implement the SimNorm normalization layer \citep{Lavoie2022SimplicialEI} using PyTorch-like notation as follows:
+
+{\small
+\begin{codesnippet}
+def simnorm(self, z, V=8):
+    shape = z.shape
+    z = z.view(*shape[:-1], -1, V)
+    z = softmax(z, dim=-1)
+    return z.view(*shape)
+    
+\end{codesnippet}
+}
+Here, \texttt{z} is the latent representation $\mathbf{z}$, and $V$ is the dimensionality of each simplex. The number of simplices $L$ can be inferred from $V$ and the dimensionality of $\mathbf{z}$. We apply a softmax (optionally modulated by a temperature $\tau$) to each of $L$ partitions of $\mathbf{z}$ to form simplices, and then reshape to the original shape of $\mathbf{z}$.
+
+\textbf{Visual RL.} TD-MPC\textbf{2} can be readily applied to tasks with other input modalities. In our visual RL experiments shown in Figure~\ref{fig:visual-rl}, we replace the default MLP encoder of TD-MPC\textbf{2} with a shallow (4 layers) convolutional encoder and use an image resolution of $64\times64$. We additionally apply random shift augmentation as in previous work \citep{kostrikov2020image, yarats2021drqv2, Hansen2022tdmpc}. We remark that, while our experiments use a relatively small image resolution, we do so to reduce computational cost and to ensure a fair comparison to baselines. However, prior work has demonstrated that TD-MPC supports inputs as large as $9\times224\times224$ \citep{lancaster2023modemv2}.
+
+\textbf{TD-MPC baseline implementation.} We benchmark against the official implementation of TD-MPC available at \url{https://github.com/nicklashansen/tdmpc}. The default TD-MPC world model has approx. $1$M trainable parameters, and uses per-task hyperparameters. We use the suggested hyperparameters where available (DMControl and Meta-World). For example, TD-MPC requires tuning of the number of planning iterations, latent state dimensionality, batch size, and learning rate in order to solve the challenging Dog and Humanoid tasks. Refer to their paper for a complete list of hyperparameters.
+
+\textbf{DreamerV3 baseline implementation.} We benchmark against the official reimplementation of DreamerV3 available at \url{https://github.com/danijar/dreamerv3}. We follow the authors' suggested hyperparameters for proprioceptive control (DMControl) and use the \texttt{S} model size ($20$M parameters), as well as an update-to-data (UTD) ratio of $512$. We use this model size and UTD for all tasks. Refer to their paper for a complete list of hyperparameters.
+
+\textbf{SAC baseline implementation.} We follow the TD-MPC \citep{Hansen2022tdmpc} paper in their decision to benchmark against the SAC implementation from \url{https://github.com/denisyarats/pytorch_sac}, and we use the hyperparameters suggested by the authors (when available). For example, this includes tuning the latent dimension, learning rate, and batch size for the Dog and Humanoid tasks. Refer to their paper for a complete list of hyperparameters.
+
+
+\section{Extending TD-MPC\textcolor{nhred}{\textbf{2}} to Discrete Action Spaces}
+\label{sec:appendix-discrete-actions}
+It is desirable to develop a single algorithm that excels at tasks with continuous and discrete action spaces alike. However, the community has yet to discover such an algorithm. While \emph{e.g.} DreamerV3 \citep{hafner2023dreamerv3} has delivered strong results on challenging tasks with discrete action spaces (such as Atari and Minecraft), we find that TD-MPC\textbf{2} produces significantly better results on difficult continuous control tasks. At the same time, extending TD-MPC\textbf{2} to discrete action spaces remains an open problem. While we do not consider discrete action spaces in this work, we acknowledge the value of such an extension. At present, the main challenge in applying TD-MPC\textbf{2} to discrete actions lies in the choice of planning algorithm. TD-MPC\textbf{2} relies on the MPC framework for planning, which is designed for continuous action spaces. We believe that MPC could be replaced with a planning algorithm designed for discrete action spaces, such as MCTS \citep{Coulom2007MCTS} as used in MuZero \citep{schrittwieser2020mastering}. It is also possible that there exists a way to apply MPC to discrete action spaces that is yet to be discovered (to the best of our knowledge), similar to how recent work \citep{hubert2021learning} has discovered ways to apply MCTS to continuous action spaces through sampling.
+
+\clearpage
+\newpage
+
+\section{Test-Time Regularization for Offline RL}
+\label{sec:appendix-test-time-regularization}
+Our multi-task experiments revolve around training massively multi-task world models on fixed datasets that consist of a variety of behaviors, which is an offline RL problem. We do not consider any special treatment of the offline RL problem in the main paper, and simply train TD-MPC\textbf{2} agents without any additional regularization nor hyperparameter-tuning. However, we recognize that models may benefit from such regularization (conservative estimations) due to extrapolation errors when the dataset has limited state-action coverage and/or is highly skewed. Current offline RL algorithms are ill-suited for our problem setting, given that we aim to develop an algorithm that can seamlessly transition from massively multi-task offline pretraining to single-task online finetuning, without any changes in hyperparameters. Current offline RL techniques rely on \emph{(1)} explicit or implicit conservatism in $Q$-value estimation which requires modifications to the training objective and empirically hampers online RL performance \citep{nakamoto2023calql}, and \emph{(2)} relies on a task-specific coefficient that balances value estimation and the regularizer. Instead, we propose to regularize the \emph{planning procedure} of TD-MPC\textbf{2}, which can be done at test-time without any additional model updates. Concretely, we apply the test-time regularizer proposed by \citet{Feng2023Finetuning}, which penalizes trajectories with large uncertainty (as estimated by the variance in $Q$-value predictions) during planning. While this approach eliminates the need for training-time regularization, it still requires users to specify a coefficient that weighs estimated value relative to uncertainty for a trajectory, which is infeasible in a multi-task scenario where estimated values may differ drastically between tasks. To circumvent this issue, we propose a simple heuristic for automatically scaling the regularization strength at each timestep based on the (magnitude of) mean value predictions for a given latent state. Specifically, we estimate the uncertainty penalty at latent state $\mathbf{z}_{t}$ of a sampled trajectory as
+\begin{equation}
+    \label{eq:appendix-uncertainty}
+    u_{t} = c \cdot \operatorname{avg}([\hat{q}_{1}, \hat{q}_{2}, \dots, \hat{q}_{N}]) \cdot \operatorname{std}([\hat{q}_{1}, \hat{q}_{2}, \dots, \hat{q}_{N}])
+\end{equation}
+where $\hat{q}_{n}$ is a value prediction from $Q$-function $n$ in an ensemble of $N$ $Q$-functions, and $c$ is now a \emph{task-agnostic} coefficient that balances return maximization and uncertainty minimization. The planning objective in Equation~\ref{eq:mppi} is then redefined as
+\begin{align}
+    \label{eq:appendix-mppi-uncertainty}
+    \mu^*,\sigma^* &= \arg\max_{(\mu,\sigma)} \mathop{\mathbb{E}}_{(\mathbf{a}_{t}, \mathbf{a}_{t+1}, \dots, \mathbf{a}_{t+H})\sim \mathcal{N}(\mu,\sigma^{2})}\\
+    &\Bigg[ \gamma^{H} Q(\mathbf{z}_{t+H}, \mathbf{a}_{t+H}) - \mathcolor{nhred}{u_{t+H}}\Bigg.\\ &+ \sum_{h=t}^{H-1} \left(\gamma^{h} R(\mathbf{z}_{h}, \mathbf{a}_{h}) - \mathcolor{nhred}{u_{h}} \right) \Bigg.\Bigg]\,,
+\end{align}
+using the definition of task-agnostic uncertainty in Equation~\ref{eq:appendix-uncertainty}. We conduct an experiment in which we apply our proposed test-time regularization to a 19M parameter TD-MPC\textbf{2} agent trained on the 80-task dataset, varying the regularization strength $c$. Results are shown in Table~\ref{tab:appendix-test-time-regularization-results}. Our results indicate that additional regularization (using our heuristic for automatic tuning) can indeed improve the average model performance for some values of $c$. Similar to what one would expect in a single-task setting, we find that large values of $c$ (strong regularization) decrease performance, whereas small (but $>0$) values of $c$ tend to improve performance compared to TD-MPC\textbf{2} without regularization. Given that our heuristic with $c = 0.01$ leads to meaningful improvements across $80$ tasks, we expect it to work reasonably well for other datasets as well, but leave this for future work.
+
+\begin{table}[h]
+\centering
+\parbox{\textwidth}{
+\caption{\textbf{Test-time regularization.} Normalized score of a 19M parameter TD-MPC\textbf{2} agent trained on the 80-task dataset, varying the regularization strength $c$ of our proposed test-time regularizer. We do not apply this regularization in any of our other experiments, and only include these results to inspire future research directions.}
+\label{tab:appendix-test-time-regularization-results}
+\centering
+\vspace{-0.05in}
+\begin{tabular}{lcccc}
+\toprule
+& No reg.  & $\mathbf{c = 0.001}$ & $\mathbf{c = 0.01}$ & $\mathbf{c = 0.1}$ \\ \midrule
+Normalized score    & $56.54$ & $58.14$ & $\mathbf{62.01}$ & $44.13$ \\ \bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Additional Multi-task Results}
+\label{sec:appendix-additional-multi-task-results}
+To provide further insights into the effect of data size and task diversity on TD-MPC\textbf{2} performance in a multi-task setting, we provide additional experiments on a 15-task subset of DMControl, selected at random. Results for TD-MPC\textbf{2} agents trained on 15 tasks, 30 tasks, and 80 tasks are shown in Figure~\ref{fig:appendix-additional-multitask}. We observe that performance scales with model size across all three task suites, but numbers are higher across the board on the smallest dataset compared to similar capacity models trained on larger datasets. This makes intuitive sense, since model capacity remains the same while there are comparably fewer tasks to learn.
+
+\begin{figure}[h]%
+    \centering
+    \includegraphics[height=1.55in]{figures/appendix_multitask_dmc15.pdf}%
+    \includegraphics[height=1.55in]{figures/appendix_multitask_dmc30.pdf}%
+    \includegraphics[height=1.55in]{figures/appendix_multitask.pdf}%
+    \vspace{-0.1in}
+    \caption{\textbf{Additional results on massively multi-task world models.} Normalized score as a function of model size on the 15-task, 30-task, and 80-task datasets. TD-MPC\textbf{2} capabilities scale with model size.}
+    \label{fig:appendix-additional-multitask}
+\end{figure}
+
+
+\end{document}

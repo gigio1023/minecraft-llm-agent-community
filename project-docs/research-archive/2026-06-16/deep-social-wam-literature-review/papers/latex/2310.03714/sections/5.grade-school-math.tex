@@ -1,0 +1,194 @@
+\section{Goals of Evaluation}\label{sec:evaluation:goals}
+
+Programming frameworks can be evaluated along many dimensions: computational efficiency, developer efficiency, intuitiveness of the code and concepts, and so forth. In this paper, we focus on perhaps the most pressing issue for current LM pipelines: the role of hand-written, task-specific prompts in achieving performant systems. Our evaluations seek to test the following hypotheses:
+
+
+\begin{enumerate}[label=\textbf{H\arabic*},itemsep=0pt, topsep=0pt]
+\item With DSPy, we can replace hand-crafted prompt strings with concise and well-defined modules, without reducing quality or expressive power.
+
+\item Parameterizing the modules and treating prompting as an optimization problem makes DSPy better at adapting to different LMs, and it may outperform expert-written prompts. %
+
+\item The resulting modularity makes it possible to more thoroughly explore complex pipelines that have useful performance characteristics or that fit nuanced metrics. 
+
+\end{enumerate}
+
+
+Our evaluation will explore these hypotheses using diverse task--program pairs. We hope this begins a shift from underspecified questions like ``how do different LMs compare on GSM8K'' toward ``how they compare on GSM8K with program P when compiled with strategy S'', which is a well-defined and reproducible run. %
+Ultimately, our goal is to reduce the role of artful prompt construction in modern AI in favor of the development of new modular, composable programs and optimizers.
+
+
+
+\section{Case Study: Math Word Problems}\label{sec:mw}
+
+
+We evaluate on the popular GSM8K dataset with grade school math questions \citep{cobbe2021training}. We sample 200 and 300 question--answer pairs from the official training set for training and development, respectively. Our final evaluations use the 1.3k official test set examples. We report extensive comparisons on the development set to avoid overfitting on test. Following prior work on GSM8K, we evaluate the accuracy of the final numerical value that appears in the LM output.
+
+
+
+
+\paragraph{Programs Considered}\label{sec:mw-programs}
+
+
+
+For this task, we consider three simple DSPy programs: a one-step Predict module (\texttt{vanilla}), a two-step ChainOfThought module (\texttt{CoT}), and finally a multi-stage ComparerOfThoughts module (\texttt{ThoughtReflection}). These are fully defined by the following code:
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false,basicstyle=\fontsize{6}{6}\ttfamily]
+vanilla = dspy.Predict("question -> answer")  # GSM8K Program `vanilla`
+
+CoT = dspy.ChainOfThought("question -> answer")  # GSM8K Program `CoT` 
+\end{lstlisting}
+\end{samepage}
+
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false,basicstyle=\fontsize{6}{6}\ttfamily]
+class ThoughtReflection(dspy.Module):
+    def __init__(self, num_attempts):
+        self.predict = dspy.ChainOfThought("question -> answer", n=num_attempts)
+        self.compare = dspy.MultiChainComparison('question -> answer', M=num_attempts)
+    
+    def forward(self, question):
+        completions = self.predict(question=question).completions
+        return self.compare(question=question, completions=completions)
+
+reflection = ThoughtReflection(num_attempts=5) # GSM8K Program `reflection`
+\end{lstlisting}
+\end{samepage}
+
+In \texttt{reflection}, five reasoning chains are sampled from the LM (alongside their answers) and they are compared in parallel by a built-in \texttt{MultiChainComparison} module, which generalizes \citet{yoran2023answering}. This generates a new answer taking into account the patterns from the five attempts. Critically, the modules used are all generic, none is specific math problems or particular LM.%
+
+\input{tables/results-gsm8k}
+
+\paragraph{Compiling}\label{sec:mw-compilers}
+
+As we discussed in Section~\ref{sec:compiler}, DSPy programs can be compiled into new, optimized programs. In our experiments, we evaluate the programs zero-shot (no compiling) as well as a number of strategies for compiling. Our simplest compiler is \texttt{LabeledFewShot}:
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+fewshot = dspy.LabeledFewShot(k=8).compile(program, trainset=trainset)
+\end{lstlisting}
+\end{samepage}
+Here, \texttt{program} can be any DSPy module. This simply samples \texttt{k=8} random demonstrations from the \texttt{trainset} for the fields common to the training examples and the signature(s), in this case, \texttt{question} and \texttt{answer}, but not the reasoning for instance. We report the average of 3--5 runs (depending on the setting) when applying such random sampling.
+
+Next, we also consider bootstrapping few-shot examples with random search: %
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+tp = BootstrapFewShotWithRandomSearch(metric=gsm8k_accuracy)
+bootstrap = tp.compile(program, trainset=trainset, valset=devset)
+\end{lstlisting}
+\end{samepage}
+This will generate demonstration chains for examples in the training set and optimize the selection of demonstrations (from this set) to self-improve the program's modules. As the name indicates, this is done with random search, treating the selection of demonstrations as a parameter to optimize. %
+
+Next, if desired, this bootstrapping process can be nested in DSPy. In particular, we can use the optimized \texttt{bootstrap} program itself to further bootstrap another program. This is relevant, for example, whenever the original zero-shot \texttt{program} performs relatively poorly.
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+bootstrap2 = tp.compile(program, teacher=bootstrap, trainset=trainset, valset=devset)
+\end{lstlisting}
+\end{samepage}
+
+And lastly, we consider \textit{ensembling} these bootstraps:
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+# A program that ensembles the top-7 candidate programs from a bootstrapping compiler run (in particular `bootstrap` or, when applicable, `bootstrap2`) with majority voting.
+ensemble = Ensemble(reduce_fn=dspy.majority).compile(bootstrap.programs[:7])
+\end{lstlisting}
+\end{samepage}
+GSM8K includes human reasoning chains. Above, \texttt{trainset} does not include these reasoning chains. We also evaluate with \texttt{trainset\_human\_CoT}, which extends the examples in \texttt{trainset} with the human reasoning string. These two datasets can be used interchangeably as the value for the \texttt{trainset} parameter above. We note here that compiling generally runs on the order of minutes (or tens of minutes) as even the more expensive settings only require running the program a few thousand times (e.g., 10--20 trials over 150--300 validation examples) and they can occur in parallel.
+
+
+
+
+\paragraph{Results}\label{sec:mw-results}
+
+Our results are summarized in Table~\ref{tab:math-results}, which includes dev results as well as our evaluation of promising representatives of each approach on the test set. %
+First, the \texttt{vanilla} program results show that \gptThreeFive{} and \llamaThirteenChat{} struggle with math word problems when they have to predict the answers directly, that is, without using a reasoning chain first. This is most pronounced in the absence of good demonstrations, which can be seen in the \texttt{none} compilation setting (i.e., zero-shot instruction) and the \texttt{fewshot} setting (i.e., sampling random question--answer pairs). Interestingly, however, \texttt{vanilla} is helped substantially by compiling with \texttt{bootstrap} and by iterating this process into \texttt{bootstrap}$\times2$. On inspecting the prompts bootstrapped (Appendix~\ref{sec:dspy_prompt_examples}), we see that the prompt allows the LM to leverage the answer field for reasoning first, which is permitted as the metric extracts the final numerical value for evaluation.
+
+Next, we consider the \texttt{CoT} program. While the expert human reasoning chains (\texttt{+human\_CoT}) provide a large boost when available, we can match or surpass this using \texttt{bootstrap}, substantiating our hypothesis that DSPy can cut the need for hand-crafted prompts. Beyond this, we see that the \texttt{reflection} program, while only a few lines longer than the others, is a clear winner, though \texttt{CoT} is quite effective with \texttt{ensemble}. Overall, the \texttt{bootstrap} compilation procedure leads to large gains for every program, across both LMs. Indeed, all programs in this table are expressed by composing two to four DSPy modules and teleprompters, and they reveal overall that---in the new paradigm prescribed by DSPy---it's composing the right generic \textit{modules}, rather than manipulating string prompts, that improves different LMs from 4--20\% accuracy to 49--88\% accuracy.
+
+We can informally compare with the following.
+\citet{zhang2022automatic} reports 48\% for \texttt{text-davinci-002}, which aligns closely with our \llamaThirteenChat{} results, and reports 59.4\% with codex when employing a manual CoT approach and 62.8\% with an automatic CoT method.
+\citet{wang2022self} report 57\% for CoT prompting with \texttt{PaLM} 540-B, which becomes 74\% upon adding self-consistency. The Llama2 authors \citep{touvron2023llama} presents 28.7\% for \texttt{llama2-13b}, 42.2\% for \texttt{llama2-34b}, and 56.8\% for \texttt{llama2-70b}.
+Intriguingly, our program with the 13b variant of the model is competitive with their 34b-based results even though we don't use human reasoning chains in our program.
+\citet{zhao2023automatic} reports 80.8\% for CoT with \texttt{gpt-3.5-turbo} from April 2023.
+The GPT-4 authors \citep{openai2023gpt4} reports that {GPT-3.5} scores 57.1\% and GPT-4 elevates this to 92\% but they note that {GPT-4} was in fact pre-trained on a subset of GSM8K's training set.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

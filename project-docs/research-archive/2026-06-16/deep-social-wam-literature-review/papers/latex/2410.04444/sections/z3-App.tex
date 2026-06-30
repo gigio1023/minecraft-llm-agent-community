@@ -1,0 +1,293 @@
+\subsection{Codes of the Best Policies Found by \framework Across Four Tasks}
+\label{sec:maincode}
+In this section, we provide the code for \framework's optimized policies across the four tasks. 
+For DROP, \framework designs an algorithm where multiple roles solve the problem independently using CoT, followed by Self-Consistency to consolidate the results, as shown in Code 1.
+For MGSM, \framework develops a stepwise self-verification algorithm combined with CoT-SC as shown in Code 2.
+For MMLU task, as shown in Code 3, the policy given by \framework is a combination algorithm of few-shot prompting and CoT-SC.
+For GPQA, \framework devises a highly diverse CoT-SC policy based on role prompts.
+
+
+
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Code of the best policy found by \framework for DROP.}]
+def solver(agent, task: str):
+    messages = [{"role": "user", "content": f"# Your Task:\n{task}"}]
+    categories = [
+        {'role': 'reasoning expert', 'return_keys': ['reasoning', 'answer'], 'output_requirement': 'reasoning', 'precision_gain':1},
+        {'role': 'mathematical reasoning expert', 'return_keys': ['calculation_steps', 'answer'], 'output_requirement': 'calculation_steps', 'precision_gain':1},
+        {'role': 'historical context analyst', 'return_keys': ['historical_analysis', 'answer'], 'output_requirement': 'historical_analysis', 'precision_gain':1},
+    ]
+
+    all_responses = []
+    for category in categories:
+        response = agent.action_call_json_format_llm(
+            model='gpt-3.5-turbo', 
+            messages=messages, 
+            temperature=0.5, 
+            num_of_response=5, 
+            role=category['role'], 
+            requirements=(
+                '1. Explain the reasoning steps to get the answer.\n' 
+                '2. Directly answer the question.\n' 
+                '3. The explanation format must be outlined clearly according to the role, such as reasoning, calculation, or historical analysis.\n' 
+                '4. The answer MUST be a concise string.\n'
+            ).strip(),
+        )
+        all_responses.append(response)
+
+    # Reflective evaluation to find the most consistent reasoning and answer pair
+    final_response = {key: [] for key in ['reasoning', 'calculation_steps', 'historical_analysis', 'answer']}
+    step_counter = {key: 0 for key in ['reasoning', 'calculation_steps', 'historical_analysis']}
+    answers = [] # Collect answers for voting
+    aggregate_weight = 1
+
+    for response in all_responses:
+        if response and 'answer' in response:
+            answers.append(response['answer'])
+            if not final_response['answer']:
+                final_response = {key: response.get(key, []) if isinstance(response.get(key, []), list) else [response.get(key, [])] for key in final_response.keys()}
+                aggregate_weight = 1
+                for cat in categories:
+                    if cat.get('output_requirement') in response.keys():
+                        step_counter[cat['output_requirement']] += step_counter[cat['output_requirement']] + cat.get('precision_gain', 0)
+            elif response['answer'] == final_response['answer'][0]:
+                for key in final_response.keys():
+                    if key in response and response[key]:
+                        if isinstance(response[key], list):
+                            final_response[key].extend(response[key])
+                        else:
+                            final_response[key].append(response[key])
+                aggregate_weight += 1
+            else:
+                # To demonstrate, some code has been omitted.
+    # selection of the final answer
+    from collections import Counter
+    answers = [str(answer) for answer in answers]
+    voted_answer = Counter(answers).most_common(1)[0][0] if answers else ''
+    final_response['answer'] = voted_answer
+
+    return final_response
+\end{lstlisting}
+\end{figure*}
+% \newpage
+
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Code of the best policy found by \framework for MGSM.}]
+
+
+def solver(agent, task: str):
+    messages = [{"role": "user", "content": f"# Your Task:\n{task}"}]
+    response = agent.action_call_json_format_llm(
+        model="gpt-3.5-turbo", 
+        messages=messages, 
+        temperature=0.5, 
+        num_of_response=5,
+        role="math problem solver", 
+        return_dict_keys=["reasoning", "answer"], 
+        requirements=(
+            "1. Please explain step by step.\n"
+            "2. The answer MUST be an integer.\n"
+            "3. Verify each step before finalizing the answer.\n"
+        ).strip(),
+    )
+    
+    consistent_answer = None
+    answer_count = {}
+    for resp in response:
+        answer = resp.get("answer", "")
+        if answer in answer_count:
+            answer_count[answer] += 1
+        else:
+            answer_count[answer] = 1
+    
+    most_consistent_answer = max(answer_count, key=answer_count.get)
+    
+    for resp in response:
+        if resp.get("answer", "") == most_consistent_answer:
+            consistent_answer = resp
+            break
+    
+    if consistent_answer is None:
+        consistent_answer = response[0]
+    
+    consistent_answer["answer"] = str(consistent_answer.get("answer", ""))
+    return consistent_answer
+\end{lstlisting}
+\end{figure*}
+
+\newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Code of the best policy found by \framework for MMLU.}]
+def solver(agent, task: str):
+    # Few-Shot Learning: Providing extended examples to guide the LLM
+    few_shot_examples = [
+        {'role':'user', 'content':'Question: In the movie Austin Powers: The Spy Who Shagged Me what is the name of Dr. Evil\'s diminutive clone?\nChoices:\n(A) Little Buddy\n(B) Mini-Me\n(C) Small Fry\n(D) Dr Evil Jr'},
+        {'role':'assistant', 'content':'In the movie Austin Powers: The Spy Who Shagged Me, Dr. Evil\'s diminutive clone is famously named Mini-Me.\nAnswer: B'},
+        \"""Three more examples are omitted here to conserve space.\"""
+        {'role':'user', 'content':'Question: Lorem Ipsum?\nChoices: (A) Lorem\n(B) Ipsum\n(C) Dolor\n(D) Sit Amet'},
+        {'role':'assistant', 'content':'Answer: A'}
+    ]
+    
+    # Integrate the few-shot examples into the conversation
+    messages = few_shot_examples + [{'role': 'user', 'content': f'# Your Task:\n{task}'}]
+    
+    # Using self-consistency by generating multiple responses
+    response = agent.action_call_json_format_llm(
+        model='gpt-3.5-turbo', 
+        messages=messages, 
+        temperature=0.8, 
+        num_of_response=5,
+        role='knowledge and reasoning expert', 
+        return_dict_keys=['reasoning', 'answer'], 
+        requirements=(
+            '1. Please explain step by step.\n'
+            '2. The answer MUST be either A or B or C or D.\n'
+        ).strip(), 
+    )
+    
+    # Select the most consistent response
+    answer_frequency = {}
+    for resp in response:
+        answer = resp.get('answer', '')
+        if answer in ['A', 'B', 'C', 'D']:
+            if answer in answer_frequency:
+                answer_frequency[answer] += 1
+            else:
+                answer_frequency[answer] = 1
+    
+    most_consistent_answer = max(answer_frequency, key=answer_frequency.get)
+    consistent_response = next(resp for resp in response if resp.get('answer') == most_consistent_answer)
+    consistent_response['answer'] = most_consistent_answer
+    
+    return consistent_response
+\end{lstlisting}
+\end{figure*}
+\newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Code of the best policy found by \framework for GPQA.}]
+def solver(agent, task: str):
+    # Step 1: Initial Prompt
+    messages = [{"role": "user", "content": f"# Your Task:\n{task}"}]
+    
+    # Main LLM Call
+    response = agent.action_call_json_format_llm(
+        model="gpt-3.5-turbo", 
+        messages=messages, 
+        temperature=0, 
+        num_of_response=5,
+        role="science professor", 
+        return_dict_keys=["reasoning", "answer"], 
+        requirements=(
+            "1. Please explain step by step.\n"
+            "2. The answer MUST be either A or B or C or D.\n"
+        ).strip(), 
+    )
+
+    # Step 2: Self-consistency Evaluation
+    answer_counts = {"A": 0, "B": 0, "C": 0, "D": 0}
+    for i, return_dict in enumerate(response):
+        answer = return_dict.get("answer", "")
+        if answer in answer_counts:
+            answer_counts[answer] += 1
+    
+    final_answer = max(answer_counts, key=answer_counts.get)
+
+    return {"answer": final_answer}
+
+\end{lstlisting}
+\end{figure*}
+
+
+
+\subsection{Codes in Game of 24 Tasks}
+\label{sec:code24}
+
+In this section, we present the initial policy for Game of 24 (Code 5), along with the Gödel agent's optimized policy (Code 6), which is generated based on a search algorithm.
+
+
+% \newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Initial code based on Chain-of-Thought for Game of 24.}]
+def solver(self, task_input):
+    # Define the prompt and system_prompt
+    prompt = f\"""
+    Let's play the Game of 24! You are given the task_input {task_input}. The objective is to find a mathematical expression using these four task_input that results in 24. You can use addition (+), subtraction (-), multiplication (*), and division (/). Each number must be used exactly once. 
+    Please provide a step-by-step explanation of your thought process and conclude with the final expression.
+    \"""
+    system_prompt = \"""
+    {
+        "thinking": "This key should contain a detailed step-by-step explanation of how to approach the problem, including intermediate steps and reasoning for each.",
+        "result": "This key should contain the final mathematical expression that equals 24."
+    }
+    \"""
+
+    # Call the OpenAI model
+    response = openai.ChatCompletion.create(
+        model="gpt-4",  # Replace with your model ID
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    # Extract and return the model's response
+    result = response['choices'][0]['message']['content']
+    return result
+\end{lstlisting}
+\end{figure*}
+% \newpage
+\begin{figure*}[ht]
+\begin{lstlisting}[style=pythonstyle, caption={Final code based on search algorithm for Game of 24.}]
+def solver(self, task_input):
+
+    operations = ['+', '-', '*', '/']
+
+    # Function to evaluate an expression
+    def evaluate_expression(a, op, b):
+        if op == '+':
+            return a + b
+        elif op == '-':
+            return a - b
+        elif op == '*':
+            return a * b
+        elif op == '/':
+            if b == 0:
+                return None  # Division by zero is not allowed
+            return a / b
+
+    # Recursive function to check all combinations of operations and permutations of numbers
+    def check_combinations(nums):
+        if len(nums) == 1:
+            # Check if the final number is close enough to 24
+            if abs(nums[0] - 24) < 1e-6:  # Allow for floating point precision errors
+                return True, str(nums[0])
+            return False, ""
+
+        # Try all permutations of task_input and all combinations of operations
+        for i in range(len(nums)):
+            for j in range(len(nums)):
+                if i != j:
+                    # Choose two task_input to operate on
+                    for op in operations:
+                        # The remaining task_input after removing the two selected task_input
+                        remaining_nums = [nums[k] for k in range(len(nums)) if k != i and k != j]
+                        result = evaluate_expression(nums[i], op, nums[j])
+                        if result is not None:
+                            # Recursively check the remaining task_input with the result of the operation
+                            found, expression = check_combinations([result] + remaining_nums)
+                            if found:
+                                # If solution is found, return with expression
+                                return True, f"({nums[i]} {op} {nums[j]}) " + expression
+
+        return False, ""
+
+    # Try all permutations of the task_input
+    for num_permutation in permutations(task_input):
+        found, expression = check_combinations(list(num_permutation))
+        if found:
+            return expression.strip()
+
+    return "No solution"
+
+\end{lstlisting}
+\end{figure*}

@@ -1,0 +1,124 @@
+\clearpage
+
+\section*{Methods}
+
+\subsection*{Baselines}
+
+We employ the Proximal Policy Optimization (PPO) algorithm \citep{schulman2017ppo}, which has become a standard choice in the field, to compare Dreamer under fixed hyperparameters across all benchmarks. There are a large number of PPO implementations available publicly and they are known to substantially vary in task performance \citep{huang2022ppodetails}. To ensure a comparison that is representative of the highest performance PPO can achieve under fixed hyperparameters across domains, we choose the high-quality PPO implementation available in the Acme framework \citep{hoffman2020acme} and select its hyperparameters in \cref{tab:hparams_ppo} following recommendations \citep{huang2022ppodetails,andrychowicz2020whatmatters} and additionally tune its epoch batch size to be large enough for complex environments \cite{cobbe2020procgen}, its learning rate, and its entropy scale. We match the discount factor to Dreamer because it works well across domains and is a common choice in the literature \citep{kapturowski2018r2d2,schrittwieser2019muzero}. We choose the IMPALA network architecture that we have found performed better than alternatives \citep{cobbe2020procgen} and set the minibatch size to the largest possible for one A100 GPU. We verify the performance of our PPO implementation and hyperparameters on the ProcGen benchmark, where a highly tuned PPO implementation has been reported by the PPO authors \citep{cobbe2021ppg}. We find that our implementation matches or slightly outperforms this performance reference.
+
+\input{tables/hparams_ppo}
+
+For Minecraft, we additionally tune and run the IMPALA and Rainbow algorithms because not successful end-to-end learning from scratch has been reported in the literature\citep{guss2019minerl}. We use the Acme implementations\citep{hoffman2020acme} of these algorithms, use the same IMPALA network we used for PPO, and tuned the learning rate and entropy regularizers.
+For all other benchmarks, we compare to tuned expert algorithms reported in the literature as referenced in the results section.
+
+\vspace*{-3ex}
+\subsection*{Implementation}
+
+\paragraph{Experience replay}
+We implement Dreamer using a uniform replay buffer with an online queue\citep{schmitt2020laser}. Specifically, each minibatch is formed first from non-overlapping online trajectories and then filled up with uniformly sampled trajectories from the replay buffer. We store latent states into the replay buffer during data collection to initialize the world model on replayed trajectories, and write the fresh latent states of the training rollout back into the buffer.
+While prioritized replay\citep{schaul2015prioritized} is used by some of the expert algorithms we compare to and we found it to also improve the performance of Dreamer, we opt for uniform replay in our experiments for ease of implementation.
+
+We parameterize the amount of training via the replay ratio. This is the fraction of time steps trained on per time step collected from the environment, without action repeat. Dividing the replay ratio by the time steps in a minibatch and by action repeat yields the ratio of gradient steps to env steps. For example, a replay ratio of 32 on Atari with action repeat of 4 and batch shape $16 \times 64$ corresponds to 1 gradient step every 128 env steps, or 1.5M gradient steps over 200M env steps.
+
+\paragraph{Optimizer}
+We employ Adaptive Gradient Clipping (AGC) \citep{brock2021agc}, which clips per-tensor gradients if they exceed $30\%$ of the L2 norm of the weight matrix they correspond to, with its default $\eps=10^{-3}$. AGC decouples the clipping threshold from the loss scales, allowing to change loss functions or loss scales without adjusting the clipping threshold. We apply the clipped gradients using the LaProp optimizer\citep{ziyin2020laprop} with $\eps=10^{-20}$ and its default parameters $\beta_1=0.9$ and $\beta_2=0.99$. LaProp normalizes gradients by RMSProp and then smoothes them by momentum, instead of computing both momentum and normalizer on raw gradients as Adam does\citep{kingma2014adam}. This simple change allows for a smaller epsilon and avoids occasional instabilities that we observed under Adam.
+
+\paragraph{Distributions}
+The encoder, dynamics predictor, and actor distributions are mixtures of 99\% the predicted softmax output and 1\% of a uniform distribution \citep{gruslys2017reactor} to prevent zero probabilities and infinite log probabilities.
+The rewards and critic neural networks output a softmax distribution over exponentially spaced bins $b \in B$ and are trained towards twohot encoded targets:
+
+\eq{
+\operatorname{twohot}(x)_i
+\doteq \begin{cases}
+|b_{k+1} - x| \,/\, |b_{k+1} - b_k| &\text{ if } i=k \\
+|b_{k\hphantom{+1}} - x| \,/\, |b_{k+1} - b_k| &\text{ if } i=k+1 \\
+0 &\text{ else} \\
+\end{cases} \qquad
+k \doteq \sum_{j=1}^{|B|} \operatorname{\delta}(b_j < x)
+\label{eq:twohot}
+}
+
+The output weights of twohot distributions are initialized to zero to ensure that the agent does not hallucinate rewards and values at initialization. For computing the expected prediction of the softmax distribution under bins that span many orders of magnitude, the summation order matters and positive and negative bins should be summed up separately, from small to large bins, and then added. Refer to the source code for an implementation.
+
+\paragraph{Networks}
+Images are encoded using stride 2 convolutions to resolution $6 \times 6$ or $4 \times 4$ and then flattened and are decoded using transposed stride 2 convolutions, with sigmoid activation on the output. Vector inputs are symlog transformed and then encoded and decoded using 3-layer MLPs. The actor and critic neural networks are also 3-layer MLPs and the reward and continue predictors are 1-layer MLPs.
+The sequence model is a GRU\citep{cho2014gru} with block-diagonal recurrent weights \citep{van2019blockrnn} of 8 blocks to allow for a large number of memory units without quadratic increase in parameters and FLOPs. The input to the GRU at each time step is a linear embedding of the sampled latent $z_t$, of the action $a_t$, and of the recurrent state to allow mixing between blocks.
+
+\clearpage
+\vspace*{-3\baselineskip}
+\subsection*{Benchmarks}
+
+\paragraph{Protocols}
+Summarized in \cref{tab:benchmarks}, we follow the standard evaluation protocols for the benchmarks where established.
+Atari \citep{bellemare2013ale} uses 57 tasks with sticky actions\citep{machado2018stickyactions}. The random and human reference scores used to normalize scores vary across the literature and we chose the most common reference values, replicated in \cref{tab:atari}.
+DMLab\citep{beattie2016dmlab} uses 30 tasks\citep{espeholt2018impala} and we use the fixed action space\citep{hessel2019popart,kapturowski2018r2d2}. We evaluate at 100M steps because running for 10B as in some prior work was infeasible. Because existing published baselines perform poorly at 100M steps, we compare to their performance at 1B steps instead, giving them a $10\times$ data advantage.
+ProcGen uses the hard difficulty setting and the unlimited level set \citep{cobbe2020procgen}. Prior work compares at different step budgets\citep{cobbe2020procgen,cobbe2021ppg} and we compare at 50M steps due to computational cost, as there is no action repeat.
+For Minecraft Diamond purely from sparse rewards, we establish the evaluation protocol to report the episode return measured at 100M env steps, corresponding to about 100 days of in-game time.
+Atari100k\citep{kaiser2019simple} includes 26 tasks with a budget of 400K env steps, 100K after action repeat. Prior work has used various environment settings, summarized in \cref{tab:atari100k_setting}, and we chose the environments as originally introduced.
+Visual Control\citep{tassa2018dmcontrol,hafner2019dreamer} spans 20 tasks with an action repeat of 2.
+Proprioceptive Control follows the same protocol but we exclude the two quadruped tasks because of baseline availability in prior work\citep{yarats2021drqv2}.
+
+\input{tables/benchmarks}
+
+\paragraph{Environment instances}
+In earlier experiments, we observed that the performance of both Dreamer and PPO is robust to the number of environment instances. Based on the CPU resources available on our training machines, we use 16 environment instance by default. For BSuite, the benchmark requires using a single environment instance. We also use a single environment instance for Atari100K because the benchmark has a budget of 400K env steps whereas the maximum episode length in Atari is in principle 432K env steps. For Minecraft, we use 64 environments using remote CPU workers to speed up experiments because the environment is slower to step.
+
+\paragraph{Seeds and error bars}
+We run 5 seeds for each Dreamer and PPO per benchmark, with the exception of 1 seed for ProcGen due to computational constraints, 10 seeds for BSuite as required by the benchmark, and 10 seeds for Minecraft to reliably report the fraction of runs that achieve diamonds. All curves show the mean over seeds with one standard deviation shaded.
+
+\paragraph{Computational choices}
+All Dreamer and PPO agents in this paper were trained on a single Nvidia A100 GPU each. Dreamer uses the 200M model size by default. On the two control suitse, Dreamer the same performance using the substantially faster 12M model, making it more accessible to researchers. The replay ratio control the trade-off between computational cost and data efficiency as analyzed in \cref{fig:ablations} and is chosen to fit the step budget of each benchmark.
+
+\clearpage
+
+\subsection*{Model sizes}
+
+To accommodate different computational budgets and analyze robustness to different model sizes, we define a range of models ranging from 12M to 400M parameters shown in \cref{tab:modelsizes}. The sizes are parameterized by the model dimension, which approximately increases in multiples of 1.5, alternating between powers of two and power of two scaled by 1.5. This yields tensor shapes that are multiples of 8 as required for hardware efficiency.
+Sizes of different network components derive from the model dimension. The MLPs have the model dimension as the number of hidden units. The sequence model has 8 times the number of recurrent units, split into 8 blocks of the same size as the MLPs. The convolutional encoder and decoder layers closest to the data use $16\times$ fewer channels than the model dimension. Each latent also uses $16\times$ fewer codes than the model dimension. The number of hidden layers and number of latents is fixed across model sizes.
+All hyperparamters, including the learning rate and batch size, are fixed across model sizes.
+
+\input{tables/modelsizes}
+
+\subsection*{Previous Dreamer generations}
+
+We present the third generation of the Dreamer line of work. Where the distinction is useful, we refer to this algorithm as DreamerV3. The DreamerV1 algorithm\citep{hafner2019dreamer} was limited to continuous control, the DreamerV2 algorithm\citep{hafner2020dreamerv2} surpassed human performance on Atari, and the DreamerV3 algorithm enables out-of-the-box learning across diverse benchmarks.
+
+We summarize the changes that DreamerV3 introduces as follows:
+\begin{itemize}
+\item Robustness techniques: Observation symlog, KL balance and free bits, 1\% unimix for all categoricals, percentile return normalization, symexp twohot loss for the reward head and critic.
+\item Network architecture: Block GRU, RMSNorm normalization, SiLu activation.
+\item Optimizer: Adaptive gradient clipping (AGC), LaProp (RMSProp followed by momentum).
+\item Replay buffer: Larger capacity, online queue, storing and updating latent states.
+\end{itemize}
+
+
+\clearpage
+\subsection*{Hyperparameters}
+\input{tables/hparams}
+
+\clearpage
+\subsection*{Minecraft}
+\label{sec:mcenv}
+
+\paragraph{Game description}
+With 100M monthly active users, Minecraft is one of the most popular video games worldwide.
+Minecraft features a procedurally generated 3D world of different biomes, including plains, forests, jungles, mountains, deserts, taiga, snowy tundra, ice spikes, swamps, savannahs, badlands, beaches, stone shores, rivers, and oceans.
+The world consists of 1 meter sized blocks that the player and break and place.
+There are about 30 different creatures that the player can interact with or fight.
+From gathered resources, the player can use over 350 recipes to craft new items and progress through the technology tree, all while ensuring safety and food supply to survive.
+There are many conceivable tasks in Minecraft and as a first step, the research community has focused on the salient task of obtaining a diamonds, a rare item found deep underground and requires progressing through the technology tree.
+
+\paragraph{Learning environment}
+We built the Minecraft Diamond environment on top of MineRL to define a flat categorical action space and fix issues we discovered with the original environments via human play testing.
+For example, when breaking diamond ore, the item sometimes jumps into the inventory and sometimes needs to be collected from the ground.
+The original environment terminates episodes when breaking diamond ore so that many successful episodes end before collecting the item and thus without the reward.
+We remove this early termination condition and end episodes when the player dies or after 36000 steps, corresponding to 30 minutes at the control frequency of 20Hz.
+Another issue is that the jump action has to be held for longer than one control step to trigger a jump, which we solve by keeping the key pressed in the background for 200ms.
+We built the environment on top of MineRL v0.4.4 \citep{guss2019minerl}, which offers abstract crafting actions. The Minecraft version is 1.11.2.
+
+\paragraph{Observations and rewards}
+The agent observes a $64\times64\times3$ first-person image, an inventory count vector for the over 400 items, a vector of maximum inventory counts since episode begin to tell the agent which milestones it has achieved, a one-hot vector indicating the equipped item, and scalar inputs for the health, hunger, and breath levels.
+We follow the sparse reward structure of the MineRL competition environment\citep{guss2019minerl} that rewards 12 milestones leading up to the diamond, for obtaining the items log, plank, stick, crafting table, wooden pickaxe, cobblestone, stone pickaxe, iron ore, furnace, iron ingot, iron pickaxe, and diamond.
+The reward for each item is only given once per episode, and the agent has to learn to collect certain items multiple times to achieve the next milestone.
+To make the return easy to interpret, we give a reward of $+1$ for each milestone instead of scaling rewards based on how valuable each item is.
+Additionally, we give $-0.01$ for each lost heart and $+0.01$ for each restored heart, but did not investigate whether this is helpful.

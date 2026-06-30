@@ -1,0 +1,103 @@
+\section{Accumulating Data Avoids Model Collapse in Deep\newline Generative Models}
+\label{sec:realistic_generative_models}
+
+We first investigate model collapse experimentally in several classes of generative models.
+Here, and for the remainder of this manuscript, the term  {\em model collapse} refers to notably worsening error over increasing iterations of the model-data loop, while {\em avoiding model collapse} refers instead to bounded error over such iterations.
+To test the effect of accumulating data on model collapse, we compare accumulating data against replacing data. We use three diverse experimental setups of causal transformers, diffusion models, and variational autoencoders trained on real text, molecular conformation, and image datasets, respectively. We find that replacing data yields model collapse for all models and all datasets, whereas accumulating data avoids model collapse.
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/language_modeling/eval_loss_linear_vs_iteration_20240329_220900.pdf}
+    \caption{\textbf{Data Accumulation Avoids Model Collapse in Language Modeling.} Sequences of causal transformer-based language models are pretrained on TinyStories \citep{eldan2023tinystories}. Cross-entropy validation loss increases when repeatedly \replace{replacing} data (left), but not when \accumulate{accumulating} data (right). Synthetic data was sampled with temperature $= 1.0$.
+    }
+    \label{fig:language_modeling_results}
+\end{figure}
+
+\subsection{Transformer-Based Causal Language Modeling}
+\label{sec:real:subsec:language_transformers}
+
+
+\paragraph{Experiments} We first train causal transformers \citep{vaswani2017attention} on text data. Specifically, we pretrain 9M parameter GPT-2 \citep{radford2019language} and 12M, 42M and 125M parameter Llama2 \citep{touvron2023llama2} language models for a single epoch on TinyStories \citep{eldan2023tinystories}, a 470M token GPT-3.5/4-generated dataset of short stories at a kindergarten reading level. For each model-fitting iteration $n \geq 2$, we sample a new dataset of the same size as TinyStories from the previous iteration's language model and then either replace or concatenate the previous dataset with the newly generated dataset. In each model-fitting iteration, we then pretrain a newly initialized model on the replaced or concatenated dataset from the previous iteration. We experiment with sampling the new datasets using temperatures $0.3$ or $1.0$.  We chose this combination of architectures, scales, dataset, and sampling because the setup necessitates pretraining multiple iterations of language models -- a computationally costly endeavor -- but we also wish to study realistic conditions where generative models are high-performing and generative diverse outputs. Because small language models (below 10M parameters) pretrained on TinyStories were shown to be able to generate coherent-albeit-simple English sentences \citep{eldan2023tinystories}, this choice of architectures, scales, dataset and temperature hopefully strikes a good balance between being representative, being diverse and being computationally feasible.
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/language_modeling/eval_loss_linear_vs_epoch_linear_col_iteration_20240329_220900.pdf}
+    \caption{\textbf{Data Accumulation Avoids Model Collapse in Language Modeling.} Learning curves for individual model-fitting iterations when repeatedly \textit{replacing} data (top), and when \textit{accumulating} data (bottom). Note: Epochs correspond to more gradient steps for accumulate than replace because the number of training data grows for accumulate.
+    }
+    \label{fig:language_modeling_results_learning_curves}
+\end{figure}
+
+\begin{table}[h!]
+    \centering
+    \small
+    \begin{tabularx}{\textwidth}{c|c|X}
+        Model & Iteration & Sample Generation \\
+        \hline 
+        Llama2 (125M) & 3 \accumulate{(A)} & In the end, the crab found a smooth shell. He took it to a safe place under a tree. The crab put the shell where he found it. Tim and his mom were tired, but they were happy. They had a fun day at the beach. And they lived happily ever after. The end. \\
+                    & 3 \replace{(R)} & Henry asked his Mom why the golf sounded so special. His Mom explained that the line of lumber had something special that would help. She said that if you're not sure, the lumber is special. \\
+                    & 8 \replace{(R)} & Friend Stan and Millie laughed together and prepared to spend the morning together. Mamaing Grandma's possibilitant, twice would measure how much she lovedk. Everyone started to get ready when they started arguing until their mum upset. \\
+        \hline
+        GPT2 (9M) & 5 \accumulate{(A)} & Jack was so happy that he took care of the honey. He thought, "I care about the beautiful garden, because it is nice and clean." He started to feed the flower every day. The flower grew bigger and taller, and Jack became very happy. \\
+                    & 5 \replace{(R)} & After playing, Lily got tired and quickly ran back to playing with her dolls. She opened her eyes and played with her dolls all day long. Her grandma was so happy that she screamed as she watched her look back at her original clothes and laughed. 
+                    \\
+                    & 10 \replace{(R)} & When she finished eating it, she tasted it all up. She said goodbye to her mom and said goodbye. Mommy smiled, feeling very proud of her. It was other. She knew that sharing is always easy to share her meal with her mom. 
+                    \\
+        \hline
+    \end{tabularx}
+    \caption{\textbf{Data Accumulation Avoids Model Collapse in Language Modeling.} Both 125M-parameter Llama2 as well as 9M GPT-2 models \replace{show decreasing quality when replacing data (R)}, but \accumulate{maintain high-quality text generations when accumulating data (A)}.}
+    \label{tab:sample_generations}
+\end{table}
+
+\paragraph{Results}
+We found that for all architectures, parameter counts, and sampling temperatures, as the number of model-fitting iterations increased, \replace{replacing data led to an increase in test cross entropy} (Fig. \ref{fig:language_modeling_results} top). We also found that for all architectures, parameter counts, and sampling temperatures, as the number of model-fitting iterations increased, \accumulate{accumulating data led to equal-or-lower test cross entropy} (Fig. \ref{fig:language_modeling_results} bottom). Lower temperature (0.3) led to a faster increase in test error than higher temperature (1.0) (Appendix Fig. \ref{fig:language_modeling_temp}), but the trend was consistent for both temperatures. Table~\ref{tab:sample_generations} shows samples of generated texts for GPT2 (9M) and Llama2 (125M) models at model-fitting iterations 3-5 when both accumulating and replacing data, as well as iterations 8-10 (replacing only).
+
+\paragraph{Ablations} 
+We ablate for several additional potential confounds beyond generation temperature. First, when accumulating data, subsequent model iterations are trained on larger datasets than when replacing data. To control for this, we also perform experiments in which data is replaced, but the size of the (fully synthetic) dataset is grown to match the training set size in the accumulation regime. We find that model performance still degrades (albeit at a lower rate). This is shown in Appendix~\ref{app:sec:lm_ablations}, Table~\ref{tab:lm_eval_loss}, right-most column.
+Second, a possible concern could be that degrading performance when replacing data could be due to low model performance in iteration 1 (and thus the quality of the first synthetic dataset). We control for this by varying the amount of training performed in iteration 1 only and find that this has no significant impact.
+Lastly, we find that our results are also consistent across varying dataset sizes and training epochs. These ablations are discussed in Appendix ~\ref{app:sec:linear_regression_numerics}.
+
+\subsection{Diffusion Models on Molecular Conformation Data}
+\label{sec:real:subsec:molecular_diffusion}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/molecular_diffusion/diffusion_test_loss_linear_vs_iteration_20240329_220900.pdf}
+    \caption{\textbf{Data Accumulation Avoids Model Collapse in Geometric Diffusion Modeling.} GeoDiff, a diffusion-based molecular conformation generation model, is trained on a subset of Drugs data containing molecular structures found in drugs. \replace{Test loss degrades when replacing data (left)} \accumulate{but not when accumulating data (right)}.}
+    \label{fig:diff_results}
+\end{figure}
+
+\textbf{Experiments} We next train sequences of diffusion models on molecular conformation data. Specifically, we train GeoDiff \citep{xu2022geodiff}, a geometric diffusion model for molecular conformation generation, on the GEOM-Drugs \citep{axelrod2022geom} dataset. We down-sample the training split of GEOM-Drugs to $40,000$ molecular conformations, which we use as our initial training set, and perform $50$ diffusion steps for each prediction. For the loss, we use the standard loss used by GeoDiff: a weighted variational lower bound to the conditional likelihood; for more details, see \citet{xu2022geodiff}.
+
+
+\textbf{Results} Over $8$ model-fitting iterations, we find \replace{test loss increases when replacing data}, matching our language model experiments, and \accumulate{test loss remains relatively constant when accumulating data} (Fig. \ref{fig:diff_results}). Unlike with language models, we found that when replacing data, performance worsens significantly in the first model-fitting iteration trained on synthetic data and does not degrade further substantially in subsequent iterations. 
+
+
+\subsection{Variational Autoencoders on Image Data}
+\label{sec:real:subsec:image_vaes}
+
+\paragraph{Experiments} We lastly train sequences of variational autoencoders (VAEs) \citep{kingma2013auto, rezende2014stochastic} on CelebA \citep{liu2015faceattributes}, a dataset of 200k images of human faces split between train and test sets, chosen as a balance between being a realistic dataset with many samples, color images and resolution, and computational feasibility of training multiple iterations of models on accumulating data. The loss is the standard VAE loss: reconstruction error plus the KL divergence between the encoder's output Gaussian and the isotropic Gaussian prior. See Appendix~\ref{app:sec:vae_ablations} for more experimental details.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/image_vae/vae_eval_loss_linear_vs_iteration_10_20240329_220900.pdf}    
+    \caption{\textbf{Data Accumulation Avoids Model Collapse in Variational Autoencoders for Image Generation.} Sequences of variational autoencoders (VAEs) are trained on CelebA, a large-scale dataset of human faces. \replace{Test loss degrades when replacing data (left)} \accumulate{but not when accumulating data (right)}.}
+    \label{fig:vae_loss}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.325\textwidth]{figures/image_vae/no_aggregate_samples.png}
+    \includegraphics[width=0.325\textwidth]{figures/image_vae/aggregate_sample.png}
+    \includegraphics[width=0.325\textwidth]{figures/image_vae/continual_samples.png}
+    \caption{\textbf{Sampled Images from } Left: \replace{Replacing} data with data generated by the previous iteration's newly trained VAE yields lower quality and eventually leads to complete mode collapse. Middle: \accumulate{Accumulating} data with data generated by the previous iteration's newly trained VAE preserves the quality and diversity of generated data across iterations. Right: Baseline samples after 100 training epochs on the dataset.}
+    \label{fig:vae_samples}
+\end{figure}
+
+
+\paragraph{Results} We find that \replace{replacing data at each iteration again exhibits model collapse}: the test error rises swiftly with each additional iteration, and each iteration yields lower quality and less diverse generated faces until all model generations represent a single mode as shown in the left panel of Figure \ref{fig:vae_samples}. In contrast, \accumulate{accumulating data at each iteration significantly slows model collapse}: the test error increases significantly slower with each additional iteration. While the diversity of generations does go down as compared in the middle and right panel of Fig. \ref{fig:vae_samples}, it still represents major axes of variation in the dataset, such as gender, but no longer seems to generate other details, along more minor axis of the data manifold, such as glasses and accessories. We discuss further analysis of VAE reconstructions in Appendix~\ref{app:sec:vae_ablations}.
+
+
+Interestingly, unlike language modeling, the test error of accumulating data does increase with the number of iterations (albeit much more slowly than with replacing data). We also note that \cite{martinez2023combining} found slightly contradictory evidence, specifically that a different architecture on a much smaller dataset exhibits fast performance deterioration even with accumulating data. Understanding under what conditions and why these discrepancies exist is an interesting direction we leave for future research.

@@ -6,15 +6,20 @@ sidebar_position: 12
 
 Search token: `SOCIAL_SIMULATION_NEXT_GOAL_HANDOFF`.
 
-Status: future multi-actor expansion handoff under the active Soul/LifeGoal
-direction.
+Status: future multi-actor expansion handoff. It is subordinate to the active
+central plan and should not drive current work before the no-regret core and
+Goldilocks branch-triage gate.
+
+Research-spine update, revised 2026-06-29: use this as historical context for
+multi-actor expansion only. For current row-producing scenario pressure, use
+`No-Regret-Core-Scenario-Catalog.md`.
 
 Material-economy update, recorded 2026-06-15: this handoff predates the
 personal-possession/material-claim/public-affordance benchmark framing. Treat
 the shared-chest loop below as a legacy first exchange surface, not as the
 definition of society or the required next benchmark. Use
-`Material-Claims-And-Social-Economy-Benchmark-Plan.md` for current benchmark
-direction.
+`Material-Claims-And-Social-Economy-Benchmark-Plan.md` only as a reference case
+library.
 
 This page is not gated on the long-term diamond harness. Use it after the
 single-actor Soul/LifeGoal social cycle can reliably produce current-run
@@ -300,7 +305,7 @@ runtime failure.
 Use this prompt as the next implementation request:
 
 ```text
-You are working in /Users/naem1023/git/minecraft-llm-agent-community.
+You are working in <repo>.
 
 Read AGENTS.md, SPEC.md, project-docs/Agent-Search-Index.md, and especially
 project-docs/Architecture/Social-Simulation-Next-Goal-Handoff.md.
@@ -355,7 +360,7 @@ requested.
 
 Answer these before implementation is considered complete:
 
-- Did one actor's verified action change another actor's available choices?
+- Did one actor's checked action outcome change another actor's available choices?
 - Can the final success be proven without reading provider prose?
 - Which exact evidence refs caused the relationship event?
 - Did generated code use runtime helpers, and were helper calls recorded?

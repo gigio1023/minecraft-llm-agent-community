@@ -1,0 +1,167 @@
+\section{The DSPy Programming Model}\label{sec:dspy_programming_model}
+
+
+We present DSPy, which treats LMs as abstract devices for text generation,\footnote{We assume access to one or more LMs, which consume a prompt string and return text completions. This may be a promptable LM capable of in-context learning (e.g., GPT-3.5 or Llama2-7b) or a smaller finetuneable LM (e.g., T5-base). An LM may be selected as the default; operations will use it unless configured otherwise.} and optimizes their usage in arbitrary computational graphs. DSPy programs are expressed in Python: each program takes the task input (e.g., a question to answer or a paper to summarize) and returns the output (e.g., an answer or a summary) after a series of steps. DSPy contributes three abstractions toward automatic optimization: signatures, modules, and teleprompters. Signatures abstract the input/output behavior of a module; modules replace existing hand-prompting techniques and can be composed in arbitrary pipelines; and teleprompters optimize all modules in the pipeline to maximize a metric. %
+
+
+
+
+
+
+\subsection{Natural Language Signatures can abstract prompting \& finetuning}\label{sec:signatures}
+
+Instead of free-form string prompts, DSPy programs use natural language \textit{signatures} to assign work to the LM. A DSPy signature is \textit{natural-language typed} declaration of a function: a short declarative spec that tells DSPy \textit{what} a text transformation needs to do (e.g., ``consume questions and return answers''), rather than \textit{how} a specific LM should be prompted to implement that behavior.
+More formally, a DSPy signature is a tuple of \textit{input fields} and \textit{output fields} (and an optional \textit{instruction}). A field consists of \textit{field name} and optional metadata.\footnote{String descriptions of the task and the fields are also optional and usually omitted. Fields can carry optional field \textit{prefix} and \textit{description}. By default, fields are assumed to hold free-form strings; we are actively exploring optional \textit{data type} as a way to specify constraints on valid values (e.g., \texttt{bool} or \texttt{int}) and more gracefully handle formatting and parsing logic, though this feature is not core to DSPy at the time of writing.}
+In typical usage, the roles of fields are inferred by DSPy as a function of field names. For instance, the DSPy compiler will use in-context learning to interpret \texttt{question} differently from \texttt{answer} and will iteratively refine its usage of these fields.
+
+Signatures offer two benefits over prompts: they can be compiled into self-improving and pipeline-adaptive prompts or finetunes. This is primarily done by bootstrapping (Sec~\ref{sec:compiler}) useful demonstrating examples for each signature. Additionally, they handle structured formatting and parsing logic to reduce (or, ideally, avoid) brittle string manipulation in user programs.
+
+
+\newcommand{\dspyarrow}{->}
+
+In practice, DSPy signatures can be expressed with a shorthand notation like \texttt{question \dspyarrow\ answer}, so that line~1 in the following is a complete DSPy program for a basic question-answering system (with line~2 illustrating usage and line~3 the response when GPT-3.5 is the LM):
+
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false,literate={í}{{\'i}}1]
+qa = dspy.Predict("question -> answer")
+qa(question="Where is Guaraní spoken?")
+# Out: Prediction(answer='Guaraní is spoken mainly in South America.')
+\end{lstlisting}
+\end{samepage}
+In the shorthand notation, each field's name indicates the semantic role that the input (or output) field plays in the transformation. DSPy will parse this notation and expand the field names into meaningful instructions for the LM, so that \texttt{english\_document \dspyarrow\ french\_translation} would prompt for English to French translation. When needed, DSPy offers more advanced programming interfaces for expressing more explicit constraints on signatures (Appendix~\ref{app:advanced-signatures}).
+
+
+\subsection{Parameterized \& templated Modules can abstract prompting techniques}\label{sec:modules}
+
+Akin to type signatures in programming languages, DSPy signatures simply define an interface and provide type-like hints on the expected behavior. To use a signature, we must declare a \emph{module} with that signature, like we instantiated a \texttt{Predict} module above. A module declaration like this returns a \textit{function} having that signature.
+
+\paragraph{The \texttt{Predict} Module}
+
+The core module for working with signatures in DSPy is \texttt{Predict} (simplified pseudocode in {Appendix~\ref{code:predict}}). Internally, \texttt{Predict} stores the supplied signature, an optional LM to use (initially \texttt{None}, but otherwise overrides the default LM for this module), and a list of demonstrations for prompting (initially empty). Like layers in PyTorch, the instantiated module behaves as a callable function: it takes in keyword arguments corresponding to the signature input fields (e.g., \texttt{question}), formats a prompt to implement the signature and includes the appropriate demonstrations, calls the LM, and parses the output fields. When \texttt{Predict} detects it's being used in \texttt{compile} mode, it will also internally track input/output traces to assist the teleprompter at bootstrapping the demonstrations.
+
+
+
+
+
+
+
+
+
+
+\vspace{2mm}
+
+\paragraph{Other Built-in Modules}
+
+DSPy modules translate prompting techniques into modular functions that support any signature, contrasting with the standard approach of prompting LMs with task-specific details (e.g., hand-written few-shot examples). To this end, DSPy includes a number of more sophisticated modules like \texttt{ChainOfThought}, \texttt{ProgramOfThought}, \texttt{MultiChainComparison}, and \texttt{ReAct}.\footnote{These modules generalize prompting techniques from the literature, respectively, by \citet{wei2022chain}, \citet{chen2022program}, \citet{yoran2023answering}, and \citet{yao2022react} and, in doing so, generalize the ideas on zero-shot prompting and rationale self-generation from \citet{kojima2022large}, \citet{zelikman2022star}, \citet{zhang2022automatic}, and \citet{huang2022large} to parameterized modules that can bootstrap arbitrary multi-stage pipelines.} These can all be used interchangeably to implement a DSPy signature. For instance, simply changing \texttt{Predict} to \texttt{ChainOfThought} in the above program leads to a system that thinks step by step before committing to its output field.
+
+Importantly, all of these modules are implemented in a few lines of code by expanding the user-defined signature and calling \texttt{Predict} one or more times on new signatures as appropriate. For instance, we show a simplified implementation of the built-in \texttt{ChainOfThought} below.
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false,literate={í}{{\'i}}1]
+class ChainOfThought(dspy.Module):
+    def __init__(self, signature):
+        # Modify signature from `*inputs -> *outputs` to `*inputs -> rationale, *outputs`.
+        rationale_field = dspy.OutputField(prefix="Reasoning: Let's think step by step.")
+        signature = dspy.Signature(signature).prepend_output_field(rationale_field)
+
+        # Declare a sub-module with the modified signature.
+        self.predict = dspy.Predict(signature)
+    
+    def forward(self, **kwargs):
+        # Just forward the inputs to the sub-module.
+        return self.predict(**kwargs)
+\end{lstlisting}
+\end{samepage}
+This is a fully-fledged module capable of learning effective few-shot prompting for any LM or task. We contrast that with {Appendix~\ref{sec:large_prompts}}, which copies long reasoning prompts hand-written by sources ranging from recent research to popular prompting libraries. %
+
+
+\vspace{2mm}
+
+ \paragraph{Parameterization}
+
+Uniquely, DSPy \textit{parameterizes} these prompting techniques. To understand this parameterization, observe that any LM call seeking to implement a particular signature needs to specify \textit{parameters} that include: (1) the specific LM to call \citep{chen2023frugalgpt}, (2) the prompt instructions \citep{yang2023large} and the string prefix of each signature field and, most importantly, (3) the demonstrations used as few-shot prompts (for frozen LMs) or as training data (for finetuning). We focus primarily on automatically generating and selecting useful demonstrations. In our case studies, we find that bootstrapping good demonstrations gives us a powerful way to teach sophisticated pipelines of LMs new behaviors systematically. %
+
+
+
+
+
+
+\paragraph{Tools}\label{sec:tools}
+
+DSPy programs may use tools, which are modules that execute computation. We support retrieval models through a \texttt{dspy.Retrieve} module. At the time of writing, DSPy has built-in support for ColBERTv2, Pyserini, and Pinecone retrievers, and we have explored experimental \texttt{dspy.SQL} for executing SQL queries and \texttt{dspy.PythonInterpreter} for executing Python code in a sandbox.
+
+\vspace{2mm}
+\paragraph{Programs}\label{sec:programs}
+
+DSPy modules can be composed in arbitrary pipelines in a define-by-run interface. Inspired directly by PyTorch and Chainer, one first declares the modules needed at initialization, allowing DSPy to keep track of them for optimization, and then one expresses the pipeline with arbitrary code that calls the modules in a \texttt{forward} method. As a simple illustration, we offer the following simple but complete retrieval-augmented generation (RAG) system.
+
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+class RAG(dspy.Module):
+    def __init__(self, num_passages=3):
+        # `Retrieve` will use the user's default retrieval settings unless overriden.
+        self.retrieve = dspy.Retrieve(k=num_passages)
+        # `ChainOfThought` with signature that generates answers given retrieval & question.
+        self.generate_answer = dspy.ChainOfThought("context, question -> answer")
+
+    def forward(self, question):
+        context = self.retrieve(question).passages
+        return self.generate_answer(context=context, question=question)
+\end{lstlisting}
+\end{samepage}
+
+To highlight modularity, we use \texttt{ChainOfThought} as a drop-in replacement of the basic \texttt{Predict}. One can now simply write \texttt{RAG()("Where is Guaraní spoken?")} to use it. Notice that, if we use a signature \texttt{"context, question -> search\_query"}, we get a system that generates search queries rather than answers.
+
+
+\subsection{Teleprompters can automate prompting for arbitrary pipelines}\label{sec:teleprompter:abstraction}
+
+
+When compiling a DSPy program, we generally invoke a \textit{teleprompter}, which is an optimizer that takes the program, a training set, and a metric---and returns a new optimized program. Different teleprompters (Sec~\ref{sec:compiler}) apply different strategies for optimization.
+
+In DSPy, training sets may be \textit{small}, potentially a handful of examples, though larger data enables more powerful optimization. Training examples may be \textit{incomplete}, i.e., only \textit{input} values are necessary. Labels for the pipeline steps are not required, unless they need to be used in the metric. In practice, we typically assume labels only for (at most) the program's final output, not the intermediate steps. This label-efficiency is critical for modularity: building a new pipeline in DSPy requires simply \textit{recompiling} the new pipeline's code, not annotating data specific to the new pipeline.
+
+\vspace{2mm}
+Metrics can be simple notions like exact match (EM) or F1, but they can be entire DSPy programs that balance multiple concerns. For example, we may compile the \texttt{RAG} module above against a dataset of question--answer pairs \texttt{qa\_trainset} and the metric EM. The goal of optimization here is to effectively bootstrap few-shot demonstrations. The following code achieves this:
+
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+# Small training set with only questions and final answers.
+qa_trainset = [dspy.Example(question="What is the capital of France?", answer="Paris")]
+
+# The teleprompter will bootstrap missing labels: reasoning chains and retrieval contexts.
+teleprompter = dspy.BootstrapFewShot(metric=dspy.evaluate.answer_exact_match)
+compiled_rag = teleprompter.compile(RAG(), trainset=qa_trainset)
+\end{lstlisting}
+\end{samepage}
+
+In this example, the \texttt{BootstrapFewShot} teleprompter (Sec~\ref{sec:compiler}, {Appendix~\ref{code:BootstrapFewShot}}) simulates \texttt{RAG} on the training example(s). It will collect \textit{demonstrations} of each module (i.e., examples of its input--output behavior) that collectively lead to valid output (i.e., respecting the signatures and the metric).
+
+If one wanted to push the compiled program to be extractive given its retrieved contexts, one could define a custom metric to use in place of \texttt{dspy.evaluate.answer\_exact\_match}:
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+def answer_and_context_match(example, pred, trace=None):
+    answer_match = dspy.evaluate.answer_exact_match(example, pred)
+    
+    # Is the prediction a substring of some passage?
+    context_match = any((pred.answer.lower() in c) for c in pred.context)
+    
+    return answer_match and context_match
+\end{lstlisting}
+\end{samepage}
+Notice that behavior like this might be more accurately checked by another DSPy program that checks for faithful grounding of answers. Such metrics are fully supported and encouraged in DSPy.
+
+
+Teleprompters can be composed by specifying a \texttt{teacher} program. DSPy will sample demonstrations from this program for prompt optimization. This composition can enable very rich pipelines, where expensive programs (e.g., complex expensive ensembles using large LMs) supervise cheap programs (e.g., simple pipelines using smaller LMs). One may start with \texttt{compiled\_rag} from above (say, compiled to use a large Llama2-13b-chat LM) but now fine-tune Flan-T5-large to create an efficient program:
+\begin{samepage}
+\begin{lstlisting}[language=Python,breaklines=true,showstringspaces=false]
+# Larger set of questions with *no labels*. Labels for all steps will be bootstrapped.
+unlabeled_questions = [dspy.Example(question="What is the capital of Germany?"), ...]
+
+# As we assumes no answer, we use `answer_passage_match` to filter ungrounded answers.
+finetuning_teleprompter = BootstrapFinetune(metric=dspy.evaluate.answer_passage_match)
+
+# We set `teacher=compiled_rag` to compose. Bootstrapping will now use `compiled_rag`.
+compiled_rag_via_finetune = finetuning_teleprompter.compile(RAG(), teacher=compiled_rag, trainset=unlabeled_questions, target='google/flan-t5-large')
+\end{lstlisting}
+\end{samepage}
+
+

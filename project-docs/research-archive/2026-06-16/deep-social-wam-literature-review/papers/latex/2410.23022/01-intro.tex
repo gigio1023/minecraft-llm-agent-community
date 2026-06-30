@@ -1,0 +1,96 @@
+\section{Introduction}
+\label{sec:intro}
+%
+%
+%
+%
+%
+%
+%
+%
+%
+Reward functions are central to reinforcement learning (RL), and are often assumed to be given as part of the problem definition \citep{Sutton1998}. 
+These functions are written to describe the task at hand, and often involve tradeoffs between ease of task definition and ease of policy optimization.  For example, assigning a reward of $+1$ for solving the task and $0$ otherwise is simple to define and accurately reflects the task goal, but is difficult to optimize due to providing zero gradients almost everywhere. 
+%
+%
+
+These difficulties have motivated the use of intrinsic rewards to aid policy optimization
+\citep{randlov1998shaping, ng1999rewardshaping, sorg2010internal, singh2010intrinsically}.  The reward designer can include additional reward shaping terms to create a denser learning signal, which can reflect task progress or guide the agent towards intermediate goals. However, designing intrinsic rewards can be remarkably challenging~\citep{booth23perils,  ibrahim2024comprehensive} 
+and places increased demands on human experts to provide task-specific knowledge. \looseness=-1
+
+Recently, several works have been proposed to leverage the vast prior knowledge encoded in large language models (LLMs) to automate the reward design process, based on a task description in natural language.
+%
+%
+They can be broadly categorized into two families:
+\begin{enumerate}[itemsep=0pt, topsep=0pt, leftmargin=0pt]
+\vspace*{-3pt}
+\item[] \textbf{1. Generating the reward function's code by LLM.}
+  A number of methods have been proposed to automatically generate
+  executable code that computes the reward directly~\citep{ma2023eureka, xie2023text2reward, yu2023language, li2024auto}. 
+  While they have demonstrated success in complex continuous control tasks, they either require access to environment source code to include in the prompt, or a detailed description of input parameters and reward function templates.
+  Furthermore, they are limited to reward functions compactly expressible via code,  describing explicit logic, and it is unclear how these approaches can easily process high-dimensional state representations such as images, or semantic features such as natural language. 
+  %
+  
+  %
+  %
+  %
+  %
+  %
+  %
+%
+%
+%
+%
+%
+%
+
+  %
+\item[] \textbf{2. Generating reward values by LLMs.} 
+  Motif~\citep{klissarovdoro2023motif, klissarov2024maestromotif} is a typical example of this category.
+  It ranks the captions of pairs of observations using an LLM and distills these preferences into a parametric reward model. Motif does not require access to environment source code nor numerical state representation, can process semantic input features, and can scale to problems requiring billions of environment samples.
+  %
+  %
+  %
+  Nevertheless, it also suffers from two important limitations. First, it requires a diverse, pre-existing dataset of captioned observations which are used to elicit preferences from the LLM. In many situations, such a dataset might not exist, and collecting it can increase the sample complexity.
+  More importantly, collecting a diverse dataset often requires a non-trivial reward function that is feasible to optimize,
+  %
+  which is the primary problem we aim to solve with intrinsic reward functions in the first place. 
+  Second, it involves a complex three-stage process, which sequentially annotates observations using an LLM, trains a reward model, and finally trains an RL agent. This is still time-consuming, given that the LLM annotation process can take several days' worth of GPU hours,
+  and is done prior to training the reward model and RL agent.
+  Alternatively, \citet{chu2023accelerating} query the LLM to directly label observations as having high or low reward at each timestep. 
+  However, querying an LLM for every observation is computationally infeasible for many RL applications, which involve 
+  millions or billions of observations.  \looseness=-1
+%
+  %
+\end{enumerate}
+As a consequence, it would be desirable to have \emph{an integrated solution} that offers: 
+\begin{enumerate}[leftmargin=15pt, itemsep=0pt]
+    \item[(1)] \emph{concurrent and fast online learning of both the intrinsic rewards and the policy 
+that requires no external data nor auxiliary reward functions,}
+    \item[(2)] \emph{expressible reward functions that can capture semantic features
+that are difficult to process with compact executable code.}
+\end{enumerate}
+In this work, we present \oni, a distributed online intrinsic reward and agent learning system --- \Cref{fig:overview} overviews the high-level components.
+%
+\oni removes the dependency on external datasets beyond the agent's own experience and enables large-scale RL training with ease. 
+\oni assumes access to captions of observations, similar to previous work~\cite{klissarovdoro2023motif, chu2023accelerating}. 
+The captions of collected observations are annotated online by an asynchronous LLM server, and both the policy and intrinsic reward model are simultaneously updated using the LLM's feedback.
+%
+%
+Such a learning framework allows us to easily instantiate different algorithmic choices for synthesizing LLM feedback. Specifically, we explore three methods: the first one is retrieval-based and simply hashes the annotations; 
+the second builds a binary classification model to distill the sentiment labels returned by the LLM;
+and the third sends pairs of captions to the LLM server for preference labeling and learns a ranking model, similar to Motif. \looseness=-1
+%
+We demonstrate that \oni is able to match Motif's performance across a range of challenging, sparse rewards from the NetHack Learning Environment (NLE)~\citep{kuettler2020nethack}, solely using the agent's gathered experience in a single, unified process. We also open-source our code to facilitate future work on LLM-based intrinsic motivation in settings where large offline datasets are not available. 
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{plot/overview.pdf}
+  \caption{Overview of Motif \citep{klissarovdoro2023motif} and ONI.}
+  \label{fig:overview}
+\end{figure}
+
+%
+%
+%
+%

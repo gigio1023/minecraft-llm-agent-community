@@ -1,0 +1,50 @@
+ALFWorld \citep{shridhar2021alfworldaligningtextembodied} is a text-based, long-horizon agent environment designed to align with the embodied ALFRED benchmark \citep{shridhar2021alfworldaligningtextembodied}.
+An ALFWorld task can involve over 50 locations and require more than 50 steps for an expert policy, challenging agents to plan, track subgoals, and explore these locations efficiently.
+In particular, a key challenge in ALFWorld is identifying likely locations of household items (\eg{} desklamps are likely on desks, shelves, or dressers). This makes ALFWorld well suited for evaluating both pretrained commonsense and learned world knowledge of an LLM-based agent.
+
+\subsection{\wmrlshort{} Training Setup}
+\label{subsec:alfworld_wmrl_setup}
+% Dataset size
+To collect training data for \wmrlshort{} (and \wmsftshort{}), we use the target model (Qwen2.5-7B-Instruct) to rollout $N=3$ trajectories per training task with temperature $\tau=1.0$.
+We use 2048 tasks from the ALFWorld original training set with a maximum step of 30.
+We then convert these rollouts to triplets of $\left\langle s_{\le t}, a_t, s_{t+1} \right\rangle$.
+After minor postprocessing (e.g., removing some samples that contains invalid actions), we obtain 21,011 triplets for training and 2,288 for validation.
+Then, we finetune a filtering model with SFT on the validation split, and subsampled ``too easy'' training samples with $\tau_{d}=0.1,\tau_{\mathrm{easy}}=0.0$ which corresponds to $\sim$30\% of the original training data.
+% We set $p=0.1$ to subsample ``too easy'' training samples, as this often ensures the majority of the dataset being medium to hard samples while not completing sacrificing too much diversity/coverage.
+% We note that $p=0.1$ is picked heuristically without tuning, and is fixed also for $\tau^2$ Bench (see \Cref{sec:More Details on tau2 Bench}.
+We set $p = 0.1$ to subsample these ``too easy'' training samples, so that the final dataset retains mostly medium-to-hard examples while preserving sufficient dataset diversity.
+We note that this value is chosen heuristically without tuning and is also fixed for $\tau^2$ Bench (see \Cref{subsec:alfworld_wmrl_setup}).
+An overview of hyperparameter heuristics/intuitions is shown in \Cref{tab:rwml_hyperparams}.
+This results in a final training set of 15,813 triplets.
+For a fair comparison, both \wmrlshort{} and \wmsftshort{} are then trained on this final training set.
+
+For $r^{\textrm{WM}}$ during training, we using Qwen3-Embedding-8B \citep{zhang2025qwen3embeddingadvancingtext} with $\tau_{d}=0.2$.
+For \wmrlshort{}, we prompt the model to generate reasoning before making a final prediction of the next state. For \wmsftshort{}, we directly train the model to predict the next state with empty reasoning tokens.
+Since there is no reasoning data available for the triplets, we find this training method for \wmsftshort{} can better enable generalization/reasoning during the second stage \policyrl{} training.
+We present the prompts used for \wmrlshort{} and \wmsftshort{} in \Cref{tab:alfred_wmrl_prompt} and \Cref{tab:alfred_wmsft_prompt}, respectively.
+For \wmrlshort{}, we train over 2 epochs using a learning rate of 1e-6, batch size of 32, group size of 8 with 2xB200 GPUs. For \wmsftshort{}, we train over 2 epochs using a learning rate of 2e-6, effective batch size of 32 over 4xB200 GPUs.
+
+
+
+\subsection{Policy RL Training Setup}
+\label{subsec:alfworld_policy_rl_setup}
+For \policyrl{}, we mainly follow setups and prompts from \citet{feng2025groupingrouppolicyoptimizationllm,yu2025dynamindlearningsimulateexperience}.
+We use the official training split from ALFWorld during training, prompting the model to generate reasoning tokens (i.e., \texttt{<think>}...\texttt{</think>}) before generating an action.
+We use a maximum step of 15 during training, using $\gamma=1.0$ to propagate terminal task success rewards to every turn in the trajectory.
+We note that this setup is identical to all \policyrl{} experiments (e.g., \wmrlshort{}+\policyrl{} and \wmsftshort{}+\policyrl{}). The only differences is the starting model checkpoint.
+All \policyrl{} runs are trained with GRPO over 300 steps with a group size of 8 on 2xB200 GPUs. Average training time is 28 hours.
+
+\subsection{Other Training Setup}
+\label{subsec:alfworld_other_setup}
+For \distill{}, \IWM{}, and \ICRIT{}, we use expert data from the official ALFWorld dataset, following \citet{zhang2025agentlearningearlyexperience}.
+For reflection data in \ICRIT{}, we follow \citet{zhang2025agentlearningearlyexperience} and use a branching factor of 3 per expert action.
+Then, we use the prompt provided in \citet{zhang2025agentlearningearlyexperience} to generate reflection data with the target model (i.e., Qwen2.5-7B-Instruct).
+% However, we find the target model cannot consistently generate coherent reflections, potentially due to its weak long-context instruction following capabilities.
+% Therefore, we follow \citet{yu2025dynathinksynergizingreasoningacting} and used a stronger LLM (i.e., GPT-4o) for this reflection generation step.
+However, we find that the target model cannot consistently generate coherent reflections, likely due to its limited long-context instruction-following capability. Therefore, following \citet{yu2025dynathinksynergizingreasoningacting}, we use a stronger LLM (i.e., GPT-4o) to generate reflections.
+After data collection, we follow \citet{zhang2025agentlearningearlyexperience} and performed SFT training by combining the world model data/critic data with the original expert actions dataset.
+All training is done on 4xB200 GPUs, similar to our \wmsftshort{}.
+
+
+
+% \input{floats/ablation_thresh}

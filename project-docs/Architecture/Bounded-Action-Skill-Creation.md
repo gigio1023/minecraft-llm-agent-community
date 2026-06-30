@@ -19,10 +19,10 @@ runtime behavior, while an agent skill is a `.agents/skills/*/SKILL.md`
 capability for coding agents.
 
 The decision is intentionally not "copy Voyager" or "pick one reference repo".
-The useful pattern is evidence-backed action skill evolution. The unsafe pattern
+The useful pattern is artifact-backed action skill evolution. The unsafe pattern
 is generated code becoming hidden runtime authority or entering the loop without
 an explicit action-selection decision, schema validation, helper-event evidence,
-and verifier-backed trial.
+and checked trial outcome.
 
 ## Core Decision
 

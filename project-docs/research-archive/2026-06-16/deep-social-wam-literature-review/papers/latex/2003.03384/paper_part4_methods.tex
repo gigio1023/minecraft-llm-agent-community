@@ -1,0 +1,396 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Methods}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\label{methods_sec}
+
+\amlz concerns the automatic discovery of algorithms that perform well on a given set of ML tasks $\mathcal{T}$. First, \emph{search experiments} explore a very large space of algorithms $\mathcal{A}$ for an optimal and generalizable $a^* \in \mathcal{A}$. 
+The quality of the algorithms is measured on a subset $\mathcal{T}_{search} \subset \mathcal{T}$, with each search experiment producing a candidate algorithm.
+In this work, we apply random search as a baseline and evolutionary search as the main search method due to their simplicity and scalability. 
+Once the search experiments are done, we select the best candidate by measuring their performances on another subset of tasks $\mathcal{T}_{select} \subset \mathcal{T}$ (\mbox{analo}gous to standard ML model selection with a validation set). Unless otherwise stated, we use binary classification tasks extracted from CIFAR-10, a collection of tiny images each labeled with object classes \cite{krizhevsky2009learning}, and we calculate the average accuracy across a set of tasks to measure the quality of each algorithm. To lower compute costs and achieve higher throughput, we create small proxy tasks for $\mathcal{T}_{search}$ and $\mathcal{T}_{select}$ by using one random matrix for each task to project the input features to lower dimensionality. The projected dimensionality is $8 \leq F \leq 256$. Finally, we compare the best algorithm's performance against hand-designed baselines on the CIFAR-10 data in the original dimensionality (3072), holding out the CIFAR-10 test set for the final evaluation. To make sure the improvement is not specific to CIFAR-10, we further show the gain generalizes to other datasets: SVHN~\cite{netzer2011reading}, ImageNet~\cite{chrabaszcz2017downsampled}, and Fashion MNIST~\cite{xiao2017fashion}. The \textit{Experiment Details} paragraphs in Section~\ref{results_sec} contain the specifics of the tasks. We now describe the search space and search method with sufficient detail to understand the results. For reproducibility, we provide the minutiae in the Supplement and the open-sourced code.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Search Space}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\label{methods_search_space_sec}
+
+We represent algorithms as computer programs that act on a small virtual memory with separate address spaces for scalar, vector and matrix variables (\eg\ \textcode{s1}, \textcode{v1}, \textcode{m1}), all of which are floating-point and share the dimensionality of the task's input features ($F$). Programs are sequences of instructions. Each instruction has an operation---or \textit{op}---that determines its function (\eg ``multiply a scalar with a vector''). To avoid biasing the choice of ops, we use a simple criterion: those that are typically learned by high-school level. We purposefully exclude machine learning concepts, matrix decompositions, and derivatives. Instructions have op-specific arguments too. These are typically addresses in the memory (\eg ``read the inputs from scalar address 0 and vector address 3; write the output to vector address 2''). Some ops also require real-valued constants (\eg $\mu$ and $\sigma$ for a random Gaussian sampling op), which are searched for as well. Suppl.\  Section~\ref{search_space_additional_details} contains the full list of 65 ops.
+
+\begin{figure}[!h]
+    \begin{code}{0.48\textwidth}{3.35in}{codebackground}  % Was 3.1in long.
+        \codeline{\codecomment{(Setup, Predict, Learn) = input ML algorithm.}}
+        \codeline{\codecomment{Dtrain / Dvalid = training / validation set.}}
+        \codeline{\codecomment{sX/vX/mX: scalar/vector/matrix var at address X.}}
+        \codeline{\codedef{def} Evaluate(Setup, Predict, Learn, Dtrain, Dvalid):}
+        \codeline{\codetab \codecomment{Zero-initialize all the variables (sX/vX/mX).}}
+        \codeline{\codetab initialize\_memory()}
+        \codeskip
+        \codeline{\codetab Setup() \codecomment{Execute setup instructions.}}
+        \codeskip
+        \codeline{\codetab for (x, y) in Dtrain:}
+        \codeline{\codetab \codetab     v0 = x \codecomment{x will now be accessible to Predict.}}
+        \codeline{\codetab \codetab     Predict() \codecomment{Execute prediction instructions.}}
+        \codeline{\codetab \codetab     \codecomment{s1 will now be used as the prediction.}}
+        \codeline{\codetab \codetab     s1 = Normalize(s1)  \codecomment{Normalize the prediction.}}
+        \codeline{\codetab \codetab     s0 = y \codecomment{y will now be accessible to Learn.}}
+        \codeline{\codetab \codetab     Learn() \codecomment{Execute learning instructions.}}
+        \codeskip
+        \codeline{\codetab sum\_loss = 0.0}
+        \codeline{\codetab for (x, y) in Dvalid:}
+        \codeline{\codetab \codetab     v0 = x}
+        \codeline{\codetab \codetab     Predict() \codecomment{Only Predict(), not Learn().}}
+        \codeline{\codetab \codetab     s1 = Normalize(s1)}
+        \codeline{\codetab \codetab     sum\_loss += Loss(y, s1)}
+        \codeskip
+        \codeline{\codetab mean\_loss = sum\_loss / len(Dvalid)}
+        \codeline{\codetab \codecomment{Use validation loss to evaluate the algorithm.}}
+        \codeline{\codetab \codereturn{return} mean\_loss}
+    \end{code}
+\caption{Algorithm evaluation on one task. We represent an algorithm as a program with three component functions (\setup, \predict, \learn). These are evaluated by the pseudo-code above, producing a mean loss for each task. The search method then uses the median across tasks as an indication of the algorithm's quality.}
+\label{algorithm_evaluation_fig}
+\end{figure}
+
+Inspired by supervised learning work, we represent an algorithm as a program with three \emph{component functions} that we call \setup, \predict, and \learn (\eg Figure~\ref{nn_fig}). The algorithm is evaluated as in Fig~\ref{algorithm_evaluation_fig}. There, the two \mbox{for-loops} implement the \textit{training} and \textit{validation phases}, processing the task's examples one-at-a-time for simplicity. The training phase alternates \predict and \learn executions. Note that \predict just takes in the features of an example (\ie\ \textcode{x})---its label (\ie\ \textcode{y}) is only seen by \learn afterward.
+
+Then, the validation loop executes \predict over the validation examples. After each \predict execution, \textit{whatever} value is in scalar address 1 (\ie{}~\textcode{s1}) is considered the prediction---\predict has no restrictions on what it can write there. For classification tasks, this prediction in $(-\infty,\infty)$ is normalized to a probability in $(0, 1)$ through a sigmoid (binary classification) or a softmax (multi-class). This is implemented as the \textcode{s1 = Normalize(s1)} instruction.
+The virtual memory is zero-initialized and persistent, and shared globally throughout the whole evaluation. This way, \setup can initialize memory variables (\eg the weights), \learn can adjust them during training, and \predict can use them. This procedure yields an accuracy for each task. The median across $D$ tasks is used as a measure of the algorithm's quality by the search method.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection {Search Method}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\label{methods_search_sec}
+
+\begin{figure}[!t]
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Tiny algorithm 1. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox1{\scalebox{0.45}{\begin{minipage}{0.89in}
+\begin{code}{\textwidth}{1.0in}{codebackground}
+\tiny
+\codeline{\codedef{def} Setup():}
+\codeskip
+\codeline{\codedef{def} Predict(v0):}
+    \codeline{\codetab s9 = arctan(s2) }
+    \codeline{\codetab s9 = mean(v5) }
+\codeskip
+\codeline{\codedef{def} Learn(v0, s0):}
+    \codeline{\codetab v1 = s9 * v1 }
+\end{code}
+\end{minipage}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Tiny algorithm 2. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox2{\scalebox{0.45}{\begin{minipage}{0.89in}
+\begin{code}{\textwidth}{1.0in}{codebackground}
+\tiny
+\codeline{\codedef{def} Setup():}
+    \codeline{\codetab  s4 = 0.5}
+    \codeline{\codetab  s5 = 0.5}
+    \codeline{\codetab  m4 = gauss(0,1)}
+\codeskip
+\codeline{\codedef{def} Predict(v0):}
+    \codeline{\codetab v1 = v0 - v9 }
+    \codeline{\codetab m4 = s2 * m4 }
+\codeskip
+\codeline{\codedef{def} Learn(v0, s0):}
+    \codeline{\codetab m2 = m2 + m4) }
+\end{code}
+\end{minipage}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Tiny algorithm 3. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox3{\scalebox{0.45}{\begin{minipage}{0.89in}
+\begin{code}{\textwidth}{1.0in}{codebackground}
+\tiny
+\codeline{\codedef{def} Setup():}
+\codeskip
+\codeline{\codedef{def} Predict(v0):}
+\codeskip
+\codeline{\codedef{def} Learn(v0, s0):}
+\end{code}
+\end{minipage}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Tiny algorithm 4. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox4{\scalebox{0.45}{\begin{minipage}{0.89in}
+\begin{code}{\textwidth}{1.0in}{codebackground}
+\tiny
+\codeline{\codedef{def} Setup():}
+    \codeline{\codetab  s4 = 0.5}
+\codeskip
+\codeline{\codedef{def} Predict(v0):}
+    \codeline{\codetab v1 = v0 - v9 }
+    \codeline{\codetab v5 = v0 + v9 }
+    \codeline{\codetab m1 = s2 * m2 }
+\codeskip
+\codeline{\codedef{def} Learn(v0, s0):}
+    \codeline{\codetab s4 = s0 - s1 }
+    \codeline{\codetab s3 = abs(s1) }
+\end{code}
+\end{minipage}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Tiny algorithm 5. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox5{\scalebox{0.45}{\begin{minipage}{0.89in}
+\begin{code}{\textwidth}{1.0in}{codebackground}
+\tiny
+\codeline{\codedef{def} Setup():}
+\codeskip
+\codeline{\codedef{def} Predict(v0):}
+\codeskip
+\codeline{\codedef{def} Learn(v0, s0):}
+    \codeline{\codetab v4 = v2 - v1 }
+    \codeline{\codetab s3 = mean(v2) }
+    \codeline{\codetab s4 = mean(v1) }
+    \codeline{\codetab s3 = s3 + s4) }
+\end{code}
+\end{minipage}}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Tiny algorithm 6. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox6{\scalebox{0.45}{\begin{minipage}{0.89in}
+\begin{code}{\textwidth}{1.0in}{codebackground}
+\tiny
+\codeline{\codedef{def} Setup():}
+    \codeline{\codetab  s4 = 0.5}
+\codeskip
+\codeline{\codedef{def} Predict(v0):}
+    \codeline{\codetab v1 = v0 - v9 }
+    \codeline{\codetab v5 = v0 + v9 }
+    \codeline{\codetab m1 = s2 * m2 }
+\codeskip
+\codeline{\codedef{def} Learn(v0, s0):}
+    \codeline{\codetab s3 = abs(s1) }
+\end{code}
+\end{minipage}}}
+\begin{tikzpicture}[remember picture]
+\createlength{\tinyalgsep}{0.15in}
+\createlength{\tinyalgwidth}{0.4in}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Step 0. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\node[inner sep=0] (p0a1) {\usebox1};
+\node[right=\tinyalgsep of p0a1, inner sep=0] (p0a2) {\usebox2};
+\node[right=\tinyalgsep of p0a2, inner sep=0] (p0a3) {\usebox3};
+\node[right=\tinyalgsep of p0a3, inner sep=0] (p0a4) {\usebox4};
+\node[right=\tinyalgsep of p0a4, inner sep=0] (p0a5) {\usebox5};
+% \node[above=0.2in of p0a3] (population) {\footnotesize{population}};
+% \draw[-Straight Barb,black] (population) -- (p0a1.north east);
+% \draw[-Straight Barb,black] (population) -- (p0a2.north east);
+% \draw[-Straight Barb,black] (population) -- (p0a3.north);
+% \draw[-Straight Barb,black] (population) -- (p0a4.north west);
+% \draw[-Straight Barb,black] (population) -- (p0a5.north west);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Step 1. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \node[below=0.4in of p0a1, inner sep=0] (p1a1) {\usebox1};
+\node[inner sep=0] (p1a1) {\usebox1};
+\node[right=\tinyalgsep of p1a1, inner sep=0] (p1a2) {\usebox2};
+\node[right=\tinyalgsep of p1a2, inner sep=0] (p1a3) {\usebox3};
+\node[right=\tinyalgsep of p1a3, inner sep=0] (p1a4) {\usebox4};
+\node[right=\tinyalgsep of p1a4, inner sep=0] (p1a5) {\usebox5};
+\node[left=\tinyalgsep of p1a1] (step1) {\footnotesize{Step 1}};
+\draw[-,orange,thick] (p1a1.north west) -- (p1a1.south east);
+\draw[-,orange,thick] (p1a1.north east) -- (p1a1.south west);
+\node[above=0.05in of p1a1] (oldest) {\footnotesize{oldest}};
+\node[above=0.05in of p1a5] (newest) {\footnotesize{newest}};
+\draw[Straight Barb-Straight Barb,black] (oldest.east) -- ({newest.west});
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Step 2. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\node[below=0.3in of p1a1, inner sep=0] (p2a1) {\usebox2};
+\node[right=\tinyalgsep of p2a1, inner sep=0] (p2a2) {\usebox3};
+\node[right=\tinyalgsep of p2a2, inner sep=0] (p2a3) {\usebox4};
+\node[right=\tinyalgsep of p2a3, inner sep=0] (p2a4) {\usebox5};
+\node[left=\tinyalgsep of p2a1] (step2) {\footnotesize{Step 2}};
+\draw[-Straight Barb,orange,thick,shorten >=3pt] (p1a2) -- (p2a1);
+\draw[-Straight Barb,orange,thick,shorten >=3pt] (p1a3) -- (p2a2);
+\draw[-Straight Barb,orange,thick,shorten >=3pt] (p1a4) -- (p2a3);
+\draw[-Straight Barb,orange,thick,shorten >=3pt] (p1a5) -- (p2a4);
+\draw[orange,thick] (p2a1.north west) rectangle (p2a1.south east);
+\draw[orange,thick] (p2a3.north west) rectangle (p2a3.south east);
+\draw[orange,thick] (p2a4.north west) rectangle (p2a4.south east);
+\node[below=0.0in of p2a3] (best) {{\color{orange} \footnotesize{best}}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Step 3. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\node[below=0.3in of p2a1, inner sep=0] (p3a1) {\usebox2};
+\node[right=\tinyalgsep of p3a1, inner sep=0] (p3a2) {\usebox3};
+\node[right=\tinyalgsep of p3a2, inner sep=0] (p3a3) {\usebox4};
+\node[right=\tinyalgsep of p3a3, inner sep=0] (p3a4) {\usebox5};
+\node[right=\tinyalgsep of p3a4, inner sep=0] (p3a5) {\usebox4};
+\node[left=\tinyalgsep of p3a1] (step3) {\footnotesize{Step 3}};
+\draw[orange,thick] (p3a3.north west) rectangle (p3a3.south east);
+\draw [thick,orange,-{[scale=0.7]Straight Barb}]
+    (p3a3.south)
+    -- ($(p3a3.south)+(0, -7pt)$)
+    -- node[below]{{\color{orange} \footnotesize{copy best}}} ($(p3a5.south)+(0, -7pt)$)
+    -- (p3a5.south);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Step 4. %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\node[below=0.4in of p3a1, inner sep=0] (p4a1) {\usebox2};
+\node[right=\tinyalgsep of p4a1, inner sep=0] (p4a2) {\usebox3};
+\node[right=\tinyalgsep of p4a2, inner sep=0] (p4a3) {\usebox4};
+\node[right=\tinyalgsep of p4a3, inner sep=0] (p4a4) {\usebox5};
+\node[right=\tinyalgsep of p4a4, inner sep=0] (p4a5) {\usebox6};
+\node[left=\tinyalgsep of p4a1] (step4) {\footnotesize{Step 4}};
+\draw [thick,orange,-{[scale=0.7]Straight Barb}]
+    (p4a5) to [out=250,in=290,looseness=3] node[below,shift={(0pt, 0pt)}]{{\color{orange} \footnotesize{mutate}}} (p4a5);
+\end{tikzpicture}
+\begin{tikzpicture}[remember picture,overlay]
+\draw[-Straight Barb,black,rounded corners=6pt]
+    ($(step4.south)+(-4pt, 0)$)
+    -- ($(step4.south)+(-4pt, -7pt)$)
+    -- ($(step4.south)+(-19pt, -7pt)$) 
+    -- ($(step1.north)+(-19pt, 7pt)$) 
+    -- ($(step1.north)+(-4pt, 7pt)$) 
+    to ($(step1.north)+(-4pt, 0)$);
+\end{tikzpicture}
+\caption{One cycle of the evolutionary method \cite{goldberg1991comparative,real2018regularized}. A population of $P$ algorithms (here, $P\!\!=\!\!5$; laid out from left to right in the order they were discovered) undergoes many cycles like this one. First, we remove the oldest algorithm (step 1). Then, we choose a random subset of size $T$ (here, $T\!\!=\!\!3$) and select the best of them (step 2). The best is copied (step 3) and mutated (step 4).
+}
+\label{evolutionary_method_fig}
+\end{figure}
+
+Search experiments must discover algorithms by modifying the instructions in the component functions (\setup, \predict, and \learn; \eg Figure~\ref{nn_fig}). Unless otherwise stated, we use the \textit{regularized evolution} search method because of its simplicity and recent success on architecture search benchmarks \cite{real2018regularized,ying2019bench,So2019TheET}. This method is illustrated in Figure~\ref{evolutionary_method_fig}. It keeps a population of $P$ algorithms, all initially \textit{empty}---\ie none of the three component functions has any instructions/code lines. The population is then improved through cycles. Each cycle picks $T\!\!<\!P$ algorithms at random and selects the best performing one as the \textit{parent}, \ie \emph{tournament selection} \cite{goldberg1991comparative}. This parent is then copied and \textit{mutated} to produce a \textit{child} algorithm that is added to the population, while the oldest algorithm in the population is removed. The mutations that produce the child from the parent must be tailored to the search space; we use a random choice among three types of actions: (i) insert a random instruction or remove an instruction at a random location in a component function, (ii) randomize all the instructions in a component function, or (iii) modify one of the arguments of an instruction by replacing it with a random choice (\eg ``swap the output address'' or ``change the value of a constant''). These are illustrated in Figure~\ref{mutations_fig}.
+
+\newcommand\mutatedtext[1]{\tikz[overlay]\node[fill=orange!20,inner sep=2pt, anchor=text, rectangle, rounded corners=1mm,fill=orange!20] {#1};\phantom{#1}}
+\begin{figure}[!t]
+\createlength{\arrowendsep}{3pt}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Mutation (i), before.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox1{\begin{subfigure}[t]{1.21in}  % Was 1.16in.
+    % Best algorithm (raw and after automatic simplification): https://colab.corp.google.com/drive/14czm6QPIiSVeRIyrgU8KRWM2_sSPay-w#scrollTo=q8gO04_NhqDN&line=7&uniqifier=1
+    \begin{code}{\textwidth}{1.05in}{codebackground}  % Was 1.2in in height.
+    \codeline{\codedef{def} Setup():}
+        \codeline{\codetab  s4 = 0.5}
+    \codeskip
+    \codeline{\codedef{def} Predict(v0):}
+        \codeline{\codetab m1 = s2 * m2 }
+    \codeskip
+    \codeline{\codedef{def} Learn(v0, s0):}
+        \codeline{\codetab s4 = s0 - s1 \hspace{-5pt}\raisebox{-2pt}{\tikzmark{a}}}
+        \codeline{\codetab s3 = abs(s1)}
+    \end{code}
+\end{subfigure}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Mutation (i), after.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox2{\begin{subfigure}[t]{1.21in}  % Was 1.16in.
+    % Best algorithm (raw and after automatic simplification): https://colab.corp.google.com/drive/14czm6QPIiSVeRIyrgU8KRWM2_sSPay-w#scrollTo=q8gO04_NhqDN&line=7&uniqifier=1
+    \begin{code}{\textwidth}{1.15in}{codebackground}  % Was 1.2in in height.
+    \codeline{\codedef{def} Setup():}
+        \codeline{\codetab  s4 = 0.5}
+    \codeskip
+    \codeline{\codedef{def} Predict(v0):}
+        \codeline{\codetab m1 = s2 * m2 }
+    \codeskip
+    \codeline{\codedef{def} Learn(v0, s0):}
+        \codeline{\codetab s4 = s0 - s1}
+        \codeline{\codetab \hspace{-\arrowendsep}\raisebox{2pt}{\tikzmark{b}}\hspace{\arrowendsep}{\mutatedtext{s2 = sin(v1)}} }
+        \codeline{\codetab s3 = abs(s1)}
+    \end{code}
+\end{subfigure}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Mutation (ii), before.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox3{\begin{subfigure}[t]{1.21in}  % Was 1.16in.
+    % Best algorithm (raw and after automatic simplification): https://colab.corp.google.com/drive/14czm6QPIiSVeRIyrgU8KRWM2_sSPay-w#scrollTo=q8gO04_NhqDN&line=7&uniqifier=1
+    \begin{code}{\textwidth}{1.05in}{codebackground}  % Was 1.08in in height.
+    \codeline{\codedef{def} Setup():}
+        \codeline{\codetab  s4 = 0.5}
+    \codeskip
+    \codeline{\codedef{def} Predict(v0):}
+        \codeline{\codetab m1 = s2 * m2 }
+    \codeskip
+    \codeline{\codedef{def} Learn(v0, s0):}
+        \codeline{\codetab \mutatedtext{s4 = s0 - s1} \raisebox{-2pt}{\tikzmark{c}}}
+        \codeline{\codetab \mutatedtext{v3 = abs(s1)} }
+    \end{code}
+\end{subfigure}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Mutation (ii), after.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox4{\begin{subfigure}[t]{1.21in}  % Was 1.16in.
+    % Best algorithm (raw and after automatic simplification): https://colab.corp.google.com/drive/14czm6QPIiSVeRIyrgU8KRWM2_sSPay-w#scrollTo=q8gO04_NhqDN&line=7&uniqifier=1
+    \begin{code}{\textwidth}{1.05in}{codebackground}  % Was 1.08in in height.
+    \codeline{\codedef{def} Setup():}
+        \codeline{\codetab  s4 = 0.5}
+    \codeskip
+    \codeline{\codedef{def} Predict(v0):}
+        \codeline{\codetab m1 = s2 * m2 }
+    \codeskip
+    \codeline{\codedef{def} Learn(v0, s0):}
+        \codeline{\codetab \hspace{-\arrowendsep}\raisebox{-2pt}{\tikzmark{d}}\hspace{\arrowendsep}{\mutatedtext{s0 = mean(m1)}} }
+        \codeline{\codetab \mutatedtext{s5 = arctan(s7)} }
+    \end{code}
+\end{subfigure}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Mutation (iii), before.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox5{\begin{subfigure}[t]{1.21in}  % Was 1.16in.
+    % Best algorithm (raw and after automatic simplification): https://colab.corp.google.com/drive/14czm6QPIiSVeRIyrgU8KRWM2_sSPay-w#scrollTo=q8gO04_NhqDN&line=7&uniqifier=1
+    \begin{code}{\textwidth}{1.05in}{codebackground}  % Was 1.08in in height.
+    \codeline{\codedef{def} Setup():}
+        \codeline{\codetab  s4 = 0.5}
+    \codeskip
+    \codeline{\codedef{def} Predict(v0):}
+        \codeline{\codetab m1 = \mutatedtext{s2} * m2 \hspace{-2pt}\raisebox{2pt}{\tikzmark{e}}}
+    \codeskip
+    \codeline{\codedef{def} Learn(v0, s0):}
+        \codeline{\codetab s4 = s0 - s1 }
+        \codeline{\codetab s3 = abs(s1)}
+    \end{code}
+\end{subfigure}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Mutation (iii), after.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\sbox6{\begin{subfigure}[t]{1.21in}  % Was 1.16in.
+    % Best algorithm (raw and after automatic simplification): https://colab.corp.google.com/drive/14czm6QPIiSVeRIyrgU8KRWM2_sSPay-w#scrollTo=q8gO04_NhqDN&line=7&uniqifier=1
+    \begin{code}{\textwidth}{1.05in}{codebackground}  % Was 1.08in in height.
+    \codeline{\codedef{def} Setup():}
+        \codeline{\codetab  s4 = 0.5}
+    \codeskip
+    \codeline{\codedef{def} Predict(v0):}
+        \codeline{\codetab \hspace{-\arrowendsep}\raisebox{2pt}{\tikzmark{f}}\hspace{\arrowendsep}m1 = \mutatedtext{s7} * m2 }
+    \codeskip
+    \codeline{\codedef{def} Learn(v0, s0):}
+        \codeline{\codetab s4 = s0 - s1 }
+        \codeline{\codetab s3 = abs(s1)}
+    \end{code}
+\end{subfigure}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Complete figure.%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setlength{\tabcolsep}{29pt}
+\begin{tabular*}{\linewidth}{@{}@{\extracolsep{\fill}}cc}
+\raisebox{3pt}{\usebox1\tikzmark{g}} & \tikzmark{h}\usebox2\\[3pt]
+\usebox3 & \usebox4\\[3pt]
+\usebox5 & \usebox6\\
+\end{tabular*}
+\begin{tikzpicture}[overlay, remember picture]
+\draw [thick,orange!80,-{[scale=1.0]Straight Barb}]
+    ({pic cs:a}) to
+    node[below,shift={(7pt,0)}] {{\color{orange} \footnotesize{\textbf{Type (i)}}}} ({pic cs:b});
+\draw [thick,orange!80,-{[scale=1.0]Straight Barb}]
+    ({pic cs:c}) to
+    node[below,shift={(4pt,0)}] {{\color{orange} \footnotesize{\textbf{Type (ii)}}}} ({pic cs:d});
+\draw [thick,orange!80,-{[scale=1.0]Straight Barb}]
+    ({pic cs:e}) to
+    node[below,shift={(5pt,0)}] {{\color{orange} \footnotesize{\textbf{Type (iii)}}}} ({pic cs:f});
+\node[] (parent) at ([shift={(1, 1.8)}]{pic cs:g}) {parent};
+\node[] (child) at ([shift={(-1, 1.4)}]{pic cs:h}) {child};
+\draw[-Straight Barb,black] (parent.north) |- ([shift={(0, 2.3)}]{pic cs:g});
+\draw[-Straight Barb,black] (child) |- ([shift={(0, 0.9)}]{pic cs:h});
+\end{tikzpicture}
+\caption{Mutation examples. Parent algorithm is on the left; child on the right. (i) Insert a random instruction (removal also possible). (ii) Randomize a component function. (iii) Modify an argument.}
+\label{mutations_fig}
+\end{figure}
+
+In order to reach a throughput of $2\textrm{k}$--$10\textrm{k}$ algorithms/second/cpu core, besides the use of small proxy tasks, we apply two additional upgrades: (1) We introduce a version of \textit{functional equivalence checking} (FEC) that detects equivalent supervised ML algorithms, even if they have different implementations, achieving a 4x speedup. To do this, we record the predictions of an algorithm after executing $10$ training and $10$ validation steps on a fixed set of examples. These are then truncated and hashed into a fingerprint for the algorithm to detect duplicates in the population and reuse previous evaluation scores. (2) We add hurdles \cite{So2019TheET} to reach further 5x throughput. In addition to (1) and (2), to attain higher speeds through parallelism, we distribute experiments across worker processes that exchange models through migration \cite{alba2002parallelism}; each process has its own P-sized population and runs on a commodity CPU core. We denote the number of processes by $W$. Typically, $100\!\!<\!\!W\!\!<\!\!1000$ (we indicate the exact numbers with each experiment\footnote{The electricity consumption for our experiments (which were run in 2019) was matched with purchases of renewable energy.}). Workers periodically upload randomly selected algorithms to a central server. The server replies with algorithms randomly sampled across all workers, replacing half the local population (\ie random \emph{migration}). To additionally improve the quality of the search, we allow some workers to search on projected binary MNIST tasks, in addition to projected binary CIFAR-10, to promote diversity (see \eg \cite{wang2019paired}). More details about these techniques can be found in Suppl.\ Section~\ref{detailed_methods_optimization_sec}. Section~\ref{discussion_sec} and Suppl.\ Section~\ref{ablation_comparison_thorough_sec} contain ablation studies showing that all these techniques are beneficial.
+
+For each experimental result, we include an \textit{Experiment Details} paragraph with the exact values for meta-parameters like $P$ and $T$. None of the meta-parameters were tuned in the final set of experiments at full compute scale. Most of them were either decided in smaller experiments (\eg $P$), taken from previous work (\eg $T$), or simply not tuned at all. In some cases, when uncertain about a parameter's appropriate value, we used a range of values instead (\eg ``$100 \leq P \leq 1000$''); different worker processes within the experiment use different values within the range.
+
+\experimentdetails[Details]{Generally, we use $T\!\!=\!\!10$, $100 \leq P \leq 1000$. Each child algorithm is mutated with probability $U\!\!=\!\!0.9$. Run time: $5$ days. Migration rate adjusted so that each worker process has fewer than 1 migration/s and at least 100 migrations throughout the expt. Specifics for each expt.\ in Suppl.\ Section~\ref{detailed_experiment_setups_sec}. Suppl.\  Section~\ref{detailed_methods_optimization_sec} describes additional more general methods minutiae.}

@@ -1,0 +1,153 @@
+\section{Experiments}
+\label{sec:experiments}
+
+The goal of our experimental evaluations is to test \name{}'s ability to serve as a powerful multi-robot control policy out of the box, as well as be a good initialization for fine-tuning to new robot tasks. Concretely, we aim to answer the following questions:
+\begin{enumerate}
+    \item How does \name{} compare to prior generalist robot policies, when evaluating on multiple robots and various types of generalization?
+    \item Can \name{} be effectively fine-tuned on a new robot setup and task, and how does it compare to state-of-the-art data-efficient imitation learning approaches?
+    \item Can we use parameter-efficient fine-tuning and quantization to reduce the computational requirements for training and inference of \name{} models and make them more accessible? What are the performance-compute trade-offs?
+\end{enumerate}
+
+\subsection{Direct Evaluations on Multiple Robot Platforms}
+\label{sec:zero_shot_exp}
+
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/bridge_results.pdf}
+    \caption{\textbf{BridgeData~V2 WidowX robot evaluation tasks and results.} We evaluate \name{} and prior state-of-the-art generalist robot policies on a comprehensive suite of tasks covering several axes of generalization, as well as tasks that specifically assess language conditioning ability. \name{} achieves highest overall performance and even outperforms closed-source model RT-2-X in all categories except for semantic generalization. Average success rates $\pm$ StdErr are computed across 170 total rollouts per approach. See \cref{app:tab:bridge_results_detailed} for detailed results.}
+    \label{fig:bridge_results}
+\end{figure}
+
+\textbf{Robot Setups and Tasks.} We evaluate \name{}'s performance ``out-of-the-box'' on two robot embodiments: the WidowX robot from the BridgeData V2 evaluations~\citep{walke2023bridgedata} (see \cref{fig:teaser}, left) and the mobile manipulation robot from the RT-1 and RT-2 evaluations~\citep{rt12022arxiv,rt22023arxiv} (``Google robot''; see \cref{fig:teaser}, middle). Both platforms have been extensively used in prior works for evaluating generalist robot policies~\citep{rt12022arxiv,rt22023arxiv,open_x_embodiment_rt_x_2023,octo_2023}. We define a comprehensive set of evaluation tasks in each environment that covers various axes of generalization, such as \textbf{visual} (unseen backgrounds, distractor objects, colors/appearances of objects); \textbf{motion} (unseen object positions/orientations); \textbf{physical} (unseen object sizes/shapes); and \textbf{semantic} (unseen target objects, instructions, and concepts from the Internet) generalization. We also assess language conditioning ability in scenes with multiple objects, testing whether the policy can manipulate the correct target object, as specified in the user's prompt. See bottom row of \cref{fig:bridge_results} and \cref{fig:rt1_results} for example task images in the BridgeData~V2 and Google robot evaluations, respectively. Overall, we evaluated each method in 170 rollouts (17 tasks with 10 trials each) for BridgeData~V2 experiments and 60~rollouts (12 tasks with 5 trials each) for Google robot experiments. A detailed breakdown of all tasks and how they differ from the training data is in \cref{sec:app:detailed_setups}. All evaluations in this and the following sections are conducted as A/B evaluations, using the same tasks with the same sets of initial robot and object states, to ensure fair comparison.
+
+
+\textbf{Comparisons.} We compare \name{}'s performance to three prior generalist manipulation policies: \textbf{RT-1-X}~\citep{open_x_embodiment_rt_x_2023}, \textbf{RT-2-X}~\citep{open_x_embodiment_rt_x_2023}, and \textbf{Octo}~\citep{octo_2023}. \textbf{RT-1-X} (35M parameters) and \textbf{Octo} (93M parameters) are transformer policies trained from scratch on subsets of the OpenX dataset; Octo is the state-of-the-art model among open-source manipulation policies. \textbf{RT-2-X} (55B parameters) is a state-of-the-art, closed-source VLA that leverages Internet-pretrained vision and language backbones.
+
+The results are summarized in \cref{fig:bridge_results} for BridgeData~V2 evaluations and \cref{fig:rt1_results} for Google robot evaluations (per-task breakdown in Appendix, \cref{app:tab:bridge_results_detailed} and \cref{app:tab:rt1_robot_results_detailed}). We find that both RT-1-X and Octo struggle on the tested tasks, often failing to manipulate the correct object, especially when distractors are present, and in some cases causing the robot to wave its arm around aimlessly. Note that our evaluations test even larger degrees 
+of generalization than the evaluations performed in those prior works to challenge the Internet-pretrained VLA models. Thus, lower performance of models without Internet pretraining is expected. RT-2-X clearly outperforms both RT-1-X and Octo, demonstrating the benefits of large, pretrained VLMs for robotics.
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+    \centering
+    \vspace{-0.2cm}
+    \includegraphics[width=\linewidth]{figures/rt1_results.pdf}
+    \caption{\textbf{Google robot evaluation results.} We evaluate generalist robot policies on in-distribution and out-of-distribution (OOD) tasks on the mobile manipulator used in RT-1 and RT-2 evaluations~\citep{rt12022arxiv,rt22023arxiv}. We find that \name{} and RT-2-X attain comparable performance and significantly outperform RT-1-X and Octo overall. Average success rates $\pm$ StdErr are computed across 60 total rollouts per approach. See \cref{app:tab:rt1_robot_results_detailed} for detailed results.}
+    \label{fig:rt1_results}
+    \vspace{-0.2cm}
+\end{wrapfigure}
+Notably, \name{} performs comparably to RT-2-X on Google robot evaluations and significantly outperforms RT-2-X on BridgeData~V2 evaluations despite being an order of magnitude smaller (7B vs. 55B parameters).
+Qualitatively, we find that both RT-2-X and OpenVLA exhibit markedly more robust behaviors than the other tested models, such as approaching the correct object when distractor objects are present, properly orienting the robot's end-effector to align with the orientation of the target object, and even recovering from mistakes such as insecurely grasping objects (see \website{} for qualitative rollout examples). RT-2-X achieves higher performance in semantic generalization tasks, as shown in \cref{fig:bridge_results}, which is expected given that it uses larger-scale Internet pretraining data and is co-fine-tuned with both robot action data and Internet pretraining data to better preserve the pretraining knowledge, rather than being fine-tuned solely on robot data, like \name{}. However, \name{} performs comparably or better in all other task categories in both BridgeData~V2 and Google robot evaluations. The performance difference can be attributed to a combination of factors: we curated a much larger training dataset for \name{} with \nepisodes{}~trajectories (vs. 350k for RT-2-X); we performed more careful cleaning of the training dataset and, \eg filtered out all-zero actions in the Bridge dataset (see \cref{sec:app:rt2x_vs_openvla_in_bridge} for a detailed discussion); and \name{} uses a fused vision encoder that combines pretrained semantic \emph{and} spatial features. See \cref{sec:app:additional_ablation_experiments} for ablation analyses of these components.
+
+
+
+
+
+
+\subsection{Data-Efficient Adaptation to New Robot Setups}
+\label{sec:finetuning_exp}
+
+
+
+
+
+
+
+While prior works mainly focused on directly evaluating VLAs ``out-of-the-box''~\citep{driess2023palm,rt22023arxiv,open_x_embodiment_rt_x_2023}, effective \emph{fine-tuning} of VLA models to new tasks and robot setups is largely unexplored, yet is key for their widespread adoption. In this section, we investigate \name{}'s ability to be quickly adapted to a new \emph{real-world} robot setup. (See \cref{sec:app:libero_sim_experiments} for fine-tuning experiments in simulation.)
+
+\textbf{Robot setups and tasks.} We test a simple fine-tuning recipe for the \name{} model: full fine-tuning of all model parameters, using small datasets with 10--150 demonstrations of a target task (see \cref{fig:finetune_results}; we explore parameter-efficient fine-tuning approaches in \cref{sec:param_efficient_finetuning}).
+We test \name{} in two setups: \textbf{Franka-Tabletop}, a stationary, table-mounted Franka Emika Panda 7-DoF robot arm; and \textbf{Franka-DROID}, the Franka robot arm setup from the recently released DROID dataset~\citep{khazatsky2024droid}, mounted on a movable standing desk. The setups use 5Hz and 15 Hz non-blocking controllers, respectively. We choose Franka robot arms as the target embodiment for our fine-tuning experiments since they are widely used in the robot learning community and thus a likely ``target'' of \name{} fine-tuning. We test on setups with different control frequencies to test \name{}'s applicability to a range of use cases.
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/finetune_results.pdf}
+    \caption{\textbf{Adapting to new robot setups.} We evaluate the state-of-the-art Diffusion Policy trained from scratch on seven Franka Emika Panda tasks (10--150 demonstrations each), as well as generalist robot policies Octo and \name{} fine-tuned on the same data. Diffusion Policy exhibits strong performance on narrow single-instruction tasks, while Octo and \name{} perform better on diverse fine-tuning tasks involving multiple instructions and distractor objects. Overall, \name{} achieves highest aggregate performance across both setups, suggesting that it is an effective default for learning a policy on a downstream task. Average success rates $\pm$ StdErr are computed across 129 rollouts per approach (99 for Franka-Tabletop tasks and 30 for Franka-DROID tasks). See \cref{app:tab:detailed_finetune_results} for detailed results.}
+    \label{fig:finetune_results}
+    \vspace{-0.3cm}
+\end{figure}
+
+\textbf{Comparisons.} We compare to \textbf{Diffusion Policy}~\citep{chi2023diffusionpolicy}, a state-of-the-art data-efficient imitation learning approach, trained from scratch. We also compare to \textbf{Diffusion Policy (matched)}, a version of Diffusion Policy that matches the input and output specifications of \name{}.\footnote{The full Diffusion Policy uses a two-step observation history with both images and proprioceptive state, and performs receding horizon control by predicting a chunk of $T$ future actions and executing the first $X$ actions in open-loop fashion before predicting the next chunk (for 15Hz control, we set $T=16, X=8$ like in the DROID prior work \citep{khazatsky2024droid}; for 5Hz control, we reduce the chunk sizes to $T=8, X=3$). It is also the only method in \cref{sec:finetuning_exp} that predicts \emph{absolute} Cartesian coordinates to control the robot; all other methods use \emph{relative} position control. Diffusion Policy (matched) uses a single image as input, has no proprioceptive information and no observation history, and predicts a single relative position control action without action chunking.
+} %
+Additionally, we evaluate \textbf{Octo}~\citep{octo_2023} fine-tuned on the target dataset, since it is currently the best generalist policy that supports fine-tuning (fine-tuning of RT-2-X is not supported through its inference API). We also fine-tune \name{} on the same target dataset, and the resulting policy is denoted by \textbf{OpenVLA}.
+Finally, as an ablation experiment, we compare to \textbf{\name{} (scratch)}, where we directly fine-tune the underlying base Prismatic VLM on the target robot setup -- rather than fine-tuning the OpenX-pretrained \name{} model -- to assess the benefit of large-scale robot pretraining.
+
+
+
+We present the results in \cref{fig:finetune_results} (per-task breakdown in Appendix, \cref{app:tab:detailed_finetune_results}).
+We find that both versions of Diffusion Policy are competitive with or outperform the generalist policies Octo and \name{} on narrower single-instruction tasks like ``Put Carrot in Bowl'' and ``Pour Corn into Pot'', but the pretrained generalist policies perform better in more diverse fine-tuning tasks that involve multiple objects in the scene and require language conditioning.
+OpenX pretraining for Octo and \name{} enables the models to better adapt to these more diverse tasks where language grounding is important; we see evidence for this in the lower performance of \name{}~(scratch). %
+
+Overall, we find that \name{} achieves the highest average performance. Notably, most prior works achieve strong performance only in \emph{either} narrow single-instruction \emph{or} diverse multi-instruction tasks, resulting in widely varying success rates. \name{} is the only approach that achieves at least 50\% success rate across all tested tasks, suggesting that it can be a strong default option for imitation learning tasks, particularly if they involve a diverse set of language instructions. For narrower but highly dexterous tasks, Diffusion Policy still shows smoother and more precise trajectories; incorporating action chunking and temporal smoothing, as implemented in Diffusion Policy, may help \name{} attain the same level of dexterity and may be a promising direction for future work (see \cref{sec:conclusion} for a detailed discussion of current limitations).
+
+
+\subsection{Parameter-Efficient Fine-Tuning}
+\label{sec:param_efficient_finetuning}
+
+
+The full fine-tuning runs of \name{} in the previous section used 8~A100~GPUs for 5-15 hours per task (depending on the dataset size) to achieve high performance. While this is substantially less compute than what is required for VLA pretraining, in this section we explore even more compute- and parameter-efficient fine-tuning approaches and investigate their effectiveness.
+
+\begin{wraptable}{r}{0.6\textwidth}
+\centering
+\vspace{-0.3cm}
+\caption{\textbf{Parameter-efficient fine-tuning evaluation.} LoRA fine-tuning achieves the best performance-compute trade-off, matching full fine-tuning performance while training only 1.4\% of the model parameters. Mean success $\pm$ StdErr computed across 33 rollouts per approach on select Franka-Tabletop tasks (see \cref{app:tab:detailed_peft_results} for details).\newline$^\ast$: Sharded across 2~GPUs with FSDP~\citep{zhao2023pytorch}.}
+\label{tab:partial_finetune_results}
+\resizebox{0.6\textwidth}{!}{\begin{tabular}{lccc}
+\toprule
+Strategy & Success Rate & Train Params ($\times 10^6$) & VRAM (batch 16) \\
+\midrule
+Full FT & \textbf{69.7 $\pm$ 7.2 \%} & 7,188.1 & 163.3 GB* \\
+\midrule
+Last layer only & 30.3 $\pm$ 6.1 \% & 465.1 & 51.4 GB \\
+Frozen vision & 47.0 $\pm$ 6.9 \% & 6,760.4 & 156.2 GB* \\
+Sandwich & 62.1 $\pm$ 7.9 \% & 914.2 & 64.0 GB \\
+LoRA, rank=32 & \textbf{68.2 $\pm$ 7.5\%} & \textbf{97.6} & \textbf{59.7 GB} \\
+\hspace{1.05cm}rank=64 & \textbf{68.2 $\pm$ 7.8\%} & 195.2 & 60.5 GB \\
+\bottomrule
+\end{tabular}}
+\end{wraptable}
+Concretely, we compare the following fine-tuning approaches: \textbf{full fine-tuning} updates all weights during fine-tuning, as described in \cref{sec:finetuning_exp}; \textbf{last layer only} fine-tunes only the last layer of \name{}'s transformer backbone and the token embedding matrix; \textbf{frozen vision} freezes the vision encoder but fine-tunes all other weights; \textbf{sandwich fine-tuning} unfreezes the vision encoder, token embedding matrix, and last layer; and \textbf{LoRA} uses the popular low-rank adaptation technique of \citet{hu2021lora} with multiple rank values $r$, applied to all linear layers of the model.
+
+We report fine-tuning success rates across multiple Franka-Tabletop tasks, as well as training parameter count and GPU memory requirements, in \cref{tab:partial_finetune_results}.\footnote{In \cref{sec:param_efficient_finetuning} and \cref{sec:quantization_exp}, we experiment with a version of the \name{} model that is pretrained with a smaller robot data mixture (the same OpenX dataset mixture as Octo) and has a slightly smaller architecture which only uses a SigLIP~\citep{zhai2023sigmoid} vision backbone instead of the fused DinoSigLIP encoder. We find that this simpler architecture still achieves strong performance in both fine-tuning tasks and ``out-of-the-box'' tasks.} We find that only fine-tuning the network's last layer or freezing the vision encoder leads to poor performance, suggesting that further adaptation of the visual features to the target scene is crucial. In contrast, ``sandwich fine-tuning'' achieves better performance since it fine-tunes the vision encoder, and it consumes less GPU memory since it does not fine-tune the full LLM backbone. Lastly, LoRA achieves the best trade-off between performance and training memory consumption, outperforming ``sandwich fine-tuning'' and matching full fine-tuning performance while fine-tuning only 1.4\% of the parameters. We find that the LoRA rank has negligible effect on policy performance and thus recommend using a default rank of $r=32$. With LoRA, we can fine-tune \name{} on a new task within 10-15~hours on a \emph{single} A100~GPU -- an 8x~reduction in compute compared to full fine-tuning.
+
+
+\subsection{Memory-Efficient Inference via Quantization}
+\label{sec:quantization_exp}
+
+\begin{minipage}{\textwidth}
+  \begin{minipage}[b]{0.59\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/inference_speed.pdf}
+    \captionof{figure}{
+        \textbf{\name{} inference speed for various GPUs.} Both bfloat16 and int4 quantization achieve high throughput, especially on GPUs with Ada Lovelace architecture (RTX 4090, H100). Further speed-ups are possible with modern LLM inference frameworks like TensorRT-LLM~\citep{tensorrt_llm}. $\spadesuit$: Model sharded across two GPUs to fit.
+    }
+    \label{fig:inference_speed}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[b]{0.39\textwidth}
+    \centering
+    \resizebox{\textwidth}{!}{\begin{tabular}{lcc}
+        \toprule
+        Precision & Bridge Success & VRAM \\
+        \midrule
+        bfloat16 & 71.3 $\pm$ 4.8\% & 16.8 GB \\
+        int8 & 58.1 $\pm$ 5.1\% & 10.2 GB \\
+        int4 & 71.9 $\pm$ 4.7\% & 7.0 GB \\
+        \bottomrule
+    \end{tabular}}
+    \captionof{table}{\textbf{Performance with quantized inference.} 4-bit quantization matches the performance of bfloat16 inference (our default approach) while reducing the GPU memory footprint by more than half. Mean success $\pm$ StdErr computed across 8~representative BridgeData~V2 tasks~\citep{walke2023bridgedata} and 80~rollouts per approach (see \cref{app:tab:detailed_quantized_inference_results} for details).}
+    \label{tab:quantized_results}
+\end{minipage}
+\end{minipage}
+
+
+\name{}, a 7B-parameter model, consumes more memory at inference time than prior open-source generalist policies such as Octo, which has $<$100M parameters. We follow best-practices from LLM serving by saving and loading \name{} in \texttt{bfloat16} precision for inference (our default approach), which cuts the memory footprint in half, allowing us to serve \name{} on GPUs with only 16GB of GPU memory. In this section, we test whether we can further reduce the required memory for policy inference and broaden accessibility of VLA policies, by using modern quantization techniques developed for serving LLMs~\citep{dettmers2022gpt3, dettmers2024qlora}. These approaches load the weights of the network at lower precision, thereby trading off reduced memory requirements for potentially reduced inference speed and accuracy.
+
+Concretely, we investigate serving the \name{} model with 8-bit and 4-bit precision on 8 representative BridgeData~V2 tasks. We report memory footprint and rollout performance in \cref{tab:quantized_results}. We also report achievable control frequencies on various consumer- and server-grade GPUs in \cref{fig:inference_speed}. We observe that 8-bit quantization slows down inference across most GPUs, due to the overhead of the added quantization operations. 4-bit inference achieves higher throughput, since reduced GPU memory transfer compensates for the quantization overhead. 
+
+As a result of the reduced inference speed, we observe a substantial performance decrease with 8-bit quantization: on the A5000~GPU we use for our evaluations, we can only run the model at 1.2Hz, which significantly changes the system dynamics compared to the training dataset for the 5Hz non-blocking controller used in the BridgeData~V2 tasks.\footnote{We attribute the performance loss to low inference speed, since both 8-bit and 4-bit quantization achieve comparable token accuracy to bfloat16 inference when evaluated offline on training data. See \cref{sec:app:additional_quantized_inference_experiments} for supporting details.} Notably, 4-bit quantization results in similar performance as bfloat16 half-precision inference despite requiring less than half the amount of GPU memory. 4-bit quantized models can run at 3Hz on the A5000, thus more closely matching the system dynamics during data collection.
+
+
+
+
+

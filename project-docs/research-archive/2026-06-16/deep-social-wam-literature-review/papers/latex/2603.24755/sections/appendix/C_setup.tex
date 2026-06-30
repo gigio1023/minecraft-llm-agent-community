@@ -1,0 +1,158 @@
+\needspace{4\baselineskip}
+\section{Evaluation Setup}\label{sec:eval-env-details}
+
+\subsection{Environment and Invocation}
+
+\paragraph{Harness version selection.} For each model we report the earliest publicly available harness version that supported that model and could execute the benchmark end-to-end. For older models whose launch-era harness was unavailable or incompatible, we used the nearest later compatible version.
+
+\paragraph{Environment.} The container image installs all languages required by the problem set alongside a shared tooling baseline. We derived this baseline by identifying commands whose absence caused failures across all harnesses; commands that failed on only one harness were excluded to avoid biasing the environment toward a particular agent. Installed packages, shell history, and agent session data reset between checkpoints. The benchmark problems are language-agnostic by design, but current experiments evaluate only the Python track.
+
+\paragraph{Invocation.} Following Terminal Bench~\citep{tb2}, we install Claude Code~\citep{claude_code} and Codex~\citep{codex} directly and invoke each in headless mode. Specific versions appear in \autoref{tab:agent-versions}.
+
+\paragraph{Reasoning effort.} For Codex we set the reasoning effort parameter to \texttt{high}. For Claude Code we configure the thinking-token budget via the environment variable following Anthropic's published mapping.
+
+\subsection{Agent Harness Versions}\label{sec:agent-versions}
+
+\begin{table}[h]
+\centering
+\caption{Harness version and reasoning effort used for each model in the main evaluation.}
+\label{tab:agent-versions}
+\small
+\begin{tabular}{lllc}
+\toprule
+Model & Harness & Version & Reasoning \\
+\midrule
+Opus~4.5      & Claude Code & 2.0.51  & high \\
+Opus~4.6      & Claude Code & 2.1.32  & high \\
+Sonnet~4.6    & Claude Code & 2.1.44  & high \\
+\midrule
+GPT~5.2 Codex & Codex CLI & 0.93.0  & high \\
+GPT~5.3 Codex & Codex CLI & 0.98.0  & high \\
+GPT~5.3 Spark & Codex CLI & 0.100.0 & high \\
+GPT~5.4       & Codex CLI & 0.110.0 & high \\
+GPT~5.4 Mini  & Codex CLI & 0.110.0 & high \\
+\midrule
+Composer~2    & Cursor CLI  & 2026.04.13-a9d7fb5 & none \\
+GLM~5.1       & Claude Code & 2.1.44  & high \\
+Kimi~K2.5     & Claude Code & 2.1.44  & high \\
+Kimi~K2.6     & Kimi CLI    & 1.37.0  & high \\
+MiniMax~M2.7  & Claude Code & 2.1.44  & high \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{\texttt{just-solve} (Baseline)}\label{sec:prompt-intervention-raw}
+
+The minimal baseline used for all primary evaluations. Each agent receives a Jinja template as its system prompt. The \texttt{is\_continuation} flag is false for the first checkpoint of a problem and true for all subsequent checkpoints. The checkpoint specification is injected verbatim via \texttt{spec}.
+
+\begin{lstlisting}[style=specblock, caption={\texttt{just-solve} prompt template}, label={lst:just-solve-prompt}]
+Implement a program that 100% solves the specification.
+That is all you need to do.
+{% if not is_continuation -%}
+Use a virtual environment and ensure that a
+`requirements.txt` is present with any dependencies
+you need to solve the problem.
+{% else -%}
+Keep using the same virtual environment you started with,
+update `requirements.txt` with any new dependencies
+you need.
+{% endif -%}
+
+Your task is:
+{{ spec.strip() }}
+\end{lstlisting}
+
+\subsection{\texttt{anti\_slop}}
+
+Explicitly instructs the agent to avoid verbose patterns, defensive over-engineering, and unnecessary abstractions.
+
+\begin{lstlisting}[style=specblock, caption={\texttt{anti\_slop} prompt template}, label={lst:anti-slop-prompt}]
+{%- if not is_continuation -%}
+You are an exceptional python software engineer and you
+to need to implement a spec. Your instructions are:
+- Write the python script that satisfies the spec
+  completely.
+- Use a virtual environment and ensure that a
+  `requirements.txt` is present with any dependencies
+  you need to solve the problem.
+{%- else -%}
+You are an exceptional python software engineer and you
+to need to implement a spec. You are updating your code
+to match an extension of the spec. Here are your
+instructions:
+- Keep using the same virtual environment you started
+  with, update `requirements.txt` with any new
+  dependencies you need.
+- Focus only on adding in the new features/changes below.
+- Make sure you test any examples provided in the task
+  description
+{%- endif %}
+- You ONLY work in this directory.
+- Follow best coding practices:
+  - Group functions into files based on related
+    functionality
+  - Keep your code clean
+- No god functions/classes.
+- Make sure the code is documented appropriately so that
+  it is easy to pick up.
+- Minimize the following gotchas:
+  - Extra defensive checks or try/catch blocks that are
+    abnormal.
+  - Casts to get around type checking
+  - Variables that are only used a single time after
+    declaration.
+  - Extra comments that a human wouldn't add.
+  - Trivial wrappers
+  - Heavy nesting
+  - If/Else ladders
+  - A ton of helper methods
+
+Your task is:
+{{ spec.strip() }}
+\end{lstlisting}
+
+\subsection{\texttt{plan\_first}}
+
+Requires the agent to plan its approach before writing code.
+
+\begin{lstlisting}[style=specblock, caption={\texttt{plan\_first} prompt template}, label={lst:plan-first-prompt}]
+You are an expert programmer and need to implement a task.
+{% if not is_continuation -%}
+Use a virtual environment and ensure that a
+`requirements.txt` is present with any dependencies
+you need to solve the problem.
+{% else -%}
+Keep using the same virtual environment you started with,
+update `requirements.txt` with any new dependencies
+you need.
+{% endif -%}
+
+Here are the steps you should always follow:
+1. Before coding plan out what you need to implement.
+2. Write the simple solution first.
+3. Ensure it is 100% correct and you have covered all
+   edge cases.
+4. Refactor to ensure the code is high quality.
+
+Here are the basic style rules you must follow:
+- Make sure the code is documented appropriately so that
+  it is easy to pick up.
+- Minimize the following gotchas:
+  - Extra defensive checks or try/catch blocks that are
+    abnormal.
+  - Casts to get around type checking
+  - Variables that are only used a single time after
+    declaration.
+  - Extra comments that a human wouldn't add.
+  - Trivial wrappers
+  - Heavy nesting
+  - If/Else ladders
+  - A ton of helper methods
+- Follow best coding practices:
+  - Group functions into files based on related
+    functionality
+  - Keep your code clean
+
+Your task is:
+{{ spec.strip() }}
+\end{lstlisting}

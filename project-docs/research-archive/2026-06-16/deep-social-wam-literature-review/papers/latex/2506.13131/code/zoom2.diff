@@ -1,0 +1,39 @@
+@@ -91,13 +156,86 @@
+     """Computes (batched) loss on learned decomposition."""
+     # Compute reconstruction loss.
+     rec_tensor = self._decomposition_to_tensor(decomposition)  # (B, N, M, P)
+...
++    # Discretization loss (encourage entries to be multiples of 1/2 or integer).
++    def dist_to_half_ints(x):
+...
++
++    def dist_to_ints(x):
+...
++    discretization_loss = 0.0
++    for factor in decomposition:
++      discretization_loss += jnp.mean(dist_to_half_ints(factor))
++      discretization_loss += jnp.mean(dist_to_ints(factor))
++
++    discretization_loss /= (
++        len(decomposition) * 2
++    )  # average across all factors and loss components
++
++    discretization_weight = self._linear_schedule(
++        global_step, start=0.0, end=self.hypers.discretization_weight
++    )
++
++    # Cosine annealing for half-integer loss.
++    cycle_length = self.config.training_steps // 4  # Number of steps per cycle
++    cycle_progress = (
++        global_step % cycle_length
++    ) / cycle_length  # Normalized progress within the current cycle [0, 1)
++    half_int_multiplier = (1 + jnp.cos(jnp.pi * cycle_progress)) / 2
++    half_int_multiplier = (
++        1 - self.hypers.half_int_start
++    ) * half_int_multiplier + self.hypers.half_int_start
++
++    total_loss = (
++        rec_loss
++        + discretization_weight * discretization_loss * half_int_multiplier
++    )
+...

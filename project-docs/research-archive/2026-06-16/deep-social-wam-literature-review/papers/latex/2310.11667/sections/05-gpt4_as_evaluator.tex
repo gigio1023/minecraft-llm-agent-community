@@ -1,0 +1,55 @@
+\vspace{-5pt}
+\section{Can GPT-4 evaluate social interactions?}
+\label{sec:human_eval}
+\vspace{-5pt}
+In this section, we study the following research question: can we leverage current LLMs to automate the evaluation framework \sotopiaeval introduced in \S\ref{sec:social_dimensions}? We choose GPT-4 \citep{openai2023gpt4} as a representative model in this study due to its superior performance.\footnote{In a pilot study, other models are not able to provide a meaningful evaluation. \update{See Appendix \ref{app_sec:evaluator_non_gpt}.}} We first collect interaction data,\footnote{Including model-human, model-model, and human-human interaction.} and then ask humans to evaluate the interactions based on the dimensions in \sotopiaeval.\footnote{Without knowing whether it is a model or a human that role-plays a character.} GPT-4 is prompted with the same set of questions (see Appendix \ref{app:eval_instructions} and \ref{app:human_annotation}) as humans, and we compare the scores produced by humans and GPT-4. 
+
+\begin{wrapfigure}[9]{r}{6cm}
+    \vspace{-50pt}
+    \centering
+    \includegraphics[width=6cm]{figures/human_model_reward_diff.pdf}
+    \vspace{-20pt}
+    \caption{Distribution of the difference between the scores given by humans and GPT-4.}
+    \label{fig:human_model_diff}
+\end{wrapfigure}
+
+\subsection{Data collection procedure} 
+We randomly sample a subset of two hundred episodes from \S\ref{sec:simulation}, and run a controlled study with a set of pre-qualified workers from Amazon Mechanical Turk.
+They are given instructions about the meaning of each dimension as mentioned in \S\ref{sec:social_dimensions} and shown examples of high-quality and low-quality annotation examples for each dimension. They not only rate each agent for each of the 7 dimensions on an 11-point Likert scale (\S\ref{sec:social_dimensions}), but also provide free-form rationales for each of their ratings.
+As each dimension of each agent is rated by several human annotators, we calculate a \emph{human score} by averaging the scores from multiple annotators.
+The agreement between human annotators is moderate with a Randolph $\kappa$ score of $0.503$ \citep{Randolph2005-iw}.
+GPT-4 is tasked with a similar job as human annotators.
+We prompt GPT-4 to generate a structured output with an integer \emph{GPT-4 score} and rationale for each episode, agent and dimension using the same set of instructions as the ones we give humans. 
+Please refer to Appendix \ref{app:human_annotation} for more details about the data collection procedure.
+
+\subsection{Analyzing GPT-4 evaluations with human evaluations}
+
+
+\begin{wraptable}[18]{l}{4.2cm}
+\small
+\vspace{-10pt}
+    \begin{tabularx}{4.2cm}{rll}
+    \toprule
+         Dim.& Models  & Humans  \\\midrule
+         \secret & {0.22}$^{**}$ & - \\
+         \knowledge & 0.33$^{**}$ & {0.19} \\
+         \socialrules & 0.33$^{**}$ & 0.42$^{**}$ \\
+         \believability& 0.45$^{**}$ & {0.27}$^{*}$ \\
+         \relationship & {\color{blue} 0.56}$^{**}$ & 0.49$^{**}$\\
+         \financialbenefits & {\color{blue} 0.62}$^{**}$& 0.34$^{**}$ \\
+         \goalcompletion & {\color{blue} 0.71}$^{**}$ & {\color{blue} 0.78}$^{**}$\\\midrule
+         \multicolumn{3}{c}{$^{**}:p\leq 0.01,^{*}:p\leq 0.05$}\\
+    \bottomrule
+    \end{tabularx}
+    \vspace{-5pt}
+    \caption{\footnotesize Pearson correlation coefficients and $p$-values between GPT-4 evaluation and human judgment on models' and humans' output among different dimensions. Strong and significant correlations are in blue. On \goalcompletion and models' output GPT-4 performs the best.
+    }
+    \label{tab:pearson_correlation}
+\end{wraptable}
+In Figure \ref{fig:human_model_diff}, we plot the difference between the GPT-4 score and the human score on the same dimension, agent and episode. We find that the majority ($>74\%$) of GPT-4 scores concentrate around the human scores within a standard deviation. It can also be seen that the white area on the left is larger than the one on the right, which means that GPT-4 is more likely to rate higher instead of lower than humans when it disagrees with average human judgment. 
+
+Table \ref{tab:pearson_correlation} breaks this aggregated analysis into different dimensions and whether the character is role-played by a human or a model. The correlations show that when models are role-playing, the GPT-4 scores have significant and strong correlations with the humans' scores on \goalcompletion, \financialbenefits, and \relationship dimensions. However, when humans are role-playing, the correlations drop significantly on all but one dimension (\goalcompletion). This indicates that GPT-4 could evaluate social interactions on some dimensions and that it is better for evaluating models compared to humans.
+In Appendix \ref{app_sec:breakdown_analysis}, we compare the average GPT-4 scores and the range of human scores for a single dimension of an agent in an episode. We find that GPT-4 scores are typically within human score ranges on most dimensions except for \socialrules and \secret, where GPT-4 often rates higher than humans do.
+
+Putting these observations together, we conclude that, with some caution, GPT-4 can be used as a proxy to human judgments for evaluating model performance%
+on some dimensions and for human performance on the \goalcompletion dimension. However, we remind readers that LLMs are known to have biases and problems for evaluation, including positional bias \citep{wang2023large}, factual inconsistency \citep{luo2023chatgpt}, favoring native speakers \citep{LIANG2023100779}. Therefore, one should be aware of the influence of these potential biases when interpreting our results. Future versions of \sotopiaeval may further improve LLM-based evaluation quality using recent methods, such as involving multiple LLMs \cite{chan2023chateval} and training larger LLM evaluators \cite{zhang2023wider}.

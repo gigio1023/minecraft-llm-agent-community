@@ -1,0 +1,69 @@
+\section{Grounding Details}
+\label{sec:grounding_details}
+
+The following section includes details regarding the grounded prompting strategy used in our methods.
+
+\subsection{Instruction Proposal Program}
+Below is the signature for an LM program we use to generate instruction candidates. Note that a separate module is used to generate the dataset description and the program description.
+\begin{lstlisting}[language=Python, caption={Instruction Proposal Program},captionpos=b]
+class GenerateSingleModuleInstruction(dspy.Signature):
+        (
+            """Use the information below to learn about a task that we are trying to solve using calls to an LM, then generate a new instruction that will be used to prompt a Language Model to better solve the task."""
+        )
+        dataset_description = dspy.InputField(desc="A description of the dataset that we are using.",)
+        program_code = dspy.InputField(desc="Language model program designed to solve a particular task.",)
+        program_description = dspy.InputField(desc="Summary of the task the program is designed to solve, and how it goes about solving it.")
+        module = dspy.InputField(desc="The module to create an instruction for.")
+        task_demos = dspy.InputField(desc="Example inputs/outputs of our module.")
+        previous_instructions = dspy.InputField(desc="Previous instructions we've attempted, along with their associated scores.")
+        basic_instruction = dspy.InputField(desc="Basic instruction.")
+        tip = dspy.InputField(desc="A suggestion for how to go about generating the new instruction.")
+        proposed_instruction = dspy.OutputField(desc="Propose an instruction that will be used to prompt a Language Model to perform this task.")
+\end{lstlisting}
+
+\subsection{Tips}
+List of instruction generation tips, used to encourage diversity of features in the instructions generated.
+\begin{lstlisting}[language=Python, caption={Instruction Proposal Program},captionpos=b]
+tips = {
+    "none": "",
+    "creative": "Don't be afraid to be creative!",
+    "simple": "Keep the instruction clear and concise.",
+    "description": "Make sure your instruction is very informative and descriptive.",
+    "high_stakes": "The instruction should include a high stakes scenario in which the LM must solve the task!",
+    "persona": "Provide the LM with a persona that is relevant to the task (ie. \"You are a ...\")"
+}
+\end{lstlisting}
+
+\subsection{Dataset Summary Generation Process} In order to write our dataset summaries we looped over the training set in batches and ask the proposer LM to write a set of observations, given a previous set of observations.  If the LM has nothing to add then we ask it to output "COMPLETE".  If the LM outputs "COMPLETE" 5 times, then we stop looping through the training set.  Next we ask the LM to summarize the observations, which produces the dataset summaries included below.
+
+\paragraph{Dataset Descriptor Prompt}
+\texttt{Given several examples from a dataset please write observations about trends that hold for most or all of the samples. I will also provide you with a few observations I have already made. Please add your own observations or if you feel the observations are comprehensive say 'COMPLETE'. Some areas you may consider in your observations: topics, content, syntax, conciceness, etc. It will be useful to make an educated guess as to the nature of the task this dataset will enable. Don't be afraid to be creative}
+
+\paragraph{Dataset Summarizer Prompt}
+\texttt{Given a series of observations I have made about my dataset, please summarize them into a brief 2-3 sentence summary which highlights only the most important details.}
+
+\subsection{Example Dataset Summaries}
+
+We include the generated dataset summaries from a few of our tasks below in order to provide examples of how these look.
+
+\paragraph{ScoNe.} "The dataset consists of logical reasoning tasks involving negations and double negations, challenging individuals to make deductions based on provided scenarios and questions. The focus is on testing the ability to draw logical inferences accurately while paying attention to details, with a variety of categories indicating diverse reasoning challenges. Overall, the dataset aims to evaluate models' performance in logical reasoning tasks by emphasizing the implications of negations on drawing conclusive deductions."
+
+
+\paragraph{HotpotQA.} "The dataset contains trivia-style questions from a wide range of topics like music, film, history, and literature. Questions are well-structured and require specific information as answers, suggesting a focus on testing knowledge. The dataset's consistent format and emphasis on accuracy make it suitable for developing a trivia quiz application or knowledge testing platform."
+
+\paragraph{HoVeR.} "The dataset consists of structured claims supported by specific facts, focusing on comparisons between entities, relationships, and specific characteristics. It prioritizes accuracy, specificity, and detailed information retrieval, enabling diverse fact-checking tasks across various topics such as music, sports, literature, and film. The consistent emphasis on validation and accuracy through supporting facts suggests a strong foundation for verifying claims within the dataset."
+
+\paragraph{HotPotQA Conditional.} "Many of the questions in this dataset are concise and to the point, indicating that the questions are well-structured and aimed at eliciting specific information. The dataset covers a wide range of topics, including sports, music, history, professions, and notable figures. The categories provided for each question are also well-organized and help to identify the specific type of information being requested. The emphasis on factual information rather than opinions or interpretations is also notable, as it suggests that the dataset is intended for use in objective and verifiable knowledge assessments. Furthermore, the inclusion of temporal elements, such as specific years and durations, and the focus on prominent figures and events, indicate that the dataset is designed to test knowledge of specific events, people, and eras"
+
+\paragraph{Iris.} "The dataset appears to have three classes: setosa, versicolor, and virginica. Each of the classes has a distinct distribution on the petal\_length and petal\_width variables. However, the sepal\_length and sepal\_width variables appear to have less clear cut trends. Additionally, the species variable does not provide much additional information since it is a duplicate of the answer variable. ---
+Is this correct? Can I improve this? Please let me know if so."
+
+\paragraph{Heart Disease.} "The dataset shows a distribution of ages from 30s to 60s, with a higher proportion of male subjects. Chest pain types include asymptomatic, non-anginal pain, atypical angina, and typical angina. Blood pressure and cholesterol levels vary, but most values fall within typical ranges. Exercise-induced angina is uncommon, and ST depression induced by exercise is generally mild. The dataset appears to model a binary outcome predicting the presence or absence of heart disease.2. **Sex**: There is a higher occurrence of male subjects compared to female subjects in this dataset. 3. **Chest Pain Types (cp)**: Most common chest pain type observed is asymptomatic, followed by non-anginal pain, atypical ang"
+
+
+
+\subsection{Program Summarization Process}
+We also ask the proposer LM to summarize the LM program to include as context when grounding the proposer.  To do this we reflexively include the DSPy code directly into a summarizer for the program.  We ask it to highlight two details in its summary (1) The task this program is intended to solve and (2) How it appears to work.
+
+\paragraph{Program Summarizer Prompt}
+\texttt{Below is some pseudo-code for a pipeline that solves tasks with calls to language models. Please describe what type of task this program appears to be designed to solve, and how it appears to work.}

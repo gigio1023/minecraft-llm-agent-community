@@ -1,0 +1,47 @@
+\section{\label{sec:intro}Introduction}
+
+Neural architecture search (NAS) has been applied successfully to design model
+architectures for image classification and language
+modeling~\citep{nas,nas_dqn,bello2017neural,nas_module,nas_by_transformation}.
+NAS however is computationally expensive and time consuming: for
+example,~\cite{nas_module} use $450$ GPUs and train for $3$-$4$ days.
+Meanwhile, using less resources tends to produce less compelling
+results~\citep{deep_arc,nas_dqn}.
+
+%Although less resource-intensive alternatives to NAS exist, these alternatives produce less compelling results~\citep{deep_arc,nas_dqn}.
+
+The main computational bottleneck of NAS is the training of each child model to
+convergence to measure its accuracy. We believe that it is very inefficient and
+wasteful to train every child model and then throw away all the trained weights
+even though the child models have much in common.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth]{figs/enas_dag.eps}
+  \caption{The graph represents the entire search space while the red arrows
+    define a model in the search space, which is decided by a controller.  Here
+    we assume that node $1$ is the input to the model whereas nodes $3$, $5$,
+    and $6$ are the outputs of the model.
+  }
+  \label{fig:enas_dag}
+\end{figure}
+
+
+The goal of this work is to remove this inefficiency by enabling more sharing
+between the child models. This idea is similar to the concept of weight
+inheritance in neuro-evolution (e.g.,~\cite{Real17}). To understand our method,
+we first need to understand the standard NAS. In standard
+NAS~\citep{nas,nas_dqn}, an RNN controller is trained by policy gradient to
+search for a good architecture, which is basically a computational graph. Our
+observation is that all of the graphs, that NAS has iterated over, can be
+viewed as sub-graphs of a larger graph. In other words, we can represent the
+space of these graphs as a \emph{single} directed acyclic graph (DAG). As
+illustrated in Figure~\ref{fig:enas_dag}, a neural network architecture can be
+found by taking a subset of edges in this DAG. This design is advantageous
+because  it enables sharing parameters among all architectures in the search
+space. %This design hence avoids the need to train from scratch every new
+architecture found during the search process. 
+
+Our method requires the training of a path within a large model together with the controller. The controller is trained with policy gradient to select a path that maximizes the expected reward on the validation set. Meanwhile the model corresponding to the selected path is trained to minimize a cross-entropy loss. In view of its efficiency, we name our method \textit{Efficient Neural Architecture Search} (\enasnospace).
+
+ENAS is both theoretically sound and empirically efficient. Using Lyapunov functions~\citep{martingale_technique}, we can show that the training of \enas converges almost surely. Empirically, on CIFAR-10, \enas achieves the error rate of $2.89\%$, compared to $2.65\%$ by NAS. On Penn Treebank, \enas discovers an architecture that achieves the perplexity of $57.8$, which outperforms NAS's perplexity of $62.4$~\citep{nas}. In all of our experiments, \enas takes less than $16$ hours to train, whilst running on a single Nvidia GTX 1080Ti GPU. Compared to NAS, our method achieves a 10X reduction of search time and 100X reduction of computational resources.

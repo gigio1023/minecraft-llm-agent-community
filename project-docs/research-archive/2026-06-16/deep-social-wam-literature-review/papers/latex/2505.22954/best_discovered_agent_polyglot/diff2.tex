@@ -1,0 +1,59 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/tools/edit.py b/tools/edit.py
+index 87fa408..a12903c 100644
+--- a/tools/edit.py
++++ b/tools/edit.py
+@@ -117,7 +117,7 @@ def write_file(path: Path, content: str, save_history: bool = True):
+                 if str(path) not in edit_history:
+                     edit_history[str(path)] = []
+                 edit_history[str(path)].append(path.read_text())
+-
++        
+         path.write_text(content)
+     except Exception as e:
+         raise ValueError(f"Failed to write file: {e}")
+@@ -172,17 +172,25 @@ def str_replace(path_obj: Path, old_str: str, new_str: str) -> str:
+     return f"File at {path_obj} has been edited: replaced '{old_str}' with '{new_str}'."
+ 
+ def insert_text(path_obj: Path, insert_line: int, new_str: str) -> str:
+-    """Insert text at specified line number."""
++    """Insert text at specified line number (1-based)."""
+     content = read_file(path_obj)
+     lines = content.splitlines()
+ 
+-    if insert_line < 1 or insert_line > len(lines) + 1:
+-        raise ValueError(f"Invalid insert line {insert_line} for file with {len(lines)} lines")
++    # Validate the insertion line number
++    if insert_line < 1:
++        raise ValueError(f"Invalid insert line {insert_line} - must be greater than 0")
++    if insert_line > len(lines) + 1:
++        raise ValueError(f"Invalid insert line {insert_line} - file only has {len(lines)} lines")
+ 
+-    # Insert the new text at the specified line (adjusting for 0-based index)
+-    lines.insert(insert_line - 1, new_str.rstrip("\n"))
+-    new_content = "\n".join(lines) + "\n"
++    # Clean up the new text to remove any trailing newlines
++    new_text = new_str.rstrip('\n')
+     
++    # Insert at the correct position (line numbers are 1-based, list indices are 0-based)
++    # Insert at index=insert_line, so it appears after the current line at that position
++    lines.insert(insert_line, new_text)
++
++    # Join lines with newline and add trailing newline
++    new_content = '\n'.join(lines) + '\n'
+     write_file(path_obj, new_content)
+     return f"File at {path_obj} has been edited: inserted text at line {insert_line}."
+ 
+@@ -243,8 +251,4 @@ def tool_function(command: str, path: str, **kwargs) -> str:
+             raise ValueError(f"Unknown command: {command}")
+ 
+     except Exception as e:
+-        return f"Error: {str(e)}"
+-
+-if __name__ == "__main__":
+-    # Example usage
+-    print(tool_function("view", "/home/ubuntu/xx/dgm/coding_agent.py"))
+\ No newline at end of file
++        return f"Error: {str(e)}"
+\ No newline at end of file
+\end{lstlisting}

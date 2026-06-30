@@ -1,0 +1,318 @@
+
+\subsection{Data Mixture for Training Universal Tokenizer}
+\label{sec:app_universal_data_mix}
+
+The training mixture for the universal tokenizer mainly consists of the $\pi_0$~\citep{black2024pi_0} datasets described in Section \ref{sec:generalist_vlas}.
+For many datasets, we include versions with multiple action space parametrizations: joint space, end-effector world frame, and end-effector camera frame, to ensure the generality of the resulting tokenizer.
+Open X-Embodiment~\citep{open_x_embodiment_rt_x_2023}, DROID~\citep{khazatsky2024droid}, and Bridge\;V2~\citep{walke2023bridgedata} are included in their original form. Before tokenization, all actions are padded to 32 dimensions to accommodate action spaces of different dimensionality.
+
+\begin{table}[h]
+    \centering
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{lcccc}
+        \toprule
+        Dataset Name & Morphology & Action Space & \makecell{Control \\Frequency\\ (Hz)}& \makecell{Mixture \\Weight\\ (\%)}\\
+        \midrule
+        ARX & Bi-manual & Joint & 50 & 7.2 \\
+        AgileX & Bi-manual & Joint & 50 & 1.8 \\
+        Fibocom & Mobile & Joint & 50 & 2.9 \\
+        Franka FR3 & Single arm & Joint & 20 & 3.7 \\
+        Mobile Trossen & Mobile & Joint & 50 & 2.5 \\
+        Trossen Biarm & Bi-manual & Joint & 50 & 4.3 \\
+        UR5 single & Single arm & Joint & 20 & 10.3 \\
+        UR5 biarm & Bi-manual & Joint & 20 & 2.4 \\
+        ARX slate mobile & Mobile & Joint & 50 & 2.5 \\
+        \midrule
+        ARX EE & Bi-manual & EE & 50 & 3.6 \\
+        AgileX EE & Bi-manual & EE & 50 & 0.9 \\
+        Fibocom EE & Mobile & EE & 50 & 1.4 \\
+        Franka FR3 EE & Single arm & EE & 20 & 1.9 \\
+        Mobile Trossen EE & Mobile & EE & 50 & 1.2 \\
+        Trossen Biarm EE & Bi-manual & EE & 50 & 2.1 \\
+        UR5 single EE & Single arm & EE & 20 & 5.2 \\
+        UR5 biarm EE & Bi-manual & EE & 20 & 1.2 \\
+        ARX slate mobile EE & Mobile & EE & 50 & 1.2 \\
+        \midrule
+        ARX Cam & Bi-manual & CamFrame & 50 & 3.6 \\
+        AgileX Cam & Bi-manual & CamFrame & 50 & 0.9 \\
+        Fibocom Cam & Mobile & CamFrame & 50 & 1.4 \\
+        Franka FR3 Cam & Single arm & CamFrame & 20 & 1.9 \\
+        Mobile Trossen Cam & Mobile & CamFrame & 50 & 1.2 \\
+        Trossen Biarm Cam & Bi-manual & CamFrame & 50 & 2.1 \\
+        UR5 single Cam & Single arm & CamFrame & 20 & 5.2 \\
+        UR5 biarm Cam & Bi-manual & CamFrame & 20 & 1.2 \\
+        ARX slate mobile Cam & Mobile & CamFrame & 50 & 1.2 \\
+        \midrule
+        ALOHA~\citep{zhao2023learning} & Bi-manual & Joint & 50 & 5.0 \\
+        DROID~\citep{khazatsky2024droid} & Single arm & Joint & 15 & 11.2 \\
+        Bridge\;V2~\citep{walke2023bridgedata} & Single arm & EE & 5 & 5.0 \\
+        OpenX~\citep{open_x_embodiment_rt_x_2023} & Single arm & EE & mixed & 3.8 \\ 
+        \bottomrule
+    \end{tabular}
+    }
+\end{table}
+
+\subsection{Trading off Between Compression and Reconstruction}
+\label{sec:app_compression_plots}
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_dataset_comparison.pdf}
+    \caption{Comparison of compression-reconstruction tradeoff on six training datsets. Any discretization method includes some hyperparameter that controls the tradeoff between reconstruction fidelity and compression level, represented here as number of tokens in the output (vocab size is held constant across all tokenizers). We sweep this hyperparameter (\ModelAcronym: rounding scale; na\"{i}ve tokenization: subsampling frequency; FSQ: number of latent tokens) and find that {\ModelAcronym} performs well across a wide range of scales. In particular, although it is less efficient than VQ-based tokenizers at low fidelities, it exhibits much better scaling to higher reconstruction fidelity, making {\ModelAcronym} much more applicable to fine-grained control problems. Specific instantiations of each tokenizer ({\ModelUniversalAcronym}, and na\"{i}ve tokenization without subsampling) are also shown.}
+    \label{fig:dataset-comparison}
+\end{figure}
+
+\subsection{Policy Training}
+\label{sec:app_policy_training_details}
+
+We train policies with $\pi_0$~\citep{black2024pi_0} and OpenVLA~\citep{kim2024openvla} backbones. Depending on the task, policies are conditioned on two or three inputs images (one third person camera, and one wrist camera per robot arm), using a resolution of 224x224 pixels. The VLA backbones encode each image separately via the pre-trained vision encoder and concatenate the resulting tokens. We additionally condition on a natural language task instruction and the robot's proprioceptive state. Both get tokenized via the LLMs language tokenizer, treating them as strings. For the proprioceptive state, we apply a bin tokenization pre-processing, akin to RT-2's action tokenization~\citep{rt22023arxiv}, discretizing into 256 bins. We then tokenize the integers as part of the text input sequence. Note that a simple bin tokenization scheme is sufficient for the proprioceptive state, since it is an \emph{input} to the policy (as opposed to the action \emph{outputs}, that require advanced tokenization as our experiments demonstrate).
+
+We train all policies using a short linear learning rate warm-up (1k steps) and then a constant learning rate of 5e-5. We use the AdamW optimizer~\citep{loshchilov2017decoupled} ($b1 = 0.9$, $b2 = 0.95$) without weight decay, clip gradient magnitude to 1 and compute an EMA of the network weights with weight 0.999.
+
+During inference, we use simple greedy autoregressive decoding, except for the bi-manual robot tasks (T-shirt folding, toast out of toaster, laundry folding), where we found a small temperature of $\beta = 0.7$ to be helpful to get policies to move out of the home position (since some of the data included stationary chunks of actions where the robot hovers in the initial position at the beginning of training episodes).
+
+\subsection{DROID Policy Setup}
+\label{sec:app_droid_exp_details}
+
+Here, we provide further details about our DROID training setup to make it easy for others to reproduce and build on our results. For training on the DROID dataset, we condition the policy on a single third-person view and the wrist camera view. Since DROID provides two external camera views per episode, we randomly sample the third-person view during training. Similarly, DROID provides three natural language annotations for each training episode, and we randomize over them during training. We do not use the camera calibration information. Thus, the trained policy can be tested on new viewpoints out of the box, without the need for calibration. We use joint velocity and absolute gripper position action space, and train the policy to predict 15-step action chunks (we execute 8 or 15-step chunks open-loop at inference time). We apply light data curation: we train only on the episodes marked as ``success'' (75k episodes) and filter out any idle timesteps with all-zero actions during training (usually timesteps in which the teleoperators reset the position of the VR controller during data collection). Other than that, we found training on the full dataset to work well, though there is likely potential for improving performance with more careful curation. We train policies for three epochs (240k iterations @ 256 batch size), which takes approximately 4~days on 8xH100 GPUs for the 3B parameter VLAs we are using.
+
+\subsection{Evaluation Tasks and Training Datasets}
+\label{sec:app_exp_task_details}
+
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/task_bus.jpeg}
+        \caption{Table Bussing}
+        \label{fig:experimental_setup_bus}
+    \end{subfigure}
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/task_shirt.jpeg}
+        \caption{T-Shirt Folding}
+        \label{fig:experimental_setup_shirt}
+    \end{subfigure}
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/task_grocery.jpeg}
+        \caption{Grocery Bagging}
+        \label{fig:experimental_setup_grocery}
+    \end{subfigure}
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/task_toast.jpeg}
+        \caption{Toast out of Toaster}
+        \label{fig:experimental_setup_toast}
+    \end{subfigure}
+    \begin{subfigure}{\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/task_laundry.jpeg}
+        \caption{Laundry Folding}
+        \label{fig:experimental_setup_laundry}
+    \end{subfigure}
+    \caption{Sampled initial configurations of evaluation tasks.}
+    \label{fig:experimental_setup}
+\end{figure}
+
+Below, we describe all evaluation tasks and training datasets used in our experiments. We detail the distribution of initial conditions and scoring criteria.
+
+\textbf{Libero.} We follow the training and evaluation setup of \citet{liu2024libero}. We evaluate on the Libero-Spatial, Libero-Object, Libero-Goal and Libero-Long benchmarking suites and use the corresponding datasets provided by the authors for training. We combine all datasets into one dataset with 270k samples, and train one policy jointly on all to reduce the number of policies that need to be trained. We train all policies for a total of 40k iterations ($\approx40$ epochs). We use the re-rendered datasets of \citet{kim2024openvla} for our experiments. Success is evaluated as a binary criterion per episode.
+
+
+\textbf{Table Bussing.} 
+This task requires a single UR5e robot arm to clean a table by bussing objects (a mixture of trash, plates, and dishes) into a trash can or bussing bin. 
+The training dataset contains demonstrations in randomized bussing scenes with approximately 70 objects. 
+The evaluation scene, shown in Figure~\ref{fig:experimental_setup_bus}, contains twelve objects on a table in an unseen configuration.
+The scene was created to stress the capability of the model, with utensils intentionally placed on top of trash, objects obstructing each other, and challenging objects such as chopsticks, transparent plastic, and reflective containers.
+The overall score is calculated as the percentage of objects correctly thrown away or placed in the bin. 
+
+\textbf{T-Shirt Folding.} 
+This task requires a bimanual ARX robot to fold a t-shirt.
+The training dataset has demonstrations of shirt folding with approximately 150 shirts, varying in size, color, and style.
+The evaluation scene, shown in Figure~\ref{fig:experimental_setup_shirt}, cycles through five seen shirts of varying colors and sizes, each starting from a flat configuration.
+The overall score is calculated as the percentage of shirts successfully folded, as determined by a human rater.
+
+\textbf{Grocery Bagging.}
+This task requires a single UR5e robot arm to bag groceries. 
+This task was evaluated out-of-the-box on models pretrained with the full mixture detailed in \citet{black2024pi_0}.
+The evaluation scene, shown in Figure~\ref{fig:experimental_setup_grocery}, contains seven items (with varying shapes, sizes, materials, and weights) and a large paper grocery bag. 
+The overall score is calculated as the percentage of items placed into the grocery bag. 
+
+\textbf{Toast out of Toaster.}
+This task requires a bi-manual Trossen ViperX robot, mirroring the ALOHA~\cite{zhao2024alohaunleashedsimplerecipe} setup, to take two pieces of toast out of a toaster and place them onto a plate. 
+This task was evaluated out-of-the-box on models pretrained with the full mixture detailed in \citet{black2024pi_0}.
+The evaluation scene is shown in Figure~\ref{fig:experimental_setup_toast} and the overall score tracks task progress, with one point for removing each piece of toast and one point for placing it on the plate, for a score out of four. 
+
+\textbf{Laundry Folding.}
+This task requires a bi-manual ARX robot to take a piece of clothing, short or t-shirt, out of a laundry bin and fold it. It is a very challenging task, since successful folding of the tangled up laundry requires multiple steps of unfurling and flattening the laundry before folding can start.
+Following \citet{black2024pi_0}, his task was evaluated with models pretrained on the full $\pi_0$ training mixture detailed in \citet{black2024pi_0} and fine-tuned with a small amount of high-quality, task-specific data.
+The evaluation scene, shown in Figure~\ref{fig:experimental_setup_laundry}, contains five items of clothing randomly placed in a laundry hamper. 
+The overall score is calculated as the percentage of clothing successfully folded and stacked, as determined by a human rater.
+
+\textbf{DROID.} We train on all successful episodes from the DROID dataset (75k episodes, 21M samples) for 240k iterations ($\approx$3 episodes). We apply light data curation (see \cref{sec:app_droid_exp_details}). After training, we deploy the policy \emph{zero-shot} in new scenes, with unseen scene background, camera angles, and objects. For quantitative evaluation, we design an evaluation suite with 16 tasks and 44 trials total per policy (see \cref{tab:droid_eval_tasks}). Each trial is scored with a task progress rubric (e.g., 1 point for picking up the correct object, 1 point for placing it in the correct receptacle). We show example scenes from the quantitative evaluation in \cref{fig:app_droid_eval_setups}. We further run qualitative tests of the policy across various real-world setups on three different university campuses (see \cref{fig:droid_quali}). We do not measure success rates during these evaluations, but provide numerous qualitative videos of successes and failures to help readers get a sense of the policy's capabilities.
+
+
+\begin{table}[t]
+    \centering
+    \caption{DROID evaluation tasks.}
+    \label{tab:droid_eval_tasks}
+    \begin{tabular}{l|c}
+        \toprule
+        Task & Trials\\
+        \midrule
+        Put the spoon in the dish rack & 4\\
+        Put carrot in bowl & 4\\
+        Put plate in dish rack & 2\\
+        Wipe the table & 2\\
+        Put the plate on the table & 2\\
+        Clean up the table & 2\\
+        Close the drawer & 4\\
+        Put the stapler on the notebook & 2\\
+        Put stapler in the drawer & 4\\
+        Clean the whiteboard & 2\\
+        Put the marker in the cup & 4\\
+        Put the black sponge in the blue bowl & 2\\
+        Put the red bottle in the black bowl & 2\\
+        Put the watermelon in the purple bowl & 2\\
+        Move the watermelon from the purple bowl to the blue bowl & 2\\
+        Put the tape in the purple bowl & 2\\
+        Put the water bottle on the left side of the table & 2\\
+        \midrule
+        \textbf{Total} & \textbf{44}\\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/droid_eval_setups.pdf}
+    \caption{Setups used for quantitative DROID evaluation.
+    }
+    \label{fig:app_droid_eval_setups}
+\end{figure}
+
+
+\begin{table*}[]
+\renewcommand{\arraystretch}{1.5}
+\caption{Universal Tokenizer Evaluation Datasets.}
+\label{sec:app_univeral_test_set}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{ccccccc}
+\hline
+  Morphology &
+  Dataset Name &
+  Platform &
+  Action Space &
+  Action Dim &
+  Control Frequency &
+  Task \\ \hline
+  \multicolumn{1}{c|}{\multirow{5}{*}{Single Arm}} &
+  SOAR~\cite{zhou2024soar} &
+  WidowX &
+  EEF &
+  7 &
+  5 &
+  Pick/place \\
+  \multicolumn{1}{c|}{} &
+  DROID-Eval EEF~\cite{khazatsky2024droid} &
+  Franka &
+  EEF &
+  7 &
+  15 &
+  Pick/place \\
+  \multicolumn{1}{c|}{} &
+  DROID-Eval Joint~\cite{khazatsky2024droid} &
+  Franka &
+  Joint &
+  8 &
+  15 &
+  Pick/place \\
+  \multicolumn{1}{c|}{} &
+  SERL~\cite{luo2024serl} &
+  Franka &
+  EEF &
+  7 &
+  10 &
+  Insertion \\
+  \multicolumn{1}{c|}{} &
+  $\pi$ Table Bussing~\cite{black2024pi_0} &
+  UR5 &
+  Joint &
+  8 &
+  20 &
+  Pick/place \\ \hline %
+  \multicolumn{1}{c|}{\multirow{4}{*}{Dexterous}} &
+  NYU DexHand~\cite{guzey2024bridging} &
+  ALLEGRO &
+  Joint+EEF &
+  30 &
+  16 &
+  Dexterous manipulation \\
+  \multicolumn{1}{c|}{} &
+  Berkeley DexHand~\cite{qi2022inhand} &
+  ALLEGRO &
+  Joint &
+  16 &
+  20 &
+  In-hand manipulation \\ %
+  \multicolumn{1}{c|}{} &
+  Berkeley DexArm~\cite{singh2024hop} &
+  xArm+ALLEGRO &
+  Joint &
+  23 &
+  20 &
+  Dextrous pick/place \\ %
+  \multicolumn{1}{c|}{} &
+  HATO~\cite{lin2024learning} &
+  UR5+Psyonic Hand &
+  EEF+Joint &
+  24 &
+  10 &
+  Dextrous pick/place \\ \hline %
+  \multicolumn{1}{c|}{\multirow{2}{*}{UMI}} &
+  UMI~\cite{chi2024universal} &
+  UMI &
+  EEF &
+  7 &
+  20 &
+  Pick/place \\
+  \multicolumn{1}{c|}{} &
+  UMI on Legs~\cite{ha2024umilegs} &
+  UMI &
+  EEF &
+  7 &
+  20 &
+  Whole-body manipulation \\ \hline %
+  \multicolumn{1}{c|}{\multirow{2}{*}{Humanoid}} &
+  HumanPlus~\cite{fu2024humanplus} &
+  Unitree H1 &
+  Joint &
+  40 &
+  50 &
+  Whole-body manipulation \\
+  \multicolumn{1}{c|}{} &
+  UCSD TeleVision~\cite{cheng2024tv} &
+  Unitree H1 w/Neck &
+  Joint &
+  28 &
+  60 &
+  Manipulation+active perception \\ \hline
+  \multicolumn{1}{c|}{\multirow{1}{*}{Navigation}} &
+  Waymo~\cite{Ettinger_2021_ICCV} &
+  Waymo Car &
+  2D delta &
+  2 &
+  10 &
+  Autonomous Driving\\ \hline
+\end{tabular}%
+}
+\end{table*}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/pi0_compute_matched.pdf}
+    \caption{\textbf{Comparison of {\GeneralistModelAcronym} and \emph{compute-matched} diffusion $\pi_0$~\citep{black2024pi_0} generalist policies.} \GeneralistModelAcronym{} clearly outperforms the diffusion VLA when trained with the same amount of training compute, due to its faster convergence. Reported: mean and 95\% CI.
+    }
+    \label{fig:pi0_compute_matched}
+\end{figure}

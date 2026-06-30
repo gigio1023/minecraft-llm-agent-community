@@ -1,0 +1,140 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Bounce Shot Scoring Challenge
+
+    Description:
+    - The environment consists of a walled field measuring 20 m x 10 m. The field contains 3 ramps/mounds (triangular prisms) placed randomly, each measuring 2 m long x 1 m wide x 0.5 m high.  
+    - A single goal 3 m wide and 1 m high is placed centered on one end of the field.
+    - A ball (0.5 m diameter) is released from a random point along the opposite side of the field from the goal. The ball is given an initial velocity of 3-5 m/s at a random angle towards the goal end of the field.
+    - Due to the ramps on the field, the ball will bounce and roll unpredictably as it crosses the field.
+    - The robot begins in the center of the field on the goal side.
+
+    Task:
+    The robot must intercept the bouncing ball and kick it into the goal to score a point. The robot should dynamically adjust its approach to the ball based on the ball's changing trajectory after each bounce off a ramp. The robot needs to time its kick to hit the ball at the optimal point in its bounce to redirect it into the goal.
+
+    Success Conditions:
+    The task is completed successfully if the robot causes the ball to fully enter the goal area.
+
+    Rewards:
+    - Small reward for decreasing distance to the ball, scaled higher as the ball gets closer to the robot's side of the field
+    - Moderate penalty if the ball's velocity drops to zero or it leaves the field without scoring
+    - Large reward for kicking the ball, scaled by the ball's post-kick velocity in the direction of the goal
+    - Large reward for scoring a goal
+
+    Termination:
+    The episode ends if the ball comes to rest, leaves the field, or enters the goal area.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.field_size = [20.0, 10.0, 0.1]
+        self.field_position = [0.0, 0.0, 0.0]
+        self.field_id = self.create_box(mass=0.0, half_extents=[self.field_size[0] / 2, self.field_size[1] / 2, self.field_size[2] / 2], position=self.field_position, color=[0.1, 0.8, 0.1, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.field_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.wall_height = 1.0
+        self.wall_thickness = 0.1
+        self.create_walls()
+        self.ramp_size = [2.0, 1.0, 0.5]
+        self.num_ramps = 3
+        self.ramp_ids = []
+        self.goal_width = 3.0
+        self.goal_height = 1.0
+        self.goal_thickness = 0.1
+        self.goal_position = [self.field_position[0] + self.field_size[0] / 2 - self.goal_thickness / 2, self.field_position[1], self.field_position[2] + self.goal_height / 2]
+        self.goal_id = self.create_box(mass=0.0, half_extents=[self.goal_thickness / 2, self.goal_width / 2, self.goal_height / 2], position=self.goal_position, color=[1.0, 0.0, 0.0, 0.5])
+        self.create_ramps()
+        self.ball_radius = 0.25
+        self.ball_position_init = [0.0, 0.0, self.field_position[2] + self.ball_radius]
+        self.ball_velocity_init = [0.0, 0.0, 0.0]
+        self.ball_id = self.create_sphere(mass=0.1, radius=self.ball_radius, position=self.ball_position_init, color=[1.0, 0.5, 0.0, 1.0])
+        self.robot_position_init = [self.field_position[0] + self.field_size[0] / 4, self.field_position[1], self.field_position[2] + self.robot.links['base'].position_init[2]]
+        self.ball_velocity_range = [3.0, 5.0]
+        self.ball_angle_range = [-np.pi / 4, np.pi / 4]
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_walls(self):
+        wall_positions = [[self.field_position[0], self.field_position[1] - self.field_size[1] / 2 - self.wall_thickness / 2, self.field_position[2] + self.wall_height / 2], [self.field_position[0], self.field_position[1] + self.field_size[1] / 2 + self.wall_thickness / 2, self.field_position[2] + self.wall_height / 2], [self.field_position[0] - self.field_size[0] / 2 - self.wall_thickness / 2, self.field_position[1], self.field_position[2] + self.wall_height / 2]]
+        wall_half_extents = [[self.field_size[0] / 2, self.wall_thickness / 2, self.wall_height / 2], [self.field_size[0] / 2, self.wall_thickness / 2, self.wall_height / 2], [self.wall_thickness / 2, self.field_size[1] / 2, self.wall_height / 2]]
+        for position, half_extents in zip(wall_positions, wall_half_extents):
+            self.create_box(mass=0.0, half_extents=half_extents, position=position, color=[0.2, 0.2, 0.2, 1.0])
+
+    def create_ramps(self):
+        for _ in range(self.num_ramps):
+            while True:
+                position = [np.random.uniform(self.field_position[0] - self.field_size[0] / 2 + self.ramp_size[0] / 2, self.field_position[0] + self.field_size[0] / 2 - self.ramp_size[0] / 2 - self.goal_thickness), np.random.uniform(self.field_position[1] - self.field_size[1] / 2 + self.ramp_size[1] / 2, self.field_position[1] + self.field_size[1] / 2 - self.ramp_size[1] / 2), self.field_position[2] + self.ramp_size[2] / 2]
+                if all((np.linalg.norm(np.asarray(position[:2]) - np.asarray(ramp_position[:2])) > self.ramp_size[0] + self.ramp_size[1] for ramp_position in [self.get_object_position(ramp_id) for ramp_id in self.ramp_ids])):
+                    break
+            ramp_id = self.create_box(mass=0.0, half_extents=[self.ramp_size[0] / 2, self.ramp_size[1] / 2, self.ramp_size[2] / 2], position=position, color=[0.4, 0.4, 0.4, 1.0])
+            self.ramp_ids.append(ramp_id)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_object_velocity(self, object_id):
+        return np.asarray(self._p.getBaseVelocity(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot.links['base'].orientation_init)
+        ball_x = -self.field_size[0] / 2 + self.ball_radius
+        ball_y = np.random.uniform(-self.field_size[1] / 2 + self.ball_radius, self.field_size[1] / 2 - self.ball_radius)
+        ball_position_init = [ball_x, ball_y, self.field_position[2] + self.ball_radius]
+        self._p.resetBasePositionAndOrientation(self.ball_id, ball_position_init, [0.0, 0.0, 0.0, 1.0])
+        ball_speed = np.random.uniform(self.ball_velocity_range[0], self.ball_velocity_range[1])
+        ball_angle = np.random.uniform(self.ball_angle_range[0], self.ball_angle_range[1])
+        ball_velocity_init = [ball_speed * np.cos(ball_angle), ball_speed * np.sin(ball_angle), 0.0]
+        self._p.resetBaseVelocity(self.ball_id, ball_velocity_init, [0.0, 0.0, 0.0])
+        return observation
+
+    def step(self, action):
+        self.distance_to_ball = self.get_distance_to_object(self.ball_id)
+        self.ball_position = self.get_object_position(self.ball_id)
+        self.ball_velocity = self.get_object_velocity(self.ball_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_ball = self.get_distance_to_object(self.ball_id)
+        new_ball_position = self.get_object_position(self.ball_id)
+        new_ball_velocity = self.get_object_velocity(self.ball_id)
+        reach_ball = (self.distance_to_ball - new_distance_to_ball) / self.dt * (1.0 - new_ball_position[0] / (self.field_size[0] / 2))
+        ball_stopped = 0.0
+        if np.linalg.norm(new_ball_velocity) < 0.1:
+            ball_stopped = -5.0
+        kick_ball = 0.0
+        if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.ball_id)) > 0:
+            ball_to_goal = np.asarray(self.goal_position)[:2] - new_ball_position[:2]
+            ball_to_goal_norm = np.linalg.norm(ball_to_goal)
+            if ball_to_goal_norm > 0.1:
+                kick_ball = np.dot(new_ball_velocity[:2], ball_to_goal) / ball_to_goal_norm
+        ball_in_goal = 0.0
+        if self.goal_position[1] - self.goal_width / 2 < new_ball_position[1] < self.goal_position[1] + self.goal_width / 2 and new_ball_position[0] > self.goal_position[0]:
+            ball_in_goal = 100.0
+        return {'reach_ball': reach_ball, 'ball_stopped': ball_stopped, 'kick_ball': kick_ball, 'ball_in_goal': ball_in_goal}
+
+    def get_terminated(self, action):
+        ball_position = self.get_object_position(self.ball_id)
+        return np.linalg.norm(self.ball_velocity) < 0.1 or abs(ball_position[0]) > self.field_size[0] / 2 or abs(ball_position[1]) > self.field_size[1] / 2
+
+    def get_success(self):
+        ball_position = self.get_object_position(self.ball_id)
+        return self.goal_position[1] - self.goal_width / 2 < ball_position[1] < self.goal_position[1] + self.goal_width / 2 and ball_position[0] > self.goal_position[0]
+\end{lstlisting}

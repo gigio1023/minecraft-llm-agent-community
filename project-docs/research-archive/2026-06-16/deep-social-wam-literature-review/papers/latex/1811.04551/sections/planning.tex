@@ -1,0 +1,36 @@
+\section{Latent Space Planning}
+\label{sec:planning}
+
+\input{algorithms/agent}
+
+To solve unknown environments via planning, we need to model the environment dynamics from experience. \method does so by iteratively collecting data using planning and training the dynamics model on the gathered data. In this section, we introduce notation for the environment and describe the general implementation of our model-based agent. In this section, we assume access to a learned dynamics model. Our design and training objective for this model are detailed in \cref{sec:model}.
+
+\paragraph{Problem setup}
+
+Since individual image observations generally do not reveal the full state of the environment, we consider a partially observable Markov decision process (POMDP). We define a discrete time step~$t$, hidden states $s_t$, image observations $o_t$, continuous action vectors $a_t$, and scalar rewards $r_t$, that follow the stochastic dynamics
+\begin{gather}
+\begin{aligned}
+\makebox[12em][l]{Transition function:} && s_t &\sim\pr[\mathrm{p}](s_t|s_{t-1},a_{t-1}) \\
+\makebox[12em][l]{Observation function:} && o_t &\sim\pr[\mathrm{p}](o_t|s_t) \\
+\makebox[12em][l]{Reward function:} && r_t &\sim\pr[\mathrm{p}](r_t|s_t) \\
+\makebox[12em][l]{Policy:} && a_t &\sim\pr[\mathrm{p}](a_t|o_{\leq t},a_{<t}),
+\label{eq:pomdp}
+\end{aligned}
+\raisetag{2.4\baselineskip}
+\end{gather}% Intentional empty line to allow column break.
+
+where we assume a fixed initial state $s_0$ without loss of generality. The goal is to implement a policy $\pr[\mathrm{p}](a_t|o_{\leq t},a_{<t})$ that maximizes the expected sum of rewards  $\E[\big]{\mathrm{p}}{\sum_{t=1}^T r_t}$, where the expectation is over the distributions of the environment and the policy.
+
+\paragraph{Model-based planning}
+
+\method learns a transition model $\p(s_t|s_{t-1},a_{t-1})$, observation model $\p(o_t|s_t)$, and reward model $\p(r_t|s_t)$ from previously experienced episodes (note italic letters for the model compared to upright letters for the true dynamics). The observation model provides a rich training signal but is not used for planning. We also learn an encoder $\q(s_t|o_{\leq t},a_{<t})$ to infer an approximate belief over the current hidden state from the history using filtering. Given these components, we implement the policy as a planning algorithm that searches for the best sequence of future actions. We use model-predictive control \citep[MPC;][]{richards2005mpc} to allow the agent to adapt its plan based on new observations, meaning we replan at each step. In contrast to model-free and hybrid reinforcement learning algorithms, we do not use a policy or value network.
+
+\paragraph{Experience collection}
+
+Since the agent may not initially visit all parts of the environment, we need to iteratively collect new experience and refine the dynamics model. We do so by planning with the partially trained model, as shown in \cref{alg:agent}. Starting from a small amount of $S$ seed episodes collected under random actions, we train the model and add one additional episode to the data set every $C$ update steps. When collecting episodes for the data set, we add small Gaussian exploration noise to the action. To reduce the planning horizon and provide a clearer learning signal to the model, we repeat each action $R$ times, as common in reinforcement learning \citep{mnih2015dqn,mnih2016a3c}.
+
+\paragraph{Planning algorithm}
+
+We use the cross entropy method \citep[CEM;][]{rubinstein1997cem,chua2018pets} to search for the best action sequence under the model, as outlined in \cref{alg:planner}. We decided on this algorithm because of its robustness and because it solved all considered tasks when given the true dynamics for planning. CEM is a population-based optimization algorithm that infers a distribution over action sequences that maximize the objective. As detailed in \cref{alg:planner} in the appendix, we initialize a time-dependent diagonal Gaussian belief over optimal action sequences $a_{t:t+H}\sim\Normal(\mu_{t:t+H},\sigma^2_{t:t+H}\mathbb{I})$, where $t$ is the current time step of the agent and $H$ is the length of the planning horizon. Starting from zero mean and unit variance, we repeatedly sample $J$ candidate action sequences, evaluate them under the model, and re-fit the belief to the top $K$ action sequences. After $I$ iterations, the planner returns the mean of the belief for the current time step, $\mu_t$. Importantly, after receiving the next observation, the belief over action sequences starts from zero mean and unit variance again to avoid local optima.
+
+To evaluate a candidate action sequence under the learned model, we sample a state trajectory starting from the current state belief, and sum the mean rewards predicted along the sequence. Since we use a population-based optimizer, we found it sufficient to consider a single trajectory per action sequence and thus focus the computational budget on evaluating a larger number of different sequences. Because the reward is modeled as a function of the latent state, the planner can operate purely in latent space without generating images, which allows for fast evaluation of large batches of action sequences. The next section introduces the latent dynamics model that the planner uses.

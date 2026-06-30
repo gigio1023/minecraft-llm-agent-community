@@ -1,0 +1,316 @@
+
+
+
+
+Below, we state and prove a generalization of \cref{thm:lower,thm:lower_adaptive} which allows for approximate maximizers in the sense of \cref{def:sharpening_general}, as well as a more general coverage coefficient.
+
+To state the result, for a model $\pi$, we define
+\begin{align}
+\Ypigamma(x) = \crl*{y\mid{}
+  \pi(y\mid{}x)\geq{}(1-\gamma)\cdot\max_{y\in\cY}\pi(y\mid
+                                                         x)}.
+\end{align}
+Next, for any integer $p\in\bbN$, we define 
+\begin{align}\Cstargp(\pi) = \prn*{\En\brk*{
+    \frac{1}{(\pi(\Ypigamma(x)\mid{}x))^p
+  }}}^{1/p},
+  \end{align} 
+  with the convention that $\Cstargp = \Cstargp(\piref)$. \msedit{Our
+    most general lower bound, \cref{thm:lower_general}, holds in the
+    regime where $\gamma=1/2$, and thus the best response$y$ has bounded margin away from suboptimal responses. }
+\begin{thmmod}{thm:lower}{$'$}[Lower bound for sharpening]
+  \label{thm:lower_general}
+  Fix integers $d \ge 1$ and $p \ge 1$ and parameters   $\epsilon \in
+  (0,1)$ and $C \ge 1$, and set $\gamma = 1/2$.  There exists a class
+  of models $\Pi$ such that i) $\log |\Pi| \asymp d (1+\log(C
+  \epsilon^{-1/p}))$, ii) $\sup_{\pi \in \Pi} \Cstargp(\pi) \lesssim
+  C$, and iii) $\Ypigamma(x)$ is a singleton for all $\pi\in\Pi$, for
+  which any sharpening algorithm $\pihat$ that attains $\En\brk*{\Pr_{x \sim
+    \cdist}[\pihat(\Ypigamma[\piref](x)) > 1/2]}  \ge 1 - \epsilon$ for
+  all $\piref \in \Pi$ must collect a total number of samples $m = n\cdot{}N$ at least
+\begin{align}
+  m \gtrsim \begin{cases}
+    \frac{ C\log |\Pi|}{\epsilon^{1+1/p} (1+\log(C \epsilon^{-1/p}))}
+    & \text{sample-and-evaluate oracle},\\
+    \frac{ C\log |\Pi|}{\epsilon^{1/p} (1+\log(C \epsilon^{-1/p}))}  &
+    \text{adaptive sample-and-evaluate oracle}.
+    \end{cases}
+\end{align}
+\end{thmmod}
+\paragraph{Proof of \Cref{thm:lower_general}}%
+  \newcommand{\Enki}{\En^{\cI}}%
+\newcommand{\Pnki}{\Pr^{\cI}}%
+\newcommand{\EnI}{\En_{\cI \sim \texttt{Unif}}}%
+Let parameters $d, p \in \bbN$ and $\epsilon > 0$ be given, and set
+$\gamma=1/2$. Let $M\in\bbN$ and $\Delta>0$ be parameters to be chosen
+later. Let $\cX = \{x_0,x_1,\dots,x_d\}$ and $\cY =
+\{y_0,y_1,\dots,y_M\}$ be arbitrary discrete sets (with
+$\abs{\cX}=d+1$ and $\abs{\cY}=M+1$).
+
+\paragraph{Construction of prompt distribution and model class}
+We use the same construction for the non-adaptive and adaptive lower
+bounds in the theorem statement. We define the prompt distribution $\cdist$ via
+\begin{align}
+    \cdist:= (1 - \Delta) \dirac_{x_0} +  \frac{\Delta}{d}
+    \sum_{i=1}^d \dirac_{x_i},
+\end{align}
+where $\dirac_x$ denotes the Dirac delta distribution on element $x$.
+
+As the first step toward constructing the model class $\Pi$, we
+introduce a family of distributions $(P_0,P_1,\dots,P_M)$  on $\cY$ as follows
+\begin{align}
+    P_0 = \dirac_{y_0}, \quad \forall i \ge 1,~ P_{i} = \frac{1}{(1-\gamma)M}\dirac_{y_i} + \sum_{j \in [M] \setminus \{i\}} \frac{1}{M}\prn*{1 - \frac{\gamma}{(M-1)(1-\gamma)}} \dirac_{y_j}.
+\end{align}
+Next, for or any index $\cI = (j_1,j_2,\dots,j_d)\in
+[M]^d$, define a model
+\begin{align}
+    \pi^{\cI}(x_i) =  \begin{cases} P_0 & i = 0\\
+    P_{j_i} & i > 0
+    \end{cases}.
+\end{align}
+We define the model class as
+\begin{align}
+    \Pi := \{\pi^{\cI}: \cI \in [M]^d\},
+\end{align}
+which we note has
+\begin{align}
+    \log |\Pi| &= d \log M. 
+\end{align}
+
+\paragraph{Preliminary technical results}
+Define 
+\begin{align}
+    \YIgamma(x) := \{y: \pi^{\cI}(y \mid x) \ge (1-\gamma) \max_{y\in\cY}\abedit{\pi^{\cI}}(y\mid{}x)\}.
+\end{align}
+The following property is immediate.
+\begin{lemma}\label{claim:Ygamma_lb} Let  $\cI = (j_1,\dots,j_d) \in
+  [d]^M$. Then $\YIgamma(x_i) = \{y_{j_i}\}$ if $i > 0$, and $\YIgamma(x_0)=\crl{y_0}$.
+\end{lemma}
+In view of this result, we define $y^{\cI}(x) = \argmax_{y}
+\pi^{\cI}(y\mid{}x)$ as the unique arg-max response for $x$.
+
+Going forward, let us fix the algorithm under consideration. Let $\Pnki\brk{\cdot}$ denote the law over the dataset used by the
+algorithm when the true instance is $\pi^{\cI}$ (including possible
+randomness and adaptivity from the algorithm itself), and let
+$\Enki\brk{\cdot}$ denote the corresponding expectation. The following lemma is a basic
+technical result.
+\begin{lemma}[Reduction to
+  classification]\label{lem:redux_to_classification} Let $\pihat$ be
+  the model produced by an algorithm with access to a
+  (adaptive) sample-and-evaluate oracle for $\pi^{\cI}$. Suppose that for some $\eps\geq{}0$,
+\begin{align}
+    \EnI\Enki\Pr_{x \sim \cdist}[\pihat(\YIgamma(x)\mid{}x) > 1/2] \ge 1 - \epsilon. \label{eq:EnIlb}
+\end{align}
+Define $\wh \cI = (\wh j_1,\dots, \wh j_d)$ via $\wh{j}_i = \argmax_j\pihat(y_j \mid x_i)$, and write $\cI = (j_1^\star,\dots,j_d^\star)$.  Then, 
+\begin{align}
+    \frac{1}{d}\sum_{i=1}^d\EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right] \le \epsilon/\Delta.
+\end{align}
+\end{lemma}
+
+
+\begin{proof}[\pfref{lem:redux_to_classification}] As established in
+  \pref{claim:Ygamma_lb}, under instance $\cI$, $\YIgamma(x_i) =
+  \{y_{j_i^\star}\}$ for any $i \in [d]$. Thus, whenever
+  $\pihat(\YIgamma(x_i)) > 1/2$, $j_i^\star = \argmax_j \pihat(y_j
+  \mid x_i) =: \wh{j}_i$. The result follows by noting that the event
+  $\{\exists i \in [d]: x = x_i\}$ occurs with probability at least
+  $\Delta$ under $x\sim\cdist$.
+\end{proof}
+
+\newcommand{\Priunif}{\Pr_{i,\mathrm{unif}}}
+
+
+\paragraph{Lower bound under sample-and-evaluate oracle} 
+Recall that in the non-adaptive framework, the sample complexity $m$
+is fixed. In light of \cref{lem:redux_to_classification}, it suffices to establishes the following claim.
+\begin{lemma}
+  \label{lem:nonadaptive_lower}
+  There exists a universal constant $c>0$ such that for all $M \ge 8$, if $m \le cdM/\Delta$, then 
+    $ \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right] \ge 1/8$
+    for all $i$.
+\end{lemma}
+With this, the result follows by selecting $\Delta = 16\eps$, with
+which \Cref{lem:redux_to_classification} implies that any algorithm
+with $\EnI\Enki\Pr_{x \sim
+  \cdist}[\pihat(\YIgamma(x)\mid{}x) > 1/2] \geq{} 1 - \epsilon$ must
+have $m \approxgeq dM/\Delta$. To
+conclude, we choose $M \asymp 1+ C \epsilon^{-1/p}$, which gives
+$m\asymp dM/\Delta \asymp dC\epsilon^{-(1+1/p)} \asymp \epsilon^{-(1+1/p)}
+\log \Pi/\log(1+ C \epsilon^{1/p})$. Finally, we check that with this
+choice, all $\pi \in \Pi$ satisfy
+\begin{align}
+  \Cstargp(\pi) 
+    &= \left(\Pr_{x \sim \cdist}\brk*{x=x_0} + \prn*{M(1-\gamma)}^p\Pr_{x \sim \cdist}\brk*{x \neq x_0}\right)^{1/p}\\
+    &= \left((1-\Delta) + \prn*{M(1-\gamma)}^p \Delta\right)^{1/p} \\
+    &\approxleq \left((1-\Delta) + \prn*{8C(1-\gamma)}^p \right)^{1/p} \lesssim C.
+\end{align}
+
+\begin{proof}[\pfref{lem:nonadaptive_lower}]
+  Let $i\in\brk{d}$ be fixed. Of the $m=n\cdot{}N$ tuples $(x,y,\log\piref(y\mid{}x))$ that are
+  observed by the algorithm,
+  let $m_i$ denote the (random) number of such examples
+  for which $x =x_i$.  From Markov's inequality, we have
+  \begin{align}
+    \label{eq:lower_markov}
+    \Pr[ m_i \le 2 \Delta m/d] \ge \frac{1}{2}
+  \end{align}
+  Going forward, let $\cD = \crl*{(x,y,\log\piref(y\mid{}x))}$ denote
+  the dataset collected by the algorithm, which has $\abs{\cD}=m$. Let $\cE_i$ denote the
+  event that, for prompt $x = x_i$, (i) there are at least two
+  distinct responses $y_j$ for which $(x_i,y_j) \notin \cD$; and (ii)
+  there are no pairs $(x_i,y)\in\cD$ for which
+  $\piref(y\mid{}x_i)>\frac{1}{M}$. Since $\cE_i$ is a measurable
+  function of $\cD$, we can write
+  \begin{align}
+    \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right]
+    &\ge   \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\} \cdot \indic\left\{ \cE_i\right\}\right]\\
+    &=   \EnI\Enki \left[\indic\{\cE_i\}\En_{\cI \sim \Pr[\cI=\cdot
+      \mid \cD]}\left[ \indic\{\wh{j}_i \ne j^{\star}_i\}
+      \right]\right],
+      \label{eq:lower_event1_passive}
+  \end{align}
+  where $\cI \sim \Pr[\cI=\cdot \mid \cD]$ is sampled from the
+  posterior distribution over $\cI$ conditioned on the dataset
+  $\cD$. Observe that conditioned on $\cE_i$, the posterior
+  distribution over $j_i^{\star}$ under $\cI \sim \Pr[\cI=\cdot \mid
+  \cD]$ is uniform over the set of indices $j\in\brk{M}$ for which
+  $(x_i, y_j)\notin\cD$, and this set has size at least $2$. Hence, $\indic\{\cE_i\}\En_{\cI \sim \Pr[\cI=\cdot
+      \mid \cD]}\left[ \indic\{\wh{j}_i \ne
+      j^{\star}_i\}\right]\geq\frac{1}{2}$, and
+  resuming from \cref{eq:lower_event1_passive}, we have
+  \begin{align}
+    \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right] \ge \frac{1}{2}\EnI\Enki \left[\indic\{\cE_i\}\right] &\ge  \frac{1}{2}\EnI\Pnki \left[\cE_i \cap \crl{m_i \le 2\Delta m/d}\right] \\
+                                                                                                                  &\ge \frac{1}{4} \EnI\Pnki \left[\cE_i \mid m_i \le 2\Delta m/d\right],
+  \end{align}
+  where the last inequality is from \cref{eq:lower_markov}.
+  Finally, we can check that under the law $\Pnki$, the probability of
+  the event $\cE_i$---conditioned on the value $m_i$---is at least the probability that
+  $(x_i,y_{j^{\star}_i}),(x_i,y_{j'}) \notin \cD$ for an arbitrary
+  fixed index $j' \ne j^{\star}_i$,
+  which on the event $\{m_i \le 2\Delta{}m/d\}$ is at least
+  \begin{align}
+    \left(1 - \frac{3}{M}\right)^{m_i} \ge \left(1 - \frac{3}{M}\right)^{2\Delta m/d},
+  \end{align}
+  where we have used that $\gamma=1/2$.
+  The value above is at least $\frac{1}{4}$ whenever $m \le c\cdot{}
+  dM/\Delta$ for a sufficiently small
+  absolute constant $c> 0$. For this value of $m$, we conclude that
+  $\EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right] \ge
+  \frac{1}{4} \EnI\Pnki \left[\cE_i \mid \{m_i \le 2\Delta
+    m/d\}\right] \ge \frac{1}{8}$.
+\end{proof}
+
+\paragraph{Lower bound under adaptive sample-and-evaluate oracle}
+\newcommand{\Sgood}{S_{\texttt{good}}}
+
+In the adaptive framework, we let $m_i$ denote the (potentially
+random) number of tuples $(x,y,\log\piref(y\mid{}x))$ observed by the algorithm in which $x
+= x_{i}$.  Note that unlike the non-adaptive framework, the
+distribution over $m_i$ depends on the
+underlying instance $\cI$ with which the algorithm interacts.
+
+
+To begin, from \Cref{lem:redux_to_classification} and Markov's
+inequality, if $\pihat$ satisfies the guarantee $
+\EnI\Enki\Pr_{x \sim \cdist}[\pihat(\YIgamma(x)) > 1/2] \ge 1 -
+\epsilon$, then there exists a set of indices $\Sgood\subset\brk{d}$
+such that\footnote{We emphasize that the set $\Sgood$ is not a random
+  variable, and depends only on
+  the algorithm itself.}\loose
+\begin{align}
+  \label{eq:sgood}
+    |\Sgood| \ge \floor{d/2}, \quad \forall i \in \Sgood, ~ \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right] \le \frac{2\epsilon}{\Delta}.
+\end{align}
+We now appeal to the following lemma.
+\begin{lemma}
+  \label{lem:adaptive_lower}
+  As long as $M\geq{}6$, it holds that for all $i\in\brk{d}$,
+  \begin{align}
+    \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right]
+    \geq{} \frac{1}{4e}    \EnI\Enki\left[ \indic\{m_i\leq{}M/3\}\right].
+  \end{align}
+\end{lemma}
+Combining \cref{lem:adaptive_lower} with \cref{eq:sgood}, it follows
+that there exist absolute constant $c_1,c_2,c_3>0$ such that if
+  $\Delta=c_1\cdot{}\eps$, then for all $i\in\Sgood$, 
+  \begin{align}
+    \EnI\bbP^{\cI}\brk*{m_i\geq{}c_2M} \geq{}c_3.
+  \end{align}
+
+Thus, with this choice for $\Delta$, we have that $i \in \Sgood$,
+\begin{align}
+  \EnI\Enki\left[ m_i\right] \gtrsim M,
+\end{align}
+and we can lower bound the algorithm's expected sample complexity by
+summing over $i\in\Sgood$:
+\begin{align}
+    \EnI\Enki\left[ m\right] \ge   \EnI\Enki\left[ \sum_{i\in \Sgood} m_i\right] \gtrsim |\Sgood|M \gtrsim dM.
+\end{align}
+The result now follows by tuning $M \asymp 1+ C \epsilon^{-1/p}$ as in
+the proof of the lower bound for non-adaptive sampling, which gives
+$\En\brk{m}\approxgeq{}dM \asymp dC\epsilon^{-1/p} \asymp \epsilon^{-1/p}
+\log \Pi/\log(1+ C \epsilon^{1/p})$ and $\Cstargp(\pi)\approxleq{}C$
+for all $\pi\in\Pi$.\loose
+
+
+
+\begin{proof}[\pfref{lem:adaptive_lower}]
+    Let $i\in\brk{d}$ be fixed. Let $\cD = \crl*{(x,y,\log\piref(y\mid{}x))}$ denote
+  the dataset collected by the algorithm at termination, which has $\abs{\cD}=m$. Let $\cE_i$ denote the
+  event that, for prompt $x = x_i$, (i) there are at least two
+  distinct responses $y_j$ for which $(x_i,y_j) \notin \cD$; and (ii)
+  there are no pairs $(x_i,y)\in\cD$ for which
+  $\piref(y\mid{}x_i)>\frac{1}{M}$. Since $\cE_i$ is a measurable
+  function of $\cD$, we can write
+  \begin{align}
+    \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right]
+    &\ge   \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\} \cdot \indic\left\{ \cE_i\right\}\right]\\
+    &=   \EnI\Enki \left[\indic\{\cE_i\}\En_{\cI \sim \Pr[\cI=\cdot
+      \mid \cD]}\left[ \indic\{\wh{j}_i \ne j^{\star}_i\}
+      \right]\right],
+      \label{eq:lower_event1}
+  \end{align}
+  where $\cI \sim \Pr[\cI=\cdot \mid \cD]$ is sampled from the
+  posterior distribution over $\cI$ conditioned on the dataset
+  $\cD$. Observe that conditioned on $\cE_i$, the posterior
+  distribution over $j_i^{\star}$ under $\cI \sim \Pr[\cI=\cdot \mid
+  \cD]$ is uniform over the set of indices $j\in\brk{M}$ for which
+  $(x_i, y_j)\notin\cD$, and this set has size at least $2$. Hence, $\indic\{\cE_i\}\En_{\cI \sim \Pr[\cI=\cdot
+      \mid \cD]}\left[ \indic\{\wh{j}_i \ne
+      j^{\star}_i\}\right]\geq\frac{1}{2}$, and
+  resuming from \cref{eq:lower_event1}, we have
+  \begin{align}
+    \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right] &\ge
+                                                              \frac{1}{2}\EnI\Enki
+                                                              \left[\indic\{\cE_i\}\right]
+    \\
+                                                            &\ge  \frac{1}{2}\EnI\Pnki \left[\cE_i \cap \crl{m_i \le M/3}\right] \\
+                                                                                                                  &= \frac{1}{2} \EnI\brk*{\Pnki \left[\cE_i \mid m_i \le M/3\right]\cdot\bbP^{\cI}\brk*{m_i\leq{}M/3}}.
+  \end{align}
+  \dfc{It might be good to justify the claim below slightly more
+    formally in the adaptive case}\mscomment{see below:}
+    
+   The event $\cE_i$ is a superset of the event $\cE_{i,j'}$ that
+  $(x_i,y_{j^{\star}_i}),(x_i,y_{j'}) \notin \cD$ for an arbitrary
+  fixed index $j' \ne j^{\star}_i$. 
+  Thus,
+  \begin{align}
+      \Pnki \left[\cE_i \mid m_i \le M/3\right] \ge \Pnki \left[ \cE_{i,j'} \mid m_i \le M/3\right] 
+  \end{align}
+  Moreover, we can realize the law of $\Pnki$ considering an infinite tape, associated to index $i$, of i.i.d. samples $y \sim \pibase(\cdot \mid x_i)$, and taking the first $m_i$ elements on this tape to be the samples 
+  $(x,y,\log \pibase(y \mid x)) \in \cD$ with $x = x_i$  (see, e.g. \citet{simchowitz2017simulator} for an argument of this form).  On the event $\{m_i \le M/3\}$, the $m_i$ samples in $(x,y,\log \pibase(y \mid x)) \in \cD$ with $x = x_i$ are a subset of the first $M/3$ samples from the index-$i$ tape. Viewed in this way, we can lower bound the probability of $\cE_{i,j}$ by the probability of the event $\tilde \cE_{i,j'}$ that the first $M/3$ $y$'s on the index-$i$ tape contain neither $j^\star_i$, nor the designated index $j'$. As these first $M/3$ $y$'s are not chosen adaptively, the probability of $\tilde \cE_{i,j'}$ is at least
+  \begin{align}
+    \left(1 - \frac{3}{M}\right)^{m_i} \ge \left(1 - \frac{3}{M}\right)^{M/3}\geq\frac{1}{2e},
+  \end{align}
+  as long as $M\geq{}6$ and $\gamma=1/2$. We conclude
+  that
+  \begin{align}
+    \EnI\Enki\left[ \indic\{\wh{j}_i \ne j_i^\star\}\right]
+    \geq{} \frac{1}{4e}    \EnI\Enki\left[ \indic\{m_i\leq{}M/3\}\right].
+  \end{align}  
+\end{proof}
+
+
+
+  
+

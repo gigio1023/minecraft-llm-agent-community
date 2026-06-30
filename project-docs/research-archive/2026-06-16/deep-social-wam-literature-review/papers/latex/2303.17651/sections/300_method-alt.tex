@@ -1,0 +1,118 @@
+\input{figures/task_examples}   
+\section{Iterative Refinement with \ours}
+\label{sec:method}
+Given an input sequence, \ours 
+generates an initial output, provides feedback on the output, and refines the 
+output according to the feedback. \ours iterates between feedback and refinement until a desired condition is met.
+\ours relies on a suitable language model and three prompts (for initial generation, feedback, and refinement), and does not require training.
+\ours is shown in Figure~\ref{fig:mainfig} and Algorithm~\ref{alg:ours}.
+Next, we describe \ours in more detail.
+
+
+\paragraph{Initial generation}
+Given an input $x$, prompt $\pgen$, and model $\model$, \ours generates an initial output $y_0$:
+\begin{align}
+     y_0 = \mathcal{M}\left(\pgen \| x\right).
+    \label{eq:gen}
+\end{align}
+For example, in \Cref{fig:code1}, the model generates functionally correct code for the given input. 
+Here, $\pgen$ is a task-specific few-shot prompt 
+(or instruction) 
+for an initial generation, and $\|$ denotes concatenation.
+The few-shot prompt contains input-output pairs $\langle x^{(k)}, y^{(k)} \rangle$ for the task.\footnote{Few-shot prompting (also referred to as ``in-context learning'') provides a model with a prompt consisting of $k$ in-context examples of the target task, each in the form of input-output pairs $\langle x_i, y_i\rangle$ \citep{brown2020language}.}
+
+
+\paragraph{\fbmod}
+Next, 
+\ours uses the same model $\mathcal{M}$ to provide feedback $fb_t$ on its own output, given a task-specific prompt $\pfb$ for generating feedback:
+\begin{align}
+    fb_t = \mathcal{M}\left(\pfb \| x \| y_t\right).
+    \label{eq:feedback}
+\end{align}
+\begin{figure}[!t]
+        \centering
+        \small
+        \begin{algorithm}[H]
+            \caption{\ours algorithm}\label{alg:ours}
+            \begin{algorithmic}[1]
+                \Require input $x$, model $\model$, prompts $\{\pgen,\pfb,\prefine\}$, stop condition $\stopcond$
+                \State $y_0=\model(\pgen\|x)$ \Comment{Initial generation (Eqn.~\ref{eq:gen})}
+                \For{iteration t $\in 0, 1,\ldots$}	
+                    \State $fb_t = \model\left(\pfb \| x \| y_t\right) $  \Comment{Feedback (Eqn.~\ref{eq:feedback})}
+                    \If{$\mathrm{stop}(fb_t, t)$} \Comment{Stop condition}
+                        \State break      
+                    \Else
+                        \State $y_{t+1} = \mathcal{M}\left(\prefine \| x \| y_0 \| fb_0 \| ... \| y   _t \| fb_t\right)$ \Comment{Refine (Eqn.~\ref{eqn:refine2})} 
+                    \EndIf
+                \EndFor
+                \State \Return $y_t$   
+            \end{algorithmic}
+        \end{algorithm}
+        \label{fig:ours:abstract}  
+    \hfill
+    \vspace{-2em}
+    \caption{The \ours algorithm. 
+    See (\S\ref{sec:method}) for a discussion of each component. 
+    }
+    \label{fig:method:abstract}    
+\end{figure}
+Intuitively, the feedback may
+address multiple aspects of the output. 
+For example, in code optimization, the feedback might address the efficiency, readability, and overall quality of the code. 
+
+Here, the prompt $\pfb$ provides examples of feedback in the form of input-output-feedback triples $\langle x^{(k)}, y^{(k)}, fb^{(k)} \rangle$.
+We prompt the model to write feedback that is actionable and specific via $fb^{(k)}$.
+By `actionable', we mean the feedback should contain a concrete action that would likely improve the output.
+By `specific', we mean the feedback should identify concrete phrases in the output to change.
+For example, %
+the feedback in \Cref{fig:code2} is ``\emph{This code is slow as it uses a for loop which is brute force. A better approach is to use the formula ... \texttt{(n(n+1))/2}}''.
+This feedback is actionable, since it suggests the action `use the formula...'.
+The feedback is specific since it mentions the `for loop'.
+
+\paragraph{\itermod}
+Next, \ours uses $\model$ to refine its most recent output, given its own feedback:
+\begin{align}
+    y_{t+1} = \mathcal{M}\left(\prefine \| x \| y_t \| fb_t\right).
+    \label{eq:refine}
+\end{align}
+For example, in \Cref{fig:code3}, given the initial output and the generated feedback, the model generates a re-implementation that is shorter and runs much faster than the initial implementation.
+The prompt $\prefine$ provides examples 
+of improving the output based on the feedback, in the form of input-output-feedback-refined quadruples $\langle x^{(k)}, y_t^{(k)}, fb_t^{(k)}, y_{t+1}^{(k)} \rangle$.
+
+\niparagraph{Iterating \ours}
+\ours alternates between \textsc{feedback} and \textsc{refine} steps until a stopping condition is met. 
+The stopping condition $\mathrm{stop}(fb_t, t)$ either stops at a specified timestep $t$, or extracts a stopping indicator (e.g. a scalar stop score) from the feedback.
+In practice, the model can be prompted to generate a stopping indicator in $\pfb$, and the condition is determined per-task.
+
+To inform the model about the previous iterations, we retain the history of previous feedback and outputs by appending them to the prompt. 
+Intuitively,
+this allows the model to learn from past mistakes and avoid repeating them. More precisely, \Cref{eq:refine} is in fact instantiated as: 
+\begin{align}
+\label{eqn:refine2}
+    y_{t+1} = \mathcal{M}\left(\prefine \| x \| y_0 \| fb_0 \| ... \| y   _t \| fb_t\right).
+\end{align}
+Finally, we use the last refinement $y_{t}$ as the output of \ours. 
+
+\Cref{alg:ours} summarizes \ours, and \Cref{fig:modules} shows an example of \ours in the \dialgen \citep{mehri-eskenazi-2020-unsupervised} and \codeopt \citep{pie} tasks. 
+\Cref{sec:prompts} provides examples of the 
+$\pgen$, $\pfb$, $\prefine$ prompts for various tasks.
+The key idea is that \ours uses the same underlying \llm to generate, get feedback, and refine its outputs given its own feedback. It relies only on supervision present in the few-shot examples.
+
+\if 0
+\subsection{Few-shot prompts make \ours \corr{}{supervision-free}}
+\label{subsec:prompts}
+
+In the iterative feedback-and-refine loop of \ours, we use the few shot prompts $p_{gen}$ (\Cref{eq:gen}), $p_{fb}$ (\Cref{eq:feedback}), and $p_{refine}$ (\Cref{eq:refine}). These few-shot prompts in \ours equip the base \llm with generation, feedback and refinement capabilities, while being supervision-free.
+
+
+\begin{itemize}
+    \item[$p_{gen}$:] Initially, the generation prompt $p_{gen}$ (\Cref{eq:gen}) guides the model to  produce the initial output $y_0$ using task-specific input-output pairs $\langle x_i, y_i \rangle$. 
+    
+    \item[$p_{fb}$:] The feedback prompt $p_{fb}$ (\Cref{eq:feedback}) provides few-shot examples of feedback in the form of input-output-feedback triples $\langle x_i, y_i, fb_i \rangle$. These examples prompt the model to generate specific and \textit{actionable feedback} on its own output.
+
+    That is, the prompt contains examples that point concretely to the phrases that should be rephrased, and with suggestions on how to improve them.
+    
+    \item[$p_{refine}$:] The refinement prompt $p_{refine}$ (\Cref{eq:refine}) provides few-shot examples of refined outputs in the form of input-output-feedback-refined quadruples $\langle x_i, y_i, fb_i, y_{i+1} \rangle$, which instruct the model to improve the output based on the feedback.
+\end{itemize}
+\Cref{sec:prompts} provides examples of the $p_{gen}$, $p_{fb}$, $p_{refine}$ prompts for various tasks where we apply \ours will be described in the next section. 
+\fi

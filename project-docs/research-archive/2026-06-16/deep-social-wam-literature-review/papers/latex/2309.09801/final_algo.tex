@@ -1,0 +1,125 @@
+\subsection{\texttt{Find-Contract}}\label{sec:find_contract_algo}
+\begin{comment}
+We show now how to employ Algorithm~\ref{alg:separate_search} to design an algorithm learning an approximately contract in $\mathcal{P}$, when the number of agent's actions $n$ is a fixed parameter. As a first observation we remark that we can not directly employ Algorithm~\ref{alg:separate_search} with contract design space equal to $\preg$ as its sample complexity could be exponential in the number of states.\footnote{For example, if $\preg=[0,1]^m$ we have that the number of hyperplanes definging $\preg$ is equal to $2m$, and thus the number of samples required by Algorithm~\ref{alg:separate_search} is exponential in $m$.} To overcome this issue we invoke \separate on a larger contract design space $\mathcal{P}' \subseteq \mathbb{R}^m_{+}$ such that $ \preg \subseteq \mathcal{P}'$, defined by a number of hyperplanes $h_{\preg'}=m+1$. In such a way we efficiently identify the boundaries of the regions $\mathcal{L}_{d} \subseteq \preg'$ and the empirical distribution over outcomes associated with that regions. Subsequently, we instantiate a LP for each action $d \in \mathcal{D}$, over the set defined by the intersection of $\mathcal{L}_{d}$ and the boundaries of $\mathcal{P}$. Finally, the algorithms prescribes the principal to commit to the contract achieving the highest expected utility among the solutions returned from the LPs instantiated for each possible action $d \in \mathcal{D}$.
+
+
+A crucial step in our analysis is to prove the approximate optimality of the solution returned by Algorithm~\ref{alg:final}. To do that, we tackle the challenging task of showing that if there exists an action $a \in \mathcal{A}$ that remains undiscovered during the interaction, \emph{i.e}., there is no $d \in \mathcal{D}$ such that $a \in I(d)$, then for any contract $p^* \in \mathcal{L}_{d^*} \cap \mathcal{P}_a$ for some $d^* \in \mathcal{D}$, the principal's utility is sufficiently close to the solution obtained by Algorithm~\ref{alg:final}. This is because there always a contract $p' \in \mathcal{P}_{a}$ with $a \in I(d)$ for some $d \in \mathcal{D}$ that provides a principal's utility close to the one achieved in $ p^* \in \mathcal{L}_{d^*} \cap \mathcal{P}_a$. We formalize this observation in the following lemma.
+
+\begin{restatable}{lemma}{epsilonsolution}\label{lem:espoptsol}
+	The solution returned by Algorithm~\ref{alg:final} is $\mathcal{O}(\sqrt \epsilon)$-optimal.
+\end{restatable}
+
+To prove Lemma~\ref{lem:espoptsol}, we first observe that if the optimal contract is such that $p^* \in \mathcal{L}_{d} \cap \mathcal{P}_a$ for some $a \in I(d)$ with $d \in \mathcal{D}$, then the principal's estimated expected utility in $p^*$ is close to the actual one, by means of Lemma~\ref{lem:boundedactions}. On the contrary if $p^* \in \mathcal{L}_{d} \cap \mathcal{P}_a$ for an action $a \not \in I(d)$, we show that the contract $p^L = (1 -\sqrt{\epsilon}) p^* + \sqrt{\epsilon} r $ either belongs to a $\preg_{a}$ with $a \in I(d)$ for some discovered action $d \in \mathcal{D}$ or the utility estimated by the seller in $p^*$ by means of $\widetilde{F}_{d} \in \Delta_{\Omega}$ is close to the actual one. Finally, using Lemma~\ref{lem:espoptsol} and the previous lemmas, we can conclude that the solution returned by Algorithm~\ref{alg:final} is approximately optimal.
+
+\begin{theorem}
+	Given $\epsilon, \alpha > 0 $, with $\mathcal{O}(\frac{n^3m^{n+1}}{\epsilon^2}\log(\frac{m}{\alpha})) $ samples the solution returned by Algorithm~\ref{alg:final} is $\sqrt{ \epsilon}$-optimal with probability of at least $1-\alpha$.
+\end{theorem}
+A crucial step in our analysis is to prove that, when the \texttt{Try-Partition} returns the tuple $(\bot,\{\mathcal{F}_d \}_{d \in \mathcal{D}},\{\mathcal{L}_{d}\}_{d\in  \mathcal{D} } )$ and thus has partitionated the space $\mathcal{P}$, then the \texttt{Find-Contract} returns an approximate optimal solution. To prove that, we tackle the challenging task of showing that if there exists an action $a \in \mathcal{A}$ that remains undiscovered during the interaction, \emph{i.e}., there is no $d \in \mathcal{D}$ such that $a \in I(d)$, then for any contract $p^* \in \mathcal{L}_{d^*} \cap \mathcal{P}_a$ for some $d^* \in \mathcal{D}$, the principal's utility is sufficiently close to the solution obtained by Algorithm~\ref{alg:final}. This is because there always a contract $p' \in \mathcal{P}_{a}$ with $a \in I(d)$ for some $d \in \mathcal{D}$ that provides a principal's utility close to the one achieved in $ p^* \in \mathcal{L}_{d^*} \cap \mathcal{P}_a$. We formalize this observation in the following lemma.
+\end{comment}
+
+The \texttt{Find-Contract} procedure (Algorithm~\ref{alg:find_contract}) finds a contract $p \in [0,B]^m$ that approximately maximizes the principal's expected utility over $[0,B]^m$ by using the cover $\{ \mathcal{L}_d \}_{d \in \mathcal{D}}$ of $\mathcal{P}$ made by approximate best-response regions given as input (obtained by running \texttt{Try-Cover}).
+
+
+\begin{wrapfigure}[13]{R}{0.44\textwidth}
+	\vspace{-.7cm}
+	\begin{minipage}{0.44\textwidth}
+		\begin{algorithm}[H]
+			\caption{\texttt{Find-Contract}}
+			\label{alg:find_contract}
+			\small
+			\begin{algorithmic}[1]
+				\Require $\{ \mathcal{L}_d\}_{d \in \mathcal{D}}$
+				\While{ $d \in \mathcal{D}$}
+				%\State $\widetilde{F}_{d} \leftarrow F$ for any $F \in \mathcal{F}[d]$
+				\vspace{1mm}
+				
+				\State $p_{d}^\star\shortleftarrow \hspace{-2mm} \argmax\limits_{p \in [0,B]^m \cap \mathcal{L}_{d} } \sum_{\omega  \in \Omega }  \widetilde{F}_{d,\omega}    \left( r_\omega - p_\omega \right)  $ \label{line:lp}
+				%\vspace{1mm}
+				\EndWhile
+				\State $d^\star \leftarrow \argmax\limits_{d \in \mathcal{D}} \, \sum_{\omega  \in \Omega }  \widetilde{F}_{d,\omega}    ( r_\omega - p^\star_{d,\omega} ) $
+				%\vspace{1mm}
+				\State $p^\star \gets p_{d^\star}^\star$ \label{line:optimal}
+				\State $p_\omega \gets (1 -\sqrt{\epsilon}) p_\omega^\star + \sqrt{\epsilon} r_\omega $ for all $\omega \in \Omega$\label{eq:final_linear_contract}
+				\State \Return $p$
+			\end{algorithmic}
+		\end{algorithm}
+	\end{minipage}
+\end{wrapfigure}
+
+
+%
+First, for every $d \in \mathcal{D}$, Algorithm~\ref{alg:find_contract} computes $p_d^\star$ which maximizes an empirical estimate of the principal's expected utility over the polytope $\mathcal{L}_d \cap [0,B]^m$.
+%
+This is done in Line~\ref{line:lp} by solving a \emph{linear program} with constraints defined by the hyperplanes identifying $\mathcal{L}_d \cap [0,B]^m$ and objective function defined by the principal's expected utility when outcomes are generated by $\widetilde{F}_d$.
+%, which can be any empirical distribution $F \in \mathcal{F}[d]$.
+%
+Then, Algorithm~\ref{alg:find_contract} takes the best contract (according to the empirical distributions $\widetilde{F}_d$) among all the $p_d^\star$, which is the contract $p^\star$ defined in Line~\ref{line:optimal}, and it returns a suitable convex combination of such a contract and a vector whose components are defined by principal's rewards (see Line~\ref{eq:final_linear_contract}). 
+% As a first observation we remark that we did not directly employ Algorithm~\ref{alg:try_partition} with contract design space equal to $[0,B]^m$ as its sample complexity would result exponential in the number of states. Consquently, to find the (apprixmately) optimal contract in $[0,B]^m$, we solve a LP for each best-response region $\lreg_d \cap [0,B]^m$ with $d \in \dreg $ returned by the \texttt{Try-Partition} algorithm and empirical distribution estimated by $\texttt{Action-Oracle}$. Then, we commit to a contract which is a convex combination between the optimal ne and the reward vector.
+The following lemma formally proves the guarantees in terms of principal's expected utility provided by Algorithm~\ref{alg:find_contract}:
+%
+\begin{restatable}{lemma}{epsilonsolution}\label{lem:solve_lpl}
+	Under the event $\mathcal{E}_\epsilon$, if $\{ \mathcal{L}_d\}_{d \in \mathcal{D}}$ is a cover of $\mathcal{P}$ computed by \textnormal{\texttt{Try-Cover}}, Algorithm~\ref{alg:find_contract} returns a contract $p \in [0,B]^m$ such that $u(p) \geq \max_{p' \in [0,B]^m} u(p') - \rho$.
+	%
+	% which is $\mathcal{O}(\sqrt \epsilon)$-optimal.
+	%
+	% the solution returned by \textnormal{\texttt{Find-Contract} } is $\mathcal{O}(\sqrt \epsilon)$-optimal.
+\end{restatable}
+%
+The main challenge in proving Lemma~\ref{lem:solve_lpl} is that, for the contract $p^\star$ computed in Line~\ref{line:optimal}, the agent's best response may \emph{not} be associated with any meta-action in $\mathcal{D}$, namely $a^\star(p^\star) \not \in A(d)$ for every $d \in \dreg$.
+%
+Nevertheless, by means of Lemma~\ref{lem:epsilonbr}, we can show that $a^\star(p^\star)$ is an approximate best response to $p^\star$.
+%
+% Nevertheless, by means of Lemma~\ref{lem:epsilonbr} it is possible to show that there always exists a contract $p' \in \lreg_d$ in which \ldots
+%Nevertheless, by means of Lemma~\ref{lem:epsilonbr}, we can show that there exists a contract $p \in \lreg_d$ in which the principal's expected utility, as estimated through the \texttt{Find-Contract} algorithm, is sufficiently close to the optimal utility $\max_{p' \in [0,B]^m} u(p')$.
+%
+Moreover, the algorithm returns the contract defined in Line~\ref{eq:final_linear_contract}, \emph{i.e.}, a convex combination of $p^\star$ and the principal's reward vector.
+%
+Intuitively, paying the agent based on the  principal's rewards aligns the agent's interests with those of the principal.
+%
+This converts the approximate incentive compatibility of $a^\star(p^\star)$ for the contract $p^\star$ into a loss in terms of principal's expected utility.
+%However, utilizing Lemma~\ref{lem:epsilonbr}, we can demonstrate the existence of a contract $p' \in \lreg_d$ for which the principal's utility, estimated through the \texttt{Find-Contract} algorithm, is sufficiently close to the optimal utility. Ultimately, by committing to the contract $p^l$ defined in Line~\ref{eq:final_linear_contract} of the \texttt{Find-Contract} algorithm, we can establish the validity of the previous lemma, supported by Lemma Dutting.
+
+%\alb{La parte sopra va spiegata meglio (vedi commento).}
+%
+% we tackle the challenging task of dealing with an optimal contract $p^* \in [0,b]^m$ that may be such that $a^\star(p^*) \not \in I(d)$ for each $d \in \dreg$, nevertheless by means of Lemma~\ref{lem:epsilonbr} we can show that there always exists a contract $p' \in \lreg_d$ in which the utility the principla estimates through the empirical distributon returned by \texttt{Action-Oracle} is close to the optimal one. Finally, by comitting to the contract $p^L$ dfined as in Line~\ref{eq:final_linear_contract} in the \texttt{Find-Contract} algorithm, by means of Lemma Dutting we can show that the lemma holds. 
+
+%\alb{La garanzia deve essere $\rho$ o $\epsilon$, decidiamo.}
+  
+
+%\begin{algorithm}
+%\caption{\texttt{FIND-CONTRACT}}
+%\label{alg:find_contract}
+%\begin{algorithmic}[1]
+%\Require $\{ \mathcal{L}_d\}_{d \in \mathcal{D}}$
+%\While{ $d \in \mathcal{D}$}
+%\State Set $\widetilde{F}_{d} \leftarrow F$ for some $F \in \mathcal{F}_d$ and solve:
+%\begin{subequations}
+%\begin{align*}
+%p_{d}^* \in \arg \max & \,\ \sum_{\omega  \in \Omega }  \widetilde{F}_{d,\omega}    \left( r_\omega - p_\omega \right)  \label{eq:utility}\\
+%& \text{s.t.} \quad p \in [0,B]^m \cap \mathcal{L}_{d} 
+%\end{align*}
+%\end{subequations}
+%\EndWhile
+%\State Set $p^* \leftarrow \arg \max_{d \in \mathcal{D}} \sum_{\omega  \in \Omega }  \widetilde{F}_{d,\omega}    \left( r_\omega - p^*_{d,\omega} \right) $
+%\State Set $p^f = (1 -\sqrt{\epsilon}) p^* + \sqrt{\epsilon} r $\label{eq:final_linear_contract}
+%\State \Return $p^f$
+%\end{algorithmic}
+%\end{algorithm}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

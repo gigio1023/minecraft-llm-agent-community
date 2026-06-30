@@ -1,0 +1,460 @@
+\begin{lstlisting}[style=diffstyle]
+diff --git a/tests/test_edit_tool.py b/tests/test_edit_tool.py
+index f0782c6..d3a4d5c 100644
+--- a/tests/test_edit_tool.py
++++ b/tests/test_edit_tool.py
+@@ -1,7 +1,7 @@
+ import pytest
+ from pathlib import Path
+ import tempfile
+-from tools.edit import tool_function
++from tools.edit import tool_function, validate_edit_actions, validate_context
+ 
+ @pytest.fixture
+ def temp_dir():
+@@ -17,6 +17,18 @@ def sample_file(temp_dir):
+     file_path.write_text(content)
+     return file_path
+ 
++@pytest.fixture
++def code_file(temp_dir):
++    """Create a sample Python file for testing token-based edits."""
++    file_path = temp_dir / "test.py"
++    content = """def test_function():
++    x = 42
++    y = "old_value"
++    return x + len(y)
++"""
++    file_path.write_text(content)
++    return file_path
++
+ class TestEditorTool:
+     def test_view_file(self, sample_file):
+         """Test viewing entire file content."""
+@@ -39,17 +51,182 @@ class TestEditorTool:
+         assert "Error" in result
+         assert "already exists" in result
+ 
+-    def test_edit_file(self, sample_file):
+-        """Test editing an existing file."""
++    def test_edit_file_full(self, sample_file):
++        """Test editing an existing file with file mode."""
+         new_content = "edited content\nnew line"
+-        result = tool_function("edit", str(sample_file), file_text=new_content)
++        result = tool_function(
++            "edit", 
++            str(sample_file), 
++            file_text=new_content, 
++            edit_type="file"
++        )
+         assert "has been overwritten" in result
+         assert sample_file.read_text() == new_content
+ 
++    def test_line_based_edit_insert(self, sample_file):
++        """Test line-based insert operation."""
++        actions = [{
++            "action": "insert",
++            "line_number": 3,
++            "content": "inserted line"
++        }]
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="line",
++            edit_actions=actions
++        )
++        assert "successfully edited" in result
++        content = sample_file.read_text().splitlines()
++        assert content[2] == "inserted line"
++        assert len(content) == 6
++
++    def test_line_based_edit_delete(self, sample_file):
++        """Test line-based delete operation."""
++        actions = [{
++            "action": "delete",
++            "line_number": 2
++        }]
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="line",
++            edit_actions=actions
++        )
++        assert "successfully edited" in result
++        content = sample_file.read_text().splitlines()
++        assert "line 2" not in content
++        assert len(content) == 4
++
++    def test_line_based_edit_replace(self, sample_file):
++        """Test line-based replace operation."""
++        actions = [{
++            "action": "replace",
++            "line_number": 3,
++            "content": "replaced line"
++        }]
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="line",
++            edit_actions=actions
++        )
++        assert "successfully edited" in result
++        content = sample_file.read_text().splitlines()
++        assert content[2] == "replaced line"
++        assert len(content) == 5
++
++    def test_token_based_edit(self, code_file):
++        """Test token-based edit operation."""
++        actions = [{
++            "action": "replace",
++            "old_token": "old_value",
++            "new_token": "new_value"
++        }]
++        result = tool_function(
++            "edit",
++            str(code_file),
++            edit_type="token",
++            edit_actions=actions
++        )
++        assert "successfully edited" in result
++        content = code_file.read_text()
++        assert "old_value" not in content
++        assert "new_value" in content
++
++    def test_multiple_token_edits(self, code_file):
++        """Test multiple token-based edit operations."""
++        actions = [
++            {
++                "action": "replace",
++                "old_token": "42",
++                "new_token": "100"
++            },
++            {
++                "action": "replace",
++                "old_token": "old_value",
++                "new_token": "new_text"
++            }
++        ]
++        result = tool_function(
++            "edit",
++            str(code_file),
++            edit_type="token",
++            edit_actions=actions
++        )
++        assert "successfully edited" in result
++        content = code_file.read_text()
++        assert "42" not in content
++        assert "100" in content
++        assert "old_value" not in content
++        assert "new_text" in content
++
++    def test_invalid_line_number(self, sample_file):
++        """Test edit with invalid line number."""
++        actions = [{
++            "action": "replace",
++            "line_number": 100,
++            "content": "invalid line"
++        }]
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="line",
++            edit_actions=actions
++        )
++        assert "Error" in result
++        assert "exceeds file length" in result
++
++    def test_invalid_edit_type(self, sample_file):
++        """Test edit with invalid edit type."""
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="invalid",
++            edit_actions=[{"action": "replace"}]
++        )
++        assert "Error" in result
++        assert "Invalid edit_type" in result
++
++    def test_missing_required_fields(self, sample_file):
++        """Test edit with missing required fields."""
++        actions = [{
++            "action": "replace"  # Missing line_number and content
++        }]
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="line",
++            edit_actions=actions
++        )
++        assert "Error" in result
++        assert "Missing required field" in result
++
++    def test_validate_context(self):
++        """Test context validation function."""
++        original = "line 1\nline 2\nline 3\nline 4\nline 5"
++        modified = "line 1\nline 2\nmodified\nline 4\nline 5"
++        assert validate_context(original, modified) is True
++
++        # Test invalid context (too many changes)
++        modified = "completely\ndifferent\ncontent"
++        assert validate_context(original, modified) is False
++
++    def test_empty_edit_actions(self, sample_file):
++        """Test edit with empty edit actions."""
++        result = tool_function(
++            "edit",
++            str(sample_file),
++            edit_type="line",
++            edit_actions=[]
++        )
++        assert "Error" in result
++        assert "Edit actions cannot be empty" in result
++
+     def test_edit_nonexistent_file(self, temp_dir):
+         """Test attempting to edit a nonexistent file."""
+         non_existent_file = temp_dir / "does_not_exist.txt"
+-        result = tool_function("edit", str(non_existent_file), file_text="new content")
++        result = tool_function("edit", str(non_existent_file), edit_type="line", edit_actions=[])
+         assert "Error" in result
+         assert "does not exist" in result
+ 
+@@ -82,4 +259,4 @@ class TestEditorTool:
+     def test_invalid_commands(self, command, sample_file):
+         """Test various invalid commands."""
+         result = tool_function(command, str(sample_file))
+-        assert "Error" in result
++        assert "Error" in result
+\ No newline at end of file
+diff --git a/tools/edit.py b/tools/edit.py
+index 59137ee..982ee84 100644
+--- a/tools/edit.py
++++ b/tools/edit.py
+@@ -1,5 +1,7 @@
+ from pathlib import Path
+ import subprocess
++from typing import Dict, Any, List, Union, Tuple
++from difflib import SequenceMatcher
+ 
+ def tool_info():
+     return {
+@@ -9,8 +11,9 @@ def tool_info():
+ * If `path` is a file, `view` displays the entire file with line numbers. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep.\n
+ * The `create` command cannot be used if the specified `path` already exists as a file.\n
+ * If a `command` generates a long output, it will be truncated and marked with `<response clipped>`.\n
+-* The `edit` command overwrites the entire file with the provided `file_text`.\n
+-* No partial/line-range edits or partial viewing are supported.""",
++* The `edit` command supports both entire file overwrites and fine-grained line/token editing via the `edit_type` parameter.\n
++* Line-based edits require line numbers and content to modify specific parts of a file.\n
++* Token-based edits require specifying old and new tokens to replace specific text fragments.""",
+         "input_schema": {
+             "type": "object",
+             "properties": {
+@@ -24,8 +27,28 @@ def tool_info():
+                     "type": "string"
+                 },
+                 "file_text": {
+-                    "description": "Required parameter of `create` or `edit` command, containing the content for the entire file.",
++                    "description": "Required parameter of `create` or `edit` command with edit_type='file', containing the content for the entire file.",
+                     "type": "string"
++                },
++                "edit_type": {
++                    "type": "string",
++                    "enum": ["file", "line", "token"],
++                    "description": "Type of edit operation: 'file' for full file, 'line' for line-based edits, 'token' for token-based edits.",
++                    "default": "file"
++                },
++                "edit_actions": {
++                    "type": "array",
++                    "description": "List of edit actions for line/token operations. Each action contains operation details.",
++                    "items": {
++                        "type": "object",
++                        "properties": {
++                            "action": {"type": "string", "enum": ["insert", "delete", "replace"]},
++                            "line_number": {"type": "integer", "description": "Line number for the operation (1-based)"},
++                            "content": {"type": "string", "description": "Content to insert/replace"},
++                            "old_token": {"type": "string", "description": "Token to be replaced (for token edits)"},
++                            "new_token": {"type": "string", "description": "New token (for token edits)"}
++                        }
++                    }
+                 }
+             },
+             "required": ["command", "path"]
+@@ -119,12 +142,126 @@ def view_path(path_obj: Path) -> str:
+     content = read_file(path_obj)
+     return format_output(content, str(path_obj))
+ 
+-def tool_function(command: str, path: str, file_text: str = None) -> str:
++def validate_edit_actions(actions: List[Dict[str, Any]], edit_type: str) -> None:
++    """Validate edit actions based on edit type."""
++    if not actions:
++        raise ValueError("Edit actions cannot be empty for line/token edits")
++
++    valid_actions = ["insert", "delete", "replace"]
++    required_fields = {
++        "line": ["action", "line_number"],
++        "token": ["action", "old_token"]
++    }
++
++    for action in actions:
++        if "action" not in action or action["action"] not in valid_actions:
++            raise ValueError(f"Invalid action. Must be one of: {valid_actions}")
++
++        # Check required fields based on edit_type
++        for field in required_fields[edit_type]:
++            if field not in action:
++                raise ValueError(f"Missing required field '{field}' in edit action")
++
++        # Validate line number if provided
++        if "line_number" in action:
++            if not isinstance(action["line_number"], int) or action["line_number"] < 1:
++                raise ValueError("Line number must be a positive integer")
++
++        # Validate content requirements
++        if action["action"] in ["insert", "replace"]:
++            if edit_type == "line" and "content" not in action:
++                raise ValueError("Content required for insert/replace actions")
++            if edit_type == "token" and "new_token" not in action:
++                raise ValueError("new_token required for token operations")
++
++def apply_line_edits(content: List[str], actions: List[Dict[str, Any]]) -> List[str]:
++    """Apply line-based edits to the content."""
++    modified_content = content.copy()
++    
++    # Sort actions by line number in reverse order to handle inserts/deletes correctly
++    sorted_actions = sorted(actions, key=lambda x: x["line_number"], reverse=True)
++
++    for action in sorted_actions:
++        line_num = action["line_number"] - 1  # Convert to 0-based index
++        
++        if line_num > len(modified_content):
++            raise ValueError(f"Line number {action['line_number']} exceeds file length")
++
++        if action["action"] == "delete":
++            if line_num >= 0:
++                del modified_content[line_num]
++        elif action["action"] == "insert":
++            modified_content.insert(line_num, action["content"])
++        elif action["action"] == "replace":
++            modified_content[line_num] = action["content"]
++
++    return modified_content
++
++def apply_token_edits(content: str, actions: List[Dict[str, Any]]) -> str:
++    """Apply token-based edits to the content."""
++    modified_content = content
++
++    for action in actions:
++        old_token = action["old_token"]
++        if action["action"] == "delete":
++            modified_content = modified_content.replace(old_token, "")
++        elif action["action"] in ["insert", "replace"]:
++            new_token = action["new_token"]
++            modified_content = modified_content.replace(old_token, new_token)
++
++    return modified_content
++
++def validate_context(original: str, modified: str, context_lines: int = 3) -> bool:
+     """
+-    Main tool function that handles:
++    Validate that the context around modified sections remains intact.
++    Returns True if context is valid, False otherwise.
++    """
++    # Use SequenceMatcher to find the similarity ratio between strings
++    similarity = SequenceMatcher(None, original, modified).ratio()
++    
++    # If content is too different (less than 30% similar), consider it invalid
++    if similarity < 0.3:
++        return False
++
++    # Split into lines for more detailed analysis
++    orig_lines = original.splitlines()
++    mod_lines = modified.splitlines()
++
++    # If line count difference is too large (more than 50%), consider it invalid
++    if abs(len(orig_lines) - len(mod_lines)) > len(orig_lines) // 2:
++        return False
++
++    # Calculate line-based similarity for sections
++    def get_block_similarity(block1: List[str], block2: List[str]) -> float:
++        return SequenceMatcher(None, "\n".join(block1), "\n".join(block2)).ratio()
++
++    # Check similarity of start and end blocks if they exist
++    if len(orig_lines) >= context_lines and len(mod_lines) >= context_lines:
++        start_similarity = get_block_similarity(
++            orig_lines[:context_lines],
++            mod_lines[:context_lines]
++        )
++        end_similarity = get_block_similarity(
++            orig_lines[-context_lines:],
++            mod_lines[-context_lines:]
++        )
++        
++        # If either the start or end blocks are too different, consider it invalid
++        if start_similarity < 0.7 or end_similarity < 0.7:
++            return False
++
++    return True
++
++def tool_function(command: str, path: str, file_text: str = None,
++                 edit_type: str = "file", edit_actions: List[Dict[str, Any]] = None) -> str:
++    """
++    Enhanced tool function that handles:
+       - 'view'  : View the entire file or directory listing
+       - 'create': Create a new file with the given file_text
+-      - 'edit'  : Overwrite an existing file with file_text
++      - 'edit'  : Edit a file using one of three modes:
++                  - file: overwrite entire file
++                  - line: line-based edits
++                  - token: token-based edits
+     """
+     try:
+         path_obj = validate_path(path, command)
+@@ -139,11 +276,36 @@ def tool_function(command: str, path: str, file_text: str = None) -> str:
+             return f"File created successfully at: {path}"
+ 
+         elif command == "edit":
+-            if file_text is None:
+-                raise ValueError("Missing required `file_text` for 'edit' command.")
+-            write_file(path_obj, file_text)
+-            return f"File at {path} has been overwritten with new content."
++            # Read original content for line/token edits and validation
++            original_content = read_file(path_obj) if edit_type in ["line", "token"] else None
++
++            if edit_type == "file":
++                if file_text is None:
++                    raise ValueError("Missing required `file_text` for 'file' edit type.")
++                write_file(path_obj, file_text)
++                return f"File at {path} has been overwritten with new content."
++
++            elif edit_type in ["line", "token"]:
++                if not edit_actions:
++                    raise ValueError("Edit actions cannot be empty for line/token edits")
++
++                validate_edit_actions(edit_actions, edit_type)
++
++                if edit_type == "line":
++                    lines = original_content.splitlines()
++                    modified_lines = apply_line_edits(lines, edit_actions)
++                    modified_content = "\n".join(modified_lines)
++                else:  # token edits
++                    modified_content = apply_token_edits(original_content, edit_actions)
+ 
++                # Validate context before writing
++                if validate_context(original_content, modified_content):
++                    write_file(path_obj, modified_content)
++                    return f"File at {path} has been successfully edited using {edit_type}-based editing."
++                else:
++                    raise ValueError("Context validation failed. Edit operation aborted.")
++            else:
++                raise ValueError(f"Invalid edit_type: {edit_type}")
+         else:
+             raise ValueError(f"Unknown command: {command}")
+ 
+@@ -152,4 +314,4 @@ def tool_function(command: str, path: str, file_text: str = None) -> str:
+ 
+ if __name__ == "__main__":
+     # Example usage
+-    print(tool_function("view", "/home/ubuntu/xx/dgm/coding_agent.py"))
++    print(tool_function("view", "/home/ubuntu/xx/dgm/coding_agent.py"))
+\ No newline at end of file
+\end{lstlisting}

@@ -1,0 +1,33 @@
+% \begin{wrapfigure}[14]{L}{0.58\textwidth}
+% \small
+\begin{algorithm}[H]%
+   \caption{V-STaR}
+   \label{alg:vstar}
+\begin{algorithmic}
+   \STATE {\bfseries Input:} Original data $\mathcal{D}_{\text{SFT}}$,  Training queries $\mathcal{D}_{\text{query}}$, base model $G_{\text{base}}$, Num generations $k$, Num iterations $T$
+   \STATE $\mathcal{D}_{\text{GEN}} \gets \mathcal{D}_{\text{SFT}}$ 
+   % \STATE $\mathcal{D}_{\text{VER}} \gets \mathcal{D}_{\text{SFT}}$ 
+   % \STATE generator\_seed $\gets M_{\text{base}}$
+   \STATE $G_{\text{SFT}}$ $\gets \text{SFT}(G_{\text{base}}, \mathcal{D}_{\text{SFT}})$
+   \FOR{$\text{iter}=1$ {\bfseries to} $T$}
+   \STATE \textcolor[HTML]{0077BB}{ $G \gets \text{SFT}(G_{\text{base}}, \mathcal{D}_{\text{GEN}})$}
+   \hfill\COMMENT{fine-tune generator}
+   \STATE \textcolor[HTML]{0077BB} {$\mathcal{S} \gets$ sample($G$, $\mathcal{D}_{\text{query}}$, $k$)}
+   \hfill\COMMENT{generate candidates}
+   \STATE \textcolor[HTML]{0077BB} {$\mathcal{D}' \gets$ label\_correctness($\mathcal{S}$)} 
+   \hfill\COMMENT{score candidates to get $z$}
+   \STATE \textcolor[HTML]{0077BB}
+{ $\mathcal{D}_{\text{GEN}} \gets \mathcal{D}_{\text{GEN}} \cup \mathcal{D}'_{[z = 1]}$ }
+   \hfill\COMMENT{correct solutions $\to$ buffer}
+   \STATE \textcolor[HTML]{3C8031} {$\mathcal{D}_{\text{VER}} \gets \mathcal{D}_{\text{VER}} \cup \mathcal{D}'$}
+   \hfill\COMMENT{all solutions $\to$ DPO buffer}
+   % \STATE \textcolor[HTML]{3C8031}{ $\mathcal{D}_{\text{GEN}} \gets \text{filter}(\text{verifier}, \mathcal{D}_{\text{GEN}})$} \COMMENT{Optional}
+   % \STATE \textcolor[HTML]{3C8031}{ $\mathcal{D}_{\text{VER}} \gets \text{filter}(\text{verifier}, \mathcal{D}_{\text{VER}})$} \COMMENT{Optional}
+   \ENDFOR
+
+\STATE \textcolor[HTML]{3C8031} {$\mathcal{D}_{\text{pref}} \gets$ preference\_pairs($\mathcal{D}_{\text{VER}})$}
+\STATE \textcolor[HTML]{3C8031} { $V \gets$ DPO($G_{\text{SFT}}$ , $\mathcal{D}_{\text{pref}}$)}
+   
+\end{algorithmic}
+\end{algorithm}
+% \end{wrapfigure}

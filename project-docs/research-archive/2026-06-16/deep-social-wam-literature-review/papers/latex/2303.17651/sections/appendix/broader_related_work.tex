@@ -1,0 +1,131 @@
+
+\section{Broader Related Work}
+\label{app:related}
+
+Compared to a concurrent work, Reflexion \cite{shinn2023reflexion}, our approach involves correction using feedback, whereas their setup involves finding the next best solution in planning using ReAct. While ReAct and Reflexion provide a free-form reflection on whether a step was executed correctly and potential improvements, our approach is more granular and structured, with multi-dimensional feedback and scores. This distinction allows our method to offer more precise and actionable feedback, making it suitable for a wider range of natural language generation tasks, including those that may not necessarily involve step-by-step planning such as open-ended dialogue generation. 
+
+
+\paragraph{Comparison with \citet{Welleck2022SelfCorrect}} 
+The closest work to ours may be Self-Correction \citep{Welleck2022SelfCorrect}; however, Self-Correction has several disadvantages compared to \ours:
+\begin{enumerate}[itemsep=0pt,topsep=0pt,partopsep=0pt]
+    \item Self-Correction does not train their model to generate explicit feedback; instead, \citet{Welleck2022SelfCorrect} trained their models to refine only. As we show in \Cref{sec:analysis} and \Cref{tab:ablation_feedback}, having the model generate explicit feedback results in significantly better refined outputs.
+    \item Self-Correction trains a separate refiner (or ``corrector'') for each task. In contrast, \ours uses instructions and few-shot prompting, and thus does not require training a separate refiner for each task.
+    \item Empirically, we evaluated \ours using the same base model of GPT-3 as Self-Correction, and with the same settings on the GSM8K benchmark. Self-Correction  
+    achieved 45.9\% accuracy while \ours (this work) achieved \textbf{55.7}\% ($\bm{\uparrow}$\textbf{9.8}).
+\end{enumerate}
+
+
+\paragraph{Comparison with non-refinement reinforcement learning (RL) approaches.}
+Rather than having an explicit refinement module, an alternative way to incorporate feedback is by optimizing a scalar reward function, e.g. with reinforcement learning (e.g.,~\citet{stiennon2020learning,Lu2022QuarkCT,Le2022CodeRL}).
+These methods differ from \ours (and more generally, refinement-based approaches) in that the model cannot access feedback on an intermediate generation. 
+Second, these reinforcement learning methods require updating the model's parameters, unlike \ours.
+
+
+
+
+See Table \ref{tab:relatedwork} for an additional detailed comparison of related work.
+
+
+\begin{table}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\scriptsize
+\begin{tabular}{lp{3cm}llp{2cm}l}
+\toprule
+ \textbf{Method}&
+  \textbf{Primary Novelty} &
+  zero/few shot improvement &
+  multi aspect critics &
+  NL feedback with error localization &
+  iterative framework \\ \midrule
+\cellcolor[HTML]{CBCEFB}RLHF \cite{stiennon2020learning} &
+  optimize for human preference &
+  \emoji[emoji]{x}trained on feedback &
+  \emoji[emoji]{x} single (human) &
+  \emoji[emoji]{check}(not self gen.) &
+  \emoji[emoji]{x} \\
+\cellcolor[HTML]{CBCEFB}Rainier RL \cite{Liu2022RainierRK} &
+  RL to generate knowledge &
+  \emoji[emoji]{x}trained on end task &
+  \emoji[emoji]{x} single(accuracy) &
+  \emoji[emoji]{x}(knowl. only) &
+  \emoji[emoji]{x} \\
+\cellcolor[HTML]{CBCEFB}\textsc{Quark} RL \cite{Lu2022QuarkCT} &
+  quantization to edit generations &
+  \emoji[emoji]{x} trained on end task &
+  \emoji[emoji]{x} single(scalar score) &
+  \emoji[emoji]{x} (dense signal) &
+  \emoji[emoji]{check} (train time iter.) \\
+\cellcolor[HTML]{CBCEFB}Code RL \cite{Le2022CodeRL} &
+  actor critic RL for code improvement &
+  \emoji[emoji]{x} trained on end task &
+  \emoji[emoji]{x} single(unit tests) &
+  \emoji[emoji]{x}(dense signal) &
+  \emoji[emoji]{x} \\ \midrule
+\cellcolor[HTML]{FFCC67}DrRepair \cite{Yasunaga2020DrRepair} &
+  Compiler feedback to iteratively repair &
+  \emoji[emoji]{x} trained semi sup. &
+  \emoji[emoji]{x} single(compiler msg) &
+  \emoji[emoji]{check}(not self gen.) &
+  \emoji[emoji]{check} \\
+\cellcolor[HTML]{FFCC67}PEER \cite{Schick2022PEERAC} &
+  doc. edit trained on wiki edits &
+  \emoji[emoji]{x}trained on edits &
+  \emoji[emoji]{x} single(accuracy) &
+  \emoji[emoji]{check}(not self gen.) &
+  \emoji[emoji]{check} \\
+\cellcolor[HTML]{FFCC67}Self critique \cite{Saunders2022SelfCritique} &
+  few shot critique generation &
+  \emoji[emoji]{x}feedback training &
+  \emoji[emoji]{x} single(human) &
+  \emoji[emoji]{check}(self gen.) &
+  \emoji[emoji]{x} \\ 
+\cellcolor[HTML]{FFCC67}Self-correct \cite{Welleck2022SelfCorrect} &
+  novel training of a corrector &
+  \emoji[emoji]{x} trained on end task &
+  \emoji[emoji]{x} single (task specific) &
+  \emoji[emoji]{check}(limited setting) &
+  \emoji[emoji]{check}(limited setting) \\ 
+  \cellcolor[HTML]{FFCC67}Const. AI \cite{bai2022constitutional} &
+  train RL4F on automat (critique, revision) pair &
+  \emoji[emoji]{x} critique training &
+  \emoji[emoji]{check} (fixed set) &
+  \emoji[emoji]{check} &
+  \emoji[emoji]{x} \\ \midrule
+\cellcolor[HTML]{9AFF99}Self-ask \cite{press2022measuring} &
+  ask followup ques when interim ans correct;final wrong &
+  \emoji[emoji]{check} few shot &
+  \emoji[emoji]{x} none &
+  \emoji[emoji]{x}(none) &
+  \emoji[emoji]{x} \\
+\cellcolor[HTML]{9AFF99}GPT3 score \cite{fu2023gptscore} &
+  GPT can score generations with instruction &
+  \emoji[emoji]{check}few shot &
+  \emoji[emoji]{x} single(single utility fn) &
+  \emoji[emoji]{x}(none) &
+  \emoji[emoji]{x} \\
+\cellcolor[HTML]{9AFF99}Augmenter \cite{Peng2023LLMAugmenter} &
+  factuality feedback from external KBs &
+  \emoji[emoji]{check}few shot &
+  \emoji[emoji]{x} single(factuality) &
+  \emoji[emoji]{check}(self gen.) &
+  \emoji[emoji]{check} \\
+\cellcolor[HTML]{9AFF99}Re$^3$ \cite{Yang2022Re3GL} &
+  $\sim$ours: but one domain, trained critics &
+  \emoji[emoji]{check}few shot &
+  \emoji[emoji]{check}(trained critics) &
+  \emoji[emoji]{check}(not self gen.) &
+  \emoji[emoji]{check} \\
+\cellcolor[HTML]{9AFF99}\ours &
+  fewshot iterative multi aspect NL fb &
+  \emoji[emoji]{check}few shot &
+  \emoji[emoji]{check} multiple(few shot critics) &
+  \emoji[emoji]{check}(self gen.) &
+  \emoji[emoji]{check}
+\end{tabular}
+\end{adjustbox}
+\normalsize
+\caption{Summary of related approaches. Reinforcement learning approaches are shown in \colorbox[HTML]{CBCEFB}{purple}}, trained corrector approaches are shown in \colorbox[HTML]{FFCC67}{orange}, and few-shot corrector approaches are shown in \colorbox[HTML]{9AFF99}{green}.
+\label{tab:relatedwork}
+\end{table}
+

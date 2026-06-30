@@ -1,0 +1,132 @@
+\section{Information sharing between coordinates}
+\label{sec:ntm}
+
+In previous sections we considered a coordinatewise architecture, which
+corresponds by analogy to a learned version of RMSprop or ADAM.  Although
+diagonal methods are quite effective in practice, we can also consider learning
+more sophisticated optimizers that take the correlations between coordinates
+into effect. To this end, we introduce a mechanism allowing different LSTMs to
+communicate with each other.
+
+\subsection*{Global averaging cells}
+
+The simplest solution is to designate a subset of the cells in each LSTM layer
+for communication. These cells operate like normal LSTM cells, but their
+outgoing activations are averaged at each step across all coordinates.  These
+\emph{global averaging cells} (GACs) are sufficient to allow the networks to
+implement L2 gradient clipping \citep{bengio:2013} assuming that each LSTM can
+compute the square of the gradient. This architecture is denoted as an LSTM+GAC
+optimizer.
+
+\subsection*{NTM-BFGS optimizer}
+
+We also consider augmenting the LSTM+GAC architecture with an external memory
+that is shared between coordinates. Such a memory, if appropriately designed
+could allow the optimizer to learn algorithms similar to (low-memory)
+approximations to Newton's method, e.g.\ (L-)BFGS \citep[see][]{nocedal:2006}.
+The reason for this interpretation is that such methods can be seen as a set of
+independent processes working coordinatewise, but communicating through the
+inverse Hessian approximation stored in the memory.  We designed a memory
+architecture that, in theory, allows the network to simulate (L-)BFGS,
+motivated by the approximate Newton method BFGS, named for Broyden, Fletcher,
+Goldfarb, and Shanno.  We call this architecture an \emph{NTM-BFGS optimizer},
+because its use of external memory is similar to the Neural Turing Machine
+\citep{graves:2014}.  The pivotal differences between our construction and the
+NTM are (1) our memory allows only low-rank updates; (2) the controller
+(including read/write heads) operates coordinatewise.
+
+%The construction can be describec by deconstructing an inverse Hessian BFGS algorithm and inserting learnable components.
+%in a manner to how we constructed the diagonal variant.
+In BFGS an explicit estimate of the full (inverse) Hessian is built up from the sequence of observed gradients.
+We can write a skeletonized version of the BFGS algorithm, using $M_t$ to represent the inverse Hessian approximation at iteration $t$, as follows
+\begin{align*}
+g_t &= \operatorname{read}(M_t, \theta_t) \\
+\theta_{t+1} &= \theta_{t} + g_t \\
+M_{t+1} &= \operatorname{write}(M_t, \theta_t, g_t)
+\,.
+\end{align*}
+Here we have packed up all of the details of the BFGS algorithm into the
+suggestively named $\operatorname{read}$ and $\operatorname{write}$ operations,
+which operate on the inverse Hessian approximation $M_t$.  In BFGS these
+operations have specific forms, for example $\operatorname{read}(M_t, \theta_t)
+= -M_t\nabla f(\theta_t)$ is a specific matrix-vector multiplication and
+the BFGS write operation corresponds to a particular low-rank update of $M_t$.
+
+In this work we preserve the structure of the BFGS updates, but discard their
+particular form. More specifically the $\operatorname{read}$ operation remains
+a matrix-vector multiplication but the form of the vector used is learned.
+Similarly, the $\operatorname{write}$ operation remains a low-rank update, but the
+vectors involved are also learned. Conveniently, this structure of interaction with
+a large dynamically updated state corresponds in a fairly direct way to the
+architecture of a Neural Turing Machine (NTM), where $M_t$ corresponds to the
+NTM memory \citep{graves:2014}.
+
+Our NTM-BFGS optimizer uses an LSTM+GAC as a controller;
+%with the same structure as was used in
+%the \piLSTM{} optimizer, with a single small LSTM operating on each coordinate of
+%the model
+however, instead of producing the update directly we attach one or
+more read and write heads to the controller.
+Each read head produces a read
+vector $r_{t}$ which is combined with the memory to produce a read result $i_t$ which is fed back into the controller at the following time
+step.  Each write head produces two outputs, a left write vector $a_t$
+and a right write vector $b_t$. The two write vectors are used to update the
+memory state by accumulating their outer product. The read and write operation for a single head is
+diagrammed in Figure~\ref{fig:ntm-bfgs} and the way read and write heads are attached to the controller
+is depicted in Figure~\ref{fig:ntm-controller}.
+
+In can be shown that NTM-BFGS with one read head and 3 write heads can simulate inverse Hessian BFGS assuming that the controller
+can compute arbitrary (coordinatewise) functions and have access to 2 GACs.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.54\linewidth]{figures/ntm-read.pdf}
+\qquad
+\includegraphics[width=0.38\linewidth]{figures/ntm-write.pdf}
+\caption{\textbf{Left:} NTM-BFGS read operation. \textbf{Right:} NTM-BFGS write operation.}
+\label{fig:ntm-bfgs}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.6\linewidth,valign=t]{figures/ntm-controller.pdf}
+\qquad
+\includegraphics[width=0.32\linewidth,valign=t]{figures/ntm-controller-element.pdf}
+\caption{\textbf{Left:} Interaction between the controller and the external
+memory in NTM-BFGS. The controller is composed of replicated coordinatewise
+LSTMs (possibly with GACs), but the read and write operations are global across all
+coordinates.
+\textbf{Right:}  A single LSTM for the $k$th coordinate in the NTM-BFGS
+controller. Note that here we have dropped the time index $t$ to simplify
+notation.}
+\label{fig:ntm-controller}
+\end{figure}
+
+\subsection*{NTM-L-BFGS optimizer}
+
+In cases where memory is constrained we can follow the example of
+L-BFGS and maintain a low rank approximation of the
+full memory (\emph{vis}.\ inverse Hessian).
+The simplest way to do this is to store a sliding history of the left and right write vectors,
+allowing us to form the matrix vector multiplication required by the read operation efficiently.
+
+
+
+
+% We have also considered replacing
+% \begin{align*}
+% \nabla^k &\rightarrow (\tanh(\nabla^k e^{s_1})\,, \tanh(\nabla^k e^{s_2})\,,\ldots)
+% \end{align*}
+% for a number of different scales $s_j$. Both of these transformations have the
+% effect of keeping the gradients to the optimizer network on a similar scale
+% throughout the optimization process.  In the NTM-BFGS variant we pre-process
+% all controller inputs in this way, including the result of the read operation.
+
+% \paragraph{Cost shaping}  Changing the optimizer objective so that
+% \begin{align*}
+% h(\theta_t) \rightarrow -\exp(-w_t h(\theta_t))
+% \end{align*}
+% helps to shift emphasis of the optimizer away from the early stages of optimization, allowing it to focus more on later stages.
+
+% \paragraph{Learned trust region} Using an L2 penalty on the magnitude of the updates proposed by the optimizer helps bias it towards producing smaller updates, and helps guard against a single bad update causing a catastrophic failure.
+

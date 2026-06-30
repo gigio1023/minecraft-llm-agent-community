@@ -1,0 +1,61 @@
+\input{figures/arxiv_minecraft/figure}
+\input{figures/ablations/figure}
+
+\section*{Results}
+\label{sec:experiments}
+
+We evaluate the generality of Dreamer across 8 domains---with over 150 tasks---under fixed hyperparameters.
+We designed the experiments to compare Dreamer to the best methods in the literature, which are often specifically designed and tuned for the benchmark at hand.
+We further compare to a high-quality implementation of PPO\citep{schulman2017ppo}, a standard reinforcement learning algorithm that is known for its robustness. We run PPO with fixed hyperparameters chosen to maximize performance across domains and that reproduce strong published results of PPO on ProcGen\citep{cobbe2021ppg}.
+To push the boundaries of reinforcement learning, we apply Dreamer to the challenging video game Minecraft, comparing it to strong previous algorithms.
+Finally, we analyze the importance of individual components of Dreamer and its robustness to different model sizes and computational budgets.
+All Dreamer agents are trained on a single Nvidia A100 GPU each, making it reproducible for many research labs.
+A public implementation of Dreamer that reproduces all results is available on the project website.
+
+\paragraph{Benchmarks}
+We perform an extensive empirical study across 8 domains that include continuous and discrete actions, visual and low-dimensional inputs, dense and sparse rewards, different reward scales, 2D and 3D worlds, and procedural generation.
+\Cref{fig:bars} summarizes the benchmark results, showing that Dreamer outperforms a wide range of previous expert algorithms across diverse domains. Crucially, Dreamer substantially outperforms PPO across all domains.
+
+\begin{itemize}
+\itempar{Atari} This established benchmark contains 57 Atari 2600 games with a budget of 200M frames, posing a diverse range of challenges\citep{bellemare2013ale}.
+We use the sticky action simulator setting \citep{machado2018revisiting}.
+Dreamer outperforms the powerful MuZero algorithm\citep{schrittwieser2019muzero} while using only a fraction of the computational resources.
+Dreamer also outperforms the widely-used expert algorithms Rainbow \citep{hessel2018rainbow} and IQN \citep{dabney2018iqn}.
+\itempar{ProcGen} This benchmark of 16 games features randomized levels and visual distractions to test the robustness and generalization of agents\citep{cobbe2020procgen}. Within the budget of 50M frames, Dreamer matches the tuned expert algorithm PPG \citep{cobbe2021ppg} and outperforms Rainbow\citep{cobbe2020procgen,hessel2018rainbow}. Our PPO agent with fixed hyperparameters matches the published score of the highly tuned official PPO implementation\citep{cobbe2021ppg}.
+\itempar{DMLab} This suite of 30 tasks features 3D environments that test spatial and temporal reasoning \citep{beattie2016dmlab}. In 100M frames, Dreamer exceeds the performance of the scalable IMPALA and R2D2+ agents \citep{kapturowski2018r2d2} at 1B environment steps, amounting to a data-efficiency gain of over 1000\%.
+We note that these baselines were not designed for data-efficiency but serve as a valuable comparison point for the performance previously achievable at scale.
+\itempar{Atari100k} This data-efficiency benchmark comntains 26 Atari games and a budget of only 400K frames, amounting to 2 hours of game time \citep{kaiser2019simple}. EfficientZero \citep{ye2021effzero} holds the state-of-the-art by combining online tree search, prioritized replay, and hyperparameter scheduling, but also resets levels early to increase data diversity, making a comparison difficult.
+Without this complexity, Dreamer outperforms the best remaining methods, including the transformer-based IRIS and TWM agents, the model-free SPR, and SimPLe \citep{micheli2022iris}.
+\itempar{Proprio Control} This benchmark contains 18 control tasks with continuous actions, proprioceptive vector inputs, and a budget of 500K environment steps \citep{tassa2018dmcontrol}. The tasks range from classical control over locomotion to robot manipulation tasks, featuring dense and sparse rewards. Dreamer sets a new state-of-the-art on this benchmark,
+outperforming D4PG, DMPO, and MPO \citep{abdolmaleki2018mpo}.
+\itempar{Visual Control} This benchmark consists of 20 continuous control tasks where the agent receives only high-dimensional images as input and has a budget of 1M environment steps \citep{tassa2018dmcontrol}.
+Dreamer establishes a new state-of-the-art on this benchmark, outperforming DrQ-v2 and CURL \citep{yarats2021drqv2}, which are specialized to visual environments and leverage data augmentation.
+\pagebreak
+\itempar{BSuite} This benchmark includes 23 environments with a total of 468 configurations that are specifically designed to test credit assignment, robustness to reward scale and stochasticity, memory, generalization, and exploration \citep{osband2019bsuite}. Dreamer establishes a new state-of-the-art on this benchmark, outperforming Boot DQN and other methods \citep{dizon2023bsuiteagents}.
+Dreamer improves over previous algorithms especially in the scale robustness category.
+\end{itemize}
+
+\paragraph{Minecraft}
+Collecting diamonds in the popular game Minecraft has been a long-standing challenge in artificial intelligence\citep{guss2019minerl,kanitscheider2021minecraftcurriculum,baker2022vpt}.
+Every episode in this game is set in a unique randomly generated and infinite 3D world. Episodes last until the player dies or up to 36000 steps equaling 30 minutes, during which the player needs to discover a sequence of 12 items from sparse rewards by foraging for resources and crafting tools. It takes about 20 minutes for experienced human players to obtain diamonds\citep{baker2022vpt}.
+We follow the block breaking setting of prior work \citep{kanitscheider2021minecraftcurriculum} because the provided action space would make it challenging for stochastic policies to keep a key pressed for a prolonged time.
+
+Because of the training time in this complex domain, extensive tuning would be difficult for Minecraft.
+Instead, we apply Dreamer out of the box with its default hyperparameters.
+As shown in \cref{fig:minecraft,fig:bars}, Dreamer is the first algorithm to collect diamonds in Minecraft from scratch without using human data as was required by VPT \citep{baker2022vpt} or adaptive curricula\citep{kanitscheider2021minecraftcurriculum}.
+All the Dreamer agents we trained on Minecraft discover diamonds in 100M environment steps.
+While several strong baselines progress to advanced items such as the iron pickaxe, none of them discovers a diamond.
+
+\paragraph{Ablations}
+In \cref{fig:ablations}, we ablate the robustness techniques and learning signals on a diverse set of 14 tasks to understand their importance.
+The training curves of individual tasks are included in the supplementary material.
+We observe that all robustness techniques contribute to performance, most notably the KL objective of the world model, followed by return normalization and symexp twohot regression for reward and value prediction. In general, we find that each individual technique is critical on a subset of tasks but may not affect performance on other tasks.
+
+To investigate the effect of the world model, we ablate the learning signals of Dreamer by stopping either the task-specific reward and value prediction gradients or the task-agnostic reconstruction gradients from shaping its representations. Unlike previous reinforcement learning algorithms that often rely only on task-specific learning signals\citep{mnih2015dqn,schrittwieser2019muzero}, Dreamer rests predominantly on the unsupervised objective of its world model. This finding could allow for future algorithm variants that leverage pretraining on unsupervised data.
+
+\paragraph{Scaling properties}
+To investigate whether Dreamer can scale robustly, we train 6 model sizes ranging from 12M to 400M parameters, as well as different replay ratios on Crafter \citep{hafner2021crafter} and a DMLab task\citep{beattie2016dmlab}. The replay ratio affects the number of gradient updates performed by the agent.
+\Cref{fig:ablations} shows robust learning with fixed hyperparameters across the compared model sizes and replay ratios.
+Moreover, increasing the model size directly translates to both higher task performance and a lower data requirement.
+Increasing the number of gradient steps further reduces the interactions needed to learn successful behaviors.
+The results show that Dreamer learns robustly across model sizes and replay ratios and that its performance and provides a predictable way for increasing performance given computational resources.  %, providing practical insights for practitioners.

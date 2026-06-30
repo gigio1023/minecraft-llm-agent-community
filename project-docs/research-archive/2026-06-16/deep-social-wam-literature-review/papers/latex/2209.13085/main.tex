@@ -1,0 +1,821 @@
+\documentclass{article}
+
+
+
+
+\usepackage[final]{neurips_2022}
+
+\usepackage[x11names, dvipsnames]{xcolor}
+\usepackage[utf8]{inputenc} %
+\usepackage[T1]{fontenc}    %
+\usepackage{hyperref}       %
+\usepackage{url}            %
+\usepackage{booktabs}       %
+\usepackage{amsfonts, amsmath, amsthm}       %
+\usepackage{nicefrac}       %
+\usepackage{microtype}      %
+\usepackage{todonotes}
+\usepackage{wrapfig}
+
+\usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{csquotes}
+
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{bbm}  %
+
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{example}{Example}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+
+\newcommand{\piD}{\pi_\beta}%
+\newcommand{\piB}{\pi_\theta}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\R}{\mathcal{R}}
+
+
+\title{Defining and Characterizing Reward Hacking}
+
+
+
+\author{%
+Joar Skalse%
+\thanks{Equal contribution. Correspondence to: \texttt{\href{mailto:joar.mvs@gmail.com}{joar.mvs@gmail.com}, \href{mailto:david.scott.krueger@gmail.com}{david.scott.krueger@gmail.com}}}
+\\
+University of Oxford\\
+\And
+Nikolaus H.\ R.\ Howe \\
+Mila, Universit\'e de Montr\'eal\\
+\And
+Dmitrii Krasheninnikov \\ 
+University of Cambridge\\
+\And
+David Krueger%
+\footnotemark[1] \\
+University of Cambridge\\
+}
+
+\usepackage{xspace}
+\newcommand{\IconBedroom}[1][1.5ex]{\includegraphics[height=#1]{figures/IconBed.pdf}\xspace}
+\newcommand{\IconKitchen}[1][1.5ex]{\includegraphics[height=#1]{figures/IconFurniture.pdf}\xspace}
+\newcommand{\IconAttic}[1][1.5ex]{\includegraphics[height=#1]{figures/IconHouse.pdf}\xspace}
+\newcommand{\IconPerson}[1][1.5ex]{\includegraphics[height=#1]{figures/IconPerson.pdf}\xspace}
+\newcommand{\IconRobot}[1][1.5ex]{\includegraphics[height=#1]{figures/IconRobot.png}\xspace}
+\begin{document}
+
+\maketitle
+
+
+
+\begin{abstract}
+We provide the first formal definition of \textbf{reward hacking}, a phenomenon where optimizing an imperfect proxy reward function, $\mathcal{\tilde{R}}$, leads to poor performance according to the true reward function, $\mathcal{R}$.  
+We say that a proxy is \textbf{unhackable} if increasing the expected proxy return can never decrease the expected true return.
+Intuitively, it might 
+be possible
+to create an unhackable proxy by leaving some terms out of the reward function (making it ``narrower'') or overlooking fine-grained distinctions between roughly equivalent outcomes,
+but we show this is usually not the case.
+A key insight is that the linearity of reward (in state-action visit counts) makes unhackability a very strong condition. 
+In particular, for the set~of~all stochastic policies, two reward functions can only be unhackable if one of them is constant.
+We thus turn our attention to deterministic policies and finite sets of stochastic policies, where non-trivial unhackable pairs always exist, and establish necessary and sufficient conditions for the existence of 
+simplifications, an important special case of unhackability.
+Our results reveal a tension between using reward functions to specify narrow tasks and aligning AI systems with human values.
+\end{abstract}
+
+\section{Introduction}
+\setcounter{footnote}{0}
+
+
+It is well known that optimising a proxy can lead to unintended outcomes: 
+a boat spins in circles collecting ``powerups'' instead of following the race track in a racing game \citep{clark2016faulty}; 
+an evolved circuit listens in on radio signals from nearby computers' oscillators instead of building its own \citep{bird2002evolved}; universities reject the most qualified applicants in order to appear more selective and boost their ratings \citep{golden2001glass}.
+In the context of reinforcement learning (RL), such failures are called \textbf{reward hacking}.
+
+For AI systems that take actions in safety-critical real world environments such as autonomous vehicles,
+algorithmic trading,
+or content recommendation systems, %
+these unintended outcomes can be catastrophic.
+This makes it crucial to align autonomous AI systems with their users' intentions.
+Precisely specifying which behaviours are or are not desirable is challenging, however.
+One approach to this specification problem is to learn an approximation of the true reward function \citep{ng2000algorithms, ziebart2010modeling, leike2018scalable}.
+Optimizing a learned proxy reward can be dangerous, however;
+for instance, it might overlook side-effects \citep{Krakovna2018Penalizing, Turner2019Conservative} or encourage power-seeking \citep{turner2021optimalneurips} behavior.
+This raises the question motivating our work: When is it safe to optimise a proxy? 
+
+To begin to answer this question, we consider a somewhat simpler one: When \textit{could} optimising a proxy lead to worse behaviour? 
+\enquote{Optimising}, in this context, does not refer to finding a global, or even local, optimum, but rather running a search process, such as stochastic gradient descent (SGD), that yields a sequence of candidate policies, and tends to move towards policies with higher (proxy) reward. 
+We make no assumptions about the path through policy space that optimisation takes.\footnote{
+ This assumption -- although conservative -- is reasonable because optimisation in state-of-the-art deep RL methods is poorly understood and results are often highly stochastic and suboptimal.
+}
+Instead, we ask whether there is \textit{any} way in which improving a policy according to the proxy could make the policy worse according to the true reward; this is equivalent to asking if there exists a pair of policies $\pi_1$, $\pi_2$ where the proxy prefers $\pi_1$, but the true reward function prefers $\pi_2$.
+When this is the case, we refer to this pair of true reward function and proxy reward function as \textbf{hackable}. 
+
+
+
+
+Given the strictness of our definition, it is not immediately apparent that any non-trivial examples of unhackable reward function pairs exist. 
+And indeed, if we consider the set of all stochastic policies, they do not (Section~\ref{sec:results_all}).
+However, restricting ourselves to \textit{any} finite set of policies guarantees at least one non-trivial unhackable pair (Section~\ref{sec:results_finite}).
+
+
+
+
+Intuitively, we might expect the proxy to be a ``simpler'' %
+version of the true reward function.  
+Noting that the definition of unhackability is symmetric, we introduce the asymmetric special case of \textbf{simplification}, and arrive at similar theoretical results for this notion.\footnote{See Section~\ref{sec:our_ definitions} for formal definitions.}
+In the process, and through examples, we show that seemingly natural ways of simplifying reward functions often fail to produce simplifications in our formal sense, and %
+in fact fail to
+rule out the potential for reward hacking.
+
+We conclude with a discussion of the implications and limitations of our work.
+Briefly, our work suggests that a proxy reward function must satisfy demanding standards in order for it to be safe to optimize. 
+This in turn implies that the reward functions learned by methods such as reward modeling and inverse RL are perhaps best viewed as auxiliaries to policy learning, rather than specifications that should be optimized.
+This conclusion is weakened, however, by the conservativeness of our chosen definitions; future work should explore when hackable proxies can be shown to be safe in a probabilistic or approximate sense, or when subject to only limited optimization.
+
+
+
+
+
+
+
+ 
+ 
+\section{Example: Cleaning Robot}
+Consider a household robot tasked with cleaning a house with three rooms: Attic \IconAttic, Bedroom \IconBedroom, and Kitchen \IconKitchen.
+The robot's (deterministic) policy is a vector indicating which rooms it cleans: 
+$\pi = [\pi_1, \pi_2, \pi_3] \in \{0, 1\}^3$.
+The robot receives a (non-negative) reward of $r_1, r_2, r_3$ for cleaning the attic, bedroom, and kitchen, respectively, and the total reward is given by $J(\pi) = \pi \cdot r$.
+For example, if $r = [1, 2, 3]$ and the robot cleans the attic and the kitchen, it receives a reward of $1+3 = 4$.
+
+
+\begin{figure*}[h!]
+\vspace{-3pt}
+\centering
+\includegraphics[width=0.75\textwidth]{figures/front-fig-hacking.pdf}
+\caption{An illustration of hackable and unhackable proxy rewards arising from overlooking rewarding features. A human wants their house cleaned.
+In (a), the robot draws an incorrect conclusion because of the proxy; this could lead to hacking. In (b), no such hacking can occur: the proxy is unhackable.}
+\label{fig:front-fig}
+\end{figure*}
+
+
+
+
+\vspace{-4pt}
+At least two ideas come to mind when thinking about \enquote{simplifying} a reward function.
+The first one is \textit{overlooking rewarding features}: suppose the true reward
+is equal for all the rooms, $r_\text{true} = [1, 1, 1]$,
+but we only ask the robot to clean the attic and bedroom, $r_\text{proxy} = [1, 1, 0]$. 
+In this case, $r_\text{proxy}$ and $r_\text{true}$ are unhackable.
+However, if we ask the robot to only clean the attic,
+$r_\text{proxy} = [1, 0, 0]$, this is hackable with respect to $r_\text{true}$. %
+To see this, note that according to $r_\text{proxy}$ cleaning the attic ($J_\text{proxy}=1$) is better than cleaning the bedroom and the kitchen ($J_\text{proxy}=0$). 
+Yet, $r_\text{true}$ says that cleaning the attic ($J_\text{true}=1$) is worse than cleaning the bedroom and the kitchen ($J_\text{true}=2$).
+This situation is illustrated in Figure~\ref{fig:front-fig}. 
+
+
+
+The second seemingly natural way to simplify a reward function is \textit{overlooking fine details}:
+suppose $r_\text{true} = [1, 1.5, 2]$,
+and we ask the robot to clean all the rooms,
+$r_\text{proxy} = [1, 1, 1]$. For these values, the proxy
+and true reward are unhackable. However, 
+with a slightly less balanced true reward function 
+such as $r_\text{true} = [1, 1.5, 3]$ the proxy does lead to hacking,
+since the robot would falsely calculate that it's 
+better to clean the attic and the bedroom than
+the kitchen alone.
+
+These two examples illustrate that while simplification of reward functions is sometimes possible, attempts at simplification can easily lead to  %
+reward hacking. 
+Intuitively, omitting/overlooking details is okay so long as all these details are not as important together as any of the details that we do share.
+In general, it is not obvious what the proxy must look like to avoid reward hacking, suggesting we should take great care when using proxies.
+For this specific environment, a proxy and a true reward are hackable exactly when there are two sets of rooms $S_1, S_2$ such that the true reward gives strictly higher value to cleaning $S_1$ than it does to cleaning $S_2$, and the proxy says the opposite: $J_1(S_1) > J_1(S_2) \; \& \; J_2(S_1) < J_2(S_2)$.
+For a proof of this statement, see Appendix~\ref{app:cleaning_robot}.
+
+
+
+
+
+        
+    
+
+
+\section{Related Work}
+
+
+
+
+\begin{wrapfigure}{r}{0.265\textwidth}\centering
+\vspace{-4mm}  %
+    \includegraphics[width=\linewidth]{figures/reward_gaming_training_curves.pdf}
+    \caption{An illustration of reward hacking when optimizing a hackable proxy. The true reward first increases and then drops off, while the proxy reward continues to increase.}\label{fig:learning-curves}
+    \vspace{-4mm}  %
+\end{wrapfigure}
+While we are the first to define hackability, we are far from the first to study specification hacking.
+The observation that optimizing proxy metrics tends to lead to perverse instantiations is often called ``Goodhart's Law'', and is attributed to \citet{goodhart1984problems}.
+\citet{Manheim2018Categorizing} provide a list of four mechanisms underlying this observation.
+
+Examples of such unintended behavior abound in both RL and other areas of AI; \citet{krakovna2020specification} provide an extensive list.
+Notable recent instances include a robot positioning itself between the camera and the object it is supposed to grasp in a way that tricks the reward model \citep{Amodei2017learning}, the previously mentioned boat race example \citep{clark2016faulty}, %
+and a multitude of examples of reward model hacking in Atari \citep{ibarz2018reward}. 
+Reward hacking can occur suddenly.
+\citet{ibarz2018reward} and \citet{pan2022effects} showcase plots similar to one in Figure~\ref{fig:learning-curves}, where optimizing the proxy (either a learned reward model or a hand-specified reward function) first leads to both proxy and true rewards increasing, and then to a sudden phase transition where the true reward collapses while the proxy continues going up. 
+
+Note that not all of these examples correspond to optimal behavior according to the proxy.
+Indeed, convergence to suboptimal policies is a well-known issue in RL \citep{thrun1993issues}. 
+As a consequence, improving optimization often leads to unexpected, qualitative changes in behavior.
+For instance, \citet{Zhang2021onthe} demonstrate a novel cartwheeling behavior in the widely studied Half-Cheetah environment that exceeds previous performance so greatly that it breaks the simulator.
+The unpredictability of RL optimization is a key motivation for our definition of hackability, since we cannot assume that agents will find an optimal policy.
+Neither can we rule out the possibility of sudden improvements in proxy reward and corresponding qualitative changes in behavior.
+Unhackability could provide confidence that reward hacking will not occur despite these challenges.
+
+Despite the prevalence and potential severity of reward hacking, to our knowledge \citet{pan2022effects} provide the first peer-reviewed work that focuses specifically on it, although \citet{everitt2017reinforcement} tackle the closely related issue of reward corruption. %
+The work of \citet{pan2022effects} is purely empirical; they manually construct proxy rewards for several diverse environments, and evaluate whether optimizing these proxies leads to reward hacking; in 5 out of 9 of their settings, it does.
+In another closely related work, \citet{zhuang2020consequences} examine what happens when the proxy reward function depends on a strict subset of features relevant for the true reward. 
+They show that optimizing the proxy reward can lead to arbitrarily low true reward under suitable assumptions. This can be seen as a seemingly valid simplification of the true reward that turns out to be (highly) hackable. 
+While their result only applies to environments with decreasing marginal utility and increasing opportunity cost, we demonstrate hackability is an issue in arbitrary MDPs.
+
+\newpage
+
+Hackability is particularly concerning given arguments that reward optimizing behavior tends to be power-seeking \citep{turner2021optimalneurips}. %
+But \citet{leike2018scalable} establish that any desired behavior (power-seeking or not) can in principle be specified as optimal via a reward function.\footnote{
+Their result concerns non-stationary policies and use non-Markovian reward functions, but in Appendix~\ref{sec:any_policy_optimal}, we show how an analogous construction can be used with stationary policies and Markovian rewards.}
+However, unlike us, they do not consider the entire policy preference ordering. %
+Meanwhile, \citet{abel2021expressivity} note that Markov reward functions cannot specify arbitrary orderings over policies or trajectories, although they do not consider hackability.
+Previous works consider reward functions to be equivalent if they preserve the ordering over policies \citep{ng1999policy, ng2000algorithms}.  Unhackability relaxes this, allowing equalities to be refined to inequalities, and vice versa.
+Unhackability provides a notion of what it means to be  ``aligned enough''; \citet{brown2020value} provide an alternative.
+They say a policy is $\varepsilon$-value aligned if its value at every state is close enough to optimal (according to the true reward function).
+Neither notion implies the other. 
+
+
+
+\textit{Reward tampering} \citep{everitt2017reinforcement, kumar2020realab, uesato2020avoiding, everitt2021reward} can be viewed as a special case of reward hacking, and refers to an agent corrupting the process generating reward signals, e.g.\ by tampering with sensors, memory registers storing the reward signal, or other hardware.
+\citet{everitt2017reinforcement} introduce the Corrupt Reward MDP (CRMDP), to model this possibility. 
+A CRMDP distinguishes corrupted and uncorrupted rewards; these are exactly analogous to the proxy and true reward discussed in our work and others.
+\citet{leike2018scalable} distinguish reward tampering from \textit{reward gaming}, where an agent achieves inappropriately high reward without tampering.
+However, in principle, a reward function could prohibit all forms of tampering if the effects of tampering are captured in the state.
+So this distinction is somewhat imprecise, and the CRMDP framework is general enough to cover both forms of hacking.
+
+Our notion of simplification bears a close resemblance to quantilization \citep{taylor2016quantilizers}.
+Quantilization returns a random policy from the top n\% best policies.
+This is similar to equating the values of those policies, but a simplification may also equate the values of the bottom/middle n\%, etc.
+Thus simplification may achieve a similar effect to quantilization without assuming that we are free to choose from among the best policies.
+
+
+
+
+
+
+
+
+
+\section{Preliminaries}
+
+We begin with an overview of reinforcement learning (RL) to establish our notation and terminology.
+Section~\ref{sec:our_ definitions} introduces our novel definitions of hackability and simplification.
+
+\subsection{Reinforcement Learning}\label{sec: reinforcement learning}
+
+We expect readers to be familiar with the basics of RL, which can be found in \citet{sutton2018reinforcement}.
+RL methods attempt to solve a sequential decision problem, typically formalised as a \textbf{Markov decision process (MDP)} , which is a tuple $(S,A,T,I,\mathcal{R},\gamma)$ where $S$ is a set of states, $A$ is a set of actions, $T : S \times A \rightarrow \Delta(S)$ is a transition function, $I \in \Delta(S)$ is an initial state distribution, $\mathcal{R}$ is a reward function, the most general form of which is $\mathcal{R} : S \times A \times S \rightarrow \Delta(\mathbb{R})$, and $\gamma \in [0,1]$ is the discount factor.
+Here $\Delta(X)$ is the set of all distributions over $X$. 
+A \textbf{stationary policy} is a function $\pi : S \rightarrow \Delta(A)$ that specifies a distribution over actions in each state, and a \textbf{non-stationary} policy is a function $\pi : (S \times A)^* \times S \rightarrow \Delta(A)$, where $*$ is the Kleene star.
+A \textbf{trajectory} $\tau$ is a path $s_0,a_0,r_0,...$ through the MDP that is possible according to $T$, $I$, and $\mathcal{R}$. 
+The \textbf{return} of a trajectory is the discounted sum of rewards $G(\tau) \doteq \sum_{t=0}^\infty \gamma^t r_t$, and the \textbf{value} of a policy is the expected return $J(\pi) \doteq \mathbb{E}_{\tau \sim \pi}[G(\tau)]$. 
+We derive \textbf{policy (preference) orderings} from reward functions by ordering policies according to their value.
+In this paper, we assume that $S$ and $A$ are finite, that $|A| > 1$, that all states are reachable, and that $\mathcal{R}(s,a,s')$ has finite mean for all $s,a,s'$. 
+
+
+
+In our work, we consider various reward functions for a given environment, which is then formally a \textbf{Markov decision process without reward} $MDP \setminus \mathcal{R} \doteq (S,A,T,I,\underline{\hspace*{0.3cm}},\gamma)$.
+Having fixed an $MDP \setminus \mathcal{R}$, any reward function can be viewed as a function of only the current state and action by marginalizing over transitions: $\mathcal{R}(s,a) \doteq \sum_{s' \sim T(s' | s,a)} \mathcal{R}(s,a,s')$, we adopt this view from here on.
+We define the \textbf{(discounted) visit counts} of a policy as $\mathcal{F}^\pi(s,a) \doteq \mathbb{E}_{\tau \sim \pi}[\sum_{i=0}^\infty \gamma^i \mathbbm{1}(s_i=s, a_i=a)]$. %
+Note that 
+$J(\pi) = \sum_{s,a} \mathcal{R}(s,a) \mathcal{F}^\pi(s,a)$, which we also write as $\langle \mathcal{R}, \mathcal{F}^\pi\rangle$.
+When considering multiple reward functions in an $MDP \setminus \mathcal{R}$, we define $J_\mathcal{R}(\pi) \doteq \langle \mathcal{R}, \mathcal{F}^\pi\rangle$ and sometimes use $J_i(\pi) \doteq \langle \mathcal{R}_i, \mathcal{F}^\pi \rangle$ as shorthand.
+We also use $\mathcal{F}: \Pi \rightarrow \mathbb{R}^{|S||A|}$ to denote the embedding of policies into Euclidean space via their visit counts, and define $\mathcal{F}(\dot{\Pi}) \doteq \{\mathcal{F}(\pi: \pi \in \dot{\Pi})\}$ for any $\dot{\Pi}$.
+Moreover, we also use a second way to embed policies into Euclidean space; let $\mathcal{G}(\pi)$ be the $|S||A|$-dimensional vector where $\mathcal{G}(\pi)[s,a] = \pi(a \mid s)$, and let $\mathcal{G}(\dot{\Pi}) \doteq \{\mathcal{G}(\pi: \pi \in \dot{\Pi})\}$.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Definitions and Basic Properties of Hackability and Simplification} \label{sec:our_ definitions}
+
+Here, we formally define \emph{hackability} as a binary relation between reward functions.
+
+
+\begin{definition}\label{def:unhackable}
+A pair of reward functions $\mathcal{R}_1$, $\mathcal{R}_2$ are \textbf{hackable} relative to policy set $\Pi$ and an environment $(S,A,T,I,\underline{\hspace*{0.3cm}},\gamma)$ if 
+there exist $\pi,\pi' \in \Pi$ such that  
+$$
+J_1(\pi) < J_1(\pi') \And J_2(\pi) > J_2(\pi'),
+$$
+else they are \textbf{unhackable}. 
+\end{definition}
+
+
+
+Note that an unhackable reward pair can have $J_1(\pi) < J_1(\pi') \And J_2(\pi) = J_2(\pi')$ or vice versa.
+Unhackability is symmetric; this can be seen be swapping $\pi$ and $\pi'$ in Definition~\ref{def:unhackable}.
+It is not transitive, however. In particular, the constant reward function is unhackable with respect to any other reward function, so if it \textit{were} transitive, any pair of policies would be unhackable. 
+Additionally, we say that $\mathcal{R}_1$ and $\mathcal{R}_2$ are \textbf{equivalent} on a set of policies $\Pi$ if $J_1$ and $J_2$ induce the same ordering of $\Pi$, and that $\mathcal{R}$ is \textbf{trivial} on $\Pi$ if $J(\pi) = J(\pi')$ for all $\pi,\pi' \in \Pi$. It is clear that $\mathcal{R}_1$ and $\mathcal{R}_2$ are unhackable whenever they are equivalent, or one of them is trivial, but this is relatively uninteresting. Our central question is if and when there are other unhackable reward pairs. 
+
+The symmetric nature of this definition is counter-intuitive, given that our motivation distinguishes the proxy and true reward functions.
+We might break this symmetry by only considering policy sequences that monotonically increase the proxy, however, this is equivalent to our original definition of hackability: think of $\mathcal{R}_1$ as the proxy, and consider the sequence $\pi, \pi'$.
+We could also restrict ourselves to policies that are approximately optimal according to the proxy; Corollary~\ref{corollary:approximately_optimal} shows that Theorem~\ref{thm:open-set} applies regardless of this restriction. %
+Finally, we define \emph{simplification} as an asymmetric special-case of unhackability; Theorem~\ref{thm:finite_simplification} shows this is in fact a more demanding condition. %
+
+\begin{definition}
+$\mathcal{R}_2$ is a \textbf{simplification} of $\mathcal{R}_1$ relative to policy set $\Pi$ if for all $\pi,\pi' \in \Pi$, 
+$$
+J_1(\pi) < J_1(\pi') \implies J_2(\pi) \leq J_2(\pi') 
+\And 
+J_1(\pi) = J_1(\pi') \implies J_2(\pi) = J_2(\pi')
+$$
+and there exist $\pi,\pi' \in \Pi$ such that $J_2(\pi) = J_2(\pi')$ but $J_1(\pi) \neq J_1(\pi')$. Moreover, if $\mathcal{R}_2$ is trivial
+then we say that this is a \textbf{trivial simplification}.
+\end{definition}
+
+
+Intuitively, while unhackability allows replacing inequality with equality -- or vice versa -- a simplification can only replace inequalities with equality, collapsing distinctions between policies.
+When $\mathcal{R}_1$ is a simplification of $\mathcal{R}_2$, we also say that $\mathcal{R}_2$ is a \textbf{refinement} of $\mathcal{R}_1$.
+We denote this relationship as $\mathcal{R}_1 \trianglelefteq \mathcal{R}_2$ or $\mathcal{R}_2 \trianglerighteq \mathcal{R}_1$ ; the narrowing of the triangle at $R_1$ represents the collapsing of distinctions between policies.
+If $\mathcal{R}_1 \trianglelefteq \mathcal{R}_2 \trianglerighteq  \mathcal{R}_3$, then we have that $\mathcal{R}_1, \mathcal{R}_3$ are unhackable,\footnote{If $J_3(\pi) > J_3(\pi')$ then $J_2(\pi) > J_2(\pi')$, since $\mathcal{R}_2 \trianglerighteq  \mathcal{R}_3$, and if $J_2(\pi) > J_2(\pi')$ then $J_1(\pi) \geq J_1(\pi')$, since $\mathcal{R}_1 \trianglelefteq  \mathcal{R}_2$. It is therefore not possible that $J_3(\pi) > J_3(\pi')$ but $J_1(\pi) < J_1(\pi')$.} but if $\mathcal{R}_1 \trianglerighteq \mathcal{R}_2 \trianglelefteq \mathcal{R}_3$, then this is not necessarily the case.\footnote{Consider the case where $\mathcal{R}_2$ is trivial -- then $\mathcal{R}_1 \trianglerighteq \mathcal{R}_2 \trianglelefteq \mathcal{R}_3$ for any $\mathcal{R}_1, \mathcal{R}_3$.}
+
+Note that these definitions are given relative to some $MDP \setminus \mathcal{R}$, although we often assume the environment in question is clear from context and suppress this dependence. The dependence on the policy set $\Pi$, on the other hand, plays a critical role in our results.
+
+
+
+
+
+
+
+\section{Results}
+
+Our results are aimed at understanding when it is possible to have an unhackable proxy reward function.
+We first establish (in Section~\ref{sec:results_all}) that (non-trivial) unhackability is impossible when considering the set of all policies.
+We might imagine that restricting ourselves to a set of sufficiently good (according to the proxy) policies would remove this limitation, but we show that this is not the case.
+We then analyze finite policy sets (with deterministic policies as a special case), and  establish necessary and sufficient conditions for unhackability and simplification.
+Finally, we demonstrate via example that non-trivial simplifications are also possible for some infinite policy sets in Section~\ref{sec:results_infinite}.
+
+\newpage
+\subsection{Non-trivial Unhackability Requires Restricting the Policy Set}\label{sec:results_all}
+
+\begin{wrapfigure}{r}{0.255\textwidth}\centering
+\vspace{-14.5mm}
+    \includegraphics[width=0.27\textwidth]{figures/gaussian_and_step.pdf}
+    \caption{
+    Two reward functions. %
+    While the step function may seem like a simplification of the Gaussian, these reward functions are hackable.}
+    \label{fig:gaussian_and_step}
+    \vspace{-8.001mm}  %
+\end{wrapfigure}
+
+We start with a motivating example.
+Consider the setting shown in Figure~\ref{fig:gaussian_and_step}, where the agent can move left/stay-still/right and gets a reward depending on its state.
+Let the Gaussian (blue) be the true reward $\mathcal{R}_1$ and the step function (orange) be the proxy $\mathcal{R}_2$. These are hackable.
+To see this, consider being at state $B$. Let $\pi(B)$ travel to $A$ or $C$ with 50/50 chance, and compare with the policy $\pi'$ that stays at $B$. Then we have that $J_1(\pi) > J_1(\pi')$ and $J_2(\pi) < J_2(\pi')$.%
+
+
+
+
+
+Generally, we might hope that some environments allow for unhackable reward pairs that are not equivalent or trivial.
+Here we show that this~is not the case, unless we impose restrictions on the set of policies we consider. 
+
+First note that if we consider \emph{non-stationary} policies, this result is relatively straightforward.
+Suppose $\mathcal{R}_1$ and $\mathcal{R}_2$ are \emph{unhackable} and \emph{non-trivial} on the set $\Pi^N$ of all non-stationary policies, and let $\pi^\star$ be a policy that maximises ($\mathcal{R}_1$ and $\mathcal{R}_2$) reward, and $\pi_\bot$ be a policy that \emph{minimises} ($\mathcal{R}_1$ and $\mathcal{R}_2$) reward. Then the policy $\pi_\lambda$ that plays $\pi^\star$ with probability $\lambda$ and $\pi_\bot$ with probability $1-\lambda$ is a policy in $\Pi^N$. Moreover, for any $\pi$ there are two unique $\alpha, \beta \in [0,1]$ such that $J_1(\pi) = J_1(\pi_\alpha)$ and $J_2(\pi) = J_2(\pi_\beta)$. 
+Now, if $\alpha \neq \beta$, then either $J_1(\pi) < J_1(\pi_\delta)$ and $J_2(\pi) > J_2(\pi_\delta)$, or vice versa, for $\delta = (\alpha + \beta)/2$. 
+If $\mathcal{R}_1$ and $\mathcal{R}_2$ are unhackable then this cannot happen, so it must be that $\alpha = \beta$. 
+This, in turn, implies that $J_1(\pi) = J_1(\pi')$ iff $J_2(\pi) = J_2(\pi')$, and so $\mathcal{R}_1$ and $\mathcal{R}_2$ are \emph{equivalent}. This means that no interesting unhackability can occur on the set of all non-stationary policies.
+
+
+
+The same argument cannot be applied to the set of \emph{stationary} policies, because $\pi_\lambda$ is typically not stationary, and mixing stationary policies' action probabilities does not have the same effect. 
+For instance, consider a hallway environment where an agent can either move left or right. Mixing the ``always go left'' and ``always go right'' policies corresponds to picking a direction and sticking with it, whereas  mixing their action probabilities corresponds to choosing to go left or right independently at every time-step.
+However, we will see that there still cannot be any interesting unhackability on this policy set, and, more generally, that there cannot be any interesting unhackability on any set of policies which contains an \emph{open subset}. Formally, a set of (stationary) policies $\dot{\Pi}$ is open if
+$\mathcal{G}(\dot{\Pi})$ is open in the smallest affine space that contains $\mathcal{G}(\Pi)$, for the set of all stationary policies $\Pi$.
+We will use the following lemma:
+
+
+
+
+\begin{lemma}\label{lemma:homeomorphism}
+In any $MDP \setminus \mathcal{R}$, if $\dot{\Pi}$ is an open set of policies, then
+$\mathcal{F}(\dot{\Pi})$ is open in $\mathbb{R}^{|S|(|A|-1)}$, and $\mathcal{F}$ is a homeomorphism between $\mathcal{G}(\dot{\Pi})$ and $\mathcal{F}(\dot{\Pi})$. %
+\end{lemma}
+
+Using this lemma, we can show that interesting unhackability is impossible on any set of stationary policies $\hat{\Pi}$ which contains an open subset $\dot{\Pi}$. 
+Roughly, if $\mathcal{F}(\dot{\Pi})$ is open, and $\mathcal{R}_1$ and $\mathcal{R}_2$ are non-trivial and unhackable on $\dot{\Pi}$, then the fact that $J_1$ and $J_2$ have a linear structure on $\mathcal{F}(\hat{\Pi})$ implies that $\mathcal{R}_1$ and $\mathcal{R}_2$ must be equivalent on $\dot{\Pi}$. From this, and the fact that $\mathcal{F}(\dot{\Pi})$ is open, it follows that $\mathcal{R}_1$ and $\mathcal{R}_2$ are equivalent everywhere.
+
+
+
+\begin{theorem} \label{thm:open-set} %
+In any $MDP \setminus \mathcal{R}$, if $\hat{\Pi}$ contains an open set, then any pair of reward functions that are unhackable and non-trivial on $\hat{\Pi}$ are equivalent on $\hat{\Pi}$.
+\end{theorem}
+
+Since simplification is a special case of unhackability, this also implies that non-trivial simplification is impossible for any such policy set. Also note that Theorem~\ref{thm:open-set} makes \emph{no assumptions} about the transition function, etc. From this result, we can show that interesting unhackability always is impossible on the set $\Pi$ of all (stationary) policies. In particular, note that the set $\tilde{\Pi}$ of all policies that always take each action with positive probability is an open set, and that $\tilde{\Pi} \subset \Pi$.
+
+
+\begin{corollary}
+In any $MDP \setminus \mathcal{R}$, any pair of reward functions that are unhackable and non-trivial on the set of all (stationary) policies $\Pi$ are equivalent on $\Pi$.
+\end{corollary}
+
+Theorem~\ref{thm:open-set} can also be applied to many other policy sets.
+For example, we might not care about the hackability resulting from policies with low proxy reward, as we would not expect a sufficiently good learning algorithm to learn such policies.
+This leads us to consider the following definition:
+
+\newpage
+
+\begin{definition}
+A (stationary) policy $\pi$ is $\varepsilon$-suboptimal if $J(\pi) \geq J(\pi^\star) - \varepsilon$.
+\end{definition}
+
+Alternatively, if the learning algorithm always uses a policy that is \enquote{nearly} deterministic (but with some probability of exploration), then we might not care about hackability resulting from very stochastic policies, leading us to consider the following definition:
+
+\begin{definition}
+A (stationary) policy $\pi$ is $\delta$-deterministic if $\forall s \in S \; \exists a \in A: \mathbb{P}(\pi(s) = a) \geq \delta$.
+\end{definition}
+
+Unfortunately, both of these sets contain open subsets, which means they are subject to Theorem~\ref{thm:open-set}.%
+
+\begin{corollary}
+\label{corollary:approximately_optimal}
+In any $MDP \setminus \mathcal{R}$, any pair of reward functions that are unhackable and non-trivial on the set of all $\varepsilon$-suboptimal policies ($\varepsilon>0$) $\Pi^\varepsilon$ are equivalent on $\Pi^\varepsilon$, and any pair of reward functions that are unhackable and non-trivial on the set of all $\delta$-deterministic policies ($\delta<1$) $\Pi^\delta$ are equivalent on $\Pi^\delta$.
+\end{corollary}
+
+Intuitively, Theorem~\ref{thm:open-set} can be applied to any policy set with \enquote{volume} in policy space.
+
+
+
+
+\subsection{Finite Policy Sets}\label{sec:results_finite}
+Having established that interesting unhackability is impossible relative to the set of all policies, we now turn our attention to the case of \emph{finite} policy sets.
+Note that this includes the set of all deterministic policies, since we restrict our analysis to finite MDPs.
+Surprisingly, here we find that non-trivial non-equivalent unhackable reward pairs \textit{always} exist.
+
+\begin{theorem}\label{thm:finite_unhackability}
+For any $MDP \setminus \mathcal{R}$, any finite set of policies $\hat{\Pi}$ containing at least two $\pi,\pi'$ such that $\mathcal{F}(\pi) \neq \mathcal{F}(\pi')$, and any reward function $\mathcal{R}_1$, there is a non-trivial reward function $\mathcal{R}_2$ such that $\mathcal{R}_1$ and $\mathcal{R}_2$ are unhackable but not equivalent.
+\end{theorem}
+
+
+
+\begin{wrapfigure}{r}{0.47\textwidth}\centering
+    \includegraphics[width=0.48\textwidth]{figures/plates.pdf}
+    \caption{
+    An illustration of the state-action occupancy space with a reward function defined over it. Points correspond to policies' state-action occupancies. Shading intensity indicates expected reward. 
+    Rotating the reward function to make $J(\pi_3) > J(\pi_4)$ passes through a reward function that sets $J(\pi_1) = J(\pi_2)$. 
+    Solid black lines are contour lines 
+    of the original reward function, dotted blue lines are contour lines of the rotated reward function.
+    }
+    \label{fig:plates}
+\end{wrapfigure}
+
+
+
+This proof proceeds by finding a path from $\mathcal{R}_1$ to another reward function $\mathcal{R}_3$ that is hackable with respect to $\mathcal{R}_1$.
+Along the way to reversing one of $\mathcal{R}_1$'s inequalities, we must encounter a reward function $\mathcal{R}_2$ that instead replaces it with equality.
+In the case that dim$(\hat \Pi) = 3$, we can visualize moving along this path as rotating the contour lines of a reward function defined on the space containing the policies' discounted state-action occupancies, see Figure~\ref{fig:plates}.
+This path can be constructed so as to avoid any reward functions that produce trivial policy orderings, thus guaranteeing $\mathcal{R}_2$ is non-trivial.
+For a \emph{simplification} to exist, we require some further conditions, as established by the following theorem:
+
+
+\begin{theorem}\label{thm:finite_simplification}
+Let $\hat{\Pi}$ be a finite set of policies, and $\mathcal{R}_1$ a reward function. The following procedure determines if there exists a non-trivial simplification of $\mathcal{R}_1$ in a given $MDP \setminus \mathcal{R}$:
+\begin{enumerate}
+    \item Let $E_1 \dots E_m$ be the partition of $\hat{\Pi}$ where $\pi,\pi'$ belong to the same set iff $J(\pi) = J(\pi')$.
+    \item For each such set $E_i$, select a policy $\pi_i \in E_i$ and let $Z_i$ be the set of vectors that is obtained by subtracting $\mathcal{F}(\pi_i)$ from each element of $\mathcal{F}(E_i)$.
+\end{enumerate}
+Then there is a non-trivial simplification of $\mathcal{R}$ iff $\mathrm{dim}(Z_1 \cup \dots \cup Z_m) \leq \mathrm{dim}(\mathcal{F}(\hat{\Pi})) - 2$, where $\mathrm{dim}(S)$ is the number of linearly independent vectors in $S$.
+\end{theorem}
+
+
+
+The proof proceeds similarly to Theorem~\ref{thm:finite_unhackability}. However, in Theorem~\ref{thm:finite_unhackability} it was sufficient to show that there are no trivial reward functions along the path from $\mathcal{R}_1$ to $\mathcal{R}_3$, whereas here we additionally need that if $J(\pi) = J(\pi')$ then $J'(\pi) = J'(\pi')$ for all functions $\mathcal{R}_2$ on the path --- this is what the extra conditions ensure. 
+
+Theorem~\ref{thm:finite_simplification} is opaque, but intuitively, the cases where $\mathcal{R}_1$ cannot be simplified are those where $\mathcal{R}_1$ imposes many different equality constraints that are difficult to satisfy simultaneously. 
+We can think of $\mathrm{dim}(\mathcal{F}(\Pi))$ as measuring how diverse the behaviours of policies in policy set $\Pi$ are. 
+Having a less diverse policy set means that a given policy ordering imposes fewer constraints on the reward function, creating more potential for simplification.
+The technical conditions of this proof determine when the diversity of $\Pi$ is or is not sufficient to prohibit simplification, as measured by $\mathrm{dim}(Z_1 \cup \dots \cup Z_m)$.
+
+Projecting $E_i$ to $Z_i$ simply moves these spaces to the origin, so that we can compare the directions in which they vary (i.e.\ their span).
+By assumption, $E_i \cap E_j = \{\}$, but $\mathrm{span}(Z_i) \cap \mathrm{span}(Z_j)$ will include the origin, and may also contain linear subspaces of dimension greater than 0.
+This is the case exactly when there are a pair of policies in $E_i$ and a pair of policies in $E_j$ that differ by the same visit counts,
+for example, when the environment contains an obstacle that could be circumnavigated in several different ways (with an impact on visit counts, but no impact on reward), and the policies in $E_i$ and $E_j$ both need to circumnavigate it before doing something else. 
+Roughly speaking, $\mathrm{dim}(Z_1 \cup \dots \cup Z_m)$ is large when either (i) we have very large and diverse sets of policies in $\hat{\Pi}$ that get the same reward according to $\mathcal{R}$, or (ii) we have a large number of different sets of policies that get the same reward according to $\mathcal{R}$, and where there are different kinds of diversity in the behaviour of the policies in each set.
+There are also intuitive special cases of Theorem~\ref{thm:finite_simplification}. For example, as noted before, if $E_i$ is a singleton then $Z_i$ has no impact on $\mathrm{dim}(Z_1 \cup \dots \cup Z_m)$. This implies the following corollary:
+
+
+
+
+
+
+
+
+\begin{corollary}
+For any finite set of policies $\hat{\Pi}$, any environment, and any reward function $\mathcal{R}$, if $|\hat{\Pi}| \geq 2$ and $J(\pi) \neq J(\pi')$ for all $\pi,\pi' \in \hat{\Pi}$ then there is a non-trivial simplification of $\mathcal{R}$.
+\end{corollary}
+
+
+
+A natural question is whether any reward function is guaranteed to have a non-trivial simplification on the set of all deterministic policies.
+As it turns out, this is not the case.
+For concreteness, and to build intuition for this result, we examine the set of deterministic policies in a simple $MDP\setminus \mathcal{R}$ with $S = \{0, 1\}, A = \{0, 1\}, T(s, a) = a, I = \{0: 0.5, 1: 0.5 \}, \gamma = 0.5$. Denote $\pi_{ij}$ the policy that takes action $i$ from state 0 and action $j$ from state 1. There are exactly four deterministic policies.
+We find that of the $4! = 24$ possible policy orderings, 12 are realizable via some reward function. In each of those 12 orderings, exactly two policies (of the six available pairs of policies in the ordering) can be set to equal value without resulting in the trivial reward function (\textit{which} pair can be equated depends on the ordering in consideration). Attempting to set three policies equal always results in the trivial reward simplification.
+
+For example, given the ordering $\pi_{00} \leq \pi_{01} \leq \pi_{11} \leq \pi_{10}$,
+the simplification $\pi_{00} = \pi_{01} < \pi_{11} < \pi_{10}$ is represented
+by $R = \left[\begin{smallmatrix} 0 & 3 \\ 2 & 1\end{smallmatrix}\right]$, where $\mathcal{R}(s, a) = R[s, a]$: for example, here taking action 1 from state 0 gives reward $\mathcal{R}(0, 1) = 3$.
+But there is no reward function representing a non-trivial simplification of this ordering with $\pi_{01} = \pi_{11}$.
+We develop and release a software suite to compute these results.
+Given an environment and a set of policies, it can calculate all policy orderings represented by some reward function. 
+Also, for a given policy ordering, it can calculate all nontrivial simplifications and reward functions that represent them.
+For a link to the repository, as well as a full exploration of these policies, orderings, and simplifications, see Appendix~\ref{sec:software}.
+
+
+\subsection{Unhackability in Infinite Policy Sets}\label{sec:results_infinite}
+The results in Section~\ref{sec:results_all} do not characterize unhackability for infinite policy sets that do not contain open sets. 
+Here, we provide two examples of such policy sets; one of them admits unhackable reward pairs and the other does not.
+Consider policies $A,B,C$, and reward functions $\mathcal{R}_1$ with $J_1(C) < J_1(B) < J_1(A)$ and $\mathcal{R}_2$ with $J_2(C) = J_2(B) < J_2(A)$.
+Policy sets $\Pi_a = \{ A \} \cup \{ \lambda B + (1 - \lambda) C  : \lambda \in [0, 1]\}$ and $\Pi_b = \{ A \} \cup \{ \lambda B + (1 - \lambda) C  : \lambda \in [0, 1]\}$ are depicted in Figure~\ref{fig:both_triangle_examples}; the vertical axis represents policies' values according to $\mathcal{R}_1$ and $\mathcal{R}_2$.
+For $\Pi_a$, $\mathcal{R}_2$ is a simplification of $\mathcal{R}_1$, but 
+for $\Pi_b$, it is not, since $J_1(X) < J_1(Y)$ and $J_2(X) > J_2(Y)$.
+
+
+
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/triangle13.png}
+        \caption{}
+        \label{fig:one_sided_triangle}
+    \end{subfigure}
+    \qquad
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/triangle36.png}
+        \caption{}
+        \label{fig:three_sided_triangle}
+    \end{subfigure}
+    \caption{
+    Infinite policy sets that do not contain open sets sometimes allow simplification (a), but not always (b).
+    Points A, B, C represent deterministic policies, while the bold lines between them represent stochastic policies. %
+    The y-axis gives the values of the policies according to reward functions $\color{NavyBlue} \mathcal{R}_1$ and $\color{Mahogany} \mathcal{R}_2$.
+    We attempt to simplify $\color{NavyBlue} \mathcal{R}_1$ by rotating the reward function such that $\color{Mahogany} J_2(B) = J_2(C)$; in the figure, we instead (equivalently) rotate the triangle along the AB axis, leading to the red triangle. In (a), $\color{Mahogany} \mathcal{R}_2$ simplifies $\color{NavyBlue} \mathcal{R}_1$, setting all policies along the BC segment equal in value (but still lower than A). In (b), $\color{Mahogany} \mathcal{R}_2$ swaps the relative value of policies X and Y ($\color{NavyBlue}{J_1(X)} < \color{NavyBlue}{J_1(Y)} = \color{Mahogany}{J_2(Y)} < \color{Mahogany}{J_2(X)}$) and so does not simplify $\color{NavyBlue} \mathcal{R}_1$.
+    }
+    \label{fig:both_triangle_examples}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Discussion}
+
+We reflect on our results and identify limitations in Section~\ref{sec:limitations}.
+In Section~\ref{sec:implications}, we discuss how our work can inform discussions about the appropriateness, potential risks, and limitations of using of reward functions as specifications of desired behavior.
+
+
+
+
+
+
+
+\subsection{Limitations}
+\label{sec:limitations}
+Our work has a number of limitations.
+We have only considered finite MDPs and Markov reward functions, leaving more general environments for future work.
+While we characterized hackability and simplification for finite policy sets, the conditions for simplification are somewhat opaque, and our characterization of infinite policy sets remains incomplete.
+
+As previously discussed, our definition of hackability is strict, arguably too strict.
+Nonetheless, we believe that understanding the consequences of this strict definition is an important starting point for further theoretical work in this area. 
+
+The main issue with the strictness of our definition has to do with the symmetric nature of hackability.  %
+The existence of complex behaviors that yield low proxy reward and high true reward is much less concerning than the reverse, as these behaviors are unlikely to be discovered while optimizing the proxy.
+For example, it is very unlikely that our agent would solve climate change in the course of learning how to wash dishes.
+Note that the existence of \textit{simple} behaviors with low proxy reward and high true reward \textit{is} concerning; 
+these could arise early in training, leading us to trust the proxy, only to later see the true reward decrease as the proxy is further optimized.
+To account for this issue, future work should explore more  realistic assumptions about the probability of encountering a given sequence of policies when optimizing the proxy, and measure hackability in proportion to this probability.
+
+
+We could allow for approximate unhackability by only considering pairs of policies ranked differently by the true and proxy reward functions as evidence of hacking iff their value according to the true reward function differs by more than some $\varepsilon$.
+Probabilistic unhackability could be defined by looking at the number of misordered policies; this would seem to require making assumptions about the probability of encountering a given policy when optimizing the proxy.
+
+
+
+
+
+
+Finally, while unhackability is a guarantee that no hacking will occur, \textit{hackability} is far from a guarantee of hacking.
+Extensive empirical work is necessary to better understand the factors that influence the occurrence and severity of reward hacking in practice.
+
+
+
+
+
+\subsection{Implications}\label{sec:implications}
+
+How should we specify our preferences for AI systems' behavior?
+And how detailed a specification is required to achieve a good outcome?
+In reinforcement learning, the goal of maximizing (some) reward function is often taken for granted, but a number of authors have expressed reservations about this approach \citep{gabriel2020artificial, Dobbe2021hard, Hadfield2016Cooperative, hadfield2017inverse, bostrom2014superintelligence}.
+Our work has several implications for this discussion, although we caution against drawing any strong conclusions due to the limitations mentioned in Section~\ref{sec:limitations}.
+
+One source of confusion and disagreement is the role of the reward function; it is variously considered as a means of specifying a task \citep{leike2018scalable} or encoding broad human values \citep{Dewey2011learning}; such distinctions are discussed by \citet{christiano_narrow_alignment} and \citet{gabriel2020artificial}.
+We might hope to use Markov reward functions to specify narrow tasks without risking behavior that goes against our broad values.
+However, if we consider the ``narrow task'' reward function as a proxy for the true ``broad values'' reward function, our results indicate that this is not possible: these two reward functions will invariably be hackable.
+Such reasoning suggests that reward functions must instead encode broad human values, or risk being hacked.
+This seems challenging, perhaps intractably so, indicating that alternatives to reward optimization may be more promising.
+Potential alternatives include imitation learning \citep{ross2011reduction}, 
+constrained RL \citep{Csaba2020con}, quantilizers \citep{taylor2016quantilizers}, and incentive management \citep{everitt2019understanding}.
+
+
+
+
+
+Scholars have also criticized the assumption that human values can be encoded as rewards \citep{Dobbe2021hard}, and challenged the use of metrics more broadly \citep{oneil2016weapons,thomas2022reliance}, citing Goodhart's Law \citep{Manheim2018Categorizing, goodhart1984problems}.
+A concern more specific to the optimization of reward functions is power-seeking \citep{turner2021optimalneurips, bostrom2012superintelligent, omohundro2008basic}.
+\citet{turner2021optimalneurips} prove that optimal policies tend to seek power in most MDPs and for most reward functions. 
+Such behavior could lead to human disempowerment; for instance, an AI system might disable its off-switch \citep{Hadfield2016the}.
+\citet{bostrom2014superintelligence} and others have argued that power-seeking makes even slight misspecification of rewards potentially catastrophic, although this has yet to be rigorously established.
+
+Despite such concerns, approaches to specification based on learning reward functions %
+remain popular \citep{fu2017learning, Stiennon2020Learning, nakano2021webgpt}.
+So far, reward hacking has usually been avoidable in practice, although some care must be taken \citep{Stiennon2020Learning}.
+Proponents of such approaches have emphasized the importance of learning a reward model in order to exceed human performance and generalize to new settings \citep{brown2020better, leike2018scalable}.
+But our work indicates that such learned rewards are almost certainly hackable, and so cannot be safely optimized.
+Thus we recommend viewing such approaches as a means of learning a policy in a safe and controlled setting, which should then be validated before being deployed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+\section{Conclusion}
+Our work begins the formal study of reward hacking in reinforcement learning.
+We formally define hackability and simplification of reward functions, and show conditions for the (non-)existence of non-trivial examples of each.
+We find that unhackability is quite a strict condition, as the set of all policies never contains non-trivial unhackable pairs of reward functions.
+Thus in practice, reward hacking must be prevented by limiting the set of possible policies, or controlling (e.g.\ limiting) optimization.
+Alternatively, we could %
+pursue approaches not based on optimizing reward functions.
+
+
+\bibliographystyle{apalike} 
+\bibliography{refs}
+
+\newpage
+
+\section*{Checklist}
+
+
+
+\begin{enumerate}
+
+
+\item For all authors...
+\begin{enumerate}
+  \item Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
+    \answerYes{}
+  \item Did you describe the limitations of your work?
+    \answerYes{}
+  \item Did you discuss any potential negative societal impacts of your work?
+    \answerYes{See Section~\ref{sec:implications}}
+  \item Have you read the ethics review guidelines and ensured that your paper conforms to them?
+    \answerYes{}
+\end{enumerate}
+
+
+\item If you are including theoretical results...
+\begin{enumerate}
+  \item Did you state the full set of assumptions of all theoretical results?
+    \answerYes{}
+        \item Did you include complete proofs of all theoretical results?
+    \answerYes{Some of the proofs are in the Appendix.}
+\end{enumerate}
+
+
+\item If you ran experiments...
+\begin{enumerate}
+  \item Did you include the code, data, and instructions needed to reproduce the main experimental results (either in the supplemental material or as a URL)?
+    \answerYes{The code and instructions for running it are available in the supplementary materials. The code does not use any datasets.}
+  \item Did you specify all the training details (e.g., data splits, hyperparameters, how they were chosen)?
+    \answerNA{We do not perform model training in this work.}
+        \item Did you report error bars (e.g., with respect to the random seed after running experiments multiple times)?
+    \answerNA{}
+        \item Did you include the total amount of compute and the type of resources used (e.g., type of GPUs, internal cluster, or cloud provider)?
+    \answerNA{No compute beyond a personal laptop (with integrated graphics) was used.}
+\end{enumerate}
+
+
+\item If you are using existing assets (e.g., code, data, models) or curating/releasing new assets...
+\begin{enumerate}
+  \item If your work uses existing assets, did you cite the creators?
+    \answerNA{The codebase was written from scratch.}
+  \item Did you mention the license of the assets?
+    \answerNA{}
+  \item Did you include any new assets either in the supplemental material or as a URL?
+    \answerYes{The codebase is available in the supplemental material.}
+  \item Did you discuss whether and how consent was obtained from people whose data you're using/curating?
+    \answerNA{}
+  \item Did you discuss whether the data you are using/curating contains personally identifiable information or offensive content?
+    \answerNA{}
+\end{enumerate}
+
+
+\item If you used crowdsourcing or conducted research with human subjects...
+\begin{enumerate}
+  \item Did you include the full text of instructions given to participants and screenshots, if applicable?
+    \answerNA{}
+  \item Did you describe any potential participant risks, with links to Institutional Review Board (IRB) approvals, if applicable?
+    \answerNA{}
+  \item Did you include the estimated hourly wage paid to participants and the total amount spent on participant compensation?
+    \answerNA{}
+\end{enumerate}
+
+
+\end{enumerate}
+
+\newpage
+
+
+
+\include{appendix}
+
+\end{document}

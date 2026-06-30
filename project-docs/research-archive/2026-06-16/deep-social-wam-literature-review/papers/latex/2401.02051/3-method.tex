@@ -1,0 +1,95 @@
+\section{Evolution of Heuristics (\ourmethod{})} \label{sec:method}
+
+
+\subsection{Main Idea}
+
+EoH aims at evolving both thoughts and codes to mimic the heuristic development conducted by human experts for efficient automatic heuristic design. To achieve this goal, EoH 
+\begin{itemize}
+    \item maintains both a natural language description and its corresponding code implementation for each heuristic. In each trial, it allows LLMs to first generate a heuristic in terms of natural language and then generate its corresponding code. The natural language description summarizes the main idea and provides a high-level understanding, while the code provides implementation details and settings that supplement the high-level thought.
+    \item employs several prompt strategies to guide LLMs to do reasoning over existing thoughts and codes. These strategies are designed to learn from previous experiences and effectively explore the heuristic space. They can be regarded as fine-grained in-context learning approaches that combine thoughts and codes for heuristic search.
+    \item evolves a population of candidate heuristics.  It uses LLMs in genetic operators such as crossover and mutation to produce new heuristics. Selection is also used to direct the search. The quality of each heuristic is evaluated on a set of problem instances.     
+   % mechanisms to maintain heuristic diversity and avoid ineffective heuristics, ultimately leading to efficient evolution.
+\end{itemize}
+Unlike most evolutionary algorithms where individuals are candidate solutions to an optimization problem, An individual in \ourmethod{} is a heuristic designed for solving a given problem. We believe that the evolution of ``thoughts" should be an important research direction.      
+
+%In contrast, \ourmethod{} aims to generate novel heuristics instead of solutions. 
+
+ \ourmethod{} Integrates LLMs into an evolutionary framework. It generates and refines heuristics automatically. Unlike some classic automatic heuristic design methods~\cite{burke2013hyper}, \ourmethod{} doesn't need any 
+ hand-crafted heuristic components or train new models.
+ 
+ %often require specific model training and domain knowledge. 
+
+\ourmethod{} evolves both thoughts and codes. Thoughts in natural language and designed prompt strategies enable \ourmethod{} to generate more diverse and effective heuristics. In contrast, FunSearch performs evolution of codes only and does not use prompt strategies explicitly.
+
+
+
+\subsection{Evolution Framework}
+
+\ourmethod{} maintains a population of $N$ heuristics, denoted as $P = \{h_1, \dots, h_N\}$, at each generation. Each heuristic $h_i$ is evaluated on a set of problem instances and assigned a fitness value $f(h_i)$.  
+
+Five prompt strategies are designed to generate new heuristics. At each generation, each strategy is called $N$ times to generate $N$ heuristics. Each newly generated heuristic will be evaluated on problem instances and added to the current population if it is feasible. At most $5N$ new heuristics will be added to the current population at each generation. Then, $N$ best individual solutions from the current population will be selected to form the population for the next generation. 
+
+EoH are summarised as follows: 
+
+\textbf{Step 0 Initialization:} Initialize the population $P$ of $N$ heuristics $h_1, \ldots, h_N$ by prompting LLMs using \textbf{Initialization prompt}, its detail can be found in Section 3.4.
+
+\textbf{Step 1 Generation of Heuristics}: If the stopping condition is not met, five \textbf{Evolution prompt strategies} (detailed in Section 3.4) are used simultaneously to generate $5N$ new heuristics. For each of the five prompt strategies, repeat the following process $N$ times: 
+\begin{itemize}
+    \item Step 1.1: Select parent heuristic(s) from the current population to construct a prompt for the strategy.
+    \item Step 1.2: Request LLM  to generate a new heuristic as well as its corresponding code implementation. 
+    \item Step 1.3: Evaluate the new heuristic on a set of evaluation instances to determine its fitness value. 
+    \item Step 1.4: Add the new heuristic to the current population if the heuristic and code are feasible.
+\end{itemize}
+
+\textbf{Step 2 Population Management:} Select the $N$ best individual heuristics from the current population to form a population for the next generation. Go to \textbf{Step 1}.  
+
+
+%The computational budget of \ourmethod{} can be set as the aims to automatically evolve the optimal heuristic within the given budget, such as the maximum number of generations $N_g$.
+
+
+\subsection{Heuristic Representation}
+Each heuristic consists of three parts: 1) its description in natural language, 2) a code block in a pre-defined format, and 3) a fitness value.
+
+The heuristic description comprises a few sentences in natural language. It is created by LLMs and presents a high-level thought.
+
+The code block is an implementation of the heuristic. It should follow a pre-defined format so that it can be identified and seamlessly integrated into \ourmethod{} framework. In the experiments, we choose to implement it as a Python function. Three basic components should be explicitly given to format the code block: 1) Name of the function, 2) Input variables, and 3) Output variables.
+
+The evaluation of heuristics in \ourmethod{} involves running the resulting algorithms on an instance set of the problem in question. This evaluation process differs from traditional evolutionary algorithms, which typically evaluate the objective function in a single instance. It is similar to some AHD approaches~\cite{lopez2016irace,hutter2011sequential} and is often costly. 
+
+
+\subsection{Prompt Strategies}
+
+\paragraph{Initialization prompt}
+
+In our experiments, we use LLMs to create all the initial heuristics, eliminating the need for expert knowledge. We inform the LLMs of the heuristic design task and instruct it to design a new heuristic by first presenting the description of the heuristic and then implementing it as a Python code block. The details of prompts for each problem are listed in the corresponding subsections in the \textbf{Appendix}. We repeat $N$ times to generate $N$ initial heuristics. 
+
+%The existing hand-crafted heuristics can also be put in the initial population, which may benefit the evolution since additional domain knowledge is used. We will study it in the future. 
+
+
+\paragraph{Evolution prompts}
+Five prompt strategies are proposed for creating new heuristics during evolution to mimic the heuristic development by humans. They are categorized into two groups: \textbf{E}xploration (\textbf{E1}, \textbf{E2}) and \textbf{M}odification (\textbf{M1}, \textbf{M2}, \textbf{M3}). The exploration strategies focus more on the exploration of the space of heuristics by conducting crossover-like operators on parent heuristics. 
+The modification strategies refine a parent heuristic by modifying, adjusting parameters, and removing redundant parts. The details of these evolutionary prompts are listed as follows:  
+
+
+\textbf{E1:} Generate new heuristics that are as much different as possible from parent heuristics. First, $p$ heuristics are selected from the current population. Then, LLM is prompted to design a new heuristic that is different from these selected heuristics as much as possible in order to explore new ideas. 
+%LLM is asked to describe the heuristic and then provide a code implementation following the pre-defined format.
+
+\textbf{E2:} Explore new heuristics that share the same idea as the selected parent heuristics. First, $p$ heuristics are selected from the current population. Then, LLM is instructed to identify common ideas behind these heuristics. Then, a new heuristic is designed that are based the common ideas but are as much different as possible from the selected parents by introducing new parts. 
+%LLM is asked to first describe the heuristic in natural language and then provide a code implementation in a pre-defined format.
+
+\textbf{M1:} Modify one heuristic for better performance. Firstly, one heuristic is selected from the population. Then, LLM is prompted to modify it to produce a new heuristic. 
+%LLM is asked to first describe the heuristic and then provide a code implementation in a pre-defined format.
+
+\textbf{M2:} Modify the parameters of one selected heuristic. First, one heuristic is selected from the current population. Then, LLM is prompted to try different parameters in the current heuristic instead of designing a new one. % LLM is asked to first describe the heuristic and then provide a code implementation in a pre-defined format.
+
+\textbf{M3:} Simplify heuristics by removing redundant components. First, one heuristic is selected from the current population. Then, LLM is prompted to analyze and identify the main components in the selected heuristic and analyze whether there are any redundant components.
+%may lead to overfitting or misleading the evolution. 
+Finally, LLM is prompted to simplify the code implementation of the heuristic based on its analysis.
+% LLM is asked to first describe the heuristic and then provide a code implementation following the pre-defined format.
+
+In all the above prompts, LLM is asked to first describe the heuristic and then provide a code implementation in a pre-defined format.
+
+Any selection method can be used in EoH. In our experimental studies, all the heuristics in the current population are ranked according to their 
+fitness.  Heuristic $i$ in the current population is randomly selected with probability $p_i \propto 1/(r_i+N)$, where $r_i$ is its rank and $N$ is the population size. 
+
+\vspace{1pt}

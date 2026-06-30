@@ -1,0 +1,592 @@
+\subsection{Idea Generation}
+%%% 
+%%% PAPER TEXTの説明を追加する?
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Limitation Analysis]
+    Please analyze the following paper text and identify limitations (constraints/challenges) from a broad perspective.
+
+Paper Text:
+\textbf{\{PAPER TEXT\}}\\
+
+Please analyze limitations from the following perspectives:\\
+1. Method/Algorithm limitations\\
+
+For each limitation:\\
+- Explain the specific problem\\
+- Explain why it is problematic\\
+- Propose improvement directions\\
+
+Additional Requirement:\\
+- Include the perspective of "AI autonomously conducting research". 
+  You may assume that the AI is provided with access to the codebase of this research. 
+  For each limitation, explain how an autonomous AI research agent could 
+  refine this limitation through self-experiments, 
+  automated ablation, or meta-learning.
+
+Constraints:\\
+- Focus on limitations that can be addressed through relatively simple implementation changes 
+  but would have significant impact if improved.\\
+- Do not focus too much on innovativeness; instead, identify limitations with substantial potential for solid performance improvement.\\
+- Output the analysis in a structured format.\\
+
+Output Structure:\\
+\#\# Method/Algorithm Limitations
+
+\#\#\# Limitation 1: [Short Title]\\
+- Specific Problem: ...\\
+- Why Problematic: ...\\
+- Improvement Directions:\\
+  - [Simple fix or adjustment]\\
+  - [Autonomous AI research perspective]\\
+
+\#\#\# Limitation 2: [Short Title]\\
+...
+
+\#\#\# Limitation 3: [Short Title]\\
+...
+\end{tcolorbox}
+
+
+%%% 
+%%% PAPER TEXT, LIMITATION, PREV IDEAS の説明を追加
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Idea Generation]
+Please generate one new research idea based on the following paper limitation analysis.\\
+
+Original Paper:
+\textbf{\{PAPER TEXT\}}\\
+
+Limitation Analysis:
+\textbf{\{LIMITATIONS\}}\\
+
+Already generated ideas:
+\textbf{\{PREV IDEAS\}}\\
+
+Constraints:\\
+1. The proposal should not require large computational resources or extensive data collection.\\
+2. Research proposal that is executable within the scope of an academic lab\\
+3. Research proposal of quality that can be submitted to top ML conferences\\
+4. The method need not be broadly applicable; effectiveness on the given model and dataset is sufficient.\\
+5. Aim for a simple, effective implementation rather than a complex or overly innovative one.\\
+6. Do not focus too much on innovativeness; instead, propose a method with solid performance improvement.\\
+7. This research should be conducted by an autonomous AI agent, 
+   which means human research activities (e.g., human-in-the-loop) should be excluded.\\
+
+Please generate one research idea in the following format. Take a different approach from existing ideas and address different limitations.\\
+
+**Important**: Always respond in the following JSON format. Include ```json.\\
+
+\begin{verbatim}
+```json
+{
+  "idea": {
+    "Name": "Short name for research idea (lowercase, underscores allowed)",
+    "Title": "Catchy and informative title",
+    "Short Hypothesis": "Concise explanation of main hypothesis or research question. 
+Clearly explain why this direction is needed, confirm that this setting is optimal
+for investigating this idea, and confirm that there are no other obviously simpler
+ways to answer the question.",
+    "Related Work": "Brief discussion of most relevant related work and how the
+proposal clearly distinguishes from them, and is not a trivial extension.",
+    "Abstract": "Conference format proposal summary (approximately 250 words)",
+    "Experiments": "List of experiments to be conducted to validate the proposal.
+Ensure these are simple and feasible. Explain specifically how you would test the
+hypothesis and detail precise algorithmic changes. Include evaluation metrics
+you would use.",
+    "Risk Factors and Limitations": "List of potential risks and limitations of the
+proposal"
+}
+}
+'''
+\end{verbatim}
+
+\end{tcolorbox}
+
+
+
+
+\subsection{Experimentation}
+\label{appendix:experimentation}
+% \begin{comment}
+% 実験に必要なコードを書かせるために、Coding Agentに与えるプロンプトの例を以下に示す。
+% Experiment Phaseでは4つのステージがあるためそれぞれのステージで異なったプロンプトが与えられる。
+% さらに一つのステージの中でもエージェントの実行毎にMEMORYなどの要素は少しずつ異なり得る。
+% \begin{itemize}
+% \item ``introduction''、``directory\_structure''、``research\_idea''要素は全てのステージで共通である。
+% \item ``research\_idea'' にはIdea Generation Phase で生成した研究アイデアが直接挿入され、今から実装する機能の俯瞰的なコンテキストをCoding Agentに与える。例をプロンプトの後に示す。
+% \item Stage2と Stage3・4 ではそれぞれ``performance\_improvement\_idea''と``ablation\_study\_idea''が挿入される。これは実装方針となるアイデアであり、例を続けて示す。
+% \item ``memory''にはこれまでそのStageで行われた実験についてのサマリーが埋め込まれる。成功した実験の結果およびメトリクス、失敗した実験の原因およびエラーログなどを用いてLLMがようやくしたものが埋め込まれる。``memory''の例については長くなるため、一部省略し後に示す。
+% \item ``required\_functionality''に、Coding Agentが実装すべき主な機能が記載されている。この内容はステージごとに短い説明文とエントリポイントとなるファイル名だけが異なる。Stage1では提案手法の実装を行うため``proposed\_method\_implementation''となる。Stage2では提案手法の精度改善を行うため要求する実装機能としては``improved\_proposed\_method''となる。
+% \end{itemize}
+% \end{comment}
+An example of the prompt given to the Coding Agent to make it write the code required for the Experiment Phase is shown below.
+Since the Experiment Phase consists of four stages, different prompts are provided for each stage.
+In addition, even within the same stage, elements such as <memory> may vary slightly across different executions of the agent.
+
+\begin{itemize}
+\item The <introduction>, <directory\_structure>, and <research\_idea> elements are shared across all stages.
+\item The <research\_idea> directly contains the research idea generated in the Idea Generation Phase, providing the Coding Agent with a high-level contextual overview of the functionality to be implemented.
+\item In Stage 2 and Stages 3–4, <performance\_improvement\_idea> and <ablation\_study\_idea> are inserted, respectively. These guide the implementation strategy.
+\item The <memory> field embeds a summary of the experiments conducted so far within the corresponding stage. This includes results and metrics from successful experiments, as well as causes of failed experiments and error logs, summarized by the LLM.
+\item The <required\_functionality> specifies the main functionalities that the Coding Agent is expected to implement. While this content differs across stages, the differences are limited to a short descriptive text and the name of the entry-point file. In Stage 1, where the proposed method is implemented, this field is set to <proposed\_method\_implementation>. In Stage 2, which focuses on improving the performance of the proposed method, the required functionality is specified as <improved\_proposed\_method>.
+\end{itemize}
+
+%%%
+%%% BASE PROMPT
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Coding Agent (An Example in Stage 1)]
+<introduction>\\
+You are an experienced AI researcher.\\
+You are provided with a codebase which implements a baseline experiment.\\
+Follow the instructions below and modify the code as necessary.\\
+</introduction>
+\vspace{6pt}
+
+<directory\_structure>\\
+<baseline.py>\\
+A python script that runs the baseline experiment.\\
+- Don't modify this file because it works fine.\\
+Args:\\
+- \text{-}-output-dir (str): path to the output directory where results will be saved.\\
+</baseline.py>
+\vspace{6pt}
+
+<plot.py>\\
+- A python script that generates plots for the experimental results.\\
+- Don't modify this file because it works fine\\
+- This script loads `scores.npz` file and plots the score distributions.\\
+- All experimental results, including ablation studies, must be plotted using this script; do not write a separate plotting script.\\
+Args:\\
+- \text{-}-input-file (str): path to the input `scores.npz` file.\\
+- \text{-}-output-dir (str): path to the output directory where plots will be saved.\\
+</plot.py>
+\vspace{6pt}
+
+<baseline\_code\_dir>\\
+This directory is the original baseline code directory.\\
+- Don't modify this directory. You should keep this directory as it is.\\
+- This directory contains the baseline code.\\
+- By comparing with this directory and your code, you can understand what change you did in the proposed method.\\
+</baseline\_code\_dir>
+\vspace{6pt}
+
+</directory\_structure>
+\vspace{6pt}
+
+<research\_idea>\\
+\textbf{\{RESEARCH IDEA\}}\\
+</research\_idea>
+\vspace{6pt}
+
+<performance\_improvement\_idea>\\
+\textbf{\{PERFORMANCE IMPROVEMENT IDEA\}}\\
+</performance\_improvement\_idea>
+\vspace{6pt}
+
+<ablation\_study\_idea>\\
+\textbf{\{ABLATION STUDY IDEA\}}\\
+</ablation\_study\_idea>
+\vspace{6pt}
+
+<memory>\\
+\textbf{\{MEMORY\}}\\
+</memory>
+\vspace{6pt}
+
+<required\_functionality>\\
+<proposed\_method\_implementation>\\
+You implement the proposed method based on research idea exploring novel improvements or revealing new insights.\\
+- You should implement only the core part of the idea, without changing the input/output file formats.\\
+- The entry script must take the same arguments as baseline.py and produce output files.\\
+- The output file schema (npz, json) must also be the same as in baseline.py.\\
+- Keep codebase modifications to a minimum, except where changes are necessary to implement the idea.\\
+- The entry script must be named proposed\_method.py.\\
+Example:\\
+\verb|```|\\
+python proposed\_method.py \text{-}-output-dir .\/results\\
+\verb|```|\\
+<important\_notes>\\
+Write implementation plan in plan\_proposed\_method.md file.\\
+</important\_notes>
+\vspace{6pt}
+
+</proposed\_method\_implementation>
+\vspace{6pt}
+
+</required\_functionality>
+\vspace{6pt}
+
+<dataset\_directory>\\
+The necessary datasets are stored in the following directory: /datasets/LoCoOp.\\
+No additional datasets should be downloaded.\\
+</dataset\_directory>
+\end{tcolorbox}
+
+
+
+\subsection{Writing}
+The prompt used for Draft Writing in the Writing Phase is shown below.
+The portion denoted as \{RESEARCH IDEA\} is identical to the text presented in \ref{appendix:experimentation}.
+\{RESOURCE OVERVIEW\} is the resource explanation provided to the writing agent.
+\{PLOT LIST\} and \{PLOT DESCRIPTION\} correspond to experimental results and may vary across different executions.
+
+%%%
+%%% DETAILED WRITING
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Detailed Writing]
+Your goal is to write up the following idea:\\
+\\
+\verb|```|markdown\\
+\textbf{\{RESEARCH IDEA\}}\\
+\verb|```|\\
+Note that idea\_text represents a preliminary hypothesis and may not necessarily align with the experiments that were eventually performed.\\
+\\
+First, make sure to refer to the experiment summaries contained in baseline\_summary.json, improved\_research\_summary.json, hyperparam\_ablation\_summary.json and component\_ablation\_summary.json.
+Important: The experiment results in hyperparam\_ablation\_summary.json and component\_ablation\_summary.json are summarized in the tables hyperparam\_ablation\_summary\_table.tex and component\_ablation\_summary\_table.tex. 
+In these .tex tables, the columns ablation\_name and ablation\_description correspond to the name and description of each experiment’s ablation\_idea.
+Do not directly copy these descriptions into the .tex tables. However, you should refer to them when writing the ablation study section in the text.
+You may modify how the non-numerical content is written in the .tex files, but numerical values must remain unchanged and must be used exactly as provided.\\
+(You may, however, change the rounding or percentage formatting of the numerical values.)\\
+\\
+Available plots for the writeup (use these filenames):\\
+\verb|```|\\
+\textbf{\{PLOT LIST\}}\\
+\verb|```|\\
+
+Please also consider which plots can naturally be grouped together as subfigures.\\
+
+We also have VLM-based figure descriptions:\\
+\verb|```|\\
+\textbf{\{PLOT DESCRIPTION\}}\\
+\verb|```|\\
+
+To better understand the methodology, please also refer to:\\
+\textbf{\{RESOURCE OVERVIEW\}}\\
+% - baseline\_tex/ and baseline\_code/baseline.py as the baseline TeX and code, respectively. When writing up the baseline method, you must follow its method section.\\
+% - baseline\_tex/baseline\_bibtex.txt contains the baseline paper's bibliographic information and title - read this file to identify the baseline method being compared against.\\
+% - proposed\_method\_code/improved\_proposed\_method.py as the proposed method's code implementation (note that the proposed method should be referenced in improved\_proposed\_method.py rather than proposed\_method.py)\\
+% - method\_section.tex (pre-written Method section with detailed technical analysis)\\
+\\
+Please read the current template.tex file and update it to produce a complete, coherent, and scientifically accurate paper.\\
+This must be an acceptable complete LaTeX writeup, suitable for a 8-page single-column paper.\\
+Make sure to use the citations from the references.bib file and report results accurately based on the experimental data provided.\\
+Start by reading template.tex to understand the current state, then edit it to incorporate all the information above into a complete paper.\\
+\\
+Please note: For the bibliography, do not use the \verb|\|begin\{filecontents\}\{references.bib\} environment. Instead, all citations should refer to an external file named references.bib.\\
+\\
+Please use the structure plan saved in paper\_structure.md as guidance for writing the full paper.
+\end{tcolorbox}
+
+
+%%%
+%%% CITATION VALIDATION
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Citation Validation]
+Your task is to validate and improve the citations in the paper, particularly in the Related Work section, by comparing with a high-quality baseline paper.\\
+
+Research idea:\\
+\verb|```|markdown\\
+\textbf{\{RESEARCH IDEA\}}\\
+\verb|```|\\
+
+Note that idea\_text represents a preliminary hypothesis and may not necessarily align with the experiments that were eventually performed.\\
+
+Please perform the following steps:\\
+
+1. **Analyze Citation Standards from Baseline Paper:**\\
+   - Read a paper from baseline\_tex/ to understand the citation standards in this field\\
+   - Pay attention to:\\
+     - The typical number of citations per section\\
+     - How citations are grouped and discussed thematically\\
+     - The balance between classic/foundational papers and recent work\\
+     - Citation density in the Related Work section\\
+\\
+2. **Evaluate Current Citations:**\\
+   - Read the current template.tex file\\
+   - Count the total number of unique citations\\
+   - Analyze citation distribution across sections\\
+   - Check if all citations in references.bib are actually used\\
+\\
+3. **Identify Citation Gaps:**\\
+   - Compare your citation count and distribution with the baseline papers\\
+   - Identify areas where additional citations would strengthen the paper\\
+   - Check if any important research areas or foundational works are missing\\
+\\
+4. **Improve Citations:**\\
+   - Add citations where the paper makes claims that should be supported\\
+   - Ensure the Related Work section has comprehensive coverage\\
+   - Make sure recent relevant work (within last 3-5 years) is adequately cited\\
+   - Verify that seminal/foundational papers in the field are included\\
+\\
+5. **Citation Quality Check:**\\
+   - Ensure citations are properly formatted and consistent\\
+   - Check that each citation adds value and is discussed meaningfully\\
+   - Avoid citation padding - each citation should serve a clear purpose\\
+\\
+Please use the Read, Edit, and MultiEdit tools to:\\
+- First analyze baseline\_tex/ papers to understand citation standards\\
+- Then review and improve the citations in template.tex\\
+- Focus especially on the Related Work section but also check other sections\\
+\\
+After your analysis, make the necessary edits to improve the citation quality and coverage to match the standards of the field.\\
+\\
+Please note: For the bibliography, do not use the \verb|\|begin\{filecontents\}\{references.bib\} environment. Instead, all citations should refer to an external file named references.bib.
+\end{tcolorbox}
+
+
+\begin{comment}
+続けて、Reflectionで使用するプロンプトを以下に示す。
+\end{comment}
+Next, we present the prompt used for Reflection.
+
+%%%
+%%% FEEDBACK GENERATION
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Feedback Generation]
+\# Role
+You are an AI assistant specializing in reviewing scientific manuscripts. Your mission is to analyze the provided artifacts (manuscript, data, code, etc.) from multiple angles and generate precise, constructive feedback based on the specified criteria.\\
+
+\# Instructions\\
+Read the content from the provided file paths and information, then generate a feedback report that focuses on the following criteria. For each criterion, state clearly if no issues are found, or provide specific details if problems or potential improvements are identified.\\
+
+\# Feedback Criteria\\
+1.  **Verification for Falsification \& Inconsistency:**\\
+    * Thoroughly cross-reference the claims made in the manuscript ./template.tex — including text, tables, and figures—against objective evidence from Experiment Summaries (JSON format), proposed\_method\_code/improved\_proposed\_method.py, and Plot Descriptions (from VLM). **Treat the Research Idea as background context only and do not flag discrepancies between it and the final manuscript.**\\
+    * Identify and report all suspected inconsistencies, such as numerical mismatches, discrepancies between the described methodology and the source code logic, and biased interpretations of plots. **All numerical discrepancies resulting from rounding are to be ignored.**\\
+\\
+2.  **Verification for Guideline Adherence:**\\
+    * Check if the manuscript complies with the rules and guidelines provided in CLAUDE.MD file.\\
+    * Report any deviations from the guidelines, including issues with formatting, style, mathematical notation, or section structure.\\
+\\
+3.  **Verification for Missing Citations:**\\
+    * Examine the manuscript for claims that require a citation but lack one, particularly for background concepts, related work, and datasets.\\
+    * Using the content from ./template.tex as a reference, suggest specific citations that should be added.\\
+    * **For each missing citation, create a descriptive string that clearly identifies the paper to be found (e.g., 'The original Transformer paper, ``Attention Is All You Need.'' '). These descriptions will form a list to be saved in a single JSON file.**\\
+\\
+4.  **Suggestions for Section-by-Section Improvements:**\\
+    * For each major section of the manuscript (Abstract, Introduction, Method, Experiments, Conclusion, etc.), propose concrete improvements to enhance clarity, persuasiveness, and impact.\\
+    * Provide actionable advice on aspects like logical flow, readability, and the effective use of figures and tables.\\
+    * Please ensure that all suggestions are actionable within the scope of the provided experiments and code, without requiring new experimental runs.\\
+    * Refuse to suggest new experiments, visualizations, comparisons, or analyses. All suggestions must be limited to encouraging deeper discussion based on the provided text, figures, and existing data.\\
+    * Focus on suggestions that amplify the manuscript's strengths and maximize the impact of its contributions. Instead of flagging claims as overstated, suggest how to rephrase or restructure the narrative to make them more compelling based on the existing evidence.**\\
+\\
+\# Inputs\\
+\#\# Research Idea:\\
+\verb|```|markdown\\
+\textbf{\{RESEARCH IDEA\}}\\
+\verb|```|\\
+
+Note that idea\_text represents a preliminary hypothesis and may not necessarily align with the experiments that were eventually performed.\\
+
+\#\# Experiment Summaries (JSON format)\\
+Refer to the experiment summaries contained in baseline\_summary.json, improved\_research\_summary.json, hyperparam\_ablation\_summary.json and component\_ablation\_summary.json.\\
+Important: The experiment results in hyperparam\_ablation\_summary.json and component\_ablation\_summary.json are summarized in the tables hyperparam\_ablation\_summary\_table.tex and component\_ablation\_summary\_table.tex. \\
+In these .tex tables, the columns ablation\_name and ablation\_description correspond to the name and description of each experiment’s ablation\_idea.\\
+Do not directly copy these descriptions into the .tex tables. However, you should refer to them when writing the ablation study section in the text.\\
+You may modify how the non-numerical content is written in the .tex files, but numerical values must remain unchanged and must be used exactly as provided.\\
+(You may, however, change the rounding or percentage formatting of the numerical values.)\\
+
+\#\# Available Plots (list of filenames)\\
+\verb|```|\\
+\textbf{\{PLOT LIST\}}\\
+\verb|```|\\
+
+\#\# Plot Descriptions (from VLM)\\
+\verb|```|\\
+\textbf{\{PLOT DESCRIPTION\}}\\
+\verb|```|\\
+
+To better understand the idea, experiments, and results, please also refer to:\\
+- baseline\_tex/ and baseline\_code/baseline.py as the baseline TeX and code, respectively. When writing up the baseline method, you must follow its method section.\\
+- baseline\_tex/baseline\_bibtex.txt contains the baseline paper's bibliographic information and title - read this file to identify the baseline method being compared against.\\
+- proposed\_method\_code/improved\_proposed\_method.py as the proposed method's code implementation (note that the proposed method should be referenced in improved\_proposed\_method.py rather than proposed\_method.py)\\
+- method\_section.tex (pre-written Method section with detailed technical analysis)\\
+
+\# Output Generation\\
+Based on your review, generate the following two files.\\
+
+\verb|---|\\
+\#\# Part 1: Feedback Report (Markdown)\\
+- **File to Generate:** `reflection\_1\_feedback.md`\\
+- **Format:** Markdown\\
+- **Content:** A comprehensive report detailing the findings from all four criteria of the `Core Task`.\\
+
+\#\#\# Markdown Report Template\\
+
+\#\#\# 1. Results of Falsification \& Inconsistency Check\\
+- [ ] No significant inconsistencies or signs of falsification were found.\\
+- [ ] The following discrepancies or concerns were identified:\\
+    - (e.g., Table 1 reports an accuracy of 92.5\%, but the JSON data shows an average of 91.8\%. This suggests a potential cherry-picking of the best seed's result.)\\
+    - (e.g., The text describes the result in Figure 3 as a ``significant improvement,'' but comparison with the VLM description indicates it is within the margin of error. The claim is overstated.)\\
+    - (e.g., The method section states a dropout rate of 0.5, but the implementation in the source code uses 0.3.)\\
+
+\#\#\# 2. Results of Guideline Adherence Check\\
+- [ ] The manuscript generally adheres to the provided guidelines.\\
+- [ ] The following deviations from the guidelines were found:\\
+    - (e.g., The font used for equations is inconsistent. Please follow the instructions in CLAUDE.md.)\\
+    - (e.g., The rule that figure captions must be placed below the figure has not been followed.)\\
+
+\#\#\# 3. Results of Missing Citations Check\\
+- [ ] No significant missing citations were identified.\\
+- [ ] The following sections may require additional citations:\\
+    - (e.g., The second paragraph of the Introduction discusses the basic Transformer architecture but lacks a citation to the original paper, ``Attention Is All You Need.'')\\
+    - (e.g., A citation should be added for the iNaturalist dataset used in the experiments, referencing the paper that introduced it.)\\
+
+\#\#\# 4. Section-by-Section Improvement Suggestions\\
+- **Abstract:** (e.g., The background description is currently too long. The abstract would be more impactful if it started with a concise one-sentence summary of the contribution and included key quantitative results.)\\
+- **Introduction:** (e.g., The problem statement is clear, but the motivation could be strengthened by better explaining why this problem is important and what the broader impact of solving it would be.)\\
+- **Related Work:** (e.g., Rather than simply listing prior studies, structure the section thematically. Clearly explaining how your work differs from or builds upon key papers will better highlight your unique contribution.)\\
+- **Method:** (e.g., The pseudocode in Algorithm 1 is dense. Consider simplifying it to show only the main steps and moving detailed explanations to the main text to improve readability.)\\
+- **Experimental Setup:** (e.g., For reproducibility, it would be beneficial to include a table summarizing all key hyperparameters. Justifying the choice of evaluation metrics and baselines would also strengthen the paper's credibility.)\\
+- **Experiments:** (e.g., Instead of just listing results, add more analysis immediately after each result to discuss *why* it occurred. This would add significant depth to the paper.)\\
+- **Ablation Study:** (e.g., It's unclear which components of your method contribute most to the performance gain. An ablation study that systematically analyzes the impact of each component would provide valuable insights and strengthen your claims.)\\
+- **Conclusion:** (e.g., Providing more specific details on the study's limitations and future directions would demonstrate scientific rigor and foresight.)\\
+
+\verb|---|\\
+\#\# Part 2: Required Citations List (JSON)\\
+- **File to Generate:** `reflection\_1\_required\_bib.json`\\
+- **Format:** JSON (A list of strings)\\
+- **Content:** A machine-readable list of the descriptive strings for each missing citation identified in `Core Task 3`. Each string in the list should be a clear instruction for a search tool.\\
+
+\#\#\# JSON Format Example\\
+\verb|```|json\\
+\verb|[|\\
+  ``The original Transformer paper, 'Attention Is All You Need' by Vaswani et al.'',\\
+  ``The paper that introduced the iNaturalist dataset.''\\
+\verb|]|
+\end{tcolorbox}
+
+%%%
+%%% FEEDBACK REVISION
+%%%
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=Prompt for Feedback Revision]
+\# Role\\
+You are an expert writing assistant who accurately incorporates feedback to improve a manuscript. Your task is to faithfully execute the requested revisions to enhance the overall quality of the text.\\
+
+\# Instructions\\
+Revise the ./template.tex strictly according to the contents of the Feedback Report found at reflection\_1\_feedback.md.
+Implement all the changes and suggestions noted in the feedback and output the complete, revised manuscript. Do not introduce new information or interpretations that are not specified in the feedback.
+When the feedback points out missing citations, you must add appropriate \verb|\|citep\{\} commands in the main text. Refer to the Newly Acquired Citations (BibTeX format).\\
+
+**Requests Beyond the Scope of Existing Data (CRITICAL):**\\
+* If a feedback requests a new experiment, a comparison with data you do not have, or an analysis that is impossible with the provided information, **DO NOT INVENT DATA OR RESULTS.**\\
+* Instead, address the comment *in the manuscript's text* by:\\
+    * **First, attempting to reframe the point as a strength or a deliberate choice using the principles in Strategy \#5. As a last resort, if this is not feasible, proceed by:**\\
+    * Acknowledging the value and validity of the feedback's suggestion.\\
+    * Politely stating that it falls outside the scope of the current study's experiments.\\
+
+\# Inputs\\
+\#\# Research Idea:\\
+\verb|```|markdown\\
+\textbf{\{RESEARCH IDEA\}}\\
+\verb|```|\\
+Note that idea\_text represents a preliminary hypothesis and may not necessarily align with the experiments that were eventually performed.\\
+
+\#\# Experiment Summaries (JSON format)\\
+Refer to the experiment summaries contained in baseline\_summary.json, improved\_research\_summary.json, hyperparam\_ablation\_summary.json and component\_ablation\_summary.json.\\
+Important: The experiment results in hyperparam\_ablation\_summary.json and component\_ablation\_summary.json are summarized in the tables hyperparam\_ablation\_summary\_table.tex and component\_ablation\_summary\_table.tex. \\
+In these .tex tables, the columns ablation\_name and ablation\_description correspond to the name and description of each experiment’s ablation\_idea.\\
+Do not directly copy these descriptions into the .tex tables. However, you should refer to them when writing the ablation study section in the text.\\
+You may modify how the non-numerical content is written in the .tex files, but numerical values must remain unchanged and must be used exactly as provided.\\
+(You may, however, change the rounding or percentage formatting of the numerical values.)\\
+
+\#\# Available Plots (list of filenames)\\
+\verb|```|\\
+\textbf{\{PLOT LIST\}}\\
+\verb|```|\\
+
+\#\# Plot Descriptions (from VLM)\\
+\verb|```|\\
+\textbf{\{PLOT DESCRIPTION\}}\\
+\verb|```|
+
+\#\# Newly Acquired Citations (BibTeX format)\\
+
+To better understand the idea, experiments, and results, please also refer to:\\
+- baseline\_tex/ and baseline\_code/baseline.py as the baseline TeX and code, respectively. When writing up the baseline method, you must follow its method section.\\
+- baseline\_tex/baseline\_bibtex.txt contains the baseline paper's bibliographic information and title - read this file to identify the baseline method being compared against.\\
+- proposed\_method\_code/improved\_proposed\_method.py as the proposed method's code implementation (note that the proposed method should be referenced in improved\_proposed\_method.py rather than proposed\_method.py)\\
+- method\_section.tex (pre-written Method section with detailed technical analysis)\\
+
+Please note: For the bibliography, do not use the \verb|\|begin\{filecontents\}\{references.bib\} environment. Instead, all citations should refer to an external file named references.bib.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=gray!10, colframe=gray!40!black, breakable=true, title=CLAUDE.md for the writing agent]
+You are an ambitious AI researcher who is looking to publish a paper that will contribute significantly to the field.\\
+Ensure that the paper is scientifically accurate, objective, and truthful. Accurately report the experimental results, even if they are negative or inconclusive.\\
+You are planning to submit to a top-tier ML conference, which has guidelines:\\
+- The main paper is limited to 8 pages, including all figures and tables, but excluding references, the impact statement, and optional appendices. In general, try to use the available space and include all relevant information.\\
+- The main paper should be single-column format, while the appendices can be in single-column format. When in single column format, make sure that tables and figures are correctly placed.\\
+- Do not change the overall style which is mandated by the conference. Keep to the current method of including the references.bib file.\\
+- Do not remove the \\graphicspath directive or no figures will be found.\\
+- Do not add `Acknowledgements` section to the paper.\\
+- Use a single backslash (\textbackslash) for LaTeX commands instead of a double backslash (\textbackslash\textbackslash).\\
+\\
+Here are some tips for each section of the paper:\\
+\\
+- **Title**:\\
+  - Title should be catchy and informative. It should give a good idea of what the paper is about.\\
+  - Try to keep it under 2 lines.\\
+\\
+- **Abstract**:\\
+  - TL;DR of the paper.\\
+  - What are we trying to do and why is it relevant?\\
+  - Make sure the abstract reads smoothly and is well-motivated. This should be one continuous paragraph.\\
+\\
+- **Introduction**:\\
+  - Longer version of the Abstract, i.e., an overview of the entire paper.\\
+  - Provide context to the study and explain its relevance.\\
+  - Highlight how the approach effectively addresses the research question or problem. Also, provide an intuitive explanation of why this method works well.\\
+  - Summarize your contributions, highlighting pertinent findings, insights, or proposed methods.\\
+\\
+- **Related Work**:\\
+  - Academic siblings of our work, i.e., alternative attempts in literature at trying to address the same or similar problems.\\
+  - Compare and contrast their approach with yours, noting key differences or similarities.\\
+  - Ensure proper citations are provided.\\
+\\
+- **Method**:\\
+  - Clearly detail what you propose to do and why. If your study aims to address certain hypotheses, describe them and how your method is constructed to test them.\\
+\\
+- **Experimental Setup**:\\
+  - Explain how you tested your method or hypothesis.\\
+  - Describe necessary details such as data, environment, and baselines, but omit hardware details unless explicitly mentioned.\\
+\\
+- **Experiments**:\\
+  - Present the results truthfully according to the data you have. If outcomes are not as expected, discuss it transparently.\\
+  - Include comparisons to baselines if available, and only include analyses supported by genuine data.\\
+  - Try to include all relevant plots and tables. Consider combining multiple plots into one figure if they are related.\\
+  - In tables, please bold the best result among the compared methods. There is no need to bold the proposed method if it is not the best.\\
+\\
+- **Conclusion**:\\
+  - Summarize the entire paper, including key strengths or findings.\\
+  - Results are strong, highlight how they might address the research problem.\\
+\\
+- **Appendix**:\\
+  - Place for supplementary material that did not fit in the main paper.\\
+  - Add more information and details (hyperparameters, algorithms, etc.) in the supplementary material.\\
+  - Add more plots and tables in the supplementary material. Make sure that this information is not already covered in the main paper.\\
+  - When checking for duplicate figures, be sure to also review their descriptions to catch cases where different figures convey the same information. For example, one figure might present aggregated training accuracy as a single line plot with a shaded standard deviation (e.g., aggregated\_training\_accuracy.png), while another (per\_seed\_training\_accuracy.png) shows the same data as three separate line plots.\\
+\\
+Ensure you are always writing good compilable LaTeX code. Common mistakes that should be fixed include:\\
+- LaTeX syntax errors (unenclosed math, unmatched braces, etc.).\\
+- Duplicate figure labels or references.\\
+- Unescaped special characters: \& \% \$ \# \_ \{ \} \textasciitilde \textasciicircum \textbackslash \\
+- Proper table/figure closure.\\
+- Do not hallucinate new citations or any results not in the logs.\\
+\\
+Ensure proper citation usage:\\
+- Always include references within \verb|\|begin\{filecontents\}\{references.bib\} ... \verb|\|end\{filecontents\}, even if they haven't changed from the previous round.\\
+- **Before citing any paper, ALWAYS read the references.bib file first to find the correct citation key. Do NOT create new fictional bibtex entries.**\\
+- Do not make any changes to reference.bib\\
+- **Verify all citation keys match exactly with those in references.bib before using them in the text.**\\
+- Note that the baseline BibTeX entry is located near the bottom of references.bib\\
+- Each section (especially Related Work) should have multiple citations.\\
+\\
+\#\# Notes\\
+- Do not include formatted mathematical formulas or equations in the Abstract. However, including key numerical results (e.g., ``an accuracy of 92.5\%'') and mentioning mathematical concepts by name is perfectly acceptable.\\
+- During the reflection process, the abstract should not be significantly altered.\\
+- Do not include results in the Method section.\\
+- Do not include Limitation sections and Future Work sections.\\
+- Use `\%` to display a literal percent sign, as a standard `\%` will be treated as a comment.\\
+\end{tcolorbox}
+

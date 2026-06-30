@@ -1,0 +1,25 @@
+\begin{algorithm}[t!]
+	\caption{PPO-SI Interleaved Training}\label{alg:ppo_si}
+	\KwIn{policy $\pi_\theta$, value function $VF(\cdot)$, SI buffer threshold $\Delta$, SI frequency $\omega$}
+	Initialize empty SI buffers for all tasks $\mathbf{D}_{SI} \leftarrow \{ \emptyset, \forall T \in \text{training tasks}\}$\;
+	Initialize a counter for simulator steps $counter \leftarrow 0$\;
+	\While(){not done}{
+	    Collect set of trajectories for all tasks $\{\tau_T, \forall T \in \text{training tasks} \}$ by running policy $\pi_\theta$ in (parallel) environments\;
+	    \ForAll(){$\mathcal{D}_{SI, T}$}{
+	      \uIf{$\tau_T$ is successful}{
+	        $\mathcal{D}_{SI, T} \leftarrow \mathcal{D}_{SI, T} \cup \tau_T$
+	      }
+	      \uElseIf{$\tau_T$'s episode return $\geq \mu_{\text{return}}(\mathcal{D}_{SI, T}) + \Delta \times \sigma_{\text{return}}(\mathcal{D}_{SI, T})$}{
+    	      $\mathcal{D}_{SI, T} \leftarrow \mathcal{D}_{SI, T} \cup \tau_T$
+	      }
+	    }
+	    Increase $counter$ accordingly\;
+	    Update $\pi_\theta$ following Equation~\ref{eq:ppo_objective}\;
+	    Fit $VF(\cdot)$ by regression on mean-squared error\;
+	    \uIf{$\mathbbm{1}(counter \bmod \omega = 0)$}{
+	        Determine the number of trajectories to sample from each buffer $\#_{\text{sample}} = \min(\{ \vert \mathcal{D}_{SI, T} \vert, \forall T \in \text{training tasks}\})$\;
+	        Sample $\#_{\text{sample}}$ trajectories from each buffer in a prioritized manner to construct $\mathcal{D}_{SI}$\;
+	        Update $\pi_\theta$ on $\mathcal{D}_{SI}$ with supervised objective\;
+	    }
+	}
+\end{algorithm}

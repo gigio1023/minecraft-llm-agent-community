@@ -1,0 +1,119 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Navigate a dynamic obstacle course to reach a target.
+
+    Description:
+    - The environment consists of a large flat ground measuring 1000 x 1000 x 10 meters.
+    - The robot starts at a fixed position on the ground, facing the positive x-axis.
+    - The target is a cylindrical object (0.5 meters in diameter and 1 meter in height) placed 20 meters directly in front of the robot's starting position.
+    - The obstacle course consists of 5 dynamic obstacles, each moving in a predictable pattern:
+      - Obstacle 1: A box (1 x 1 x 1 meters) moving side-to-side (along the y-axis) with an amplitude of 2 meters and a period of 4 seconds. It is placed 5 meters in front of the robot's starting position.
+      - Obstacle 2: A box (1 x 1 x 1 meters) moving up and down (along the z-axis) with an amplitude of 1 meter and a period of 3 seconds. It is placed 8 meters in front of the robot's starting position.
+      - Obstacle 3: A box (1 x 1 x 1 meters) rotating around its center with a radius of 1 meter and a period of 5 seconds. It is placed 11 meters in front of the robot's starting position.
+      - Obstacle 4: A box (1 x 1 x 1 meters) moving diagonally (along both x and y axes) with an amplitude of 1 meter and a period of 6 seconds. It is placed 14 meters in front of the robot's starting position.
+      - Obstacle 5: A box (1 x 1 x 1 meters) moving in a circular pattern (along the x-y plane) with a radius of 1 meter and a period of 7 seconds. It is placed 17 meters in front of the robot's starting position.
+    - The task of the robot is to navigate through the dynamic obstacle course and reach the target as quickly as possible.
+
+    Success:
+    The task is successfully completed when the robot reaches the target.
+
+    Rewards:
+    To help the robot complete the task:
+    - The robot receives a reward for each time step it remains in the environment, encouraging steady progress.
+    - The robot is rewarded based on how much it reduces the distance to the target, incentivizing swift movement towards the goal.
+    - The robot is penalized for colliding with any obstacles.
+
+    Termination:
+    The task terminates immediately if the robot collides with any obstacle or reaches the target.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.ground_size = [1000.0, 1000.0, 10.0]
+        self.ground_position = [0.0, 0.0, 0.0]
+        self.ground_id = self.create_box(mass=0.0, half_extents=[self.ground_size[0] / 2, self.ground_size[1] / 2, self.ground_size[2] / 2], position=self.ground_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.ground_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.target_radius = 0.25
+        self.target_height = 1.0
+        self.target_position = [20.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.target_height / 2]
+        self.target_id = self.create_cylinder(mass=0.0, radius=self.target_radius, height=self.target_height, position=self.target_position, color=[0.0, 1.0, 0.0, 1.0])
+        self.obstacle_size = [1.0, 1.0, 1.0]
+        self.obstacle_1_position_init = [5.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.obstacle_size[2] / 2]
+        self.obstacle_2_position_init = [8.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.obstacle_size[2] / 2]
+        self.obstacle_3_position_init = [11.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.obstacle_size[2] / 2]
+        self.obstacle_4_position_init = [14.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.obstacle_size[2] / 2]
+        self.obstacle_5_position_init = [17.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.obstacle_size[2] / 2]
+        self.obstacle_1_id = self.create_box(mass=0.0, half_extents=[self.obstacle_size[0] / 2, self.obstacle_size[1] / 2, self.obstacle_size[2] / 2], position=self.obstacle_1_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.obstacle_2_id = self.create_box(mass=0.0, half_extents=[self.obstacle_size[0] / 2, self.obstacle_size[1] / 2, self.obstacle_size[2] / 2], position=self.obstacle_2_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.obstacle_3_id = self.create_box(mass=0.0, half_extents=[self.obstacle_size[0] / 2, self.obstacle_size[1] / 2, self.obstacle_size[2] / 2], position=self.obstacle_3_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.obstacle_4_id = self.create_box(mass=0.0, half_extents=[self.obstacle_size[0] / 2, self.obstacle_size[1] / 2, self.obstacle_size[2] / 2], position=self.obstacle_4_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.obstacle_5_id = self.create_box(mass=0.0, half_extents=[self.obstacle_size[0] / 2, self.obstacle_size[1] / 2, self.obstacle_size[2] / 2], position=self.obstacle_5_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.robot_position_init = [0.0, 0.0, self.ground_position[2] + self.ground_size[2] / 2 + self.robot.links['base'].position_init[2]]
+        self.robot_orientation_init = self._p.getQuaternionFromEuler([0.0, 0.0, 0.0])
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_cylinder(self, mass, radius, height, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, height=height)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self.time = 0.0
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot_orientation_init)
+        return observation
+
+    def step(self, action):
+        self.distance_to_target = self.get_distance_to_object(self.target_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.time += self.dt
+        obstacle_1_new_y = self.obstacle_1_position_init[1] + 2.0 * np.sin(2 * np.pi * self.time / 4.0)
+        self._p.resetBasePositionAndOrientation(self.obstacle_1_id, [self.obstacle_1_position_init[0], obstacle_1_new_y, self.obstacle_1_position_init[2]], [0.0, 0.0, 0.0, 1.0])
+        obstacle_2_new_z = self.obstacle_2_position_init[2] + 1.0 * np.sin(2 * np.pi * self.time / 3.0)
+        self._p.resetBasePositionAndOrientation(self.obstacle_2_id, [self.obstacle_2_position_init[0], self.obstacle_2_position_init[1], obstacle_2_new_z], [0.0, 0.0, 0.0, 1.0])
+        obstacle_3_new_x = self.obstacle_3_position_init[0] + 1.0 * np.cos(2 * np.pi * self.time / 5.0)
+        obstacle_3_new_y = self.obstacle_3_position_init[1] + 1.0 * np.sin(2 * np.pi * self.time / 5.0)
+        self._p.resetBasePositionAndOrientation(self.obstacle_3_id, [obstacle_3_new_x, obstacle_3_new_y, self.obstacle_3_position_init[2]], [0.0, 0.0, 0.0, 1.0])
+        obstacle_4_new_x = self.obstacle_4_position_init[0] + 1.0 * np.cos(2 * np.pi * self.time / 6.0)
+        obstacle_4_new_y = self.obstacle_4_position_init[1] + 1.0 * np.sin(2 * np.pi * self.time / 6.0)
+        self._p.resetBasePositionAndOrientation(self.obstacle_4_id, [obstacle_4_new_x, obstacle_4_new_y, self.obstacle_4_position_init[2]], [0.0, 0.0, 0.0, 1.0])
+        obstacle_5_new_x = self.obstacle_5_position_init[0] + 1.0 * np.cos(2 * np.pi * self.time / 7.0)
+        obstacle_5_new_y = self.obstacle_5_position_init[1] + 1.0 * np.sin(2 * np.pi * self.time / 7.0)
+        self._p.resetBasePositionAndOrientation(self.obstacle_5_id, [obstacle_5_new_x, obstacle_5_new_y, self.obstacle_5_position_init[2]], [0.0, 0.0, 0.0, 1.0])
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_target = self.get_distance_to_object(self.target_id)
+        survival = 1.0
+        reach_target = (self.distance_to_target - new_distance_to_target) / self.dt
+        return {'survival': survival, 'reach_target': reach_target}
+
+    def get_terminated(self, action):
+        collision_obstacle_1 = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.obstacle_1_id)) > 0
+        collision_obstacle_2 = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.obstacle_2_id)) > 0
+        collision_obstacle_3 = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.obstacle_3_id)) > 0
+        collision_obstacle_4 = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.obstacle_4_id)) > 0
+        collision_obstacle_5 = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.obstacle_5_id)) > 0
+        collision_target = len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.target_id)) > 0
+        return collision_obstacle_1 or collision_obstacle_2 or collision_obstacle_3 or collision_obstacle_4 or collision_obstacle_5 or collision_target
+
+    def get_success(self):
+        contact_points_target = self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=self.target_id)
+        return len(contact_points_target) > 0
+\end{lstlisting}

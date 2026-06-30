@@ -1,0 +1,27 @@
+\section{Sandbox Environment Implementation}\label{sec:implementation}
+The Smallville sandbox game environment is built using the Phaser web game development framework~\cite{72_Phaser}. The visual environment sprites, including agent avatars, as well as an environment map and collision map that we authored, are imported into Phaser.
+
+We supplement the sandbox development framework with a server that makes the sandbox information available to generative agents and enables generative agents to move and influence the sandbox environment. The server maintains a JSON data structure that contains information about each agent in the sandbox world, including their current location, a description of their current action, and the sandbox object they are interacting with. At each sandbox time step, the sandbox server parses the JSON for any changes coming from the generative agents, moves the agents to their new positions, and updates the status of any sandbox objects that the agents are interacting with (e.g., changing the status of the coffee machine from ``idle'' to ``brewing coffee'' if an agent's action is ``making espresso for a customer @ Hobbs Cafe: counter: coffee machine''). The sandbox server is also responsible for sending all agents and objects that are within a preset visual range for each agent to that agent's memory, so the agent can react appropriately. The agent's output action then updates the JSON, and the process loops for the next time step.
+
+End users initialize a new agent with a brief natural language description, as in the paragraph about John Lin in Section~\ref{sec:avatar}. In our implementation, we split this semicolon-delimited list of characteristics up into a set of memories. These serve as the initial memories that determine the agent's behavior.
+These memories are initial starting points: as the agents gain more experience in the sandbox world, and as more records saturate the memory stream, the agent's summary and behavior will evolve. 
+
+\subsection{From Structured World Environments to Natural Language, and Back Again} 
+The architecture of generative agents operates using natural language. Therefore, we need a mechanism to ground the agent's reasoning to the sandbox world. To achieve this, we represent the sandbox environment---areas and objects---as a tree data structure, with an edge in the tree indicating a containment relationship in the sandbox world. We convert this tree into natural language to pass to the generative agents. For instance, ``stove'' being a child of ``kitchen'' is rendered into ``there is a stove in the kitchen.''
+
+Agents build individual tree representations of the environment as they navigate it --- subgraphs of the overall sandbox environment tree. We initialize each agent with an environment tree capturing the spaces and objects that the agent should be aware of: the rooms and objects in their living quarters, their workplace, and commonly visited stores and shops. As the agents navigate the sandbox world, they update this tree to reflect newly perceived areas. Agents are not omniscient: their tree may get out of date as they leave an area, and is updated when they re-enter the area.
+
+To determine the appropriate location for each action, we traverse the agent's stored environment tree and flatten a portion of it into natural language to prompt the language model. Recursively starting at the root of the agent's environment tree, we prompt the model to find the most suitable area. For example, if Eddy's agent indicated that he should  \gentxt{take a short walk around his workspace}:
+\begin{quote}
+    {\small
+    \texttt{[Agent’s Summary Description]\\
+            Eddy Lin is currently in {The Lin family’s house: Eddy Lin’s bedroom: desk)} that has Mei and John Lin’s \\bedroom, Eddy Lin’s bedroom, common room, kitchen, bathroom, and garden. \\
+            Eddy Lin knows of the following areas: {The Lin \\family’s house, Johnson Park, Harvey Oak Supply Store, The Willows Market and Pharmacy, Hobbs Cafe, The Rose and Crown Pub}. \\
+            * Prefer to stay in the current area if the activity can be done there. \\
+            Eddy Lin is planning to take a short walk around his workspace. Which area should Eddy Lin go to? 
+    }
+    }
+\end{quote}
+This outputs \gentxt{The Lin family’s house}. We then use the same process recursively to determine the most appropriate subarea within the chosen area until we reach a leaf node of the agent's environment tree. In the example above, the result of this traversal is \gentxt{The Lin family’s house: garden: house garden}. Finally, we use traditional game path algorithms to animate the agent's movement so that it travels to the location indicated by the leaf node.
+
+When an agent executes an action on an object, we prompt the language model to ask what happens to the state of the object. For example, if Isabella's generative agent outputs the action ``making espresso for a customer'', a query to the language model indicates in response that the state of the coffee machine in Hobbs Cafe should change from ``off'' to ``brewing coffee''.

@@ -7,13 +7,70 @@ sidebar_position: 4
 This is the literature-translation spec.
 
 External references are useful, but they are not product specs. Every reference
-must be translated through the project's Soul-grounded social-simulation goal.
+must be translated through the project's advisory social-material WAM direction
+and Soul-grounded social-simulation goal.
 
 For each paper, ask two questions:
 
 1. What mechanism does this teach?
-2. How should that mechanism be adapted to Soul-grounded Minecraft social
-   simulation?
+2. How should that mechanism be adapted to advisory social-material consequence
+   prediction in Soul-grounded Minecraft social simulation?
+
+Do not treat "verified actions", logs, screenshots, or deterministic scoring as
+the novelty of a reference adaptation. Verification is expected hygiene. The
+active question is whether the reference helps define, predict, collect, score,
+or improve social-material transitions.
+
+## WAM And World-Model References
+
+### World Action Models
+
+Mechanism:
+
+- distinguish reactive action selection from consequence prediction;
+- predict a future state or delta coupled to an action;
+- separate prediction accuracy from acting success.
+
+Adaptation:
+
+- instantiate the future state as typed Minecraft/social state, not pixels;
+- keep the WAM advisory: it predicts physical, material, and social deltas but
+  never selects the executed action or overrides runtime checks;
+- score predicted deltas against observed transition rows.
+
+### VLA And Visual-Policy Minecraft Systems
+
+References: VPT, STEVE-1, GROOT, ROCKET, JARVIS-VLA, MineStudio visual-policy
+assets.
+
+Mechanism:
+
+- camera/button or visual-policy action learning;
+- dataset, reset, callback, and manifest discipline;
+- competence gates and visual review support.
+
+Adaptation:
+
+- use these systems as contrast classes or data/benchmark references;
+- do not make keyboard/mouse imitation the default action space;
+- keep this repo's WAM action altitude at Mineflayer-backed typed actions and
+  action skills unless a future experiment explicitly studies low-level action.
+
+### Social World Models
+
+Mechanism:
+
+- structured social-state prediction;
+- explicit distinction between being a strong actor and being a good world
+  model.
+
+Adaptation:
+
+- turn social-state predictions into Minecraft social-material deltas such as
+  possession, access, obligation, trust/friction category, and future action
+  opportunity;
+- avoid LLM-judge social truth as a primary label;
+- use social constructs as prediction targets, not as role-play flavor.
 
 ## Minecraft And Embodied Agent References
 
@@ -121,8 +178,8 @@ Mechanism:
 
 Adaptation:
 
-- improve Minecraft primitive UX, verifier diagnostics, and context packets
-  before increasing provider authority.
+- improve Minecraft primitive UX, runtime diagnostics, transition logging, and
+  context packets before increasing provider authority.
 
 ### Codex-Style Tool Runtime
 
@@ -142,10 +199,10 @@ Adaptation:
 - expose Minecraft primitives and actor-owned action skills through an
   `action_surface` packet;
 - keep direct/deferred affordance exposure separate from domain strategy;
-- use pre/post action hooks and verifier artifacts to explain success, partial
-  progress, blockers, and unsafe attempts;
+- use pre/post action hooks and artifacts to explain success, partial progress,
+  blockers, unsafe attempts, and transition rows;
 - do not translate "house-building MCP demo" into core architecture. Translate
-  it into better tool descriptions, schemas, hooks, and verifier evidence.
+  it into better tool descriptions, schemas, hooks, and observed-delta records.
 
 ## Social Simulation And Persona References
 
@@ -275,3 +332,7 @@ Adaptation:
 If applying a reference would make the actor ignore Soul/LifeGoal continuity,
 relationships, obligations, or social consequences in favor of generic
 task-completion performance, reject that application or reframe it.
+
+If applying a reference would make verification or evidence collection the
+headline rather than a support layer for social-material prediction, reject that
+framing or demote it to methodology.

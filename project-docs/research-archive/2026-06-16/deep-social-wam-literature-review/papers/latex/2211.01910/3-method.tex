@@ -1,0 +1,119 @@
+\workshopexclude{\section{Natural Language Program Synthesis using LLMs}}
+\workshoponly{\section{Method in Detail}}
+
+% \workshopexclude{
+% \begin{figure}
+%   \centering
+%   \vspace{-0.1in}
+%   \includegraphics[width=0.8\linewidth]{figures/illustration/APE_pipeline.pdf}
+%   \caption{Our method, \textbf{Automatic Prompt Engineer (APE)}, automatically generates instructions for a task that is specified via output demonstrations: it generates several instruction candidates, either via direct inference or a recursive process based on semantic similarity, executes them using the target model, and selects the most appropriate instruction based on computed evaluation scores.}\label{fig:pipline}
+% \end{figure}
+% }
+
+We consider a task specified by a dataset $\trainingData = \{(\demoQ, \demoA)\}$ of input/output demonstrations sampled from population $\mathcal{X}$, and a prompted model $\M$. 
+The goal of natural language program synthesis is to find a single instruction $\instruction$ such that, when $\M$ is prompted with the concatenation $[\instruction ; \demoQ]$ of instruction and a given input, $\M$ produces the corresponding output $\demoA$. More formally, we frame this as an optimization problem, where we seek instruction $\instruction$ that maximizes the expectation of some per-sample score $f(\instruction, \demoQ, \demoA)$ over possible $(\demoQ, \demoA)$:
+\begin{equation}\label{eq:score}
+\instruction^{\star} = \argmax_\instruction f(\instruction) =  \argmax_\instruction \expectation{(\demoQ, \demoA)}{f(\instruction,\demoQ, \demoA)}
+\end{equation}
+Note that in general, $\demoQ$ may be the empty string, such that we are optimizing $\instruction$ as a prompt that directly produces outputs $\{A\}$.
+While this task has been widely attempted by humans, we have little knowledge of how compatible any particular instruction is with model $\M$. Thus, we propose to treat this human-intractable question as a black-box optimization process guided by LLMs. 
+Our algorithm, APE, uses LLMs in each of two key components, proposal and scoring. As shown in Figure \ref{fig:highlight} and summarized in Algorithm \ref{alg:ape}, APE first proposes a few candidate prompts, and then filters/refines the candidate set according to a chosen score function, ultimately choosing the instruction with the highest score. We discuss options for proposal and scoring next. 
+
+% \newcommand{\algspacer}{\hspace{1em}}
+% \begin{algorithm}[tb]\small
+%     % \vspace{-0.15in}
+%     \caption{Automatic Prompt Engineer (APE)}\label{alg:ape}
+%     \begin{algorithmic}
+%         \STATE {\bfseries Require:} $\trainingData \gets \{(\demoQ, \demoA)\}_n$: training examples, $f:\instruction\times\mathcal{D} \mapsto \mathbb{R}$: score function
+%         % , $k$: \% of proposals to keep
+%     \end{algorithmic}
+%     \begin{algorithmic}[1]
+%         \STATE Use LLM to sample instruction proposals $\ \proposal \gets \{\instruction_1, ..., \instruction_m\}$. (See Section~\ref{subsec:initialU})
+%         \WHILE{not converged}
+%         \STATE Choose a random training subset $\widetilde{\mathcal{D}}_\textrm{train} \subset \trainingData$. 
+%         % \STATE Update the number of proposals to keep $k \gets \lceil k/2 \rceil$
+%         \FORALL{$\instruction$ in $\proposal$}
+%             \STATE Evaluate score on the subset $\widetilde{s} \gets f(\instruction, \widetilde{\mathcal{D}}_\textrm{train})$ (See Section~\ref{sec:score_function} )
+%         \ENDFOR
+%         \STATE Filter the top k\% of instructions with high scores $\proposal_k \subset \proposal$ using $\{\widetilde{s}_1, ..., \widetilde{s}_m\}$
+%         \STATE Update instructions $\proposal \gets  \proposal_k$ or use LLM to resample $\proposal \gets \text{resample} ( \proposal_k )$ (See Section~\ref{sec:iterative}) 
+%         \ENDWHILE
+%     \end{algorithmic}
+%     \begin{algorithmic}
+%         \STATE {\bfseries Return} instruction with the highest score $\instruction^{\star} \gets \arg\max_{\instruction \in \proposal_k} f(\instruction, \trainingData)$
+%     \end{algorithmic}
+% \end{algorithm}
+
+\subsection{Initial Proposal Distributions}\label{subsec:initialU}
+Due to the infinitely large search space, finding the right instruction can be extremely difficult, which has rendered natural language program synthesis historically intractable. Recent progress in NLP has shown language models are very good at generating diverse natural language text. Therefore, we consider leveraging a pretrained LLM to propose a good set $\proposal$ of candidate solutions that will guide our search procedure. While random samples from LLMs are unlikely to produce the desired ($\demoQ, \demoA$) pairs, we can instead ask the LLM to approximately infer the most likely instructions with a high score, given the input/output demonstrations; i.e., to approximately sample from $P(\instruction\given\trainingData,\ f(\instruction)\textrm{ is high})$.
+
+\begin{wrapfigure}{R}{0.3\textwidth}
+\centering
+\vspace{-0.1in}
+\includegraphics[width=0.275\textwidth]{figures/illustration/template_combined.pdf}
+\caption{Prompts for LLMs}
+\vspace{-0.35in}
+\label{fig:llm_template}
+\end{wrapfigure}
+
+\newcommand{\algspacer}{\hspace{1em}}
+\begin{algorithm}[tb]\small
+    % \vspace{-0.15in}
+    \caption{Automatic Prompt Engineer (APE)}\label{alg:ape}
+    \begin{algorithmic}
+        \STATE {\bfseries Require:} $\trainingData \gets \{(\demoQ, \demoA)\}_n$: training examples, $f:\instruction\times\mathcal{D} \mapsto \mathbb{R}$: score function
+        % , $k$: \% of proposals to keep
+    \end{algorithmic}
+    \begin{algorithmic}[1]
+        \STATE Use LLM to sample instruction proposals $\ \proposal \gets \{\instruction_1, ..., \instruction_m\}$. (See Section~\ref{subsec:initialU})
+        \WHILE{not converged}
+        \STATE Choose a random training subset $\widetilde{\mathcal{D}}_\textrm{train} \subset \trainingData$. 
+        % \STATE Update the number of proposals to keep $k \gets \lceil k/2 \rceil$
+        \FORALL{$\instruction$ in $\proposal$}
+            \STATE Evaluate score on the subset $\widetilde{s} \gets f(\instruction, \widetilde{\mathcal{D}}_\textrm{train})$ (See Section~\ref{sec:score_function} )
+        \ENDFOR
+        \STATE Filter the top k\% of instructions with high scores $\proposal_k \subset \proposal$ using $\{\widetilde{s}_1, ..., \widetilde{s}_m\}$
+        \STATE Update instructions $\proposal \gets  \proposal_k$ or use LLM to resample $\proposal \gets \text{resample} ( \proposal_k )$ (See Section~\ref{sec:iterative}) 
+        \ENDWHILE
+    \end{algorithmic}
+    \begin{algorithmic}
+        \STATE {\bfseries Return} instruction with the highest score $\instruction^{\star} \gets \arg\max_{\instruction \in \proposal_k} f(\instruction, \trainingData)$
+    \end{algorithmic}
+\end{algorithm}
+
+\paragraph{Forward Mode Generation} We consider two approaches to generate high-quality candidates from $P(\instruction\given\trainingData,\ f(\instruction)\textrm{ is high})$. First, we adopt an approach based on ``forward'' mode generation by translating this distribution $P(\instruction\given\trainingData,\ f(\instruction)\textrm{ is high})$ into words. For example, in our instruction induction experiments (Subsection \ref{sec:inst_induct}), we follow \citet{honovich2022instruction} and prompt the LLM using Figure \ref{fig:llm_template} (Top). %In this case, the template suggests the outputs are generated based on the instruction, so that the score functions considered will be high. 
+
+\paragraph{Reverse Mode Generation} Although the ``forward'' model works out of the box for most of the pretrained LLMs, translating $P(\instruction\given\trainingData,\ f(\instruction)\textrm{ is high})$ into words requires custom engineering across different tasks. This is because while instructions are typically found in the beginning of passages, the ``forward'' model only generates text from left to right, which requires the instruction to be predicted at the end of the prompt. Therefore, we desire a more flexible approach such that the instruction can be anywhere in the text. To address this, we consider ``reverse'' mode generation, which uses an LLM with infilling capabilities---e.g., T5~\citep{raffel2020exploring}, GLM \citep{du2022glm}, and InsertGPT~\citep{bavarian2022efficient}---to infer the missing instructions. Our ``reverse'' model directly samples from $P(\instruction\given\trainingData,\ f(\instruction)\textrm{ is high})$ by filling in the blank. We show an example of the such template in Figure \ref{fig:llm_template} (Middle).
+
+\paragraph{Customized Prompts} Note that depending on the score function being used, there may exist more appropriate prompts than the samples above. For example, in our TruthfulQA experiments, we start with the human-designed instructions from the original dataset~\citep{lin2022truthfulqa} and ask the the ``reverse'' model to propose initial instruction samples that fit the missing context (Figure \ref{fig:llm_template} (Bottom)). 
+
+\subsection{Score Functions} \label{sec:score_function}
+To cast our problem as black-box optimization, we choose a score function that accurately measures the alignment between the dataset and the data the model generates. In our instruction induction experiments, we consider two potential score functions, described below. In the TruthfulQA experiments, we focused primarily on automated metrics proposed in \citet{lin2022truthfulqa}, similar to the execution accuracy. In each case, we evaluate the quality of a generated instruction using Equation (\ref{eq:score}), and take the expectation over a held-out test dataset $\testData$.
+
+\paragraph{Execution accuracy} First, we consider evaluating the quality of an instruction $\instruction$ using the execution accuracy metric proposed by \citet{honovich2022instruction}, which we denote as $\fexec$. In most cases, execution accuracy is simply defined as the 0-1 loss, $f(\instruction, \demoQ, \demoA) = \mathbb{1}\left[\M([\instruction ; \demoQ]) = \demoA\right]$. On some tasks, execution accuracy takes into account invariants; e.g., it may be an order invariant set matching loss, as described in Appendix A of \citet{honovich2022instruction}.  
+
+\paragraph{Log probability} We further consider a softer probabilistic score function, which we hypothesize might improve optimization by providing a more fine-grained signal when searching over low-quality instruction candidates. In particular, we consider the log probability of the desired answer given the instruction and question under the target model $\M$, which on a per sample basis, is $\log P(\demoA\given[\instruction ; \demoQ])$.
+
+\paragraph{Efficient score estimation}
+Estimating the score by computing the score over the entire training dataset for all instruction candidates can be expensive. To reduce the computation cost, we adopt a filtering scheme where a promising candidate receives more computation resources while a low-quality candidate receives less computation. 
+It can be achieved by using a multi-stage computation strategy on lines 2-9 Algorithm \ref{alg:ape}. We first evaluate all candidates with a small subset of the training dataset. For the candidates with a score greater than a certain threshold, we sample and evaluate a new non-overlapping subset from the training dataset to update the moving average of the score. 
+Then, we repeat this process until a small set of candidates is left, which are evaluated on the entire training dataset. 
+This adaptive filtering scheme significantly improves the computation efficiency by keeping the exact computation costs for the high-quality samples and drastically reducing the computation costs for low-quality candidates. 
+We note that a similar score estimation scheme has been used in previous works \citep{li2022competition, maclaurin2015firefly}.
+
+\subsection{Iterative Proposal Distributions}\label{sec:iterative}
+Despite our attempt to directly sample high-quality initial instruction candidates, it could be the case that the method described in Subsection \ref{subsec:initialU} fails to produce a good proposal set $\proposal$, either because it lacks of diversity or does not contain any candidates with a suitably high score. In case of such challenges, we explore an iterative process for resampling $\proposal$.
+
+\begin{wrapfigure}{R}{0.3\textwidth}
+\centering
+\vspace{-0.1in}
+\includegraphics[width=0.275\textwidth]{figures/illustration/template_resample.pdf}
+\caption{Resampling}
+\vspace{-0.15in}
+\label{fig:template_resampling}
+\end{wrapfigure}
+
+\paragraph{Iterative Monte Carlo Search}
+Instead of only sampling from the initial proposal, we consider exploring the search space locally around the current best candidates. This allows us to generate new instructions that are more likely to be successful. We call this variant \textit{iterative \algname}. 
+At each stage, we evaluate a set of instructions and filter out candidates with low scores. Then, an LLM is asked to generate new instructions similar to those with high scores. We provide the prompt used for resampling in Figure \ref{fig:template_resampling}. 
+Figure \ref{fig:main-posterior} (Right) shows that although this approach improves the overall quality of the proposal set $\proposal$, the highest scoring instruction tends to remain the same with more stages. We conclude iterative generation provides marginal improvement over the relative simplicity and effectiveness of the generative process described in Subsection \ref{subsec:initialU}. Therefore, we use \algname~without iterative search as default unless otherwise stated.

@@ -1,0 +1,48 @@
+\ifonecolumn
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.6\columnwidth]{figures/intro_cropped.png}
+    \caption{A state-of-the-art RM on RewardBench (\texttt{Skywork/Skywork-Reward-Gemma-2-27B-v0.2}) drastically changes its assigned rewards and flips its preference when only a few (\textbf{bolded}) words in the input change. Explicitly regularizing RMs during training (\S\ref{sec:training}) improves its robustness and maintains the preference. The rewards are normalized into $[0, 1]$.
+    \iflongversion
+    The example is taken from RewardBench and originally from \citet{zeng2024evaluating}.
+    \fi
+    }
+    \label{fig:intro}
+\end{figure}
+\fi
+
+\section{Introduction}
+
+Reward models (RMs) have recently seen much increased usage, both for scalably evaluating large models~\citepia{bai2022training,wu2023finegrained,dong2023raft} and as a component in language model (LM) alignment~\citepia{ouyang2022training,dong2023raft,yuan2024selfrewarding,ankner2024critiqueoutloudrewardmodels}.
+Existing RMs obtain impressive performance on standard benchmarks, e.g. obtaining $\ge95\%$ accuracy on RewardBench~\citep{lambert2024rewardbenchevaluatingrewardmodels}.
+
+However, benchmarks can often become a target for over-optimization, and many  state-of-the-art (SOTA) ML models perform worse when the evaluation benchmark is
+\iflongversion
+re-collected following the same protocol,
+\else
+re-collected,
+\fi
+such as in \citet{zhang2024a} for GSM8k~\citep{cobbe2021trainingverifierssolvemath} and in \citet{pmlr-v97-recht19a} for ImageNet~\citep{imagnet}.
+Similarly, minor input transformations can cause severe model degradations, such as in \citet{wang2021adversarial} for the GLUE benchmark~\citep{wang-etal-2018-glue} and in \citet{Jin_Jin_Zhou_Szolovits_2020} for sentiment analysis and NLI.
+This is particularly concerning for RMs: in alignment and inference-time search methods, policies are optimized against an RM; so any spurious correlation captured by the RM can lead to, or exacerbate, reward hacking, 
+ostensibly increasing rewards but in fact hurting quality.
+
+\ifonecolumn
+\else
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=\columnwidth]{figures/intro_cropped.png}
+    \caption{A state-of-the-art RM on RewardBench (\texttt{Skywork/Skywork-Reward-Gemma-2-27B-v0.2}) drastically changes its assigned rewards and flips its preference when only a few (\textbf{bolded}) words in the input change. Explicitly regularizing RMs during training (\S\ref{sec:training}) improves its robustness and maintains the preference. The rewards are normalized into $[0, 1]$. The example is taken from RewardBench and originally from \citet{zeng2024evaluating}.}
+    \vspace{-5mm}
+    \label{fig:intro}
+\end{figure}
+\fi
+
+This work investigates the robustness of SOTA RMs.
+We propose \benchmark, a benchmark consisting of instances from the original RewardBench altered with diverse meaning- or ranking-preserving transformations that are carefully categorized.
+We show that top-performing RMs on RewardBench are brittle: they substantially degrade in performance under such transformations, in many cases leading to below-random ($<50\%$) accuracy.
+For example, in Figure~\ref{fig:intro}, the RM preference flips after a few input words are changed even when the meaning is identical; and in Figure~\ref{fig:pretrained-rms-controlled-full}, by merely altering the answer format for mathematical problems, RM ranking accuracy can drop from $>95\%$ to $73\%$.
+
+We propose a simple method for improving RM robustness by regularizing the score similarity between original and paraphrased inputs.
+We show that such a regularized RM is not only more robust to paraphrasing but the robustness also generalizes to other distinct transformations that it has never been trained on.
+More importantly, we demonstrate that regularized RMs also provide downstream utility in alignment, enabling better outputs.

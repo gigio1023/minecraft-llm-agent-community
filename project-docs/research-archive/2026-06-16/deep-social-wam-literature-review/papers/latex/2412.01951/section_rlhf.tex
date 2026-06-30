@@ -1,0 +1,267 @@
+
+We now turn our attention to theoretical guarantees for the \rlhfalg
+algorithm family, which uses tools from reinforcement learning to optimize
+the self-reward function. When specialized to \mlsharp, the  RL
+objective used by \rlhfalg takes the form \iclr{$  \pihat \approx \argmax_{\pi\in\Pi}\crl*{
+  \En_{\pi}\brk*{\log\piref(y\mid{}x)}
+  -\beta\Dkl{\pi}{\piref}
+  }$}
+\arxiv{\begin{align}
+  \label{eq:ml_rlhf}
+  \pihat \approx \argmax_{\pi\in\Pi}\crl*{
+  \En_{\pi}\brk*{\log\piref(y\mid{}x)}
+  -\beta\Dkl{\pi}{\piref}
+  }
+\end{align}}
+for $\beta>0$. The exact optimizer $\pistarb = \argmax_{\pi\in\Pi}\crl*{
+  \En_{\pi}\brk*{\log\piref(y\mid{}x)}
+  -\beta\Dkl{\pi}{\piref}
+}$ for this objective has the form $
+\pistarb(y\mid{}x)\propto\piref^{1+\beta^{-1}}(y\mid{}x)$,  which converges to a sharpened model (per \cref{def:sharpening}) as $\beta\to{}0$.\loose
+
+
+The key challenge we encounter in this section is the mismatch between the RL reward $\log \pibase(y \mid x)$ and the sharpening desideratum $\pihat(\Ystar(x) \mid x)$. For example, suppose a unique argmax---say, $y^\star(x)$---and second-to-argmax---say, $y'(x)$---are nearly as likely under $\pibase$. Then the RL reward $\E_{\pihat}[\log \pibase(y \mid x)]$ must be optimized to extremely high precision before $\pihat$ can be guaranteed to distinguish the two. To quantify this effect, we introduce a 
+\emph{margin condition}. 
+\begin{assumption}[Margin]
+  \label{ass:hard_margin}
+  For a margin parameter $\gammargin>0$, the base model $\piref$ satisfies
+  \[
+    \max_{y\in\cY}\piref(y\mid{}x) \geq{}(1+\gammargin)\cdot\piref(y'\mid{}x)\quad\forall{}y'\notin\Ystar(x),\quad\forall{}x\in\supp(\mu).
+  \]%
+  \iclr{\vspace{-5pt}}
+\end{assumption}
+\sftalg does not suffer from the pathology in the example above, because once $y^\star(x)$ and $y'(x)$ are drawn in a batch of $N$ responses, we have $\ybon_i = y^\star(x_i)$ regardless of margin. However, as we shall show in \Cref{sec:benefits_exploration}, the \rlhfalg algorithm is amenable to online exploration, which may improve dependence on other problem parameters.
+
+
+
+
+\subsubsection{Guarantees for \rlhfalg with Direct Preference Optimization}
+
+The first of our theoretical results for \rlhfalg takes an
+offline reinforcement learning approach, whereby we implement
+\cref{eq:rlhf} using a reward-based variant of Direct Preference
+Optimization (DPO) \citep{rafailov2024direct,gao2024rebel}. Let $\cDpref=\crl*{(x,y,y')}$ be a dataset of $n$ examples sampled via
+$x\sim\cdist$, $y,y'\sim\piref(y\mid{}x)$. For a parameter $\beta>0$, we \arxiv{consider the algorithm
+that solves}\iclr{solve $\pihat\in \argmin_{\pi\in\Pi}$\loose}
+\begin{small}
+  \begin{align}
+    \label{eq:dpo_ml}
+    \arxiv{\pihat\in \argmin_{\pi\in\Pi}}\sum_{(x,y,y')\in\cDpref}\prn*{
+    \beta\log\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}-\beta\log\frac{\pi(y'\mid{}x)}{\piref(y'\mid{}x)}
+    - \prn*{\log\piref(y\mid{}x)-\log\piref(y'\mid{}x)}
+    }^2.
+  \end{align}%
+\end{small}%
+
+\paragraph{Assumptions}
+Per 
+\iftoggle{workshop}{\cite{rafailov2024direct}}{\citet{rafailov2024direct}}, the solution to \cref{eq:dpo_ml} coincides
+with that of \cref{eq:ml_sharpening} asymptotically. To provide
+finite-sample guarantees, we make a number of statistical
+assumptions. First, we make a natural realizability assumption (e.g., \iftoggle{workshop}{\cite{zhu2023principled,xie2024exploratory}}{\citet{zhu2023principled,xie2024exploratory}}).
+\begin{assumption}[Realizability]
+  \label{ass:realizability_dpo}
+  The model class $\Pi$ satisfies $\pistarb\in\Pi$.\footnote{See \Cref{rmk:realizability} for a discussion of this assumption.}
+\end{assumption}
+Next, we define two concentrability coefficients for a
+model $\pi$:
+\begin{align}
+  \label{eq:conc}
+  \cC_{\pi} = \En_{\pi}\brk*{\frac{\pi(y\mid{}x)}{\piref(y\mid{}x)}},
+  \mathand
+\Cpp{\pi}{\pi'}\ldef{}\En_{\pi}\brk*{\prn*{\frac{\pi(y\mid{}x)}{\pi'(y\mid{}x)}}^{\beta}}.
+\end{align}
+The following result shows that both coefficients are bounded for the
+KL-regularized model $\pistarb$.
+\begin{lemma}
+  \label{lem:conc_bound}
+  The model $\pistarb$ satisfies $\cC_{\pistarb} \leq \Cstar$ and $\Cpp{\piref}{\pistarb} \leq{} \abs*{\cY}$.
+\end{lemma}
+Motivated by this result, we assume the coefficients in \cref{eq:conc}
+are bounded for all $\pi\in\Pi$.
+\begin{assumption}[Concentrability]
+  \label{ass:conc-closs}
+  All $\pi\in\Pi$ satisfy
+  $\cC_{\pi} \leq \Cconc$
+  for a parameter $\Ccon \geq \Cstar$, and
+  $\Cpp{\piref}{\pi} \leq \Closs$
+  for a parameter $\Closs \geq \abs{\cY}$.
+\end{assumption}
+By \cref{lem:conc_bound}, this assumption is consistent with
+\cref{ass:realizability_dpo} for reasonable bounds on $\Cconc$ and
+$\Closs$; note that our sample complexity bounds will only incur logarithmic dependence on $\Closs$.
+
+
+
+\paragraph{Main result}
+Our sample complexity guarantee for \rlhfalg (via \cref{eq:dpo_ml})
+is as follows.\loose
+      \begin{theorem}
+        \label{thm:dpo}
+        Let $\eps,\delta,\deltaf\in(0,1)$ be given. Set
+        $\beta\approxleq\gammargin\delta\eps$, and suppose that
+        \cref{ass:realizability_dpo,ass:conc-closs,ass:hard_margin} hold with parameters
+        $\Cconc$, $\Closs$, and $\gammargin>0$. For an appropriate
+        choice for $n$, the DPO algorithm (\cref{eq:dpo_ml}) ensures that with
+        probability at least $1-\deltafail$, $                    \bbP_{x\sim\cdist}\brk*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}
+        \leq \eps$, and has sample complexity
+       \begin{align}
+          m = \bigoht\prn*{\frac{\Cconc\log^{3}(\Closs\abs{\Pi}\deltafail^{-1})}{\gammargin^2\delta^2\eps^2}}.
+        \end{align}
+      \end{theorem}
+Compared to the guarantee for \bestofnalg, \rlhfalg learns
+a sharpened model with 
+the same dependence on the accuracy $\eps$\abedit{, but a worse dependence on $\delta$; as we primarily consider $\delta$ constant (cf. \Cref{prop:greedy}), we view this as relatively unimportant. We further remark that \rlhfalg uses $N=2$ responses per
+prompt, while \sftalg uses many ($N\approx \Cstar/\eps$) responses but fewer prompts. Other \arxiv{notable }differences include:\loose}
+\begin{itemize}
+  \item \rlhfalg requires the margin condition in
+  \cref{ass:hard_margin}, and has sample complexity scaling with
+  $\gammargin^{-1}$. We believe this dependence is natural for
+  algorithms based on reinforcement learning, as it relates suboptimality with respect to the reward
+  function $\rself(y\mid{}x)=\log\piref(y\mid{}x)$ (i.e.,
+  $\En_{x\sim\mu}\brk*{\max_{y\in\cY}\log\piref(y\mid{}x)-\En_{y\sim\pihat(x)}\brk*{\log\piref(y\mid{}x)}}\leq\eps$,
+  the objective minimized by reinforcement learning)
+  to approximate sharpening error $\bbP_{x\sim\cdist}\brk*{\pihat(\Ystar(x)\mid{}x)\leq{}1-\delta}$. However, it is not clear if the precise dependence we pay is necessary. %
+\item \rlhfalg requires a bound on the uniform coverage parameter
+  $\Cconc$, which is larger than the parameter $\Cstar$ required by
+  \bestofnalg in general. We expect that this assumption can be
+  removed by incorporating pessimism in the vein of
+  \citep{liu2024provably,huang2024correcting}. Also,
+  \rlhfalg requires a bound on the parameter $\Closs$. This grants
+  control over the range of the reward function
+  $\log\piref(y\mid{}x)$, which can otherwise be unbounded. Since the
+  dependence on $\Closs$ is only logarithmic, we view this as fairly
+  mild. Overall, the guarantee in \cref{thm:dpo} may be somewhat
+  pessimistic; it would be interesting if the result can be improved %
+  to match the sample complexity
+  of \bestofnalg.
+\end{itemize}
+ \arxiv{\dfc{Expand into longer remark on tradeoffs of $N$ vs $n$?}}
+
+
+
+
+
+
+
+\subsubsection{Benefits of Exploration}\label{sec:benefits_exploration}
+The sample complexity guarantees in \cref{thm:dpo} scale with the
+coverage parameter $\Cstar = \En[1/\piref(\Ystar(x)|x)]$, which in
+general is unavoidable in the sample-and-evaluate framework via our lower bound,~\cref{thm:lower}. Although $\Cstar$ is a problem-dependent parameter, in the worst case it can be as large as $\abs{\cY}$ (which is exponential in sequence length for autoregressive models). 
+Fortunately, unlike
+\bestofnalg, the \rlhfalg objective \eqref{eq:rlhf} is amenable to RL algorithms employing
+active exploration, leading to improved sample complexity when the class $\Pi$ has additional structure. \loose
+
+Our below guarantees for \rlhfalg replace the assumption of bounded coverage
+with boundedness of a structural parameter for the model class
+$\Pi$ known as the ``sequential extrapolation coefficient'' (SEC)
+\citep{xie2023role,xie2024exploratory}, which we denote by $\SEC(\Pi)$. The formal definition is 
+deferred to \cref{sec:proofs_exploration}. Conceptually,
+$\SEC(\Pi)$ may thought of as a generalization of the eluder dimension
+\citep{russo2013eluder,jin2021bellman}.  
+It can always be bounded by the coverability coefficient of the model
+class \citep{xie2024exploratory} and can be as large as $\Ccon$ in the worst case, so that bounds based on the SEC reflect improvements that are possible in favorable instances. 
+
+
+Beyond boundedness of the SEC, we require a bound on the range of the log-probabilities of $\piref$.\loose
+\begin{assumption}[Bounded log-probabilities]\label{assumption:xpo-bdr}
+For all $\pi \in \Pi$, $(x,y) \in \MX\times \MY$, $\abs[\big]{\log \frac{1}{\piref(y|x)}} \leq \Rmax$.\loose
+\end{assumption}
+\dfedit{We expect that the dependence on $\Rmax$ in our result can be
+  replaced with $\log(\Closs)$ (\cref{ass:conc-closs}), but we omit
+  this extension to simplify presentation.
+  }
+
+  We appeal to (a slight modification of)  \xpo, an iterative  language model alignment algorithm  due to
+\cite{xie2024exploratory}. \xpo{} is based on the objective in
+\cref{eq:dpo_ml}, but unlike DPO,  incorporates a bonus term to
+encourage exploration to leverage \textbf{online} interaction. See \cref{sec:proofs_exploration} for a
+detailed overview.
+  
+
+
+
+\arxiv{\paragraph{Main result}}
+
+\arxiv{The main guarantee for \rlhfalg with \xpo is as follows.}{}
+
+
+\begin{theorem}[Informal version of \cref{thm:xpo-sharpening-apx}]\label{thm:xpo-sharpening}
+Suppose that \Cref{ass:hard_margin,assumption:xpo-bdr} hold with parameters $\gammargin,\Rmax>0$, and that
+\Cref{ass:realizability_dpo} holds with $\beta 
+= \gammargin/(2\log(2|\MY|/\delta))$. For any $m\in\bbN$ and $\deltafail\in(0,1)$, \xpo
+(\cref{alg:xpo}), when configured appropriately, produces an
+$(\eps,\delta)$-sharpened model $\pihat \in \Pi$ with probability at
+least $1-\deltafail$, and uses sample complexity\footnote{Technically, \cref{alg:xpo} operates in a slight generalization of the sample-and-evaluate framework (\cref{def:oracle-model}), where the algorithm is allowed to query $\piref(y\mid{} x)$ for arbitrary $x,y$. We expect that our lower bound (\cref{thm:lower}) can be extended to to show that dependence on $\Cstar$ is necessary in the worst case even in this more general framework. \cref{alg:xpo} is fundamentally using additional instance-dependent structure (via the SEC) to avoid dependence on the coverage parameter, $\Cstar$.} \[m = \bigoht\prn*{\frac{\SEC(\Pi)\cdot{}\log(\abs{\Pi}\deltafail^{-1})}{\gammargin^2\delta^2\eps^2}}.\]
+
+\end{theorem}
+The takeaway from \cref{thm:xpo-sharpening} is that there is no
+dependence on the coverage coefficient for $\piref$. Instead,
+the rate depends on the complexity of exploration, as governed by the
+sequential extrapolation coefficient $\SEC(\Pi)$. \arxiv{We emphasize that while we
+present guarantees for \xpo under the \arxiv{sequential extrapolation
+coefficient}\iclr{SEC} for concreteness, we}\iclr{We} expect similar guarantees can
+derived for other active exploration algorithms and complexity
+measures \citep{jiang2017contextual,foster2021statistical,jin2021bellman,xie2023role}.\loose
+
+
+\arxiv{
+\paragraph{Example: Linearly parameterized models}
+As a stylized example of a model class $\Pi$ where active exploration
+dramatically improves the sample complexity of sharpening, we consider
+the class $\Pi_{\phi,B}$ of linear softmax models. This class
+consists of models of the form \iclr{$\pi_\theta(y\mid{}x) \propto \exp(\langle
+  \phi(x,y),\theta\rangle)$,}
+\arxiv{\begin{align}
+\pi_\theta(y\mid{}x) \propto \exp(\langle
+  \phi(x,y),\theta\rangle),\label{eq:softmax}
+       \end{align}
+       }
+where $\theta\in\bbR^{d}$ is a parameter vector with $\norm{\theta}_2
+\leq B$, and $\phi(x,y)\in\bbR^{d}$ is a known feature map with
+$\nrm*{\phi(x,y)}\leq{}1$. The sequential extrapolation coefficient
+for this class can be bounded as $\SEC(\Pi)=\wt O(d)$, and the optimal
+KL-regularized model $\pistarb$ is a linear softmax model (i.e.,
+$\pistarb\in\Pi$) whenever the base model $\piref$ is itself a linear
+softmax model. This leads to the following result.
+
+
+\begin{theorem}\label{thm:xpo-softmax}
+  Fix $\epsilon,\delta,\deltafail \in (0,1)$ and $B>0$. Suppose that (i) $\piref = \pi_{\theta^\star}$ is a
+  linear softmax model with $\norm{\theta^\star}_2 \leq
+  \frac{\gammargin B}{3\log(2|\MY|/\delta)}$; (ii) $\piref$ satisfies
+  \cref{ass:hard_margin} with parameter $\gammargin$. \cref{alg:xpo},
+  with \arxiv{base model $\piref$, }reward function $r(x,y) :=
+  \log \piref(x,y)$, and model class $\Pi_{\phi,B}$, returns an
+  $(\epsilon,\delta)$-sharpened model with
+  \arxiv{probability}\iclr{prob.}\arxiv{ at least} $1-\rho$, and with sample complexity $m=\poly(\epsilon^{-1},\delta^{-1},\gammargin^{-1}, d, B, \log(|\MY|/\deltafail))$.\loose
+\end{theorem}
+Importantly, \cref{thm:xpo-softmax} has no dependence on the coverage
+parameter $\Cstar$, scaling only with the dimension $d$ of the
+softmax model class. \loose
+
+For a quantitative comparison,\arxiv{ we note that even for the simple
+special case of the linear softmax
+model class,} it is straightforward to construct examples of models $\piref$ where
+$\Cstar = \EE[1/\piref(\ystar(x)|x)] \asymp |\MY| \asymp \exp(\Omega(d))$, yet
+\cref{ass:hard_margin} is satisfied with $\gammargin=\Omega(1)$. For such models, \bestofnalg will incur
+$\exp(\Omega(d))$ sample complexity; see \cref{ex:softmax} for details. Hence, \cref{thm:xpo-softmax} represents an \emph{exponential} improvement, obtained by exploiting the structure of the self-reward function in
+a way that goes beyond \bestofnalg.\loose
+
+
+
+\begin{remark}[Non-triviality]
+  \cref{thm:xpo-softmax} is quite stylized in the sense that if the parameter vector $\theta^\star$ of $\piref$ is known, then it
+is trivial to directly compute the parameter vector for the sharpened
+model $\pistarb$ (which corresponds to rescaling $\theta^{\star}$). \cref{alg:xpo} is interesting and
+non-trivial nonetheless because it \emph{does not have explicit knowledge of
+  $\theta^\star$}, as it operates in the sample-and-evaluate oracle
+model (\cref{def:oracle-model}). \arxiv{Moreover, the guarantee generalizes to
+any model class $\Pi$ for which $\SEC(\Pi)$ can be bounded; see \cref{thm:xpo-sharpening-apx} for the formal statement.\loose}
+\end{remark}
+}
+
+
+
+
+

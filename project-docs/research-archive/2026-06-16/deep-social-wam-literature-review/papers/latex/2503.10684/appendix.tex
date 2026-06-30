@@ -1,0 +1,318 @@
+\section{Discussion and Future work}
+\label{sec:discussion}
+
+\paragraph{Computational Cost} 
+Our method takes approximately 1 minute to process a 5-minute video on an NVIDIA RTX 3090Ti, due to the need to predict actions across the entire trajectory. Since data preprocessing is a one-time cost, spending only 1/20 of the video duration with 4 GPUs is acceptable. Also, it is more efficient than those methods relying on human or VLM annotations while ensuring quality.
+
+\paragraph{Failure Case Due to Occasional Assumption Violation}
+Our method is occasionally unstable in action-intensive scenes like combat, where performance drops on task \texttt{combat spiders} (29\% to 20\%). See \cref{app: skill videos} for visualization of this failure case. This is likely due to a violation of \cref{assumption: confidence} (Skill Confidence), as indicated by sharp prediction loss fluctuations. However, such issues are not observed elsewhere. Since overly short segments (<~5 frames) comprise less than 10\% of all videos, overall effectiveness remains unaffected.
+
+\paragraph{Choice of Loss Term}
+Currently our method detects changes in $P(a_t|o_{1:t})$. A possible alternative is to use $P(o_{t+1}|o_{1:t})$. We don't use it because it does not directly reflect skill changes as $P(a_t|o_{1:t})$ does, and current models~\citep{minedreamer} for predicting future observations suffer from hallucinations. We leave the attempt of this alternative to future work.
+
+\paragraph{Scalability and Broader Applicability}
+Since our method is label-free, it has the potential to segment and train on the numerous gameplay trajectories on YouTube. We also anticipate the potential application of our method to other larger datasets and other open-world video games beyond Minecraft.
+
+\section{Proofs}
+In this section, we provide a detailed proof of \cref{thm:non-switching and switching}, regarding the bounds of relative predictive probability under scenarios of skill transition and non-transition. We prove the lower bound and upper bound respectively in the following two subsections. 
+\label{app: proof}
+\subsection{Proof of Upper Bound Under Skill Non-Transition}
+\begin{align*}
+P(\frac{P(a_{t+1}|o_{1:t+1})}{(\prod_{i=1}^t P(a_{i}|o_{1:i}))^{1/t}}>\frac{(K-1)c}{K}) 
+&> P(P(a_{t+1}|o_{1:t+1})>\frac{(K-1)c}{K})
+\\&> P(P(\pi_{t+1}=\pi_{t}|o_{1:t+1})\pi_t(a_{t+1}|o_{1:t+1})>\frac{(K-1)c}{K}) && \text{(\cref{eq:transition}})
+\\&> P(\pi_t(a_{t+1}|o_{1:t+1})>c) && \text{(\cref{assumption: consistency})}
+\\&= P(\pi_{t+1}(a_{t+1}|o_{1:t+1})>c)
+\\&> 1-\delta   && \text{(\cref{assumption: confidence})}
+\end{align*}
+
+\subsection{Proof of Lower Bound Under Skill Transition}
+We first magnify the likelihood ratio between the next action and the average action history,
+\begin{align*}
+\frac{P(a_{t+1}|o_{1:t+1})}{(\prod_{i=1}^t P(a_{i}|o_{1:i}))^{1/t}}
+&< \frac{P(\pi_{t+1}=\pi_t|o_{1:t+1})\pi_t(a_{t+1}|o_{1:t+1}) + P(\pi_{t+1}\ne\pi|o_{1:t+1})}{(\prod_{i=1}^t P(a_{i}|o_{1:i}))^{1/t}} && \text{(\cref{eq:transition})}
+\\&< \frac{P(\pi_{t+1}=\pi_t|o_{1:t+1})\pi_t(a_{t+1}|o_{1:t+1}) + P(\pi_{t+1}\ne\pi|o_{1:i})}{\frac{K-1}{K}(\prod_{i=1}^t\pi_{i-1}(a_{i}|o_{1:i}))^{1/t}} && \text{(\cref{eq:transition} and} \\ & && \text{ \cref{assumption: consistency})}
+\\&< \frac{\pi_t(a_{t+1}|o_{1:t+1})+\frac{1}{K}}{\frac{K-1}{K}(\prod_{i=1}^t\pi_{i-1}(a_{i}|o_{1:i}))^{1/t}}    && \text{(\cref{assumption: consistency})}
+\\&= \frac{K}{K-1}\frac{\pi_t(a_{t+1}|o_{1:t+1})}{\prod_{i=1}^t\pi_{t}(a_{i}|o_{1:i}))^{1/t}} + \frac{1}{(K-1)\prod_{i=1}^t\pi_{i}(a_{i}|o_{1:i}))^{1/t}}
+\\&< \frac{Km}{2(K-1)} + \frac{1}{(K-1)\prod_{i=1}^t\pi_{i}(a_{i}|o_{1:i}))^{1/t}} && \text{(\cref{assumption: deviance})}
+\end{align*}
+Therefore,
+\begin{align*}
+ &P(\frac{P(a_{t+1}|o_{1:t+1})}{(\prod_{i=1}^t P(a_{i}|o_{1:i}))^{1/t}} < \frac{Km}{2(K-1)} + \frac{1}{c(K-1)})
+\\&> P(\frac{Km}{2(K-1)} + \frac{1}{(K-1)\prod_{i=1}^t\pi_{i}(a_{i}|o_{1:i}))^{1/t}}<\frac{Km}{2(K-1)} + \frac{1}{c(K-1)})
+\\&= P(\prod_{i=1}^t\pi_{i}(a_{i}|o_{1:i}))^{1/t} > c)
+\\&> \prod_{i=1}^{t}P(\pi_{i}(a_{i}|o_{1:i}) > c)
+\\&> (1-\delta)^t > 1-t\delta   && \text{(\cref{assumption: confidence})}
+\end{align*}
+
+\section{Minecraft Environment}
+\label{app:minecraft_env}
+Minecraft is an extremely popular sandbox game that allows players to freely create and explore their
+world. This game has infinite freedom, allowing players to change the world and ecosystems through
+building, mining, planting, combating, and other methods. It is precisely because
+of this freedom that Minecraft becomes an excellent AI testing benchmark. In this
+game, AI agents need to face situations that are highly similar to the real world, making judgments
+and decisions to deal with various environments and problems. By using Minecraft, AI researchers can more
+conveniently simulate various complex and diverse environments and tasks, thereby improving the
+practical value and application of AI technology.
+
+Our Minecraft environment is a hybrid between MineRL~\citep{minerl} and the MCP-Reborn (\href{https://github.com/Hexeption/MCP-Reborn}{https://github.com/Hexeption/MCP-Reborn}) Minecraft modding package. Unlike the regular Minecraft game, in which the server (or the "world") always runs at 20Hz while the client’s rendering speed can typically reach 60-100Hz, the frame rate is fixed at 20 fps for the client in our experiments. The action and
+observation spaces in our environment are identical to what a human player can operate and observe on their device when
+playing the game. These details will be further explained in subsequent subsections.
+
+\subsection{Minecraft Game World Setting}
+We choose Minecraft version 1.16.5’s survival mode as our experiment platform. In this mode, the
+agent may encounter situations that result in its death, such as being burned by lava or a campfire, getting killed by hostile
+mobs, or falling from great heights. When this happens, the agent will lose all its items and respawn at a random location
+near its initial spawn point within the same Minecraft world or at the last spot it attempted to sleep. Importantly, even after
+dying, the agent retains knowledge of its previous deaths and can adjust its actions accordingly since there is no masking of
+policy state upon respawn.
+
+\subsection{Observation Space}
+The environmental observation space consists of two parts. The first part is the raw pixels from the
+Minecraft game that players would see, including overlays such as the hotbar, health indicators, and
+animations of a moving hand in response to attack or "use" actions. The rendering resolution of Minecraft is 640x360; however, in our experiments, we resize images to 128x128 for better computational efficiency while maintaining discernibility.
+The second part includes auxiliary information about the agent’s current environment, such as its location and weather conditions.
+Human players can obtain this information by pressing F3. The specific observation details we include
+are shown in \cref{tab:observation_space}. 
+
+\begin{table}[H]
+\centering
+\resizebox{0.8\linewidth}{!}{
+\renewcommand\arraystretch{1.1}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Sources         & Shape       & Description                                                                                                                                                                                                                                                                                                                                \\ \midrule
+pov (raw pixel)             & \makecell[c]{(640, 360, 3) \\ to (128,128,3)} & Ego-centric RGB frames.                                                                                                                                                                                                                                                                                                                    \\ \midrule
+player\_pos     & (5,)        & The coordinates of (x,y,z), pitch, and yaw of the agent.                                                                                                                                                                                                                                                                                   \\ \midrule
+location\_stats & (9,)        & \begin{tabular}[c]{@{}l@{}}The environmental information of the agent's current position, \\ including \texttt{biome\_id}, \texttt{sea\_level}, \texttt{can\_see\_sky}, \texttt{is\_raining} etc.\end{tabular}                                                                                                                                                                 \\ \midrule
+inventory       & (36,)       & \begin{tabular}[c]{@{}l@{}}The items in the current inventory of the agent, including \\ the \texttt{type} and corresponding \texttt{quantity} of each item in each slot. \\ If there is no item, it will be displayed as \texttt{air}.\end{tabular}                                                                                                                \\ \midrule
+equipped\_items & (6,)        & \begin{tabular}[c]{@{}l@{}}The current equipment of the agent, including \texttt{mainhand}, \texttt{offhand}, \\ \texttt{chest}, \texttt{feet}, \texttt{head}, and \texttt{legs} slots. Each slot contains \texttt{type}, \texttt{damage}, \\ and \texttt{max\_damage} information.\end{tabular}                                                                                                                           \\ \midrule
+event\_info     & (5,)        & \begin{tabular}[c]{@{}l@{}}The events that occur in the current step of the game, including \\ \texttt{pick\_up} (picking up items), \texttt{break\_item} (breaking items), \\ \texttt{craft\_item} (crafting items using a crafting table or crafting grid), \\ \texttt{mine\_block} (mining blocks by suitable tools), and \\ \texttt{kill\_entity} (killing game mobs).\end{tabular} \\ \bottomrule
+\end{tabular}}
+\captionsetup{justification=centering}
+\caption{The observation space we use in Minecraft.}
+\label{tab:observation_space}
+\end{table}
+
+During the actual inference process, the controllers (VPT~\citep{vpt}, GROOT~\citep{groot1}, STEVE-1~\citep{steve1}) only perceive
+the raw pixels. The agents (JARVIS-1~\citep{jarvis-1}, OmniJarvis~\citep{omnijarvis}) can access auxiliary information from the environment to generate the text condition of the controller.
+
+\subsection{Action Space}
+Our action space includes almost all actions directly available to human players, such as keypresses,
+mouse movements, and clicks. It consists of two parts: the mouse and the keyboard. When in-game GUIs are not open, the mouse movement is responsible for changing the player’s camera perspective. When a GUI is open, it moves the cursor. The left and
+right buttons are responsible for attacking and using items. The keyboard is mainly responsible for
+controlling the agent’s movement. We use the same joint hierarchical action space as VPT~\citep{vpt}, which combines button space and camera space. Button space encodes all combinations of possible keyboard operations (excluding mutually exclusive actions such as \texttt{forward} and \texttt{back}) and a
+flag indicating whether the mouse is used, resulting in a total of 8461 candidate actions. The camera
+space discretizes the range of one mouse movement into 121 actions. Therefore, the action head of
+the agent is a multi-classification network with 8461 dimensions and a multi-classification network
+with 121 dimensions. We also filter out frames (both the observation and action) with null action as VPT~\citep{vpt}.
+
+In addition, we abstract the crafting and smelting actions with GUI into functional binary actions,
+which are the same as MineDojo (Fan et al., 2022). These advanced actions are only used by the agents (JARVIS-1~\citep{jarvis-1}, OmniJarvis~\citep{omnijarvis}). The detailed action space is described in \cref{tab:action_space}.
+
+\begin{table}[H]
+\centering
+\resizebox{0.8\linewidth}{!}{
+\renewcommand\arraystretch{1.1}
+\begin{tabular}{@{}cccl@{}}
+\toprule
+\textbf{Index} & \textbf{Action}  & \textbf{Human Action} & \textbf{Description}                                                                                                                                                                                                                                                                                             \\ \midrule
+1              & Forward          & key W                 & Move forward.                                                                                                                                                                                                                                                                                                    \\
+2              & Back             & key S                 & Move backward.                                                                                                                                                                                                                                                                                                   \\
+3              & Left             & key A                 & Strafe left.                                                                                                                                                                                                                                                                                                     \\
+4              & Right            & key D                 & Strafe right.                                                                                                                                                                                                                                                                                                    \\
+5              & Jump             & key Space             & Jump. When swimming, keeps the player afloat.                                                                                                                                                                                                                                                                    \\
+6              & Sneak            & key left Shift        & Slowly move in the current direction of movement. \\
+7              & Sprint           & key left Ctrl         & Move quickly in the direction of the current motion.                                                                                                                                                                                                                                                                 \\
+8              & Attack           & left Button     & Destroy blocks (hold down); Attack entity (click once).                                                                                                                                                                                                                                                          \\
+9              & Use              & right Button    & Interact with the block that the player is currently looking at.                                                                                                 \\
+10             & hotbar.{[}1-9{]} & keys 1 - 9            & Selects the appropriate hotbar item.                                                                                                                                                \\
+11             & Yaw              & move Mouse X      & Turning; aiming; camera movement.Ranging from -180 to +180.                                                                                                                                                                                                                                                      \\
+12             & Pitch            & move Mouse Y      & Turning; aiming; camera movement.Ranging from -180 to +180.  \\
+
+\midrule
+
+13             & Equip            & -      & Equip the item in the main hand from the inventory.  \\
+
+14             & Craft            & -      & Execute a crafting recipe to obtain a new item.  \\
+
+15             & Smelt            & -      & Execute a smelting recipe to obtain a new item.  
+
+
+\\ \bottomrule
+\end{tabular}}
+\captionsetup{justification=centering}
+\caption{The action space we use in Minecraft.}
+\label{tab:action_space}
+\end{table}
+
+
+\section{Experiment Details}
+In this section, we provide our experiment details, including benchmark, training details for GROOT and STEVE-1, how we use event-based information as external auxiliary information, and the length pruning algorithm for sub-trajectories.
+\subsection{Minecraft Skill Benchmark}
+\label{app: benchmark}
+MCU~\citep{mcu} is a diverse benchmark that can comprehensively evaluate the mastery of atomic skills by agents in Minecraft. Since our method is an improvement on dataset processing instead of a new model architecture, it cannot help agents learn new skills that they are completely incapable of acquiring previously. Therefore, we choose 10 early game skills from the original benchmark that the original agent can already grasp at a basic level. Besides, we add \texttt{use torch}, which is also a useful skill in Minecraft. We also add \texttt{find and collect wood}, an enhanced version of the skill \texttt{collect wood}, which requires the agent to start from the plains instead of the forest, aiming to test its ability to explore and find trees. 
+
+Details of the 12 skills in our early game benchmark are shown in \cref{table: benchmark}. For each skill, we include the evaluation metric and a brief description of what the skill is. For skills "Sleep" and "Use bow", GROOT performs very well on the original metric, so we design a manual metric that better assesses its actual performance. STEVE-1 can take text as prompts, which are also listed in the table. For some of the skills, it is tricky to find proper text prompts, so we use visual prompts instead.  
+\begin{table}[!ht]
+\renewcommand{\arraystretch}{1.13}
+\centering
+\begin{tabularx}{0.99\linewidth}{@{}>{\centering\arraybackslash}m{1in} >{\centering\arraybackslash}m{2in} >{\centering\arraybackslash}m{2in} >{\centering\arraybackslash}m{1in}@{}}
+\toprule
+\textbf{Skill} & \textbf{Metric} & \textbf{Description}  & \textbf{Text Prompt for STEVE-1} \\ \midrule
+Use furnace  & Craft item cooked mutton  & Given a furnace and some mutton and coal, craft a cooked mutton.  & - \\ \hline
+Hunt Sheep & Kill entity sheep  & Summon some sheep before the agent, hunt the sheep.  & - \\ \hline
+Sleep in bed & \textbf{STEVE-1}: Use item white bed.  \textbf{GROOT}: Sleep in bed properly. & Given a white bed, sleep on it.  & Sleep in bed. \\ \hline
+Use torch & Use item torch & Give some torches, use them to light up an area. Time is set at night. & Use a torch to light up an area. \\ \hline
+Use boat & Use item birch boat & Given a birch boat, use it to travel on water. The biome is ocean. & - \\ \hline
+Use bow & \textbf{STEVE-1}: Use item bow.  \textbf{GROOT}: Use item bow 20\%, Shoot in distance 40\%, take aim 40\% & Given a bow and some arrows, shoot the sheep summoned before the agent. & - \\ \hline
+Collect stone & Mine block stone (cobblestone, iron, coal, diamond) & Given an iron pickaxe, collect stone starting from cave. Night vision is enabled. & Collect stone. \\ \hline
+Collect seagrass & Mine block seagrass (tall seagrass, kelp) & Given an iron pickaxe, collect seagrass starting from ocean. & -  \\ \hline
+Collect wood & Mine block oak (spruce, birch, jungle, acacia) log & Given an iron pickaxe, collect wood starting from \textbf{forest}. & Chop a tree.    \\ \hline
+Find and collect wood & Mine block oak (spruce, birch, jungle, acacia) log & Given an iron pickaxe, \textbf{find} and collect wood starting from \textbf{plains}. & Chop a tree. \\ \hline
+Collect dirt & Mine block dirt (grass block) & Given an iron pickaxe, collect dirt starting from plains.  & Collect dirt. \\ \hline
+Collect grass & Mine block grass (tall grass) & Given an iron pickaxe, collect grass starting from plains.  & Collect grass. \\
+\bottomrule
+\end{tabularx}
+\caption{Details of 12 atomic skills in our Minecraft skill benchmark for testing GROOT and STEVE-1.}
+\label{table: benchmark}
+\end{table}
+
+\subsection{Training Details}
+\label{app: hyper}
+The modified hyperparameters for GROOT and STEVE-1 are listed in \cref{tab:hyper}. We adjust parallel GPUs, gradient accumulation batches, and batch sizes to better align with our available computing resources. To speed up convergence without compromising performance, we double the learning rate for GROOT. The total number of frames for STEVE-1 is also modified, as we change the training dataset from a mixed subset of 8.x (house building from scratch), 9.x (house building from random materials), and 10.x (obtaining a diamond pickaxe) to the full 7.x dataset (early game), which better suits our benchmark tasks.~\footnote{OpenAI released five subsets of contractor data: 6.x, 7.x, 8.x, 9.x, and 10.x.}
+
+All models are trained parallelly on four NVIDIA RTX 4090Ti GPUs. We follow the same policy training pipeline as the original paper, except for the modified hyperparameters mentioned above. GROOT is trained for three epochs of our dataset. STEVE-1, however, is only trained for 1.5 epochs of our dataset, because we observe that the model starts to overfit on the dataset if it is trained further.   
+
+\begin{table}[!ht]
+\parbox{.5\linewidth}{
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}cc@{}}
+    \toprule
+    Hyperparameter & Value  \\ \midrule
+    Learning Rate & 0.00004 \\
+    Parallel GPUs & 4   \\
+    Accumulate Gradient Batches  & 1    \\
+    Batch Size & 8  \\
+    \bottomrule
+    \end{tabular}
+}
+\parbox{.5\linewidth}{
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}cc@{}}
+    \toprule
+    Hyperparameter & Value  \\ \midrule
+    Parallel GPUs & 4   \\
+    Accumulate Gradient Batches  & 4    \\
+    Batch Size & 4  \\
+    n\_frames & 100M \\
+    \bottomrule
+    \end{tabular}
+}
+\label{tab:hyper}
+\caption{Modified hyperparameters for training controllers. 
+\textbf{(Left)} GROOT.
+\textbf{(Right)} STEVE-1.}
+\end{table}
+
+\subsection{Event-Based Information}
+\label{app: event}
+Within the Minecraft environment, we focus on events in the categories "use item", "mine block", "craft item", and "kill entity", as they reflect the player's primary activities. Multiple events may occur simultaneously and are recorded as a set. Only the final step of a repeating sequence of sets of events is marked as positive. For example, in the sequence: ("use item iron pickaxe", "mine block iron ore"), ("use item iron pickaxe", "mine block iron ore"), ("use item iron pickaxe", "mine block diamond ore"), ("use item torch"), ("use item torch"), the second, third, fifth steps will be marked as positive. Additionally, for any step $t$ that includes a "kill entity" event, we mark $t+16$ as positive instead of $t$, because there will be a short death animation that follows the entity’s death, and we want it to be included in the same segment.
+
+\subsection{Length Pruning Algorithm}
+\label{app: prune}
+STEVE-1 forces a minimum and maximum length of trajectories in its method, so we need a length pruning algorithm. In our implementation, the length of each trajectory is pruned as follows: If a trajectory is too short, it is merged with subsequent trajectories until it meets the minimum length requirement. If this results in a trajectory exceeding the maximum length, it is truncated, and the remainder forms the beginning of the next trajectory. For instance, given a minimum and maximum length of 15 and 200, sub-trajectories of lengths 12, 12, 6, 196, and 37 are adjusted to 24, 200, and 39. Here, the first two sub-trajectories are merged, while the 6 is combined with 196 but truncated at 200, with the remaining 2 merged into the next trajectory. There might be more sophisticated strategies, but we use this straightforward algorithm for simplicity.
+
+% \section{Additional Experiment Results}
+% Some secondary experimental results are presented in this section due to the page limit of the main body.
+% \subsection{Ablation Study}
+% \label{app: ablation}
+% The result of the ablation study mentioned in \ref{subsec:ablation} on each task is shown in Table \ref{ablation_result}. The average score for each method is computed as follows: For each task, the method with the best performance is scaled to a score of 100, and the scores of all other methods are scaled proportionally. These scaled scores are then averaged across all tasks to obtain the final average score for each method. Notice that we keep the original success rate instead of the scaled score in the table.
+% \begin{table*}[!ht]
+% \centering
+% \caption{\textbf{Success rate of GROOT trained on dataset segmented by different splitting methods with or without the two components of SBD on different tasks.} The average score for each method is computed by scaling the score of the method with the best performance to 100 and the scores of all other methods proportionally for each task, and then averaging across all tasks. Notice that we keep the original success rate instead of the scaled score in the table.}
+% \label{ablation_result}
+% \vspace{0.1in}
+% \renewcommand{\arraystretch}{1.2}
+% \resizebox{0.99\linewidth}{!}{
+% \begin{tabular}{@{}cccccccccccccc@{}}
+% \toprule
+% Task  & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/furnace.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/hunt_sheep.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/sleep.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/torch.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/boat.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/bow.png}
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/stone.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/seagrass.png} 
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/wood.png}
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/tree.png} 
+% &\includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/dirt.png}
+% & \includegraphics[height=0.6cm,valign=c,keepaspectratio]{figures/icons/grass.png}
+% & \textbf{Average} \\
+% \midrule
+% \text{None} & 21\% & 26\% & 100\% & \textbf{97\%} & 71\% & 30\% & 21.74 & 34\% & 76\% & 19\% & 14.5 & 9.5 & 64.2 \\
+% \text{Reward} & 33\% & 52\% & 100\% & 88\% & \textbf{97\%} & 32\% & 23.65 & \textbf{65\%} & 92\% & 47\% & 15.5 & 21.6 & 87.4 \\
+% \text{Loss} & \textbf{44\%} & \textbf{54\%} & 100\% & 94\% & 72\% & 46\% & 25.84 & 63\% & \textbf{95\%} & \textbf{48\%} & 17.9 & 22.7 & 91.8 \\
+% \text{Both} & 30\% & \textbf{54\%} & 100\% & 88\% & 93\% & \textbf{80\%} & \textbf{26.81} & 51\% & 90\% & 44\% & \textbf{19.67} & \textbf{25.38} & \textbf{93.3} \\
+% \bottomrule
+% \end{tabular}
+% }
+% \end{table*}
+
+\section{Examples of Skill Videos}
+We sample one video segmented by our method for each skill in the benchmark and an extra video showing a failure case, presenting each video with five screenshots. The first and last screenshots correspond to the first and last frames of the video, while the other three are manually selected to best illustrate the progression of the skill.
+\label{app: skill videos}
+\begin{itemize}
+    \item smelt food 
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/smelt_food.pdf}
+        \end{center}
+    \item hunt sheep
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/hunt_sheep.pdf}
+        \end{center}
+    \item sleep
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/sleep.pdf}
+        \end{center}
+    \item use torch
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/use_torch.pdf}
+        \end{center}
+    \item use boat
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/use_boat.pdf}
+        \end{center}
+    \item use bow
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/use_bow.pdf}
+        \end{center}
+    \item collect stone
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/collect_stone.pdf}
+        \end{center}
+    \item collect seagrass
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/collect_seagrass.pdf}
+        \end{center}
+    \item collect wood
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/collect_wood.pdf}
+        \end{center}
+    \item collect dirt
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/collect_dirt.pdf}
+        \end{center}
+    \item collect grass
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/collect_grass.pdf}
+        \end{center}
+    \item combat spider (failure case: overly short)
+        \begin{center}
+        \includegraphics[width=0.99\linewidth]{figures/skills/combat_spider.pdf}
+        \end{center}
+\end{itemize}

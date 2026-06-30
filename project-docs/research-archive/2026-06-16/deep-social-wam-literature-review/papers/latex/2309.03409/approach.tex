@@ -1,0 +1,54 @@
+\section{\name{}: LLM as the Optimizer}
+\label{sec:approach}
+
+\begin{figure}
+\centering
+\subfigure{\includegraphics[width=.55\linewidth]{\figurepath workflow.pdf}}
+\caption{An overview of the \name{} framework. Given the meta-prompt as the input, the LLM generates new solutions to the objective function, then the new solutions and their scores are added into the meta-prompt for the next optimization step. The meta-prompt contains the solution-score pairs obtained throughout optimization, a natural language description of the task, and (in prompt optimization) a few task exemplars. Figure~\ref{fig:meta_prompt_example} shows a sample meta-prompt for prompt optimization.
+}
+\vspace{-.5em}
+\label{fig:overview}
+\end{figure}
+
+Figure~\ref{fig:overview} illustrates the overall framework of \name{}. 
+In each optimization step, the LLM generates candidate solutions to the optimization task based on the optimization problem description and previously evaluated solutions in the meta-prompt. 
+Then the new solutions are evaluated and added to the meta-prompt for the subsequent optimization process. 
+The optimization process terminates when the LLM is unable to propose new solutions with better optimization scores, or a maximum number of optimization steps has reached. 
+We first outline the desired features of LLMs for optimization, then describe the key design choices based on these desirables.
+
+\subsection{Desirables of Optimization by LLMs}
+
+\myparagraph{Making use of natural language descriptions} The main advantage of LLMs for optimization is their ability of understanding natural language, which allows people to describe their optimization tasks without formal specifications. 
+For instance, in prompt optimization where the goal is to find a prompt that optimizes the task accuracy, the task can be described with a high-level text summary along with input-output examples.
+
+\myparagraph{Trading off exploration and exploitation} The exploration-exploitation trade-off is a fundamental challenge in optimization, and it is important for LLMs serving as optimizers to balance these two competing goals. 
+This means that the LLM should be able to exploit promising areas of the search space where good solutions are already found, while also exploring new regions of the search space so as to not miss potentially better solutions.
+
+\subsection{Meta-prompt Design}
+
+As the input to the optimizer LLM, the meta-prompt contains the following two essential parts.
+
+\myparagraph{Optimization problem description} 
+The first part is the text description of the optimization problem, including the objective function and solution constraints. 
+For example, for prompt optimization, the LLM can be instructed to ``generate a new instruction that achieves a higher accuracy'', and we denote such instructions in the meta-prompt as \emph{meta-instructions}. 
+We can also provide customized meta-instructions as an informal regularization of the generated solutions, such as ``the instruction should be concise and generally applicable''.
+
+\myparagraph{Optimization trajectory} 
+Besides understanding natural language instructions, LLMs are also shown to be able to recognize patterns from in-context demonstrations~\citep{wei2023larger,madaan2022text,mirchandani2023large}. 
+Our meta-prompt makes use of this property and instructs the LLM to leverage the optimization trajectory for generating new solutions. 
+Specifically, the optimization trajectory includes past solutions and their optimization scores, sorted in the ascending order. 
+Including optimization trajectory in the meta-prompt allows the LLM to identify similarities of solutions with high scores, encouraging the LLM to build upon existing good solutions to construct potentially better ones without the need of explicitly defining how the solution should be updated.
+
+\subsection{Solution Generation}
+
+At the solution generation step, the LLM generates new solutions with the meta-prompt as input. 
+The following are the key optimization challenges we address in this stage.
+
+\myparagraph{Optimization stability} In the optimization process, not all solutions achieve high scores and monotonically improve over prior ones. 
+Due to the sensitivity of in-context learning to the prompt, LLM output can be drastically affected by low-quality solutions in the input optimization trajectory, especially at the beginning when the solution space has not been adequately explored. 
+This sometimes results in optimization instability and large variance. 
+To improve stability, we prompt the LLM to generate multiple solutions at each optimization step, allowing the LLM to simultaneously explore multiple possibilities and quickly discover promising directions to move forward.
+
+\myparagraph{Exploration-exploitation trade-off} 
+We tune the LLM sampling temperature to balance between exploration and exploitation. 
+A lower temperature encourages the LLM to exploit the solution space around the previously found solutions and make small adaptations, while a high temperature allows the LLM to more aggressively explore solutions that can be notably different.

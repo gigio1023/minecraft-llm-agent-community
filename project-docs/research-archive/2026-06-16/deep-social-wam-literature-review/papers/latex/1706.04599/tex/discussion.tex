@@ -1,0 +1,49 @@
+% !TeX root = ../main.tex
+
+In the previous section, we discovered that the simplest and most parameter efficient method is temperature scaling, which consistently gives the best calibration. In this section, we discuss several interesting properties of temperature scaling in connection with neural networks.
+
+%\paragraph{The canonical form.} 
+Most surprisingly, although the vector model is strictly more powerful than the temperature one, their optimal solutions are \emph{almost identical}. Empirically, we find that the vector model is optimized when all entries in the parameter vector are roughly equal to $\frac{1}{T}$, where $T$ is the optimal temperature. 
+
+Even more surprisingly, the matrix model \emph{also recovers} the optimal temperature except in cases of severe overfitting. The optimal weight matrices $W$ are found to be near-diagonal, with all the diagonal entries roughly equal to $\frac{1}{T}$, and the bias vectors $b$ close to 0. 
+
+We suspect that temperature scaling is the \emph{canonical form} of multiclass Platt scaling for calibrating neural networks. These observations provide very strong evidence that somehow, it is the nature of modern neural networks to produce logits that can be calibrated with a scalar. 
+% Our explanation for such a strong prior is that  overconfidence is really caused by excessive optimization pushing the likelihood distributions toward point masses. Temperature scaling explicitly corrects for this phenomenon by softening the distributions. 
+This is one way to see why the scalar model performs the best among the three multiclass Platt scaling variants. It is like the "occams razor" that contains everything necessary and nothing more. 
+
+% \paragraph{Connections to regularization.} There is an interesting connection between temperature scaling and weight decay, which we have shown in \autoref{motivation} to be a major factor influencing calibration. Suppose $f_\wb$ is a pre-trained feedforward neural network of depth $L$ with ReLU activation units, and possibly max / average pooling. For simplicity, suppose there is no bias term. That is, for $l=1...L$,
+% $$\xb^{(l)} = \text{pool}\left(\text{ReLU}\left( \xb^{(l-1)}\wb^{(l)}\right) \right)$$
+% where $\xb^{(0)}$ is the input matrix, and $\xb^{(l)}$ is the output of the $l^{th}$ layer.
+% Then the following three procedures produce equivalent models:
+% \begin{enumerate}[label={\alph*)},itemsep=0.5pt,topsep=0pt]
+% 	\item optimizing a weight decay loss $\frac{1}{2}\lambda\|\wb\|^2_2$ with gradient descent on the pre-trained model. $\lambda\in(0,1)$ is a (usually very small) tunable hyperparameter.
+% 	\item weight shrinkage by a factor of $(1-\lambda)$.
+% 	\item setting $T=(1-\lambda)^{-L}$ in (\ref{temp}).
+% \end{enumerate}
+% This claim is quite intuitive; a more formal proof is given in the Appendix. 
+% Colloquially, it says that post-processing with temperature scaling is at least very similar to post-processing with weight decay. Selecting $T$ to minimize validation NLL can be viewed as tuning the (post-processing) weight decay coefficient on the validation set, except that the process is much easier since no training is required.
+
+
+%\paragraph{Connections to information theory.}
+%{\claim
+%	\label{gradients}
+%	By the end of our recipe, the model satisfies the following condition on the validation set of $n$ samples $(x_1,y_1)...(x_n,y_n)$.
+%	\begin{equation}
+%	\text{NLL}
+%	= -\sum_{i=1}^{n}\log\left(p^{(i)}_{y_i}\right)
+%	= \sum_{i=1}^{n} H\left(\mathbf{p}^{(i)}\right)
+%	\end{equation}
+%	where $\mathbf{p}^{(i)}$ is the $i$th sample's predicted distribution (by \ref{temp}).	Note the implicit dependency of $\mathbf{p}$ on the selected $T$. $H(\mathbf{p}) = -\sum_{j=1}^{K}p_j\log(p_j)$ is the information theoretical entropy of the distribution $\mathbf{p}$. $p^{(i)}_{y_i}$ is the $y_i$th dimension of the $\mathbf{p}^{(i)}$, that is, the predicted probability corresponding to the ground truth label.
+%	{\color{red} Actually an iff. condition because the stationary point is unique; it occurs only at the minimum.}
+%}
+
+%\begin{proof}
+%	Please see appendix.
+%\end{proof}
+
+%\textbf{This claim says that after temperature tuning, over the validation set on average, the new cross entropy i.e. NLL loss is exactly the same as the entropy of the %new likelihood distribution.}
+
+%{\color{red} This should be important. But what does this really mean?}
+
+%Asymptotically, as $n\rightarrow\infty$, Claim \ref{gradients} says that
+%$$\E_{X,Y}[H()]$$

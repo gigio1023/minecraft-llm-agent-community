@@ -1,0 +1,42 @@
+\section{Experimental Setup}
+\label{sec:experimental-setup}
+In this section we explain how inputs are constructed to run \benchmark{} evaluation.
+In addition, we review the models that we evaluate in this work.
+
+\subsection{Retrieval-Based Approach}
+\label{sec:experimental-setup:input-formulation}
+\benchmark{} instances provide an issue description and a codebase as input to the model.
+While issues descriptions are usually short ($195$ words on average as shown in Table~\ref{table:dataset-stats}), codebases consist of many more tokens ($438$K lines on average) than can typically be fit into an LMs context window.
+Then the question remains of exactly how to choose the relevant context to provide to the model?
+
+To address this issue for our baselines, we simply use a generic retrieval system to select the files to insert as context.
+In particular, we evaluate models under two relevant context settings: 1) sparse retrieval and 2) an oracle retrieval.
+
+\textbf{Sparse retrieval.}
+Dense retrieval methods are ill-suited to our setting due to very long key and query lengths, and especially the unusual setting of retrieving code documents with natural language queries.
+Therefore, we choose to use BM25 retrieval~\citep{robertson2009probabilistic} to retrieve relevant files to provide as context for each task instance.
+We experiment with three different maximum context limits, and simply retrieve as many files as fits within the specified limit.
+We evaluate each model on all limits that fit within its context window and report the best performance.
+From observation, models perform best on the shortest context window, as shown in Table~\ref{table:bm25-results}.
+
+\textbf{``Oracle'' retrieval.}
+For analysis purposes we also consider a setting where we ``retrieve'' the files edited by the reference patch that solved the issue on GitHub.
+This ``oracle" setting is less realistic, since an engineer working on addressing an issue may not know a priori which files need to be modified.
+In addition, this setting is also not necessarily comprehensive since edited files alone may not include all the required context to understand exactly how software will behave when interacting with unseen parts of the code.
+
+We compare the BM25 retrieval results with those of the ``oracle'' retrieval setting, as shown in Table~\ref{table:recall}.
+We observe that in approximately $40\%$ of instances, BM25 retrieves a superset of the oracle files for the $\num{27000}$-token context limit. However, in almost half of the instances with the $\num{27000}$-token limit, it retrieves none of the files from the ``oracle'' context.
+
+\subsection{Input Format}
+\label{sec:experimental-setup:input-format}
+Once the retrieved files are selected using one of the two methods above, we construct the input to the model consisting of task instructions, the issue text, retrieved files and documentation, and finally an example patch file and prompt for generating the patch file.
+Examples of instances and further details on this formulation are provided in Appendix~\ref{appx:experiment-details}.
+
+\subsection{Models}
+\label{sec:experimental-setup:models}
+Due to the need to process long sequence lengths, there are only a few models that are currently suitable for  \benchmark{}.
+Thus we evaluate ChatGPT-3.5 ({\small \texttt{gpt-3.5-turbo-16k-0613}}), GPT-4 ({\small \texttt{gpt-4-32k-0613}}), Claude 2, and \swellama{} with their context limits shown in Table~\ref{tab:model-context-comparision}.
+
+\input{tables/bm25-results}
+
+\input{tables/model-context-comparision}

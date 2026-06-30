@@ -1,0 +1,137 @@
+\begin{lstlisting}[language=Python]
+import numpy as np
+from oped.envs.r2d2.base import R2D2Env
+
+class Env(R2D2Env):
+    """
+    Task: Push two balls into separate goals while avoiding static obstacles.
+
+    Description:
+    - The environment consists of a large flat ground.
+    - Two balls, one red and one blue, are placed at fixed initial positions on the ground. The red ball is positioned at [2.0, -2.0, 0.5] and the blue ball is positioned at [2.0, 2.0, 0.5].
+    - Two goal areas are defined by pairs of posts. The red goal is defined by posts placed at [10.0, -2.0, 1.0] and [10.0, -1.0, 1.0]. The blue goal is defined by posts placed at [10.0, 1.0, 1.0] and [10.0, 2.0, 1.0].
+    - Three cylindrical obstacles of 1 meter radius and 2 meters height are placed at fixed positions: [5.0, 0.0, 1.0], [7.0, -1.0, 1.0], and [7.0, 1.0, 1.0].
+    - The robot is initialized at [0.0, 0.0, 0.5], facing the positive x-direction.
+    - The task is for the robot to push the red ball into the red goal and the blue ball into the blue goal while avoiding the obstacles.
+
+    Success:
+    The task is completed successfully if the robot pushes both balls into their respective goals without colliding with any obstacles.
+
+    Rewards:
+    - The robot is rewarded for decreasing its distance to each ball.
+    - The robot is rewarded for pushing each ball towards its respective goal.
+    - The robot is penalized for colliding with obstacles.
+    - The robot is greatly rewarded if a ball passes between the goal posts of its respective goal.
+
+    Termination:
+    The task is terminated if the robot collides with an obstacle, if a ball collides with an obstacle, or if a time limit of 60 seconds is reached.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.ground_size = [1000.0, 1000.0, 10.0]
+        self.ground_position = [0.0, 0.0, 0.0]
+        self.ground_id = self.create_box(mass=0.0, half_extents=[self.ground_size[0] / 2, self.ground_size[1] / 2, self.ground_size[2] / 2], position=self.ground_position, color=[0.5, 0.5, 0.5, 1.0])
+        self._p.changeDynamics(bodyUniqueId=self.ground_id, linkIndex=-1, lateralFriction=0.8, restitution=0.5)
+        self.ball_radius = 0.5
+        self.red_ball_position_init = [2.0, -2.0, self.ground_size[2] / 2 + self.ball_radius]
+        self.blue_ball_position_init = [2.0, 2.0, self.ground_size[2] / 2 + self.ball_radius]
+        self.red_ball_id = self.create_sphere(mass=1.0, radius=self.ball_radius, position=self.red_ball_position_init, color=[1.0, 0.0, 0.0, 1.0])
+        self.blue_ball_id = self.create_sphere(mass=1.0, radius=self.ball_radius, position=self.blue_ball_position_init, color=[0.0, 0.0, 1.0, 1.0])
+        self.goal_post_height = 2.0
+        self.goal_post_radius = 0.1
+        self.red_goal_position = [10.0, -1.5, self.ground_size[2] / 2 + self.goal_post_height / 2]
+        self.blue_goal_position = [10.0, 1.5, self.ground_size[2] / 2 + self.goal_post_height / 2]
+        self.red_goal_post_left_id = self.create_cylinder(mass=0.0, radius=self.goal_post_radius, height=self.goal_post_height, position=[self.red_goal_position[0], self.red_goal_position[1] - 0.5, self.red_goal_position[2]], color=[1.0, 1.0, 1.0, 1.0])
+        self.red_goal_post_right_id = self.create_cylinder(mass=0.0, radius=self.goal_post_radius, height=self.goal_post_height, position=[self.red_goal_position[0], self.red_goal_position[1] + 0.5, self.red_goal_position[2]], color=[1.0, 1.0, 1.0, 1.0])
+        self.blue_goal_post_left_id = self.create_cylinder(mass=0.0, radius=self.goal_post_radius, height=self.goal_post_height, position=[self.blue_goal_position[0], self.blue_goal_position[1] - 0.5, self.blue_goal_position[2]], color=[1.0, 1.0, 1.0, 1.0])
+        self.blue_goal_post_right_id = self.create_cylinder(mass=0.0, radius=self.goal_post_radius, height=self.goal_post_height, position=[self.blue_goal_position[0], self.blue_goal_position[1] + 0.5, self.blue_goal_position[2]], color=[1.0, 1.0, 1.0, 1.0])
+        self.obstacle_radius = 1.0
+        self.obstacle_height = 2.0
+        self.obstacle_positions = [[5.0, 0.0, self.ground_size[2] / 2 + self.obstacle_height / 2], [7.0, -1.0, self.ground_size[2] / 2 + self.obstacle_height / 2], [7.0, 1.0, self.ground_size[2] / 2 + self.obstacle_height / 2]]
+        self.obstacle_ids = [self.create_cylinder(mass=0.0, radius=self.obstacle_radius, height=self.obstacle_height, position=pos, color=[0.0, 0.0, 0.0, 1.0]) for pos in self.obstacle_positions]
+        self.robot_position_init = [0.0, 0.0, self.ground_size[2] / 2 + self.robot.links['base'].position_init[2]]
+        self.robot_orientation_init = self._p.getQuaternionFromEuler([0.0, 0.0, 0.0])
+        self.time_limit = 60.0
+
+    def create_box(self, mass, half_extents, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_BOX, halfExtents=half_extents, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_sphere(self, mass, radius, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_SPHERE, radius=radius)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def create_cylinder(self, mass, radius, height, position, color):
+        collision_shape_id = self._p.createCollisionShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, height=height)
+        visual_shape_id = self._p.createVisualShape(shapeType=self._p.GEOM_CYLINDER, radius=radius, length=height, rgbaColor=color)
+        return self._p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=collision_shape_id, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+
+    def get_object_position(self, object_id):
+        return np.asarray(self._p.getBasePositionAndOrientation(object_id)[0])
+
+    def get_distance_to_object(self, object_id):
+        object_position = self.get_object_position(object_id)
+        robot_position = self.robot.links['base'].position
+        return np.linalg.norm(object_position[:2] - robot_position[:2])
+
+    def reset(self):
+        observation = super().reset()
+        self.time = 0.0
+        self._p.resetBasePositionAndOrientation(self.red_ball_id, self.red_ball_position_init, [0.0, 0.0, 0.0, 1.0])
+        self._p.resetBasePositionAndOrientation(self.blue_ball_id, self.blue_ball_position_init, [0.0, 0.0, 0.0, 1.0])
+        self._p.resetBasePositionAndOrientation(self.robot.robot_id, self.robot_position_init, self.robot_orientation_init)
+        return observation
+
+    def step(self, action):
+        self.distance_to_red_ball = self.get_distance_to_object(self.red_ball_id)
+        self.distance_to_blue_ball = self.get_distance_to_object(self.blue_ball_id)
+        self.red_ball_position = self.get_object_position(self.red_ball_id)
+        self.blue_ball_position = self.get_object_position(self.blue_ball_id)
+        observation, reward, terminated, truncated, info = super().step(action)
+        self.time += self.dt
+        return (observation, reward, terminated, truncated, info)
+
+    def get_task_rewards(self, action):
+        new_distance_to_red_ball = self.get_distance_to_object(self.red_ball_id)
+        new_distance_to_blue_ball = self.get_distance_to_object(self.blue_ball_id)
+        new_red_ball_position = self.get_object_position(self.red_ball_id)
+        new_blue_ball_position = self.get_object_position(self.blue_ball_id)
+        survival = 1.0
+        reach_red_ball = (self.distance_to_red_ball - new_distance_to_red_ball) / self.dt
+        reach_blue_ball = (self.distance_to_blue_ball - new_distance_to_blue_ball) / self.dt
+        push_red_ball = (new_red_ball_position[0] - self.red_ball_position[0]) / self.dt
+        push_blue_ball = (new_blue_ball_position[0] - self.blue_ball_position[0]) / self.dt
+        collision_penalty = 0.0
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0:
+                collision_penalty = -10.0
+                break
+        red_ball_in_goal = 0.0
+        if self.red_goal_position[1] - 0.5 < new_red_ball_position[1] < self.red_goal_position[1] + 0.5 and new_red_ball_position[0] > self.red_goal_position[0]:
+            red_ball_in_goal = 10.0
+        blue_ball_in_goal = 0.0
+        if self.blue_goal_position[1] - 0.5 < new_blue_ball_position[1] < self.blue_goal_position[1] + 0.5 and new_blue_ball_position[0] > self.blue_goal_position[0]:
+            blue_ball_in_goal = 10.0
+        return {'survival': survival, 'reach_red_ball': reach_red_ball, 'reach_blue_ball': reach_blue_ball, 'push_red_ball': push_red_ball, 'push_blue_ball': push_blue_ball, 'collision_penalty': collision_penalty, 'red_ball_in_goal': red_ball_in_goal, 'blue_ball_in_goal': blue_ball_in_goal}
+
+    def get_terminated(self, action):
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.robot.robot_id, bodyB=obstacle_id)) > 0:
+                return True
+        for obstacle_id in self.obstacle_ids:
+            if len(self._p.getContactPoints(bodyA=self.red_ball_id, bodyB=obstacle_id)) > 0 or len(self._p.getContactPoints(bodyA=self.blue_ball_id, bodyB=obstacle_id)) > 0:
+                return True
+        if self.time >= self.time_limit:
+            return True
+        return False
+
+    def get_success(self):
+        red_ball_position = self.get_object_position(self.red_ball_id)
+        blue_ball_position = self.get_object_position(self.blue_ball_id)
+        red_ball_in_goal = self.red_goal_position[1] - 0.5 < red_ball_position[1] < self.red_goal_position[1] + 0.5 and red_ball_position[0] > self.red_goal_position[0]
+        blue_ball_in_goal = self.blue_goal_position[1] - 0.5 < blue_ball_position[1] < self.blue_goal_position[1] + 0.5 and blue_ball_position[0] > self.blue_goal_position[0]
+        return red_ball_in_goal and blue_ball_in_goal
+\end{lstlisting}

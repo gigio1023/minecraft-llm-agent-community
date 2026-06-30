@@ -1,0 +1,90 @@
+\subsection{Notation and Preliminaries}
+\label{sect:econgames}
+
+In this work, we use notation that borrows from both the reinforcement learning and the optimal tax theory literature, see Table~\ref{tab:notation}.
+
+\begin{table}[h!]
+    \begin{minipage}[t]{0.48\linewidth}
+        \begin{small}
+            \begin{center}
+                \begin{tabular}[c]{ll}
+                    \multicolumn{1}{c}{\textbf{}} &
+                    \multicolumn{1}{c}{\textbf{}} \\
+                    $t$ & time \\
+                    $i,j,k$ & agent indices \\
+                    \hline
+                    $\mweight$, $\pweight$ & model weights \\
+                    \hline
+                    $\st$ & state \\
+                    $\ob$ & observation \\
+                    $\ac$ & action \\
+                    $\rew$ & reward \\
+                    $\policy$ & policy \\
+                    $\df$ & discount factor \\
+                    $\trans$ & state-transition, world dynamics \\
+                    \hline
+                    $\hidden$ & hidden state
+                \end{tabular}
+                \label{tab:notation_rl}
+            \end{center}
+        \end{small}
+    \end{minipage}
+    \begin{minipage}[t]{0.48\linewidth}
+        \begin{small}
+            \begin{center}
+                \begin{tabular}[c]{ll}
+                    \multicolumn{1}{c}{\textbf{}} &
+                    \multicolumn{1}{c}{\textbf{}} \\
+                    $\endow$ & endowment \\
+                    $\money$ & coin \\
+                    $\stone$ & stone \\
+                    $\wood$ & wood \\
+                    \hline
+                    $\income$ & income \\
+                    $\labor$ & labor \\
+                    $\util$ & utility \\
+                    \hline
+                    $\tax$ & tax \\
+                    $\taxrate$ & tax-rate \\
+                    \hline
+                    $\plannerpolicy$ & planner policy \\
+                    $\socialwelfare$  & social welfare \\
+                    $\socialwelfareweight$  & social welfare weight \\
+                    $\socialmarginalwelfareweight$  & social marginal welfare weight \\
+                    \hline
+                    $\gini$ & Gini index \\
+                    $\equality$ & Equality index \\
+                \end{tabular}
+                \label{tab:notation_econ}
+            \end{center}
+        \end{small}
+    \end{minipage}
+    \caption{Notation. Subscripts are indices. Superscripts are labels.    \label{tab:notation}}
+\end{table}
+
+
+
+
+Formally, we build on the framework of partial-observable multi-agent Markov Games (MGs) \citep{sutton2018reinforcement}, defined by the tuple $(S, A, \rew, \trans, \df, \ob, \calI)$, where $S$ and $A$ are the state and action spaces, respectively, and $\calI$ are agent indices.
+Bold-faced quantities denote vectors, e.g., $\bm{a}=(a_1,\ldots,a_N)$, the action profile for $N$ agents.
+MGs proceed in episodes that last $\eplen + 1$ steps (possibly infinite), covering $\eplen$ transitions.
+At each time $t \in [0,\eplen]$, the world state is denoted $\st_t$. Each agent $i = 1,\ldots,N$ receives an observation $\ob_{i,t}$, executes an action $\ac_{i,t}$ and receives a reward $\rew_{i,t}$.
+The environment transitions to the next state $\st_{t+1}$, according to the transition distribution $\trans\brck{\st_{t+1} | \st_t, \va_t }$.
+Agent-specific observations $\ob_{i, t}$ describe the portion of the state $\st_t$ that agent $i$ is able to observe.
+
+Each agent learns a policy $\pol_i\brck{\ac_{i,t} | \ob_{i,t}, \hidden_{i,t}; \theta_i}$ that maximizes its $\df$-discounted expected return, where the policy is conditioned on the history of past observations by maintaining a hidden state $\hidden_{i, t}$, and  where
+$\theta_i$ parameterizes the policy of agent $i$.
+Let $\bm{\pol} = \brck{\pol_1,\ldots,\pol_N}$ denote the joint policy
+and $\bm{\pol}_{-i} = \brck{\pol_1,\ldots,\pol_{i-1},\pol_{i+1},\ldots,\pol_N}$ denote the  policy without agent $i$.
+Through reinforcement learning, agent $i$ seeks a policy to solve
+\eq{\label{eq:rl-agent-objective}
+\max_{\theta_i} \E_{a_i\sim \pi_i, \va_{-i}\sim\bm{\pi}_{-i}, \st'\sim\trans} \brcksq{ \sum_t \df^t \rew_{i,t}},
+}
+for discount factor $\gamma \in (0, 1)$. Equation \ref{eq:rl-agent-objective} describes an agent $i$ that maximizes its expected reward, which depends on the behavioral policies $\bm{\pi}_{-i}$ of the other agents and the environment transition dynamics $\trans$.
+This is a policy that best responds to the policies of other agents, given the dynamics of the simulated environment and an agent's observations.
+
+For data efficiency, all agents share the same parameters during training,  denoted  $\mweight$, but condition their policy $\policy_i\brck{\ac_i|\ob_i, \hidden_i; \mweight}$ on agent-specific observations $\ob_i$ and  hidden-state $\hidden_i$.
+In effect, if one agent learns a useful new behavior for some part of the state space then this becomes available to another agent.
+At the same time, agent behaviors remain heterogeneous because they have different observations and hidden states.
+
+

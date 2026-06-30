@@ -1,0 +1,49 @@
+\section{Latent Overshooting}
+\label{sec:overshooting}
+
+\input{figures/overshooting/figure}
+
+In the previous section, we derived the typical variational bound for learning and inference in latent sequence models (\cref{eq:elbo}). As show in \cref{fig:elbo}, this objective function contains reconstruction terms for the observations and KL-divergence regularizers for the approximate posteriors. A limitation of this objective is that the stochastic path of the transition function $\p(s_t|s_{t-1},a_{t-1})$ is only trained via the KL-divergence regularizers for one-step predictions: the gradient flows through $\p(s_t|s_{t-1},a_{t-1})$ directly into $\q(s_{t-1})$ but never traverses a chain of multiple $\p(s_t|s_{t-1},a_{t-1})$. In this section, we generalize this variational bound to \emph{latent overshooting}, which trains all multi-step predictions in latent space. We found that several dynamics models benefit from latent overshooting, although our final agent using the RSSM model does not require it (see \cref{sec:exp_overshooting}).
+
+\paragraph{Limited capacity}
+
+If we could train our model to make perfect one-step predictions, it would also make perfect multi-step predictions, so this would not be a problem. However, when using a model with limited capacity and restricted distributional family, training the model only on one-step predictions until convergence does in general not coincide with the model that is best at multi-step predictions. For successful planning, we need accurate multi-step predictions. Therefore, we take inspiration from \citet{amos2018awareness} and earlier related ideas \citep{krishnan2015deepkalman,lamb2016professor,chiappa2017recurrent}, and train the model on multi-step predictions of all distances. We develop this idea for latent sequence models, showing that multi-step predictions can be improved by a loss in latent space, without having to generate additional images.
+
+\paragraph{Multi-step prediction}
+
+We start by generalizing the standard variational bound (\cref{eq:elbo}) from training one-step predictions to training multi-step predictions of a fixed distance $d$. For ease of notation, we omit actions in the conditioning set here; every distribution over $s_t$ is conditioned upon $a_{<t}$. We first define multi-step predictions, which are computed by repeatedly applying the transition model and integrating out the intermediate states,
+\begin{equation}
+\begin{aligned}
+\p(s_t|s_{t-d})
+&\triangleq\int\prod_{\tau=t-d+1}^t \p(s_\tau|s_{\tau-1})\d s_{t-d+1:t-1} \\
+&=\E{\p(s_{t-1}|s_{t-d})}{\p(s_t|s_{t-1})}.
+\end{aligned}
+\end{equation}%
+The case $d=1$ recovers the one-step transitions used in the original model. Given this definition of a multi-step prediction, we generalize \cref{eq:elbo} to the variational bound on the multi-step predictive distribution $p_d$,
+\begin{equation}
+\begin{aligned}
+&\ln\pr[p_d](o_{1:T})
+\triangleq\ln\int\prod_{t=1}^T\p(s_t|s_{t-d})\p(o_t|s_t)\d s_{1:T} \\[-2ex]
+&\geq\sum_{t=1}^T \Big(
+  \describe{\E{\q(s_t|o_{\leq t})}{\ln\p(o_t|s_t)}}{reconstruction} \eqbr&\quad
+  -\describe{\Ebelow[\big]{\p(s_{t-1}|s_{t-d})\q(s_{t-d}|o_{\leq t-d})}{\KL{\q(s_t|o_{\leq t})}{\p(s_t|s_{t-1})}}}{multi-step prediction} \Big).
+\end{aligned}
+\label{eq:dstep}
+\end{equation}%
+For the derivation, please see \cref{eq:dstep_deriv} in the appendix. Maximizing this objective trains the multi-step predictive distribution. This reflects the fact that during planning, the model makes predictions without having access to all the preceding observations.
+
+We conjecture that \cref{eq:dstep} is also a lower bound on $\ln\p(o_{1:T})$ based on the data processing inequality. Since the latent state sequence is Markovian, for $d\geq 1$ we have $\MI{s_t;s_{t-d}}\leq\MI{s_t;s_{t-1}}$ and thus
+$\E{}{\ln\pr[p_d](o_{1:T})}\leq\E{}{\ln\p(o_{1:T})}$. Hence, every bound on the multi-step predictive distribution is also a bound on the one-step predictive distribution in expectation over the data set. For details, please see \cref{eq:dataproc_deriv} in the appendix. In the next paragraph, we alleviate the limitation that a particular $p_d$ only trains predictions of one distance and arrive at our final objective.
+
+\paragraph{Latent overshooting}
+
+We introduced a bound on predictions of a given distance $d$. However, for planning we need accurate predictions not just for a fixed distance but for all distances up to the planning horizon. We introduce latent overshooting for this, an objective function for latent sequence models that generalizes the standard variational bound (\cref{eq:elbo}) to train the model on multi-step predictions of all distances $1 \leq d \leq D$,
+{\small\begin{multline}
+\frac{1}{D}\sum_{d=1}^D\ln\pr[p_d](o_{1:T}) \geq
+\sum_{t=1}^T \Big(
+  \describe{\E{\q(s_t|o_{\leq t})}{\ln\p(o_t|s_t)}}{reconstruction} \eqbr
+  -\describe{\frac{1}{D}\sum_{d=1}^D
+    \beta_d\Ebelow[\big]{\p(s_{t-1}|s_{t-d})\q(s_{t-d}|o_{\leq t-d})}{\KL{\q(s_t|o_{\leq t})}{\p(s_t|s_{t-1})}}}{latent overshooting} \Big).
+\label{eq:latov}
+\end{multline}}%
+Latent overshooting can be interpreted as a regularizer in latent space that encourages consistency between one-step and multi-step predictions, which we know should be equivalent in expectation over the data set. We include weighting factors $\{\beta_d\}_{d=1}^D$ analogously to the $\beta$-VAE \citep{higgins2016beta}. While we set all $\beta_{>1}$ to the same value for simplicity, they could be chosen to let the model focus more on long-term or short-term predictions. In practice, we stop gradients of the posterior distributions for overshooting distances $d>1$, so that the multi-step predictions are trained towards the informed posteriors, but not the other way around.

@@ -1,0 +1,85 @@
+
+
+\section{Introduction}
+
+The use of synthetic data has gained significant traction due to its ability to reduce data collection costs and enhance privacy protection, with applications in computer vision \citep{wood2021fake}, healthcare \citep{azizi2021can, santangelo2025good}, finance \citep{potluru2023synthetic} and recently large language models (LLMs) \citep{chen2024diversity}. A growing body of work has demonstrated that training with synthetic data can improve model performance in various applications such as image recognition \citep{hesynthetic, tremblay2018training}, image generation \citep{doersch2019sim2real,shrivastava2017learning,tian2023stablerep} and language generation \citep{gunasekar2023textbooks,guo2024deepseek,zelikman2022star}.   However, recent studies caution that recursively training models on synthetic data alone can lead to a degradation of quality, a phenomenon often coined \emph{model collapse} \citep{shumailov2024ai, dohmatob2024model, dohmatobstrong, dohmatob2024tale, alemohammad2023self, gerstgrasser2024model}. This contrast between  empirical success  and pessimistic research findings   gives rise to a natural question about what might have caused the discrepancy. 
+
+In response to the above question, an important practical observation  is that synthetic data  are rarely used in raw form in the aforementioned applications. Instead, practitioners often apply filtering steps to remove low-quality synthetic samples before retraining. For example, in natural language generation, synthetic sentences are often   screened using grammar checkers or LLM-as-a-judge pipelines \citep{zheng2023judging,gu2024survey}; in computer vision, synthetic images can be filtered using pretrained discriminators  or human annotation \citep{hesynthetic}; in recommendation and preference learning, synthetic feedback is often validated against external heuristics or known user signals \citep{tu2025resofilter, iskander2024quality, lupidi2024source2synth, lampis2023bridging, zhang2024regurgitative}.
+Common across all these approaches is the use of a knowledgeable ``discriminator'' (henceforth the \emph{verifier} ) -- whether a machine or human --   that evaluates and filters out low-quality candidate synthetic samples (i.e., those not passing the discriminator's screening).
+This observation naturally  raises the following research question: 
+\begin{quote} 
+    \emph{Does  verifier-based filtering of synthetic data contribute to the observed empirical success of   model improvements, and does it prevent model collapse in the long run?} 
+\end{quote} 
+
+There has been a growing body of work studying the mechanisms of \emph{model collapse}, including theoretical analyzes that are often examined in the context of classic parameter estimation problems  \citep{dohmatob2024model,dohmatobstrong,gerstgrasser2024model,dey2024universality,xu2025probabilistic,sureshrate}. However, these works have all assumed the use of  synthetic data \emph{without} filtering. Only few recent works start to examine how filtered synthetic data  affects the performance of iterative retraining, but  under idealized assumptions such as access to a perfectly correct verifier  \citep{amin2025escaping}  or highly structured errors in synthetic data (i.e., i.i.d. noise added to binary labels  \citep{feng2024beyond}). A realistic and instructive framework for analyzing synthetic retraining of generative models remains still poorly understood. In this paper, we further push the boundary of this important agenda, and  examine iterative retraining under imperfect verifiers that filter out low-quality synthetic data based on their (possibly biased) knowledge. We refer to this process as    \emph{verifier-based synthetic retraining} for convenience. Specifically, we seek principled understandings about the empirically observed short-term successes of verifier-based synthetic retraining and analysis about its long-term convergence under iterative retraining.  
+
+
+
+\medskip
+\noindent
+\textbf{Our contributions.}     We start from  theoretical investigations and  analyze verifier-based synthetic retraining with \emph{verified} synthetic data on the foundational linear regression model---a canonical  setting that has become central to the study of model collapse (e.g., \citep{dohmatob2024model,dohmatobstrong,gerstgrasser2024model,zhusynthesize,garg2025preventing}).\footnote{The theoretical analysis of \citep{feng2024beyond} is also based on linear models, specifically, linear classifiers.} We then verify our theoretical insights through thorough empirical studies in real-world generative settings.  Our main contributions are summarized as follows:
+
+\begin{itemize}
+    \item \emph{Does verified synthetic data improve retraining and, if so, under what conditions?} 
+     We show that it indeed can, provided the right conditions are met.
+    Through a new form of bias-variance trade-off under data filtering,  we characterize the regimes in which verifier-based synthetic retraining   leads to strict model improvement, rather than  degradation, in   the short term (Theorem \ref{thm:linear:one_step}). The conditions we identify highlight the mixed effect of synthetic sample size, the verifier's bias  and  selectivity  during filtering, yielding practical insights regarding   \emph{when}  verification of synthetic data is beneficial.
+    
+    \item \emph{Can the retraining improvement in the short term be sustained in the long run?}  Our theoretical analysis shows that the answer is   \emph{No} -- unless the verifier has no bias.
+    Formally, we show that verifier-based synthetic retraining  will converge to the verifier's knowledge center in the long term (Theorem \ref{thm:linear:long_term}).
+    This result reveals how the verifier's quality affects  the asymptotic dynamics of iterative retraining.
+    \textcolor{black}{Notably, while verifier selectivity influences short-term performance, it does not change the long-run converging point, though it does affect its convergence rate.}
+    
+    \item \emph{Do the insights from the above theoretical analysis apply to real generative models empirically?} Indeed, both simulations of linear regression settings   and  training Variational Autoencoders (VAEs) on the real-world MNIST data demonstrate that our theoretical insights align with observed training dynamics in these settings. For example, Figure \ref{fig:mnist-illustration} shows how the generative model of VAE   can start from a  poor model trained on a small number of 500 images and gradually improve from being retrained on filtered synthetic imaged generated by itself, until after 40 iterations of retraining generating sharp images that are visually comparable to a VAE trained directly on the entire MNIST dataset. More quantitative analysis of our empirical studies can be found in Section \ref{sec:experiment}.     
+\end{itemize}
+
+
+
+\subsection{Related Work}
+
+\paragraph{Understanding and mitigating model collapse.}
+Recent work shows that heavy reliance on synthetic data in iterative training can cause \emph{model collapse}—the degradation of performance when a model is repeatedly retrained on its own synthetic outputs (possibly mixed with real data).\footnote{There is no widely agreed-upon formal definition; see \citep{schaeffer2025position} for discussion.} Empirical evidence supports this phenomenon: \citet{shumailov2024ai} show that recursive training on unfiltered synthetic data induces distribution shift and mode collapse, while \citet{dohmatobstrong} find that even small synthetic proportions can harm performance. In linear settings, \citet{dohmatob2024model} analyze collapse mechanisms explicitly, and \citet{dohmatob2024tale} connect degradation to altered neural scaling laws.
+
+
+
+
+\textcolor{black}{To mitigate collapse, prior work broadly explores three strategies.
+First, accumulating data or gradually increasing the synthetic dataset size across iterations can suppress noise and bound errors \citep{gerstgrasser2024model, dey2024universality, xu2025probabilistic, kazdancollapse, barzilai2025models}.
+Second, mixing synthetic data with real data stabilizes retraining \citep{bertrand2024stability, fu2024towards, futheoretical}, as performance progressively degrades without sufficient fresh real data \citep{alemohammad2023self}.
+Recent studies have even derived optimal mixing ratios to maximize this stabilizing effect \citep{he2025golden, garg2025preventing}.
+Finally, algorithmic interventions, such as the token re-sampling procedures proposed by \citet{zhusynthesize}, offer alternative pathways to avoid collapse.}
+
+     
+
+Unlike prior work that relies on unfiltered synthetic data, our framework incorporates an external verifier to remove low-quality samples. Such verifiers may be human annotators or stronger teacher models. Filtering is widely used in iterative retraining and has shown empirical success in preventing model degradation and even improving performance \citep{hesynthetic,tian2023stablerep,guo2024deepseek,zelikman2022star,zhang2024regurgitative, lampis2023bridging, haluptzoklanguage, patwa2024enhancing}. Motivated by this, we develop a principled understanding of when improvement is possible—namely, whether a generative model can leverage the verifier’s feedback, embedded in the selected synthetic subset, to achieve sustained gains.
+
+
+\vspace{-2mm}
+\paragraph{Filtering and selecting synthetic data.}
+\textcolor{black}{While a rich line of empirical work demonstrates that these filtering strategies can improve model performance,
+theoretical understanding about iterative retraining with filtered synthetic data remains largely unexplored, with only a few recent exceptions.}
+\textcolor{black}{\citet{amin2025escaping} assume a strong, reliable quality function and focus on how an external labeler aids learning under this fixed filtering mechanism. 
+\citet{feng2024beyond} study a classification problem and identify a sharp phase transition.
+However, modeling synthetic data merely as noisy labels abstracts away the structural dependencies between features and labels inherent to true generative processes.
+}
+Finally, \citet{ferbach2024self,weiself} considers a conceptually similar problem of learning  a discrete preference distribution from human feedback by using humans' preferred choices as a filtering strategy.
+% In such a setting, the generator maximizes the expected reward and the model distribution converges to the highest-reward level set, ultimately collapsing in diversity.}
+\textcolor{black}{In their population-level analysis, curating synthetic data via an external reward function forces the model distribution to converge to the highest-reward level set, maximizing expected reward but ultimately collapsing in diversity.}
+
+Similar to many of the aforementioned studies above, our theoretical analysis also focuses on linear models \citep{feng2024beyond,dohmatobstrong,gerstgrasser2024model}.
+However, our model allows inaccuracy of the verifier in terms of both bias and variance.
+Errors in the synthetic data primarily stem from the inaccuracy of the generative model itself \textcolor{black}{rather than exogenous noise}.
+We show that model's short-term performance varies smoothly with the verifier's bias, selectivity, and  size of synthetic data, rather than exhibiting a sharp phrase transition from complete failure to perfect accuracy as in \citet{feng2024beyond}.
+In the long run, the model's performance converges to the verifier's knowledge center whereas verifier's selectivity only affects convergence speed.
+Our results bridge short-term and long-term perspectives of iterative retraining, illustrating  how varied verifier qualities give rise to distinct performances of iterative retraining.
+
+\paragraph{Comparison with reward maximization frameworks.}
+\label{app:reward_comparison}
+While sharing the conceptual similarity of evaluating generated data via an external feedback mechanism, our modeling approach substantially differs from reward maximization frameworks in various aspects, including preference matching \citep{ferbach2024self,weiself} and recent Reinforcement Learning with Verified Rewards (RLVR)\citep{guo2024deepseek,yu2025dapo}. 
+Theoretically, these methods frame the problem as policy optimization, where the objective is to maximize a provided reward signal. While highly effective for alignment, the definition of a ``good model'' is tied to the specific reward formulation, which may not correspond to recovering the true data-generating distribution.
+Practically, reward optimization relies on assigning scalar rewards or pairwise comparison signals \citep{ouyang2022training}, which are often difficult and noisy to define. For instance, evaluating image quality or open-ended language generation with a single numerical reward is inherently subjective. While recent methods like RLVR avoid this issue by restricting themselves to domains with clearly verifiable rewards \citep{guo2025deepseek,wu2025invisible,yu2025dapo}, many important training settings lack such reliable reward functions.
+In contrast, we study the widely used ``generate-verify-retrain'' paradigm, which utilizes binary accept/reject filtering. 
+Theoretically, our framework defines a ``good model'' at the parameter level, explicitly modeling the relationship between the verifier's filtering rule and the ground truth. 
+By formalizing this link, we can directly analyze model performance during iterative retraining, even for an imperfect or biased verifier.
+Practically, this filtering mechanism is less noisy, highly stable, and serves as a core scalable primitive in modern LLM pipelines like DeepSeek-Coder \citep{guo2025deepseek}. 
+
+

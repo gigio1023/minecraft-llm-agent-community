@@ -1,0 +1,94 @@
+\section{\benchmark}
+
+\input{sections/ex_table}
+
+We propose \benchmark, a benchmark that measures RM robustness.
+The instances are based on those from the original RewardBench, but altered using various meaning- or ranking-preserving transformations, mostly adapted from prior work.
+We categorize \benchmark transformations into three types: controlled transformation using templates that ensure the preservation of meaning, automatically generated transformations that are more naturalistic, and domain-specific transformations (e.g., for coding).
+Tables~\ref{tab:benchmark-examples} to \ref{tab:benchmark-examples-safety} show transformation examples and a complete list of all 28 transformations is in \S\ref{sec:full-examples}.
+Not all transformations are applied to all instances; see \S\ref{sec:metrics}.
+We note that, while some of our transformations are somewhat adversarial, they are all model-agnostic and have been manually designed without model-specific training. We expect that learned targeted transformations~\citepia{zhu2024promptrobustevaluatingrobustnesslarge,raina-etal-2024-llm,liu2024robustnesstimeunderstandingadversarial} would cause even larger performance degradations.
+
+
+\subsection{Controlled Transformations} \label{sec:controlled-transformations}
+
+In the first category, we manually design templates that embed the original prompt and response,
+ensuring that the underlying meaning is not changed.
+\begin{enumerate}
+    \item \textbf{Add Quotes}: We surround the prompt and the response with 10 quotation marks on each side.
+    \item \textbf{Punct. Spaces}: We add a pair of whitespaces around each punctuation mark.
+    \item \textbf{Twitter Handle/URL}: As proposed in \citet{ribeiro-etal-2020-beyond}, we append a string in the form of a Twitter handle or URL (randomly generated and does not correspond to any real user/post).
+    \item \textbf{StressTest}: From \citet{naik-etal-2018-stress}, we append semantically vacuous strings, randomly choosing between ``and true is true'' and ``and false is not true'' repeated five times, following \citet{zhu2024promptrobustevaluatingrobustnesslarge}.
+    \item \textbf{Ignore Above/Below}: We distract the model by adding the chosen response before/after the prompt and additional instruction asking to ignore it.
+    \item \textbf{Rot-13/Rot-2}: We encode (only) the prompt
+    with Rot-13 which shifts each letter 13 positions forward in the alphabet, a common transformation in corpora which pretrained LMs are familiar with~\citep{doi:10.1073/pnas.2322420121}. We use the same specification prompt from \citet{doi:10.1073/pnas.2322420121}. \citet{doi:10.1073/pnas.2322420121} also experimented with Rot-2 to control for memorization effects, which we follow.
+\end{enumerate}
+
+\subsection{Naturalistic Transformations} \label{sec:naturalistic-transformations}
+
+These transformations imitate RM input noise in the wild. They are not guaranteed to perfectly preserve meaning, but reflect realistic challenges that RMs face. For example, back-transcribed inputs simulate RM interaction using speech, homoglyphs are likely with OCR-obtained inputs, and the character-level transformations mimic typos.
+For back-translation, back-transcription, and word deletion, we ensure that the transformed inputs are similar to the original by enforcing a consine similarity constraint of at least 0.7 as measured by the Universal Sentence Encoder~\citep{cer-etal-2018-universal}, resampling if not satisfied.
+We also manually examined the transformed inputs to ensure that they are reasonable; see examples in Table~\ref{tab:benchmark-examples-natural-full}.
+Most of these transformations are taken from \citet{morris-etal-2020-textattack} and also commonly considered in past work~\citepia{10.1007/978-3-030-99736-6_27,hagen-etal-2024-revisiting}.
+\begin{enumerate}
+    \item \textbf{Paraphrase}: We use Llama-3-70B-instruct \citep{grattafiori2024llama3herdmodels} to automatically paraphrase the prompt and the
+    \iflongversion
+    response. We include our paraphrase instruction in \S\ref{sec:instructions}.
+    \else
+    response (see \S\ref{sec:instructions}).
+    \fi
+
+    \item \textbf{Back-translation}: Alternatively, we obtain paraphrases by translating the English sentence to Spanish and then back
+    \iflongversion
+    to English
+    \fi
+    using OPUS-MT~\citep{TiedemannThottingal:EAMT2020,tiedemann2023democratizing} for five rounds, following \citet{morris-etal-2020-textattack}.\iflongversion\footnote{\url{https://huggingface.co/Helsinki-NLP/opus-mt-en-ROMANCE} and \url{https://huggingface.co/Helsinki-NLP/opus-mt-ROMANCE-en}.}\fi
+
+    \item \textbf{Back-transcription}: Similar in spirit, back-transcription~\citep{kubis-etal-2023-back} converts texts to audio and then back to text. Again following \citet{morris-etal-2020-textattack}, we use fairseq S$^2$~\citep{wang-etal-2021-fairseq} for text-to-speech and Whisper-base~\citep{radford2022robustspeechrecognitionlargescale} for speech recognition.
+
+    \item \textbf{Homoglyph Substitutions}: In Unicode, some characters look similar or identical to common Latin letters or numbers but with different code points, such as between \includegraphics[height=0.8\fontcharht\font`\B]{figures/e.pdf} (Latin letter) and \includegraphics[height=0.8\fontcharht\font`\B]{figures/e_homoglyph.pdf} (Cyrillic letter). They are thus represented differently digitally but a human cannot differentiate between them. We use the mapping in \citet{morris-etal-2020-textattack}.
+
+    \item \textbf{Character Swaps/substitutions/insertions/deletions}: For 50\% of words, we randomly swap two neighboring characters in that word.
+    Alternatively, for 30\% of words, we randomly substitute/insert/delete one character.
+    For substitutions, we consider both (1) substituting with any letter or (2) neighboring letters on a Qwerty keyboard, more realistically simulating typos~\citepia{belinkov2018synthetic,Rychalska2019models}.
+    These are related to common linguistic phenomena metathesis, epenthesis, and syncope, to which humans are robust~\citep{Rawlinson1976}.
+    They have been widely considered in prior work where ML models are expected to be invariant to these changes~\citepia{belinkov2018synthetic,Rychalska2019models,ribeiro-etal-2020-beyond}.
+
+    \item \textbf{Word Deletion}: We randomly delete one word from the prompt and the response, separately.
+\end{enumerate}
+
+\subsection{Domain-targeted Transformations}
+
+RewardBench contains subsets that test  RMs in targeted domains, including their coding ability, mathematical ability, and harmlessness. We craft transformations that target each. For coding, RewardBench considers many programming languages; we focus on Python and expect analogous transformations in
+\iflongversion
+other programming languages
+\else
+others
+\fi
+to have similar effects.
+
+\begin{enumerate}
+    \item \textbf{Code Minification}: We automatically minify Python programs by renaming variables, removing unnecessary whitespaces, etc.\iflongversion\footnote{Using \url{https://github.com/dflook/python-minifier}}\fi\xspace This maintains program functionality while equally degrading the style of the chosen and rejected responses.
+
+    \item \textbf{Add Comment}: To confuse the RM, we add a comment ``\texttt{\# bad}'' after each line of the chosen response and ``\texttt{\# good}'' after each line of the rejected response. To be less adversarial, we also consider a variant where we add ``\texttt{\# bad}'' to both.
+
+    \item \textbf{Append Other Code}: Again to be adversarial, we append the rejected code snippet after the chosen snippet, and vice versa. This does not change the functionality of the code because all RewardBench Python instances end in a return statement, and any code that follows would be a no-op.
+
+
+    \item \textbf{Swap Format}: All math instances in RewardBench have an artifact: the chosen response always has the final answer in a \texttt{\textbackslash boxed\{\}} \LaTeX\ environment, and the rejected response always reports the answer after a markdown ``\texttt{\# Answer}'' header. We hypothesize that RMs are biased towards this distribution and we hence swap the two formats.
+
+    \item \textbf{Jailbreaking}: LMs are expected to be harmless and refrain from answering offensive or dangerous questions. Much work has attempted to ``jailbreak'' LMs using specific prompts to elicit harmful answers. We test if these same prompts make RMs prefer harmful answers over refrained answers. We use the top prompts from the JailbreakChat dataset,\footnote{We consider top-scoring templates in the Jailbreak Chat dataset (\url{https://huggingface.co/datasets/rubend18/ChatGPT-Jailbreak-Prompts}) that are for GPT-4, excluding ``GPT-4 Simulator'' since it cannot be generally applied easily. We take the 3 top-scoring templates.} following prior work~\citepia{liu2024jailbreakingchatgptpromptengineering,shen2024donowcharacterizingevaluating}.
+\end{enumerate}
+
+\subsection{Metrics} \label{sec:metrics}
+
+As mentioned in \S\ref{sec:background}, we mainly consider RM ranking changes (and inspect the changes in raw rewards in \S\ref{sec:score-changes}). Specifically, each instance of RewardBench, and thus also \benchmark, pairs a prompt $p$ with a winning response $y_w$ and a losing response $y_l$. We measure how often an RM prefers the winning response over the losing response. %
+
+To quantify RM robustness, we measure the absolute \textbf{ranking accuracy drop} after transforming the instances, micro-averaged across all instances.\footnote{
+\iflongversion
+RewardBench uses a more complex averaging scheme, so our numbers cannot be directly compared to theirs.
+\else
+Differing from the averaging scheme in RewardBench.
+\fi} The transformations have different applicability (e.g., the Python transformations only apply to the Python subset), and the ranking accuracy drop is only computed on those instances.
+See \S\ref{sec:full-examples} for the applicability of each transformation.
+Similarly, sometimes a transformation has no effect on an instance (e.g., when our cosine similarity requirement in \S\ref{sec:naturalistic-transformations} is not met after 10 attempts, though this is rare), which we would also exclude.

@@ -1,0 +1,64 @@
+\section{Self-Rewarded Training}
+
+\begin{wrapfigure}{r}{0.6\textwidth}
+\begin{minipage}{0.6\textwidth}
+\begin{algorithm}[H]
+\caption{Self-Rewarded Training (\algo{})}
+\label{alg:srt}
+\KwIn{Prompt dataset $\mathcal{X}$}
+\ForEach{RL iteration}{
+    \tcc{\emph{Inference step}}
+    Sample minibatch $\mathcal{B} \subseteq \mathcal{X}$
+
+    \ForEach{prompt $x \in \mathcal{B}$}{
+        Generate $n$ solutions $y^{(1)},...,y^{(n)} \sim \pi_\text{label}(\cdot|x)$
+
+        Identify majority-vote answer:
+        $$y_\text{majority} \gets \arg\max_{y'} \sum_{i=1}^{n} \mathbf{1}[\text{answer}(y^{(i)}) = y']$$
+
+        Define reward function: $$r(y) \gets \mathbf{1}[\text{answer}(y) = y_\text{majority}]$$
+    }
+
+    \tcc{\emph{Gradient update step}}
+    Perform RL gradient update using $r(\cdot)$
+}
+\end{algorithm}
+\end{minipage}
+\vspace{-1em} 
+\end{wrapfigure}
+
+Our objective in this work is to investigate whether \emph{reliable} training supervision for language models can be generated without external labels. The typical practice for online RL involves generating multiple responses to a prompt, then assigning high or low rewards to each generation according to a ground-truth verifier. In the absence of such a verifier, one might develop a mechanism to derive proxy labels. This mechanism then provides a simple recipe for framing self-improvement as an RL problem. At a high level, each iteration proceeds as follows: \textbf{(1)} Sample a mini-batch of prompts, \textbf{(2)} Determine pseudo-labels, $y_\text{pseudo}$, using the mechanism for each prompt, \textbf{(3)}
+Generate $n$ responses per prompt and use agreement with the derived psuedo-labels as an intrinsic binary reward:
+
+\begin{align}
+    \label{eqn:self-reward}
+    r(y)=\mathbf{1}[\text{answer}(y)=y_\text{pseudo}],
+\end{align}
+
+and then \textbf{(4)} Perform a single RL update step on this mini-batch using the  reward function $r(\cdot)$.
+
+
+\paragraph{Self-supervision via majority voting.}
+Among several possible choices for determining reasonably accurate pseudo-labels, we explore the simplest one in this work, \emph{majority voting}. Majority voting has been empirically demonstrated to have higher accuracy compared to individual model generations~\citep{wang2023selfconsistency} and is thus a suitable choice to exploit an LLM's inherent generation-verification gap (see Appendix Figure~\ref{fig:generation_verification_gap}, where majority voting consistently outperforms the model's average capabilities across 3 test datasets and therefore can act as a verifier). 
+In our setting, models typically produce a step-by-step chain of thought followed by a final answer (in the case of regular RL training, this final answer is extracted and matched with the ground truth to produce rewards), so one can group all responses by their final answer to determine the majority vote. Concretely, assume we want to generate pseudo-labels using policy $\pi_\text{label}$ (which can be any reasonable policy). This procedure then involves: \textbf{(1)} sampling multiple answers per prompt using policy $\pi_\text{label}$, \textbf{(2)} grouping answers according to their parsed final solutions, \textbf{(3)} estimating the ground truth answer with the most common solution.
+
+
+\paragraph{Self-Rewarded Training (SRT).} 
+The general procedure is described in Algorithm~\ref{alg:srt}, which henceforth shall be called Self-Rewarded Training (\algo{}) in this paper. Since the method prescribes a specific form of the reward function using model self-consistency, it is compatible with all the common RL training algorithms such as PPO, RLOO, REINFORCE, GRPO, etc. We study the quality of generated labels during training by controlling $\pi_\text{label}$: setting $\pi_\text{label}$ to be the base model recovers our familar setting of learning the majority voting decisions of a fixed model (while still using the current policy's rollouts for RL training), and setting $\pi_\text{label}$ to be the current policy $\pi_\theta$ after each gradient step allows us to study whether the quality of the learning signal can be concurrently improved during RL training. In the case where we use the current policy $\pi_\theta$ to generate our pseudo-labels, we can reuse them for performing the RL gradient step as well. As the number of generations per prompt typically falls in the range 16-64~\citep{yu2025dapoopensourcellmreinforcement}, this variant of \algo{} incurs no additional compute cost compared to the versions of these algorithms employing ground truth labels. In our work, whether the final answer is correctly formatted and parseable is used to filter responses, but given more compute, one can theoretically employ more sophisticated systems like LLM-as-a-judge~\citep{zheng2023judgingllmasajudgemtbenchchatbot,gu2025surveyllmasajudge} or generative verifiers~\citep{zhang2025generativeverifiersrewardmodeling} to further improve the quality of the training signal. We leave these for future work.
+
+
+As long as majority voting leads to a positive generation-verification gap at each RL iteration, we expect iterative self-rewarding to provide a useful supervisory signal. We describe our empirical observations in the following section.
+
+
+
+
+
+
+
+
+
+
+
+
+
+

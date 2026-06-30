@@ -1,0 +1,107 @@
+\section{Details of Environment}
+\label{sec:details_of_environment}
+
+This section provides a more exhaustive description of the environment dynamics and the observations (and, where appropriate, actions) available to agents and the social planner.
+We describe these separately for each of the mechanics used to construct the simulation.
+Note that observations and actions are essentially the inputs and outputs of the neural network policies trained using RL.
+Planner observations/actions are irrelevant for baseline tax models, where tax rates are either fixed or calculated formulaically.
+
+\paragraph{World Dynamics.}
+The \textit{Gather-and-Build} environment is organized over a 2D grid.
+Grid cells can be occupied by agents, resources, houses, or other landmarks such as water.
+At the start of each episode, certain cells are designated as `source' cells that function to spawn new resource units.\footnote{For our purposes, we use the same, fixed layout of source cells each episode.}
+A given source cell only spawns a single type of resource, i.e. wood or stone.
+If an agent moves to a cell that contains a resource, that resource is added to the agent's inventory and removed from the world at that location.
+At the start of each timestep, resources randomly re-spawn at empty source cells according to the regeneration probability.
+
+The state of the world is represented as a $H \times W \times C$ tensor, where $H$ and $W$ are the size of the world and $C$ is the number of unique entities that may occupy a cell, and the value of a given element indicates that a particular entity is occupying the associated location.
+The social planner is able to observe the full world state tensor, while agent observations are restricted to views of the state tensor from a narrower, egocentric spatial window.
+Our experiments use a world of size 25-by-25, where agent observations have size 11-by-11.
+Agent spatial observations are padded as needed when their observation window extends beyond the world grid.
+
+
+\paragraph{Movement and Gathering.}
+Agents must navigate the world in order to collect resources and build new houses.
+The action space of the agents includes 4 actions for moving up, down, left, and right.
+Agents are restricted from moving on top of water cells, cells occupied by other agents, and cells containing houses built by other agents.
+In this way, agents may create difficulty for other agents by restricting their available paths.
+
+Before resources may be sold or used to build houses, they must be collected from the world.
+An agent collects resources by moving itself on top of a resource-populated source cell.
+By default, this adds a single unit of the collected resources to the agent's inventory, with the possibility of a bonus unit also being collected, the probability of which is determined by the agent's collecting skill.
+
+Agents observe the state of their inventories (including wood, stone, and coin) as well as their own collecting skill.
+The planner is also able to observe agents' inventories but cannot observe skill values.
+
+
+\paragraph{Building.}
+When an agent has both stone and wood in its inventory, it may spend one unit of each in order to construct a house.
+The action space of the agents includes 1 action for building.
+Agents are restricted from building on source cells as well as locations where a house already exists.
+Building places a house at the location occupied by the agent and adds coin to the agent's inventory, the amount of which is determined by its building skill.
+Agents observe their own building skill, which the planner is not able to observe.
+
+
+\paragraph{Trading.}
+Agents can buy and sell resources from one another through a trading mechanism structured as a \textit{continuous double auction}.
+This is conceptually similar to a commodities or stock exchange, where participants do not interface directly but instead submit bids and asks to a market, which identifies and executes valid trades.
+The action space of the agents includes 44 actions for trading, representing the combination of 11 price levels ($0, \ldots, 10$ coin), 2 directions (bids and asks), and 2 resources (wood and stone).
+Note: agents buy resources by submitting bids and sell resources by submitting asks.
+Each trade action therefore maps to a single order (i.e. bid 3 coin for 1 wood, ask for 5 coin in exchange for 1 stone, etc.).
+Once an order is submitted, it remains open until either it is matched (in which case a trade occurs) or it expires (after 50 timesteps).
+Agents are restricted from having more than 5 open orders for each resource and are restricted from placing orders that they cannot complete: they cannot bid with more coin than they possess and cannot submit asks for resources that they do not have.
+
+A bid/ask pair form a valid trade if they are for the same resource and the bid price matches or exceeds the ask price.
+When a new order is received (i.e. bid 3 coin for 1 wood) it is compared against complementary orders to identify potential valid trades.
+When a single bid (ask) could be paired with multiple existing asks (bids), priority is giving the ask (bid) with the lowest (highest) price; in the event of ties, priority then is given to the oldest existing order.
+Once a match is identified, the trade is executed using the price of whichever order was placed first.
+As an example, if the market receives a new bid that offers 8 coin for 1 stone and the market has two open asks offering 1 stone for 3 coin and 1 stone for 7 coin, respectively, the market would pair the bid with the first ask and a trade would be executed for 1 stone at a price of 3 coin:
+the bidding agent loses 3 coin and gains 1 stone and the asking agent loses 1 stone and gains 3 coin.
+Once a bid and ask are paired and the trade is executed, both orders are removed from the market.
+
+The state of the market is captured by the number of outstanding bids and asks at each price level for each resource.
+Agents observe these counts both for their own bids/asks as well as the cumulative bids/asks of other agents (representing the bids/asks that they could respond to).
+The planner observes the cumulative bids/asks of all agents.
+In addition, both agents and the planner observe some historical information from the market: (for each resource) the average trading price as well as the number of trades at each price level.
+
+
+\paragraph{Taxation and Redistribution.}
+The main text describes the general implementation of periodic, bracketed taxes used in our environment (Section \ref{sect:brackettax}).
+On the first timestep of each tax period, the planner sets the marginal tax rates that will be used to collect taxes when the tax period ends.
+For baseline models, these are set either formulaically or using fixed rates.
+For taxes controlled by a deep neural network (i.e. AI Economist), the action space of the planner is divided into seven action subspaces, one for each tax bracket: $\{0, 0.05, 0.10, \ldots, 1.0\}^7$.
+Each subspace denotes the set of discretized marginal tax rates that the planner may select.\footnote{Discretization of tax rates only applies to deep learning networks.}
+The action space takes this form because, when setting new rates, the planner samples 7 rates at once.
+
+Agents observe:
+\begin{itemize}
+    \item The tax rates of the current tax period
+    \item The marginal rate at the income level earned within the current period so far
+    \item Indicators of the temporal progress of the current tax period
+    \item The set of sorted and anonymized incomes the agents reported in the previous period
+\end{itemize}
+The planner observes the same information as well as the non-anonymized income and marginal tax rate (at that income) of each agent in the previous period.
+
+
+\paragraph{Action Details.}
+In our implementation, both agents and planners use discrete action spaces.
+One advantage of this choice is that it grants easier control over which actions the agent/planner models can sample at a given time.
+We encode this using `action masks' which we use to ensure that the policy network assigns effectively 0 probability to restricted actions.
+Action masking is useful for preventing invalid actions and is how we control the tax annealing (see Section \ref{sec:trainingstrategy}) for the AI Economist experiments.
+
+In addition to the actions described above, we include a \texttt{NO-OP} action (``no operation'') in each action space.
+(For the planner, each of the 7 action subspaces includes a \texttt{NO-OP} action.)
+The \texttt{NO-OP} action is interpreted as essentially taking no action, allowing the agent to ``idle'' and the planner to leave a bracket's tax rates unchanged between periods.
+
+Most importantly, we use these implementation features to enable the planner to observe every timestep while only acting at the start of each new tax period.
+For timesteps other than those at the start of a tax period we simply use the action mask to enforce that only \texttt{NO-OP} actions are sampled.
+This allows the planner to use rich temporal information while also ensuring that policy gradients are only propagated from the action samples used to control taxes.
+
+
+
+
+
+
+
+
+

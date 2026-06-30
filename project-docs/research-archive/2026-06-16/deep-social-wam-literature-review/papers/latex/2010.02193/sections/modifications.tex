@@ -1,0 +1,26 @@
+\section{Summary of Modifications}
+\label{sec:modifications}
+
+To develop DreamerV2, we used the Dreamer agent \citep{hafner2019dreamer} as a starting point. This subsection describes the changes that we applied to the agent to achieve high performance on the Atari benchmark, as well as the changes that were tried but not found to increase performance and thus were not not included in DreamerV2.
+
+Summary of changes that were tried and were found to help:
+
+\begin{itemize}
+\itempar{Categorical latents} Using categorical latent states using straight-through gradients in the world model instead of Gaussian latents with reparameterized gradients.
+\itempar{KL balancing} Separately scaling the prior cross entropy and the posterior entropy in the KL loss to encourage learning an accurate temporal prior, instead of using free nats.
+\itempar{Reinforce only} Reinforce gradients worked substantially better for Atari than dynamics backpropagation. For continuous control, dynamics backpropagation worked substantially better.
+\itempar{Model size} Increasing the number of units or feature maps per layer of all model components, resulting in a change from 13M parameters to 22M parameters.
+\itempar{Policy entropy} Regularizing the policy entropy for exploration both in imagination and during data collection, instead of using external action noise during data collection.
+\end{itemize}
+
+Summary of changes that were tried but were found to not help substantially:
+
+\begin{itemize}
+\itempar{Binary latents} Using a larger number of binary latents for the world model instead of categorical latents, which could have encouraged a more disentangled representation, was worse.
+\itempar{Long-term entropy} Including the policy entropy into temporal-difference loss of the value function, so that the actor seeks out states with high action entropy beyond the planning horizon.
+\itempar{Mixed actor gradients} Combining Reinforce and dynamics backpropagation gradients for learning the actor instead of Reinforce provided marginal or no benefits.
+\itempar{Scheduling} Scheduling the learning rates, KL scale, actor entropy loss scale, and actor gradient mixing (from 0.1 to 0) provided marginal or no benefits.
+\itempar{Layer norm} Using layer normalization in the GRU that is used as part of the RSSM latent transition model, instead of no normalization, provided no or marginal benefits.
+\end{itemize}
+
+Due to the large computational requirements, a comprehensive ablation study on this list of all changes is unfortunately infeasible for us. This would require 55 tasks times 5 seeds for 10 days per change to run, resulting in over 60,000 GPU hours per change. However, we include ablations for the most important design choices in the main text of the paper.

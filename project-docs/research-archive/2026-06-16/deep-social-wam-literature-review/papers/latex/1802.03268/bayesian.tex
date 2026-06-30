@@ -1,0 +1,94 @@
+\section{\label{sec:bayes}A Bayesian Framework}
+
+We briefly review the relevant background in Bayesian neural networks and two
+variational inference methods, specifically mean-field approximation and
+structured approximation. We the proceed to show that NAS can be casted as an
+instance of Bayesian neural networks and that this formulation of NAS inspires
+our novel approach.
+
+\subsection{\label{sec:bayesian}The Bayesian Framework}
+Suppose we want to model an unknown distribution $p(\x)$ of our data. In the
+Bayesian framework~\citep{bayes_nn}, we seek to learn a latent variable $\z$ in
+the probability space $Z$ such that $z$ is likely to generate our data $\x$. We
+start by postulating a prior distribution $p(\z)$ over the possible hidden
+variables $\z$, which represents our initial belief in how $z$ should look
+like. We then attempt to learn a distribution $q(\z)$ over $\Z$ that minimizes
+the Kullback-Leiber divergence between $q(\z)$ and the true posterior $p(\z |
+\x)$. Using Bayes rule, we can write the KL divergence as follows.
+\begin{align}
+  \text{KL}\left( q(\z) \parallel p(\z | \x) \right)
+    &= \mathbb{E}_{\z \sim q} \left[ \log{q(\z)} \right]
+     - \mathbb{E}_{\z \sim q} \left[ \log{p(\x | \z)} \right]
+     - \mathbb{E}_{\z \sim q} \left[ \log{p(\z)} \right] + \log{p(\x)} \\
+    &= -\mathbb{E}_{\z \sim q} \left[ \log{p(\x | \z)} \right]
+     + \mathbb{E}_{\z \sim q}\left[ \log{q(\z)} - \log{p(\z)} \right] + \log{p(\x)} \\
+    \label{eqn:elbo}
+    &\leq -\mathbb{E}_{\z \sim q} \left[ \log{p(\x | \z)} \right] + \text{KL}(q(\z) \parallel p(\z))
+\end{align}
+The right-hand side of Eqn~\ref{eqn:elbo} is called the \textit{Evidence Lower
+Bound} (ELBO) of the hypothesized distribution $q(\z)$. The ELBO captures the
+expected log-likelihood $\mathbb{E}_{z \sim q} \left[ \log{p(\x | \z)} \right]$
+of the data $\x$ given the latent variable $\z$, which we can observe from our
+training data. In recent work, the divergence $\text{KL}(q(\z) \parallel
+p(\z))$ was treated as a regularization term. For
+instance,~\cite{variational_dropout,variational_dropout_rnn} approximated the
+KL divergence with an $\ell_2$ regularization on their parameters, equivalently
+assuming a prior $p(\z)$ to put weights on the all parameters being $0$. The
+take-away message is that in practice, one can approximate the ELBO term in
+different ways, leading to different learning algorithms.
+
+\subsection{\label{sec:mean_field_and_structured}Mean-field and Structured Variational Approximation}
+If the latent variable $\z$ can take on an arbitrary form, then the ELBO term
+is intractable. Mean-field approximation relaxes all the dependencies among
+components of $\z$. Specifically, mean-field approximation assumes that if $\z
+= (z_1, z_2, ..., z_m)$ then
+\begin{align}
+  q(\z) = \prod_{i=1}^{m} q_i(z_i)
+\end{align}
+While such independence assumption makes it easier to learn $q(\z)$, it
+introduces a bias in the space of latent variables $\Z$. This is because the
+true posterior $p(\z | \x)$, which we aim to approximate with $q(\z)$, may have
+a degree of dependencies between the components $z_i$'s. In contrast to
+mean-field approximiation,structured variational approximation
+methods~\citep{struct_approx} assume a certain degree of dependencies on the
+components of $\z$, leading to a model with a higher fidelity to the true
+posterior $p(\z | \x)$, at the tradeoff of more complex learning problem.
+
+\subsection{\label{sec:bayesian_nas}Connection to Neural Architecture Search}
+In~\cite{variational_inference_reviews}, it is noted that the ELBO
+can be used as a criterion for model selection, effectively drawing a
+connection from variational methods to NAS methods, which aim to select the
+best models, a.k.a.  network architectures.
+
+To cast the NAS problem as an instance of the described Bayesian framework, we
+let $\z$ be a pair $(\m, \theta_{\m})$ of an architecture $\m$ and its
+parameters $\theta_{\m}$, and note that $\m$ is a discrete latent variable. Now
+we can write
+\begin{align}
+  \text{ELBO}(q)
+    &= -\mathbb{E}_q \left[ \log{p(\x | \z)} \right]
+     + \text{KL}(q(\m, \theta_\m) \parallel p(\m, \theta_\m | \x)) \\
+    \label{eqn:models_and_params}
+    &= -\sum_{\m} q(\m) \int{\log{p(\x | \m, \theta_\m)} q(\theta_{\m} | \m) d\theta_{\m}}
+     + \text{KL}(q(\m, \theta_\m) \parallel p(\m, \theta_\m | \x))
+\end{align}
+Eqn.~\ref{eqn:models_and_params} exhibits an instance of structured variational
+approximation as described in Section~\ref{sec:mean_field_and_structured}, as
+$\theta_\m$ depends on $\m$ and has to be learned to fit with each model $\m$.
+Some existing approaches for NAS falls into this
+category~\citep{nas,nas_module,nas_dqn,nas_module_dqn}. As noted, structured
+variational approximation has a high fidelity to the true posterior, which
+means that the aforementioned methods can better approximate the true posterior
+$p(\x | \z)$, at the cost of solving a more difficult learning problem. In the
+case of NAS, the learning problem is to learn the parameters $\theta_\m$, which
+means to optimize a neural network $\m$ from scratch. This is an expensive
+process, and it leads to the notorious computational expense of these NAS
+approaches.
+
+On the other hand, mean-field variational approximation seems inappropriate for
+NAS, because not all models $\m$ can be compatible with the parameters
+$\theta_{\m'}$ of another model, e.g. the number of parameters can differ, not
+to mention further structures in $\theta_\m$. However, in
+Section~\ref{sec:enas}, we show that we are able to enforce a novel structure
+on $\theta_\m$ which leads to a succesful mean-field approximation of
+Eqn.~\ref{eqn:models_and_params}.

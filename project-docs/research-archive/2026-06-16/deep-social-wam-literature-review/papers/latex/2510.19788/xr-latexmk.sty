@@ -1,0 +1,54 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{xr-latexmk}
+
+\RequirePackage{xr} %TODO: what about hyper-xr ??
+\RequirePackage{etoolbox}
+
+%% Important!!!
+% Always make sure the loading order is amsmath -> hyperref -> cleveref if you use all three packages. Otherwise xr will make you suffer
+
+%% for package XR
+\newcommand*{\addFileDependency}[1]{% argument=file name and extension
+  \typeout{(#1)}% latexmk will find this if $recorder=0 (however, in that case, it will ignore #1 if it is a .aux or .pdf file etc and it exists! if it doesn't exist, it will appear in the list of dependents regardless)
+  \@addtofilelist{#1}% if you want it to appear in \listfiles, not really necessary and latexmk doesn't use this
+  \IfFileExists{#1}{}{\typeout{No file #1.}}% latexmk will find this message if #1 doesn't exist (yet)
+}
+
+\newcommand{\myexternaldocument}[1]{%
+    \externaldocument{#1}%
+    \addFileDependency{#1.tex}%
+    \addFileDependency{#1.aux}%
+}
+
+% %%% Hack that removes the duplicated citation labels
+% %%% See https://tex.stackexchange.com/questions/433834/ignore-a-section-or-chapter-when-cross-referencing
+\@ifpackageloaded{xr}
+  {\def\sf@safe@newlabel#1{%
+     \ifcsundef{r@#1}
+      {\newlabel{#1}}
+      {\PackageInfo{xr}{label `#1' already defined, skipping}%
+        \@gobble}}
+  \long\def\XR@test#1#2#3#4\XR@{%
+      \let\XR@tempa\@gobbletwo
+      \ifx#1\newlabel
+        \let\XR@tempa\@firstoftwo%
+      \else\ifx#1\@input
+         \let\XR@tempa\@secondoftwo
+      \fi\fi
+       \XR@tempa{\newlabel{\XR@prefix#2}{#3}}{\edef\XR@list{\XR@list#2\relax}}%
+      \ifeof\@inputcheck\expandafter\XR@aux
+      \else\expandafter\XR@read\fi}}
+  {}%
+\@ifpackageloaded{xr-hyper}
+  {\long\def\XR@test#1#2#3#4\XR@{%
+     \ifx#1\newlabel
+      \ifcsundef{r@#2}
+         {\expandafter\protected@xdef\csname r@\XR@prefix#2\endcsname
+            {\XR@addURL{#3}}}
+         {\PackageInfo{xr-hyper}{label `#2' already defined, skipping}}%
+     \else\ifx#1\@input
+      \edef\XR@list{\XR@list\filename@area#2\relax}%
+    \fi\fi
+    \ifeof\@inputcheck\expandafter\XR@aux
+    \else\expandafter\XR@read\fi}}
+  {}
