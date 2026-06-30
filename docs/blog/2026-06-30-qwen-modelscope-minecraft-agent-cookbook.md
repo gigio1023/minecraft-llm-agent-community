@@ -1,12 +1,13 @@
 ---
-slug: qwen-modelscope-minecraft-agent-cookbook
-title: "Cookbook: Run Qwen ModelScope Lanes in the Minecraft LLM-Agent Harness"
+slug: provider-lane-cookbook
+title: "Cookbook: Run Provider Lanes in the Minecraft LLM-Agent Harness"
 authors: [gigio1023]
-tags: [qwen, modelscope, minecraft, llm-agents, cookbook, mineflayer]
+tags: [minecraft, llm-agents, cookbook, mineflayer, evaluation]
 ---
 
-This is the practical recipe I used to run the Qwen Plus and Qwen Max lanes in
-the Minecraft LLM-agent harness through ModelScope API-Inference.
+This is the practical recipe I used to run provider-backed lanes in the Minecraft
+LLM-agent harness. The concrete run below used Qwen Plus and Qwen Max through
+ModelScope API-Inference, but the harness pattern is not tied to that provider.
 
 It is written as a reproducible operator note, not a leaderboard. The goal is
 to start from a fresh natural village-adjacent Minecraft world, let a
@@ -17,10 +18,10 @@ that say what actually happened.
 
 ## What This Reproduces
 
-The completed Qwen lanes used this shape:
+The completed example lanes used this shape:
 
 - provider: `modelscope-api`
-- models: Qwen Plus and Qwen Max through ModelScope API-Inference
+- example models: Qwen Plus and Qwen Max through ModelScope API-Inference
 - actor: `npc_b`
 - scenario: `natural-village-spawn-v1`
 - seed: `4167799982467607063`
@@ -40,7 +41,7 @@ In practice, that means the actor should try to collect logs, craft planks and
 sticks, create or place a crafting table, recover from blockers, and leave
 evidence that can be reviewed later. Prose alone does not count as progress.
 
-## 1. Prepare ModelScope Access
+## 1. Prepare Provider Access
 
 Create or update the repo-local ignored `.env` file:
 
@@ -49,19 +50,19 @@ MODELSCOPE_API_KEY=...
 MODELSCOPE_BASE_URL=https://api-inference.modelscope.ai/v1
 ```
 
-Set the concrete ModelScope model ids available to your account:
+For this example, set the concrete ModelScope model ids available to your account:
 
 ```bash
 export MODELSCOPE_QWEN_PLUS_MODEL='<your ModelScope Qwen Plus model id>'
 export MODELSCOPE_QWEN_MAX_MODEL='<your ModelScope Qwen Max model id>'
 ```
 
-The social-cycle CLI does not infer the ModelScope model from environment
-fallbacks. Pass `--model` explicitly every time so the report cannot hide which
-ModelScope lane was evaluated.
+The social-cycle CLI does not infer the model from provider environment fallbacks.
+Pass `--provider` and `--model` explicitly every time so the report cannot hide
+which lane was evaluated.
 
-For an account-level smoke test, call the OpenAI-compatible Chat Completions
-endpoint directly:
+For a ModelScope account-level smoke test, call the OpenAI-compatible Chat
+Completions endpoint directly:
 
 ```bash
 MODEL_ID="$MODELSCOPE_QWEN_MAX_MODEL"
@@ -90,8 +91,8 @@ Do not commit tokens or paste raw credential output into reports.
 
 ## 2. Run A Provider-Free Visual Setup Smoke
 
-Before spending ModelScope quota, confirm that the scenario and visual capture
-path are working without a live provider:
+Before spending live provider quota, confirm that the scenario and visual capture path
+are working without a live provider:
 
 ```bash
 cd probe
@@ -120,19 +121,19 @@ review, inspect the report before judging the run:
 
 That smoke proves setup readiness: generated world, selected seed, spawn
 validation, manifest linking, and report-profile screenshot capture. It does
-not prove the Qwen lane will make good Minecraft progress.
+not prove a live model lane will make good Minecraft progress.
 
 ## 3. Run Provider Quota Preflight
 
-The completed comparison stored its Qwen preflight here:
+The completed comparison stored its ModelScope preflight here:
 
 ```text
 project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/preflight/qwen-30cycle-preflight.json
 ```
 
-That artifact allowed both Qwen lanes under the local ModelScope monthly
+That artifact allowed both example ModelScope lanes under the local monthly
 API-call policies. The later completed lanes used 38 provider records each, so
-future 30-cycle Qwen preflights should estimate at least 40 requests per lane.
+future 30-cycle preflights should estimate at least 40 requests per lane.
 
 From the repository root, the repo preflight helper command shape is:
 
@@ -151,7 +152,7 @@ Use a path appropriate for the experiment you are running. Do not overwrite a
 published preflight artifact unless you intentionally want to replace that
 record.
 
-## 4. Run The Qwen Plus Lane
+## 4. Run One ModelScope Lane
 
 From `probe/`, run:
 
@@ -171,13 +172,13 @@ bun run probe:social-cycle -- \
   --report ../project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-plus.json
 ```
 
-The completed lane produced:
+The completed Qwen Plus example lane produced:
 
 - report: `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-plus.json`
 - review summary: `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-plus-review-summary.json`
 - review markdown: `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-plus-review.md`
 
-## 5. Run The Qwen Max Lane
+## 5. Run A Second ModelScope Lane
 
 Use the same scenario and output shape, changing only the model and report path:
 
@@ -197,7 +198,7 @@ bun run probe:social-cycle -- \
   --report ../project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-max.json
 ```
 
-The completed lane produced:
+The completed Qwen Max example lane produced:
 
 - report: `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-max.json`
 - review summary: `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-max-review-summary.json`
@@ -262,7 +263,7 @@ Material milestones from the completed artifacts:
   cobblestone by the end of the lane.
 
 Those numbers are useful for reproducing this harness lane. They are not a
-general Qwen ranking and not evidence that interaction history beats a plain
+general model ranking and not evidence that interaction history beats a plain
 LLM prior.
 
 ## Caveats

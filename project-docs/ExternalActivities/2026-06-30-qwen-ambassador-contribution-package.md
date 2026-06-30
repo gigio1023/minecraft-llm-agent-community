@@ -12,20 +12,21 @@ monthly form.
 
 ### 1. Docusaurus Blog Post / Rich Visual Report
 
-Title: Qwen in a Minecraft Natural Village: a Visual 30-Cycle Model Comparison
+Title: A Minecraft Natural Village Model Run: Visual 30-Cycle Field Report
 
 Public link:
 `<PUBLIC_DOCUSARUS_RICH_VISUAL_REPORT_URL>`
 
 Expected Docusaurus URL after publication:
-`https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-minecraft-agent-visual-report`
+`https://naem1023.github.io/minecraft-llm-agent-community/blog/natural-village-model-comparison`
 
 Type: blog / article / evaluation
 
 Short description:
-A rich visual field report for a personal Minecraft LLM-agent experiment using
-Qwen Plus and Qwen Max through ModelScope, compared with GPT-5.4 mini and
-Gemini 3.1 Flash Lite on the same 30-cycle natural-village task. It includes
+A rich visual field report for a personal Minecraft LLM-agent experiment with
+multiple provider-backed lanes. The concrete run used Qwen Plus and Qwen Max
+through ModelScope alongside GPT-5.4 mini and Gemini 3.1 Flash Lite on the same
+30-cycle natural-village task. It includes
 Minecraft screenshots, model cards, outcome bars, material timelines, provider
 cost bars, caveats, and artifact links.
 
@@ -34,28 +35,29 @@ Local source:
 
 ### 2. Docusaurus Blog Post / Cookbook Tutorial
 
-Title: Cookbook: Run Qwen ModelScope Lanes in the Minecraft LLM-Agent Harness
+Title: Cookbook: Run Provider Lanes in the Minecraft LLM-Agent Harness
 
 Public link:
 `<PUBLIC_DOCUSARUS_COOKBOOK_BLOG_URL>`
 
 Expected Docusaurus URL after publication:
-`https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-modelscope-minecraft-agent-cookbook`
+`https://naem1023.github.io/minecraft-llm-agent-community/blog/provider-lane-cookbook`
 
 Type: blog / cookbook / reproducible tutorial
 
 Short description:
-A reproducible operator note showing how the Qwen ModelScope lanes were run in
-the Minecraft LLM-agent harness, including ModelScope setup, provider-free
-visual smoke, quota preflight shape, Qwen Plus/Max commands, review-summary
-commands, artifact inspection points, expected metrics, and caveats.
+A reproducible operator note showing how provider-backed lanes are run in the
+Minecraft LLM-agent harness. It uses ModelScope Qwen Plus/Max as the concrete
+example, but focuses on provider setup, provider-free visual smoke, quota
+preflight shape, run commands, review-summary commands, artifact inspection
+points, expected metrics, and caveats.
 
 Local source:
 `docs/blog/2026-06-30-qwen-modelscope-minecraft-agent-cookbook.md`
 
 ### 3. Open-Source Project / Repository Artifact
 
-Title: Qwen Natural Village Minecraft Agent Evaluation
+Title: Natural Village Minecraft Agent Evaluation
 
 Public link:
 `<PUBLIC_REPO_ARTIFACT_URL>`
@@ -66,18 +68,19 @@ Current branch URL:
 Type: project / open-source artifact index / evidence bundle
 
 Short description:
-A repo-level landing document for the Qwen natural-village Minecraft agent
+A repo-level landing document for the natural-village Minecraft agent
 evaluation. It indexes the final HTML report, combined comparison JSON,
-Qwen/Gemini experiment folders, Docusaurus blog posts, cookbook material, and
+provider-lane experiment folders, Docusaurus blog posts, cookbook material, and
 selected raw artifacts so readers can inspect the evidence behind the public
-write-ups.
+write-ups. The ModelScope/Qwen lanes are the concrete use case, not the whole
+point of the artifact.
 
 Local source:
 `QWEN_NATURAL_VILLAGE_EVAL.md`
 
 ### 4. Social Post
 
-Title: Qwen Minecraft Agent Evaluation X Post
+Title: Minecraft Agent Evaluation X Post
 
 Public link:
 `<PUBLIC_X_POST_URL>`
@@ -85,10 +88,10 @@ Public link:
 Type: social post
 
 Short description:
-A concise public X post linking the Qwen Minecraft agent evaluation and final
-report. The post highlights that Qwen Plus/Max were tested in a 30-cycle
-natural-village Minecraft harness with runtime evidence and screenshots, and
-that Qwen Max achieved the deepest material progress in this run.
+A concise public X post linking the Minecraft agent evaluation and final report.
+The post may mention that the ModelScope lanes used Qwen Plus/Max, but should
+frame the public artifact around the natural-village harness, runtime evidence,
+screenshots, and material progress observations.
 
 Local source:
 `project-docs/ExternalActivities/2026-06-30-qwen-ambassador-x-post.md`
@@ -99,7 +102,8 @@ The four links should not look like the same artifact pasted four times. They
 have distinct jobs:
 
 - visual report: what happened and what the model-comparison evidence showed;
-- cookbook blog: how to reproduce the Qwen ModelScope lanes;
+- cookbook blog: how to reproduce provider-backed lanes, using ModelScope Qwen as
+  the concrete example;
 - repo artifact: where the raw reports, screenshots, summaries, and scripts
   live;
 - X post: public social distribution that points readers back to the report.
@@ -111,7 +115,8 @@ contribution slot should use the cookbook blog post above.
 
 The operating guide recommends avoiding LinkedIn for now because the account can
 surface employer identity. A second Docusaurus blog post is safer and stronger:
-it is public, technical, Qwen-related, and useful to another developer.
+it is public, technical, useful to another developer, and still includes a
+concrete ModelScope/Qwen example without making the whole project provider-specific.
 
 ## Form Submission Notes
 
@@ -120,8 +125,8 @@ it is public, technical, Qwen-related, and useful to another developer.
 - Keep wording personal and technical.
 - Avoid employer names, internal systems, or claims that this is an official
   benchmark.
-- Use "personal Qwen experiment" or "open-source Qwen evaluation artifact"
-  rather than formal ambassador branding in public copy.
+- Keep public copy centered on the Minecraft harness and use ModelScope/Qwen as
+  the concrete model-provider example rather than the headline.
 
 ## Public URL Checklist
 

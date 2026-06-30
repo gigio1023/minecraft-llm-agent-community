@@ -1,7 +1,10 @@
-# Qwen Natural Village Minecraft Agent Evaluation
+# Natural Village Minecraft Agent Evaluation
 
-This repository now includes a small Qwen-focused Minecraft LLM-agent
-evaluation artifact.
+This repository now includes a small Minecraft LLM-agent evaluation artifact.
+The completed run used Qwen Plus and Qwen Max through ModelScope for two lanes,
+alongside OpenAI and Gemini reference lanes, but the artifact is about the
+harness, evidence, and natural-village task rather than a provider-specific
+benchmark.
 
 It is a personal open-source experiment, not a general model leaderboard. The
 question is narrower:
@@ -27,8 +30,8 @@ Use these public links for the four contribution slots after publication:
 
 Expected Docusaurus URLs:
 
-- `https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-minecraft-agent-visual-report`
-- `https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-modelscope-minecraft-agent-cookbook`
+- `https://naem1023.github.io/minecraft-llm-agent-community/blog/natural-village-model-comparison`
+- `https://naem1023.github.io/minecraft-llm-agent-community/blog/provider-lane-cookbook`
 
 Current branch repo artifact URL:
 
@@ -100,11 +103,13 @@ docs/blog/2026-06-30-qwen-minecraft-agent-visual-report.mdx
 
 ## Contribution Fit
 
-This repo artifact can be shared as a Qwen-related open-source project or
-evaluation contribution because it provides:
+This repo artifact can be shared as an open-source Minecraft LLM-agent
+evaluation contribution with a concrete ModelScope/Qwen use case because it
+provides:
 
-- a Qwen ModelScope use case;
-- comparable Qwen Plus and Qwen Max lanes;
+- a ModelScope/Qwen Plus and Qwen Max use case inside a broader provider-lane
+  harness;
+- comparable ModelScope, OpenAI, and Gemini lanes;
 - concrete Minecraft runtime artifacts;
 - model-comparison observations;
 - a reproducible cookbook blog and rich visual report.
