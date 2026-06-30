@@ -15,6 +15,7 @@ import {
 import type { FunctionTool, ResponseFunctionToolCall } from "openai/resources/responses/responses";
 
 import type { JsonValue } from "./inputSnapshot.js";
+import { waitForGeminiRequestSlot } from "./gemini/rateLimit.js";
 import {
   appendProviderUsageRecord,
   buildEstimatedUsage,
@@ -245,6 +246,7 @@ export async function callGeminiFunctionToolSelection(input: {
       }
 
       try {
+        await waitForGeminiRequestSlot();
         const response = await client.models.generateContent({
           model,
           contents: input.user,

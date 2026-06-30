@@ -19,6 +19,7 @@ import {
   type ProviderUsageRecord
 } from "../providerUsageTracker.js";
 import { parseOpenAiJsonText } from "../openaiApiJsonProvider.js";
+import { waitForGeminiRequestSlot } from "./rateLimit.js";
 
 export type GeminiTextCallResult = {
   path: "text-genai";
@@ -90,6 +91,7 @@ export async function callGeminiTextGenai(input: {
         estimatedUsage,
         context: input.usageContext
       });
+      await waitForGeminiRequestSlot();
       const response = await client.models.generateContent({
         model,
         contents: input.prompt,

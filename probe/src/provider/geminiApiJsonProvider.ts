@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 import { parseOpenAiJsonText } from "./openaiApiJsonProvider.js";
+import { waitForGeminiRequestSlot } from "./gemini/rateLimit.js";
 import {
   appendProviderUsageRecord,
   buildEstimatedUsage,
@@ -173,6 +174,7 @@ export async function callGeminiJsonSchema<T>(input: {
       }
 
       try {
+        await waitForGeminiRequestSlot();
         const response = await client.models.generateContent({
           model,
           contents: input.user,
