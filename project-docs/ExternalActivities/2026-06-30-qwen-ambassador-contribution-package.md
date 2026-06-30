@@ -2,8 +2,8 @@
 
 Date: 2026-06-30
 
-Guide referenced:
-`<home>/git/brain/career-operations/external-activities/2026-06-30-qwen-ambassador-contribution-guide.md`
+Prepared from the private local contribution guide for the June 2026 submission
+window.
 
 Goal: submit four meaningful, publicly shared Qwen-related contributions in one
 monthly form.
