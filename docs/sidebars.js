@@ -7,6 +7,7 @@ const sidebars = {
     'getting-started',
     'architecture',
     'evidence-and-artifacts',
+    'qwen-modelscope-minecraft-agent-cookbook',
     'roadmap',
   ],
 };
