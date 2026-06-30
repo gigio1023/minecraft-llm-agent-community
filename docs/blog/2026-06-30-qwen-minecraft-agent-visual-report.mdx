@@ -1,0 +1,718 @@
+---
+slug: qwen-minecraft-agent-visual-report
+title: "Qwen in a Minecraft Natural Village: a Visual 30-Cycle Model Comparison"
+description: "A visual field report comparing Qwen Plus and Qwen Max via ModelScope against two reference lanes in a 30-cycle Minecraft natural-village run."
+authors: [gigio1023]
+tags: [qwen, modelscope, minecraft, llm-agents, visual-report, evaluation]
+image: /img/qwen-natural-village-report/hero-village-start.png
+---
+
+import heroVillage from '@site/static/img/qwen-natural-village-report/hero-village-start.png';
+import qwenPlusImage from '@site/static/img/qwen-natural-village-report/qwen-plus-cycle30-follow.png';
+import qwenMaxImage from '@site/static/img/qwen-natural-village-report/qwen-max-cycle20-follow.png';
+import qwenMaxFirstPerson from '@site/static/img/qwen-natural-village-report/qwen-max-cycle30-first-person.png';
+import gptMiniImage from '@site/static/img/qwen-natural-village-report/gpt54-mini-cycle30-follow.png';
+import geminiImage from '@site/static/img/qwen-natural-village-report/gemini31-flash-lite-cycle30-follow.png';
+
+export const runs = [
+  {
+    id: 'qwen-plus',
+    label: 'Qwen Plus',
+    model: 'Qwen-Ambassador/Qwen3.7-Plus',
+    provider: 'ModelScope',
+    image: qwenPlusImage,
+    verified: 12,
+    blocked: 8,
+    noProgress: 10,
+    verifierPassed: 20,
+    requests: 38,
+    tokens: 1129990,
+    reqPerVerified: 3.17,
+    tokensPerVerified: 94166,
+    milestone: 'Workbench evidence at cycle 0004, wooden pickaxe retained, no cobblestone.',
+    inventory: 'cherry_planks x2, oak_log x3, oak_planks x1, stick x2, wooden_pickaxe x1',
+    read: 'The cleaner Qwen lane for early material setup: logs, planks, table placement, and a retained pickaxe chain.'
+  },
+  {
+    id: 'qwen-max',
+    label: 'Qwen Max',
+    model: 'Qwen-Ambassador/Qwen3.7-Max',
+    provider: 'ModelScope',
+    image: qwenMaxImage,
+    verified: 15,
+    blocked: 8,
+    noProgress: 7,
+    verifierPassed: 16,
+    requests: 38,
+    tokens: 1093021,
+    reqPerVerified: 2.53,
+    tokensPerVerified: 72868,
+    milestone: 'Workbench evidence at cycle 0003, wooden pickaxe retained, 6 cobblestone recorded.',
+    inventory: 'cherry_planks x1, cobblestone x6, dirt x4, stick x6, wooden_pickaxe x1',
+    read: 'The deepest material chain in this run: it moved from wood and table work into pickaxe and stone work.'
+  },
+  {
+    id: 'gpt54-mini',
+    label: 'GPT-5.4 mini',
+    model: 'gpt-5.4-mini',
+    provider: 'OpenAI API',
+    image: gptMiniImage,
+    verified: 8,
+    blocked: 9,
+    noProgress: 13,
+    verifierPassed: 19,
+    requests: 204,
+    tokens: 1115823,
+    reqPerVerified: 25.5,
+    tokensPerVerified: 139478,
+    milestone: 'Crafting table held in inventory, but not placed or verified; no pickaxe or cobblestone.',
+    inventory: 'crafting_table x1, dirt x3, oak_log x3, oak_planks x6, oak_stairs x1, pink_petals x2, stick x4',
+    read: 'The lane completed, but it spent far more provider records and did not close the same workbench evidence.'
+  },
+  {
+    id: 'gemini-31',
+    label: 'Gemini 3.1 Flash Lite',
+    model: 'gemini-3.1-flash-lite',
+    provider: 'Gemini API',
+    image: geminiImage,
+    verified: 11,
+    blocked: 19,
+    noProgress: 0,
+    verifierPassed: 11,
+    requests: 67,
+    tokens: 1709204,
+    reqPerVerified: 6.09,
+    tokensPerVerified: 155382,
+    milestone: 'Workbench evidence at cycle 0005, sticks and planks retained, no shelter or storage.',
+    inventory: 'oak_log x1, oak_planks x4, stick x8',
+    read: 'The paced lane finished the 30 cycles, then spent much of the second half blocked around table movement.'
+  }
+];
+
+export const maxRequests = Math.max(...runs.map((run) => run.requests));
+export const maxTokensPerVerified = Math.max(...runs.map((run) => run.tokensPerVerified));
+
+export function compactNumber(value) {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
+  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  return `${value}`;
+}
+
+export function OutcomeStack({run}) {
+  const total = run.verified + run.blocked + run.noProgress;
+  const segment = (value) => `${(value / total) * 100}%`;
+  return (
+    <div className="outcomeStack" aria-label={`${run.label} outcome distribution`}>
+      <span className="segment verified" style={{width: segment(run.verified)}} title={`${run.verified} verified progress`} />
+      <span className="segment blocked" style={{width: segment(run.blocked)}} title={`${run.blocked} blocked`} />
+      <span className="segment noProgress" style={{width: segment(run.noProgress)}} title={`${run.noProgress} no progress`} />
+    </div>
+  );
+}
+
+export function ModelCard({run}) {
+  return (
+    <article className={`modelCard ${run.id}`}>
+      <img src={run.image} alt={`${run.label} Minecraft report screenshot`} />
+      <div className="modelBody">
+        <p className="eyebrow">{run.provider}</p>
+        <h3>{run.label}</h3>
+        <p className="modelName">{run.model}</p>
+        <OutcomeStack run={run} />
+        <dl className="miniStats">
+          <div><dt>verified</dt><dd>{run.verified}/30</dd></div>
+          <div><dt>blocked</dt><dd>{run.blocked}/30</dd></div>
+          <div><dt>records</dt><dd>{run.requests}</dd></div>
+          <div><dt>tokens</dt><dd>{compactNumber(run.tokens)}</dd></div>
+        </dl>
+        <p>{run.read}</p>
+        <p className="inventory"><b>Final inventory:</b> {run.inventory}</p>
+      </div>
+    </article>
+  );
+}
+
+export function BarRow({run, value, max, suffix = ''}) {
+  return (
+    <div className="barRow">
+      <span className="barLabel">{run.label}</span>
+      <span className="barTrack" aria-hidden="true">
+        <span className={`barFill ${run.id}`} style={{width: `${(value / max) * 100}%`}} />
+      </span>
+      <span className="barValue">{compactNumber(value)}{suffix}</span>
+    </div>
+  );
+}
+
+export function Timeline({run, items}) {
+  return (
+    <article className={`timelineCard ${run.id}`}>
+      <h3>{run.label}</h3>
+      <ol>
+        {items.map((item) => (
+          <li key={item.cycle}>
+            <span>{item.cycle}</span>
+            <b>{item.label}</b>
+            <p>{item.note}</p>
+          </li>
+        ))}
+      </ol>
+    </article>
+  );
+}
+
+<style>{`
+.qwenReport {
+  --paper: #f8f2e5;
+  --surface: #fffaf0;
+  --ink: #1c2721;
+  --muted: #58625a;
+  --line: #d8cfbc;
+  --qwen: #178457;
+  --stone: #777c82;
+  --amber: #c58b2b;
+  --blocked: #a84a3d;
+  --soft: #edf3e5;
+  color: var(--ink);
+}
+.qwenReport * { box-sizing: border-box; min-width: 0; }
+.qwenReport .eyebrow,
+.qwenReport .metaLabel {
+  margin: 0 0 6px;
+  color: var(--qwen);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.qwenReport .lead {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.65;
+  margin: 0 0 18px;
+}
+.reportHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  gap: 18px;
+  align-items: stretch;
+  margin: 24px 0 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.reportHero img {
+  width: 100%;
+  height: 100%;
+  min-height: 330px;
+  object-fit: cover;
+  display: block;
+}
+.heroCopy {
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+.heroCopy h2 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.12;
+}
+.heroCopy p { margin: 0; color: var(--muted); line-height: 1.65; }
+.heroFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.heroFacts span {
+  display: block;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, .8);
+  font-size: 13px;
+}
+.heroFacts b {
+  display: block;
+  color: var(--ink);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.metricGrid,
+.modelGrid,
+.timelineGrid,
+.galleryGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+}
+.metricCard,
+.modelCard,
+.timelineCard,
+.noteBox,
+.barPanel,
+.galleryCard {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.metricCard {
+  padding: 16px;
+}
+.metricCard b {
+  display: block;
+  font-size: 28px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.metricCard span { color: var(--muted); font-size: 13px; }
+.modelCard {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modelCard img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+.modelBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.modelBody h3,
+.timelineCard h3 {
+  margin: 0;
+  font-size: 22px;
+}
+.modelName,
+.inventory {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.modelBody p { margin: 0; line-height: 1.58; }
+.outcomeStack {
+  display: flex;
+  width: 100%;
+  height: 16px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #ebe3d2;
+}
+.segment.verified { background: var(--qwen); }
+.segment.blocked { background: var(--blocked); }
+.segment.noProgress { background: var(--stone); }
+.miniStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.miniStats div {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+.miniStats dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.miniStats dd {
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.legend span::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.legend .verifiedKey::before { background: var(--qwen); }
+.legend .blockedKey::before { background: var(--blocked); }
+.legend .noProgressKey::before { background: var(--stone); }
+.barPanel {
+  padding: 16px;
+  margin: 16px 0;
+}
+.barPanel h3 { margin: 0 0 12px; }
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(130px, .75fr) minmax(120px, 2fr) minmax(70px, .35fr);
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+}
+.barLabel,
+.barValue {
+  font-size: 13px;
+  font-weight: 750;
+}
+.barValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.barTrack {
+  height: 12px;
+  border-radius: 6px;
+  background: #eee4d1;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--qwen);
+}
+.barFill.gpt54-mini { background: var(--amber); }
+.barFill.gemini-31 { background: var(--blocked); }
+.barFill.qwen-plus { background: #2f9f6e; }
+.barFill.qwen-max { background: #126b49; }
+.timelineCard { padding: 16px; }
+.timelineCard ol {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.timelineCard li {
+  border-left: 4px solid var(--qwen);
+  padding-left: 12px;
+}
+.timelineCard.gpt54-mini li { border-left-color: var(--amber); }
+.timelineCard.gemini-31 li { border-left-color: var(--blocked); }
+.timelineCard span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.timelineCard b { display: block; }
+.timelineCard p { margin: 3px 0 0; color: var(--muted); line-height: 1.55; }
+.noteBox {
+  padding: 16px;
+  margin: 18px 0;
+  background: #fbf5e7;
+}
+.noteBox strong { color: var(--ink); }
+.galleryCard { overflow: hidden; }
+.galleryCard img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+.galleryCard figcaption {
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.checklist {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  margin: 12px 0 0;
+}
+.checklist span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--soft);
+  font-size: 13px;
+}
+.checklist b { display: block; }
+@media (max-width: 820px) {
+  .reportHero { grid-template-columns: 1fr; }
+  .reportHero img { min-height: 220px; }
+  .heroCopy { padding: 18px; }
+  .heroCopy h2 { font-size: 26px; }
+  .barRow { grid-template-columns: 1fr; gap: 6px; }
+  .barValue { text-align: left; }
+  .miniStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+`}</style>
+
+<div className="qwenReport">
+
+I ran Qwen Plus and Qwen Max through a small Minecraft LLM-agent harness, then compared
+their 30-cycle natural-village lanes with GPT-5.4 mini and Gemini 3.1 Flash Lite.
+
+This is a personal open-source Qwen field report. It is
+not a leaderboard, not a broad model claim, and not a decision about whether
+interaction history can beat an LLM prior. The point was narrower: put several
+models in the same natural Minecraft setup, make them act through the same runtime,
+and keep enough evidence to inspect what actually happened.
+
+<section className="reportHero" aria-label="Natural village report summary">
+  <img src={heroVillage} alt="Minecraft natural village start position with the agent near houses and a path" />
+  <div className="heroCopy">
+    <p className="eyebrow">Minecraft natural village - report-grade visual evidence</p>
+    <h2>Four 30-cycle model lanes, one village-adjacent material task.</h2>
+    <p>
+      Each completed lane started from the same natural village scenario and tried to
+      make concrete material progress: collect logs, craft useful items, place or use a
+      workbench, recover from blockers, and leave runtime artifacts behind.
+    </p>
+    <div className="heroFacts">
+      <span><b>120</b> completed cycles</span>
+      <span><b>384</b> visual captures</span>
+      <span><b>5.05M</b> total tokens</span>
+      <span><b>46</b> verified-progress cycles</span>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!--truncate-->
+
+<div className="qwenReport">
+
+## The Experiment Contract
+
+The run used `natural-village-spawn-v1` with seed `4167799982467607063`. Each model
+received a fresh world lane, 30 cycles, the report visual profile, and Minecraft
+server version `1.21.4` for `prismarine-viewer` screenshots.
+
+<div className="metricGrid" aria-label="Experiment setup metrics">
+  <div className="metricCard">
+    <p className="metaLabel">world</p>
+    <b>natural village</b>
+    <span>same seed, fresh world per lane</span>
+  </div>
+  <div className="metricCard">
+    <p className="metaLabel">providers</p>
+    <b>3 APIs</b>
+    <span>ModelScope, OpenAI API, Gemini API</span>
+  </div>
+  <div className="metricCard">
+    <p className="metaLabel">runtime</p>
+    <b>evidence first</b>
+    <span>provider output -> action -> verifier -> artifact</span>
+  </div>
+  <div className="metricCard">
+    <p className="metaLabel">visuals</p>
+    <b>3 cameras</b>
+    <span>first-person, follow, high view every cycle</span>
+  </div>
+</div>
+
+Screenshots are included because they make the run easier to inspect. They are not
+block-identity authority. Block and progress claims come from runtime artifacts:
+inventory, observe/world-state scan, verifier output, and action evidence.
+
+## Model Cards
+
+<div className="modelGrid">
+  {runs.map((run) => <ModelCard key={run.id} run={run} />)}
+</div>
+
+<div className="legend" aria-label="Outcome legend">
+  <span className="verifiedKey">verified progress</span>
+  <span className="blockedKey">blocked</span>
+  <span className="noProgressKey">no progress</span>
+</div>
+
+## Outcome Shape
+
+The strongest result for Qwen here is not that it "won" a benchmark. The useful
+observation is more specific: both Qwen lanes completed the full 30-cycle run with
+low provider-record counts, report-grade visual captures, and concrete material
+evidence. Qwen Max carried the deepest material chain in this particular run.
+
+<div className="barPanel" aria-label="Verified progress bars">
+  <h3>Verified-progress cycles out of 30</h3>
+  {runs.map((run) => <BarRow key={`${run.id}-verified`} run={run} value={run.verified} max={30} />)}
+</div>
+
+<div className="barPanel" aria-label="Provider records bars">
+  <h3>Provider records used</h3>
+  {runs.map((run) => <BarRow key={`${run.id}-requests`} run={run} value={run.requests} max={maxRequests} />)}
+</div>
+
+<div className="barPanel" aria-label="Tokens per verified progress bars">
+  <h3>Approximate tokens per verified-progress cycle</h3>
+  {runs.map((run) => <BarRow key={`${run.id}-tokens-per-progress`} run={run} value={run.tokensPerVerified} max={maxTokensPerVerified} />)}
+</div>
+
+Read together, the bars show three different things:
+
+- Qwen Max had the most verified-progress cycles: `15/30`.
+- Qwen Plus and Qwen Max used only `38` provider records each.
+- GPT-5.4 mini finished the lane, but needed `204` provider records in this run.
+- Gemini 3.1 Flash Lite completed only after request pacing and spent much of the
+  second half blocked.
+
+## The Material Timeline
+
+<div className="timelineGrid">
+  <Timeline
+    run={runs[0]}
+    items={[
+      {cycle: 'cycle 0004', label: 'Workbench evidence appears', note: 'The Qwen Plus lane reached table evidence early and kept the material chain coherent.'},
+      {cycle: 'mid run', label: 'Wooden pickaxe retained', note: 'The final inventory included a wooden pickaxe, sticks, logs, and planks.'},
+      {cycle: 'cycle 0030', label: 'Progress stayed wood-level', note: 'No cobblestone was recorded, so the lane remained useful but shallower than Qwen Max.'}
+    ]}
+  />
+  <Timeline
+    run={runs[1]}
+    items={[
+      {cycle: 'cycle 0003', label: 'Workbench evidence appears', note: 'Qwen Max moved through table evidence slightly earlier in the run.'},
+      {cycle: 'late run', label: 'Pickaxe and stone chain', note: 'The final inventory recorded a wooden pickaxe and 6 cobblestone.'},
+      {cycle: 'cycle 0030', label: 'Camera caveat', note: 'Third-person final views had a terrain cross-section artifact; the mining claim comes from runtime evidence.'}
+    ]}
+  />
+  <Timeline
+    run={runs[2]}
+    items={[
+      {cycle: 'early run', label: 'Useful crafting inventory', note: 'The final inventory included a crafting table, planks, sticks, logs, dirt, petals, and stairs.'},
+      {cycle: 'mid to late', label: 'Movement dominated', note: 'The action count included 14 move_to calls and 13 no-progress cycles.'},
+      {cycle: 'cycle 0030', label: 'Workbench unresolved', note: 'The table was held, not placed or verified in the same way as the Qwen lanes.'}
+    ]}
+  />
+  <Timeline
+    run={runs[3]}
+    items={[
+      {cycle: 'cycle 0005', label: 'Workbench evidence appears', note: 'Gemini reached table evidence, then kept planks and sticks.'},
+      {cycle: 'second half', label: 'Blocked table recovery', note: 'The lane accumulated 19 blocked cycles, many around movement and generated-action contract issues.'},
+      {cycle: 'cycle 0030', label: 'Finished with pacing', note: 'The completed lane required GEMINI_MIN_REQUEST_INTERVAL_MS=15000 after an unpaced attempt hit a TPM quota at cycle 6.'}
+    ]}
+  />
+</div>
+
+## What I Think Qwen Demonstrated
+
+The Qwen lanes were useful in the part of this experiment that matters most to the
+current runtime: grounded material continuity. They did not merely describe a plan.
+They left checkable traces: logs became planks and sticks, table evidence appeared,
+tools showed up in inventory, and Qwen Max reached cobblestone.
+
+That does not make this a general statement about Minecraft competence. It does make
+Qwen Plus and Qwen Max good candidates for more low-cost evidence-producing runs
+where the project needs artifact-heavy material behavior before moving toward
+harder action-consequence and social-response questions.
+
+<div className="noteBox">
+  <strong>Important boundary:</strong> this run mostly evaluates one-actor material
+  work continuity in a natural village. It does not prove social emergence, long-run
+  settlement behavior, or a learnable action-consequence target beyond LLM prior.
+</div>
+
+## Visual Evidence
+
+<div className="galleryGrid">
+  <figure className="galleryCard">
+    <img src={qwenPlusImage} alt="Qwen Plus final third-person follow screenshot near village buildings and a crafting table" />
+    <figcaption>
+      <b>Qwen Plus, cycle 30.</b> A clean report-camera view near village structures and
+      a workbench. Runtime evidence records table progress and a retained wooden pickaxe.
+    </figcaption>
+  </figure>
+  <figure className="galleryCard">
+    <img src={qwenMaxImage} alt="Qwen Max third-person follow screenshot near a village house and tree" />
+    <figcaption>
+      <b>Qwen Max, cycle 20.</b> I use this cleaner village view for the card because the
+      cycle 30 third-person views have a known camera cross-section artifact.
+    </figcaption>
+  </figure>
+  <figure className="galleryCard">
+    <img src={qwenMaxFirstPerson} alt="Qwen Max first-person screenshot looking at stone underground" />
+    <figcaption>
+      <b>Qwen Max, cycle 30 first-person.</b> The stone-mining claim is based on runtime
+      state: local stone mining at roughly `x=14,y=103,z=15`, with cobblestone increasing
+      from `4` to `6`.
+    </figcaption>
+  </figure>
+  <figure className="galleryCard">
+    <img src={gptMiniImage} alt="GPT-5.4 mini final third-person follow screenshot on a village path" />
+    <figcaption>
+      <b>GPT-5.4 mini, cycle 30.</b> The lane completed, but the artifact summary keeps
+      the workbench goal pending rather than treating a held table as placed evidence.
+    </figcaption>
+  </figure>
+  <figure className="galleryCard">
+    <img src={geminiImage} alt="Gemini 3.1 Flash Lite final third-person follow screenshot beside a village house and crafting table" />
+    <figcaption>
+      <b>Gemini 3.1 Flash Lite, cycle 30.</b> The paced lane retained planks and sticks,
+      but the second half was dominated by blocked movement and rejected generated-action
+      candidates.
+    </figcaption>
+  </figure>
+</div>
+
+## What Still Failed
+
+The failures are part of the value of the experiment. They show where the runtime and
+action surface still need work:
+
+- movement recovery can dominate after an early crafting success;
+- table-crafting and recipe contracts still create avoidable friction;
+- generated action-skill candidates can be rejected by schema/contract checks before
+  a Minecraft action executes;
+- visual review needs camera caveats beside screenshots, not hidden in a separate log;
+- the objective was too broad for a clean 30-cycle causal story.
+
+For the next version of this experiment, I would make the target sharper:
+
+```text
+Place a crafting table and maintain a village-adjacent work point with bounded
+material follow-through.
+```
+
+That would still produce useful material evidence without mixing workbench, shelter,
+storage, navigation recovery, and long-horizon continuity into one 30-cycle lane.
+
+## Caveats I Would Keep On The Cover
+
+<div className="checklist">
+  <span><b>Not a leaderboard</b> Four completed lanes, one seed, one objective, one harness.</span>
+  <span><b>Not a prediction-prior decision</b> No prediction-arm comparison was run here.</span>
+  <span><b>Visuals are review evidence</b> Screenshots help humans inspect behavior; runtime artifacts own block identity.</span>
+  <span><b>Qwen Max visual caveat</b> Cycle 30 third-person follow/high views show a camera cross-section artifact.</span>
+  <span><b>Gemini pacing caveat</b> The completed lane used `GEMINI_MIN_REQUEST_INTERVAL_MS=15000`.</span>
+  <span><b>Excluded lanes</b> Gemini 2.5 Flash Lite, Gemma 4 31B, and unpaced Gemini 3.1 were not comparable completed lanes.</span>
+</div>
+
+## Artifacts
+
+The article is based on the final report and combined comparison JSON:
+
+- `project-docs/static-exports/final-natural-village-model-comparison-report-2026-06-30.html`
+- `project-docs/Experiments/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/combined-model-comparison-30cycle-analysis.json`
+
+The same project also keeps per-lane review summaries, provider preflight records,
+run reports, and report-grade screenshot folders. That is the real lesson for me:
+small model comparisons become much more useful when they leave enough evidence to
+debug their own caveats.
+
+</div>

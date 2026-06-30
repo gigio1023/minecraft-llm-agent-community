@@ -10,58 +10,70 @@ monthly form.
 
 ## Recommended Four Contributions
 
-### 1. Blog / Article
+### 1. Docusaurus Blog Post / Rich Visual Report
 
-Title: Testing Qwen in a Minecraft LLM Agent: a 30-Cycle Natural Village Run
+Title: Qwen in a Minecraft Natural Village: a Visual 30-Cycle Model Comparison
 
 Public link:
-`<PUBLIC_BLOG_URL>/blog/qwen-minecraft-agent-natural-village`
+`<PUBLIC_DOCUSARUS_RICH_VISUAL_REPORT_URL>`
+
+Expected Docusaurus URL after publication:
+`https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-minecraft-agent-visual-report`
 
 Type: blog / article / evaluation
 
 Short description:
-A technical write-up of a personal Minecraft LLM-agent experiment using Qwen
-Plus and Qwen Max through ModelScope, compared with GPT-5.4 mini and Gemini 3.1
-Flash Lite on the same 30-cycle natural-village task. The post explains the
-scenario, evidence rules, Qwen results, and failure modes.
+A rich visual field report for a personal Minecraft LLM-agent experiment using
+Qwen Plus and Qwen Max through ModelScope, compared with GPT-5.4 mini and
+Gemini 3.1 Flash Lite on the same 30-cycle natural-village task. It includes
+Minecraft screenshots, model cards, outcome bars, material timelines, provider
+cost bars, caveats, and artifact links.
 
 Local source:
-`docs/blog/2026-06-30-qwen-minecraft-agent-natural-village.md`
+`docs/blog/2026-06-30-qwen-minecraft-agent-visual-report.mdx`
 
-### 2. Open-Source Project / Repository Artifact
+### 2. Docusaurus Blog Post / Cookbook Tutorial
+
+Title: Cookbook: Run Qwen ModelScope Lanes in the Minecraft LLM-Agent Harness
+
+Public link:
+`<PUBLIC_DOCUSARUS_COOKBOOK_BLOG_URL>`
+
+Expected Docusaurus URL after publication:
+`https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-modelscope-minecraft-agent-cookbook`
+
+Type: blog / cookbook / reproducible tutorial
+
+Short description:
+A reproducible operator note showing how the Qwen ModelScope lanes were run in
+the Minecraft LLM-agent harness, including ModelScope setup, provider-free
+visual smoke, quota preflight shape, Qwen Plus/Max commands, review-summary
+commands, artifact inspection points, expected metrics, and caveats.
+
+Local source:
+`docs/blog/2026-06-30-qwen-modelscope-minecraft-agent-cookbook.md`
+
+### 3. Open-Source Project / Repository Artifact
 
 Title: Qwen Natural Village Minecraft Agent Evaluation
 
 Public link:
+`<PUBLIC_REPO_ARTIFACT_URL>`
+
+Current branch URL:
 `https://github.com/gigio1023/minecraft-llm-agent-community/blob/research/docs/QWEN_NATURAL_VILLAGE_EVAL.md`
 
-Type: project / open-source artifact / evaluation
+Type: project / open-source artifact index / evidence bundle
 
 Short description:
 A repo-level landing document for the Qwen natural-village Minecraft agent
-evaluation. It links the final HTML report, comparison JSON, Qwen/Gemini
-experiment folders, cookbook, and blog post, and summarizes the completed
-comparison lanes.
+evaluation. It indexes the final HTML report, combined comparison JSON,
+Qwen/Gemini experiment folders, Docusaurus blog posts, cookbook material, and
+selected raw artifacts so readers can inspect the evidence behind the public
+write-ups.
 
 Local source:
 `QWEN_NATURAL_VILLAGE_EVAL.md`
-
-### 3. Cookbook / Tutorial
-
-Title: Cookbook: Run Qwen in the Minecraft LLM-Agent Harness
-
-Public link:
-`<PUBLIC_DOCS_URL>/docs/qwen-modelscope-minecraft-agent-cookbook`
-
-Type: cookbook / tutorial / reproducible note
-
-Short description:
-A short reproducible note showing how the Qwen ModelScope lanes were configured
-inside the Minecraft LLM-agent harness, including model IDs, scenario, visual
-profile, preflight artifacts, command shape, inspection targets, and caveats.
-
-Local source:
-`docs/public-docs/qwen-modelscope-minecraft-agent-cookbook.md`
 
 ### 4. Social Post
 
@@ -81,11 +93,25 @@ that Qwen Max achieved the deepest material progress in this run.
 Local source:
 `project-docs/ExternalActivities/2026-06-30-qwen-ambassador-x-post.md`
 
+## Why These Four Count Separately
+
+The four links should not look like the same artifact pasted four times. They
+have distinct jobs:
+
+- visual report: what happened and what the model-comparison evidence showed;
+- cookbook blog: how to reproduce the Qwen ModelScope lanes;
+- repo artifact: where the raw reports, screenshots, summaries, and scripts
+  live;
+- X post: public social distribution that points readers back to the report.
+
+The public-docs cookbook page may remain as supporting documentation, but the
+contribution slot should use the cookbook blog post above.
+
 ## Why Not LinkedIn As The Fourth?
 
 The operating guide recommends avoiding LinkedIn for now because the account can
-surface employer identity. A cookbook/tutorial is safer and stronger: it is
-public, technical, Qwen-related, and useful to another developer.
+surface employer identity. A second Docusaurus blog post is safer and stronger:
+it is public, technical, Qwen-related, and useful to another developer.
 
 ## Form Submission Notes
 
@@ -101,10 +127,13 @@ public, technical, Qwen-related, and useful to another developer.
 
 Before submitting, replace placeholders:
 
-- `<PUBLIC_BLOG_URL>`
-- `<PUBLIC_DOCS_URL>`
+- `<PUBLIC_DOCUSARUS_RICH_VISUAL_REPORT_URL>`
+- `<PUBLIC_DOCUSARUS_COOKBOOK_BLOG_URL>`
+- `<PUBLIC_REPO_ARTIFACT_URL>`
 - `<PUBLIC_X_POST_URL>`
-- `<PUBLIC_REPO_OR_REPORT_URL>` in the X draft
+- `<PUBLIC_DOCUSARUS_RICH_VISUAL_REPORT_URL>` in the X draft
 
 If GitHub Pages is not published today, use GitHub blob URLs for the blog,
-cookbook, and report artifacts on the `research/docs` branch.
+cookbook, and repo artifact on the `research/docs` branch. Confirm whether the
+public Pages URL is under `naem1023.github.io` or another account before
+submitting the monthly form.

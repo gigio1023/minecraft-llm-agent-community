@@ -12,7 +12,31 @@ making grounded material progress for 30 cycles, and can the run leave enough
 evidence to inspect what actually happened?
 ```
 
-## Public Artifacts
+## Public Contribution Artifacts
+
+Use these public links for the four contribution slots after publication:
+
+- Rich visual report blog:
+  `<PUBLIC_DOCUSARUS_RICH_VISUAL_REPORT_URL>`
+- Cookbook/tutorial blog:
+  `<PUBLIC_DOCUSARUS_COOKBOOK_BLOG_URL>`
+- Repo artifact index:
+  `<PUBLIC_REPO_ARTIFACT_URL>`
+- X post:
+  `<PUBLIC_X_POST_URL>`
+
+Expected Docusaurus URLs:
+
+- `https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-minecraft-agent-visual-report`
+- `https://naem1023.github.io/minecraft-llm-agent-community/blog/qwen-modelscope-minecraft-agent-cookbook`
+
+Current branch repo artifact URL:
+
+```text
+https://github.com/gigio1023/minecraft-llm-agent-community/blob/research/docs/QWEN_NATURAL_VILLAGE_EVAL.md
+```
+
+## Local Artifact Index
 
 - Final self-contained HTML report:
   `project-docs/static-exports/final-natural-village-model-comparison-report-2026-06-30.html`
@@ -22,10 +46,12 @@ evidence to inspect what actually happened?
   `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/`
 - Gemini extension experiment:
   `project-docs/Experiments/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/`
-- Cookbook:
+- Cookbook blog:
+  `docs/blog/2026-06-30-qwen-modelscope-minecraft-agent-cookbook.md`
+- Supporting public-docs cookbook:
   `docs/public-docs/qwen-modelscope-minecraft-agent-cookbook.md`
-- Blog post:
-  `docs/blog/2026-06-30-qwen-minecraft-agent-natural-village.md`
+- Rich visual report blog:
+  `docs/blog/2026-06-30-qwen-minecraft-agent-visual-report.mdx`
 
 ## Completed Lanes
 
@@ -51,10 +77,10 @@ a text-only evaluation.
 
 ## Reproduction Entry Points
 
-Start with the cookbook:
+Start with the cookbook blog:
 
 ```text
-docs/public-docs/qwen-modelscope-minecraft-agent-cookbook.md
+docs/blog/2026-06-30-qwen-modelscope-minecraft-agent-cookbook.md
 ```
 
 Then inspect the final report:
@@ -66,6 +92,12 @@ project-docs/static-exports/final-natural-village-model-comparison-report-2026-0
 The final report embeds screenshots as data URIs so it can be opened locally
 without broken image paths.
 
+For a more shareable visual explanation, read:
+
+```text
+docs/blog/2026-06-30-qwen-minecraft-agent-visual-report.mdx
+```
+
 ## Contribution Fit
 
 This repo artifact can be shared as a Qwen-related open-source project or
@@ -75,7 +107,7 @@ evaluation contribution because it provides:
 - comparable Qwen Plus and Qwen Max lanes;
 - concrete Minecraft runtime artifacts;
 - model-comparison observations;
-- a reproducible cookbook and final report.
+- a reproducible cookbook blog and rich visual report.
 
 It avoids company/internal context and should be treated as a personal technical
 experiment.
