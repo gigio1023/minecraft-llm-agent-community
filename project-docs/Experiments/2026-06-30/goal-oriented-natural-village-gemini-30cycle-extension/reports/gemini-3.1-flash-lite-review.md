@@ -37,7 +37,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0004 cycle_end
 
-![cycle-0004 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0004-cycle-end-first-person.png)
+![cycle-0004 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0004-cycle-end-first-person.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -46,7 +46,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0004 cycle_end
 
-![cycle-0004 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0004-cycle-end-third-person-follow.png)
+![cycle-0004 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0004-cycle-end-third-person-follow.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -55,7 +55,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0004 cycle_end
 
-![cycle-0004 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0004-cycle-end-third-person-high.png)
+![cycle-0004 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0004-cycle-end-third-person-high.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -64,7 +64,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0005 cycle_end
 
-![cycle-0005 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0005-cycle-end-first-person.png)
+![cycle-0005 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0005-cycle-end-first-person.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -73,7 +73,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0005 cycle_end
 
-![cycle-0005 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0005-cycle-end-third-person-follow.png)
+![cycle-0005 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0005-cycle-end-third-person-follow.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -82,7 +82,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0005 cycle_end
 
-![cycle-0005 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0005-cycle-end-third-person-high.png)
+![cycle-0005 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0005-cycle-end-third-person-high.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -91,7 +91,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0006 cycle_end
 
-![cycle-0006 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-cycle-end-first-person.png)
+![cycle-0006 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-cycle-end-first-person.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -100,7 +100,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0006 cycle_end
 
-![cycle-0006 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-cycle-end-third-person-follow.png)
+![cycle-0006 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-cycle-end-third-person-follow.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -109,7 +109,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0006 cycle_end
 
-![cycle-0006 cycle_end](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-cycle-end-third-person-high.png)
+![cycle-0006 cycle_end](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-cycle-end-third-person-high.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -118,7 +118,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0006 final
 
-![cycle-0006 final](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-final-first-person.png)
+![cycle-0006 final](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-final-first-person.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -127,7 +127,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0006 final
 
-![cycle-0006 final](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-final-third-person-follow.png)
+![cycle-0006 final](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-final-third-person-follow.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`
@@ -136,7 +136,7 @@ These images are prismarine-viewer review evidence only. Do not use pixels as bl
 
 ### cycle-0006 final
 
-![cycle-0006 final](/Users/gigio/git/minecraft-llm-agent-community/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-final-third-person-high.png)
+![cycle-0006 final](<repo>/data/actors/social-runs/social-cycle-373dddc3-d5f2-4ffd-a2d4-3bea4e5b62da/npc_b/visual-evidence/cycle-0006-final-third-person-high.png)
 
 - renderer_trust: `review_only_not_block_identity`
 - block_identity_authority: `runtime_world_state_scan_or_observe_evidence`

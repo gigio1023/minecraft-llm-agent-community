@@ -3,7 +3,7 @@
 Date: 2026-06-30
 
 Guide referenced:
-`/Users/gigio/git/brain/career-operations/external-activities/2026-06-30-qwen-ambassador-contribution-guide.md`
+`<home>/git/brain/career-operations/external-activities/2026-06-30-qwen-ambassador-contribution-guide.md`
 
 Goal: submit four meaningful, publicly shared Qwen-related contributions in one
 monthly form.
