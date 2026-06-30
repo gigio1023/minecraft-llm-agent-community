@@ -20,7 +20,7 @@ that say what actually happened.
 The completed Qwen lanes used this shape:
 
 - provider: `modelscope-api`
-- models: `Qwen-Ambassador/Qwen3.7-Plus` and `Qwen-Ambassador/Qwen3.7-Max`
+- models: Qwen Plus and Qwen Max through ModelScope API-Inference
 - actor: `npc_b`
 - scenario: `natural-village-spawn-v1`
 - seed: `4167799982467607063`
@@ -49,22 +49,22 @@ MODELSCOPE_API_KEY=...
 MODELSCOPE_BASE_URL=https://api-inference.modelscope.ai/v1
 ```
 
-Use the exact model ids in commands and reports:
+Set the concrete ModelScope model ids available to your account:
 
-```text
-Qwen-Ambassador/Qwen3.7-Plus
-Qwen-Ambassador/Qwen3.7-Max
+```bash
+export MODELSCOPE_QWEN_PLUS_MODEL='<your ModelScope Qwen Plus model id>'
+export MODELSCOPE_QWEN_MAX_MODEL='<your ModelScope Qwen Max model id>'
 ```
 
 The social-cycle CLI does not infer the ModelScope model from environment
 fallbacks. Pass `--model` explicitly every time so the report cannot hide which
-model was evaluated.
+ModelScope lane was evaluated.
 
 For an account-level smoke test, call the OpenAI-compatible Chat Completions
 endpoint directly:
 
 ```bash
-MODEL_ID=Qwen-Ambassador/Qwen3.7-Max
+MODEL_ID="$MODELSCOPE_QWEN_MAX_MODEL"
 
 curl -sS -D /tmp/modelscope-qwen.headers \
   -o /tmp/modelscope-qwen.response.json \
@@ -140,8 +140,8 @@ From the repository root, the repo preflight helper command shape is:
 mkdir -p tmp
 
 bun .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
-  --candidate modelscope-api:Qwen-Ambassador/Qwen3.7-Plus \
-  --candidate modelscope-api:Qwen-Ambassador/Qwen3.7-Max \
+  --candidate "modelscope-api:$MODELSCOPE_QWEN_PLUS_MODEL" \
+  --candidate "modelscope-api:$MODELSCOPE_QWEN_MAX_MODEL" \
   --estimate-requests 80 \
   --estimate-total-tokens 2500000 \
   > tmp/qwen-30cycle-preflight.json
@@ -162,7 +162,7 @@ PROBE_SERVER_VERSION=1.21.4 \
 SOCIAL_CYCLE_REASONING=low \
 bun run probe:social-cycle -- \
   --provider modelscope-api \
-  --model Qwen-Ambassador/Qwen3.7-Plus \
+  --model "$MODELSCOPE_QWEN_PLUS_MODEL" \
   --actor npc_b \
   --cycles 30 \
   --max-actions-per-cycle 1 \
@@ -188,7 +188,7 @@ PROBE_SERVER_VERSION=1.21.4 \
 SOCIAL_CYCLE_REASONING=low \
 bun run probe:social-cycle -- \
   --provider modelscope-api \
-  --model Qwen-Ambassador/Qwen3.7-Max \
+  --model "$MODELSCOPE_QWEN_MAX_MODEL" \
   --actor npc_b \
   --cycles 30 \
   --max-actions-per-cycle 1 \
