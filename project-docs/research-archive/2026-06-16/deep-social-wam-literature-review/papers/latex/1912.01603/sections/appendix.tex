@@ -1,0 +1,140 @@
+\section{Hyper Parameters}
+\label{sec:hparams}
+
+\paragraph{Model components}
+
+We use the convolutional encoder and decoder networks from \citet{ha2018worldmodels}, the RSSM of \citet{hafner2018planet}, and implement all other functions as three dense layers of size $300$ with ELU activations \citep{clevert2015elu}. Distributions in latent space are 30-dimensional diagonal Gaussians. The action model outputs a tanh mean scaled by a factor of 5 and a softplus standard deviation for the Normal distribution that is then transformed using tanh \citep{haarnoja2018sac}. The scaling factor allows the agent to saturate the action distribution.
+
+\paragraph{Learning updates}
+
+We draw batches of 50 sequences of length 50 to train the world model, value model, and action model models using Adam \citep{kingma2014adam} with learning rates $6\times10^{-4}$, $8\times10^{-5}$, $8\times10^{-5}$, respectively and scale down gradient norms that exceed $100$. We do not scale the KL regularizers ($\beta=1$) but clip them below $3$ free nats as in PlaNet. The imagination horizon is $H=15$ and the same trajectories are used to update both action and value models. We compute the $\mathrm{V}_\lambda$ targets with $\gamma=0.99$ and $\lambda=0.95$. We did not find latent overshooting for learning the model, an entropy bonus for the action model, or target networks for the value model necessary.
+
+\paragraph{Environment interaction}
+
+The dataset is initialized with $S=5$ episodes collected using random actions. We iterate between $100$ training steps and collecting $1$ episode by executing the predicted mode action with $\Normal(0,0.3)$ exploration noise. Instead of manually selecting the action repeat for each environment as in \citet{hafner2018planet} and \citet{lee2019slac}, we fix it to 2 for all environments. See \cref{fig:repeat} for an assessment of the robustness to different action repeat values.
+
+\paragraph{Discrete control}
+
+For experiments on Atari games and DeepMind Lab levels, the action model predicts the logits of a categorical distribution. We use straight-through gradients for the sampling step during latent imagination. The action noise is epsilon greedy where $\epsilon$ is linearly scheduled from $0.4\rightarrow0.1$ over the first $200,000$ gradient steps. To account for the higher complexity of these tasks, we use an imagination horizon of $H=10$, scale the KL regularizers by $\beta=0.1$, and bound rewards using tanh. We predict the discount factor from the latent state with a binary classifier that is trained towards the soft labels of $0$ and $\gamma$.
+
+\clearpage
+\section{Derivations}
+\label{sec:derivations}
+
+We define the information bottleneck objective \citep{tishby2000ib} for latent dynamics models,
+\begin{equation}
+\max
+\MI{s_{1:T}; (o_{1:T},r_{1:T}) \mid a_{1:T}}
+-\beta\,\MI{s_{1:T},i_{1:T} \mid a_{1:T}},
+\end{equation}
+where $\beta$ is scalar and $i_t$ are dataset indices that determine the observations $\p(o_t|i_t)\defined\delta(o_t-\bar{o}_t)$ as in \citet{alemi2016vib}.
+
+Maximizing the objective leads to model states that can predict the sequence of observations and rewards while limiting the amount of information extracted at each time step. This encourages the model to reconstruct each image by relying on information extracted at preceeding time steps to the extent possible, and only accessing additional information from the current image when necessary. As a result, the information regularizer encourages the model to learn long-term dependencies.
+
+For the generative objective, we lower bound the first term using the non-negativity of the KL divergence and drop the marginal data probability as it does not depend on the representation model,
+\begin{equation}
+\begin{aligned}
+&\MI{s_{1:T};(o_{1:T},r_{1:T}) \mid a_{1:T}} \\
+=\enskip&\E[\Big]{\p(o_{1:T},r_{1:T},s_{1:T},a_{1:T})}{\sum_t
+    \ln\p(o_{1:T},r_{1:T}|s_{1:T},a_{1:T})
+    -\describe{\ln\p(o_{1:T},r_{1:T}|a_{1:T})}{const}} \\
+\stackrel{+}{=}\enskip&\E[\Big]{}{\sum_t
+    \ln\p(o_{1:T},r_{1:T}|s_{1:T},a_{1:T})} \\
+\geq\enskip&\E[\Big]{}{\sum_t
+    \ln\p(o_{1:T},r_{1:T}|s_{1:T},a_{1:T})}
+    -\KL[\Big]{\p(o_{1:T},r_{1:T}|s_{1:T},a_{1:T})}{\prod_t\q(o_t|s_t)\q(r_t|s_t)} \\
+=\enskip&\E[\Big]{}{\sum_t
+    \ln\q(o_t|s_t)+\ln\q(r_t|s_t)}.
+\end{aligned}
+\end{equation}%
+For the contrastive objective, we subtract the constant marginal probability of the data under the variational encoder, apply Bayes rule, and use the InfoNCE mini-batch bound \citep{poole2019bounds},
+\begin{equation}
+\begin{aligned}
+&\E{}{\ln\q(o_t|s_t)+\ln\q(r_t|s_t)} \\
+\upto\enskip&\E{}{\ln\q(o_t|s_t)-\ln\q(o_t)+\ln\q(r_t|s_t)} \\
+=\enskip&\E{}{\ln\q(s_t|o_t)-\ln\q(s_t)+\ln\q(r_t|s_t)} \\
+\geq\enskip&\E[\bigg]{}{\ln\q(s_t|o_t)-\ln\sum_{o'}\q(s_t|o')+\ln\q(r_t|s_t)}.
+\end{aligned}
+\end{equation}%
+For the second term, we use the non-negativity of the KL divergence to obtain an upper bound,
+\begin{equation}
+\begin{aligned}
+&\MI{s_{1:T};i_{1:T} \mid a_{1:T}} \\
+=\enskip&\E[\Big]{\p(o_{1:T},r_{1:T},s_{1:T},a_{1:T},i_{1:T})}{\sum_t
+    \ln\p(s_t|s_{t-1},a_{t-1},i_t)
+    -\ln\p(s_t|s_{t-1},a_{t-1})} \\
+=\enskip&\E[\Big]{}{\sum_t
+    \ln\p(s_t|s_{t-1},a_{t-1},o_t)
+    -\ln\p(s_t|s_{t-1},a_{t-1})} \\
+\leq\enskip&\E[\Big]{}{\sum_t
+    \ln\p(s_t|s_{t-1},a_{t-1},o_t)
+    -\ln\q(s_t|s_{t-1},a_{t-1})} \\
+=\enskip&\E[\Big]{}{\sum_t
+    \KL{\p(s_t|s_{t-1},a_{t-1},o_t)}{\q(s_t|s_{t-1},a_{t-1})}}.
+\end{aligned}
+\end{equation}%
+This lower bounds the objective.
+
+\pagebreak
+\section{Discrete Control}
+\label{sec:discrete}
+
+We evaluate Dreamer on a subset of tasks with discrete actions from the Atari suite \citep{bellemare2013ale} and DeepMind Lab \citep{beattie2016dmlab}. While agents that purely learn through world models are not yet competitive in these domains \citep{kaiser2019simple}, the tasks offer a diverse test bed with visual complexity, sparse rewards, and early termination. Agents observe $64\times64\times3$ images and select one of between $3$ and $18$ actions. For Atari, we follow the evaluation protocol of \citet{machado2018stickyactions} with sticky actions. Refer to \cref{fig:discrete} for these experiments.
+
+\input{figures/discrete/figure}
+
+\clearpage
+\section{Behavior Learning}
+\label{sec:value-all}
+\input{figures/value/figure}
+
+\clearpage
+\section{Representation Learning}
+\label{sec:repr-all}
+\input{figures/repr/figure}
+
+\clearpage
+\section{Action Repeat}
+\input{figures/repeat/figure}
+
+\clearpage
+\section{Continuous Control Scores}
+
+\begin{tabularx}{\textwidth}{
+@{}
+X
+>{\raggedleft\arraybackslash}p{4em}
+>{\raggedleft\arraybackslash}p{4em}
+>{\raggedleft\arraybackslash}p{4em}
+>{\raggedleft\arraybackslash}p{4em}
+@{}}
+\toprule
+& A3C & D4PG & PlaNet\footnote{We re-run PlaNet with fixed action repeat of $R=2$ to not tune the this value for each of the 20 tasks. As a result, the scores differ from \citet{hafner2018planet}.} & Dreamer \\
+\midrule
+Input modality & proprio & pixels & pixels & pixels \\
+Environment steps & $10^8$ & $10^8$ & $5\times10^6$ & $5\times10^6$ \\
+\midrule
+Acrobot Swingup         &   41.90 &           91.70  &           3.21  & \textbf{365.26} \\
+Cartpole Balance        &  951.60 &  \textbf{992.80} &         452.56  & \textbf{979.56} \\
+Cartpole Balance Sparse &  857.40 & \textbf{1000.00} &         164.74  & \textbf{941.84} \\
+Cartpole Swingup        &  558.40 &  \textbf{862.00} &         312.56  & \textbf{833.66} \\
+Cartpole Swingup Sparse &  179.80 &          482.00  &           0.64  & \textbf{812.22} \\
+Cheetah Run             &  213.90 &          523.80  &         496.12  & \textbf{894.56} \\
+Cup Catch               &  104.70 &  \textbf{980.50} &         455.98  & \textbf{962.48} \\
+Finger Spin             &  129.40 &  \textbf{985.70} &         495.25  &         498.88  \\
+Finger Turn  Easy       &  167.30 &  \textbf{971.40} &         451.22  &         825.86  \\
+Finger Turn  Hard       &   88.70 &  \textbf{966.00} &         312.55  &         891.38  \\
+Hopper Hop              &    0.50 &          242.00  &           0.37  & \textbf{368.97} \\
+Hopper Stand            &   27.90 &  \textbf{929.90} &           5.96  & \textbf{923.72} \\
+Pendulum Swingup        &   48.60 &          680.90  &           3.27  & \textbf{833.00} \\
+Quadruped Run           &     $-$ &             $-$  &         280.45  & \textbf{888.39} \\
+Quadruped Walk          &     $-$ &             $-$  &         238.90  & \textbf{931.61} \\
+Reacher Easy            &   95.60 &  \textbf{967.40} &         468.50  & \textbf{935.08} \\
+Reacher Hard            &   39.70 &  \textbf{957.10} &         187.02  &         817.05  \\
+Walker Run              &  191.80 &          567.20  &         626.25  & \textbf{824.67} \\
+Walker Stand            &  378.40 &  \textbf{985.20} &         759.19  & \textbf{977.99} \\
+Walker Walk             &  311.00 &  \textbf{968.30} & \textbf{944.70} & \textbf{961.67} \\
+\midrule
+Average                 &  243.70 &          786.32  &  332.97 & \textbf{823.39} \\
+\bottomrule
+\end{tabularx}

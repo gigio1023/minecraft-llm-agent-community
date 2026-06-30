@@ -1,0 +1,53 @@
+\section{Formal definitions and technical details}
+\label{app:formal_formulation}
+\subsection{Formal formulation of the tasks in \sotopia}
+We formulate social interactions in \sotopia as mixed-motive Markov games. An $N$-agent Dec-POMDP framework \cite{bernstein2002complexity,nair2003taming} includes a state space, an action space, an observation space, a transition function, an observation function, and a reward function. We make two major extensions: (a) the reward function gives vector rewards in $M$ social dimensions to $N$ agents (introduced in \S\ref{sec:social_dimensions}), and (b) a procedurally generated task space (\S\ref{sec:task_space}, \S\ref{app:sec:task_space}). The state space in \sotopia includes both the task and the interaction history in the current episode. The action space includes five types of actions: \texttt{speak} an utterance, \texttt{non-verbal communication}, \texttt{physical action}, and two special \texttt{none} (indicating no action at this time step) and \texttt{leave} actions (no more action is permitted after leaving). Each type of action, except for special actions, is supplemented by a piece of free text indicating the content of the action. For example, a legal action could be \texttt{speak("Hello, Bob!")}, \texttt{non-verbal communication("smile and nod")}, or \texttt{physical action("call 911")}. The state is almost fully observable except for the other agents' social goals and character profiles which will be detailed in \S\ref{sec:task_space}. We consider a simple state transition function that deterministically maintains the interaction history by adding new actions at each time step. 
+
+Despite that turn-taking and timing response is an important aspects of social skills, we consider the case where the agents take turns to act in round-robin order, i.e. agent $i$ only act at time step $t$ when $t \equiv i \mod N$. For a long enough horizon, this generalizes to any conversation with proper turn-taking. In our experiments, we only consider $N=2$ cases, while the environment is designed to support any $N\geq2$ cases.
+
+\subsection{Task space technical details}
+\label{app:sec:task_space}
+\subsubsection{Characters}
+The name, gender, age, occupation, and pronouns are in free text format, while the formats of personality traits, moral values, and personal values are lists of pre-defined types. However, these attributes are often not independent with different levels of correlation and complicated mechanisms. \citep{feldman1985personality,el2020personality,toledo2023neurocircuitry} However, understanding the relationship between these attributes is beyond the scope of this paper. We leverage the commonsense knowledge in GPT-4 to generate these profiles with the following prompt: 
+\begin{quote}
+\texttt{Please generate a list of N fictional characters, one line per character. Each with their attributes: <attribute 1> <attribute 1 format > <attribute 2> <attribute 2 format>...}"
+\end{quote}
+The personality trait types are ``\emph{openness to experience}'', ``\emph{conscientiousness}'', ``\emph{extraversion}'', ``\emph{agreeableness}'' and ``\emph{neuroticism}'' \citep{goldberg1992-jf}. The moral value types are ``\emph{care}'', ``\emph{fairness}'', ``\emph{loyalty}'', ``\emph{authority}'' and ``\emph{purity}'' \citep{cieciuch_davidov_2012}. The Schwartz personal value types are ``\emph{self-direction}'', ``\emph{simulation}'', ``\emph{hedonism}'', ``\emph{achievement}'', ``\emph{power}'', ``\emph{security}'', ``\emph{conformity}'', ``\emph{tradition}'', ``\emph{benevolence}'', and ``\emph{universalism}'' \cite{cieciuch_davidov_2012}. The decision-making style types are ``\emph{directive}'', ``\emph{analytical}'', ``\emph{conceptual}'', and ``\emph{behavioral}''. 
+As previously studied in \citet{wang-etal-2019-persuasion}, these characteristics all affect the behaviors in strategic conversations. 
+
+To give the conversations more background, after generating the above attributes, we prompt GPT-4 with "a secret that this character doesn't want anyone else to know and a piece of public information that other people know about them" to generate the secret and public information. The authors fix a small proportion of profiles that are not realistic or not consistent within the profile (e.g., gender nonbinary but with pronouns as he/him). 
+The character profiles that will used in role-playing are 20 men, 18 women, and 2 nonbinary characters aged from 21 to 63. 
+
+\subsubsection*{Relationships}
+To generate relationships, except for strangers, we randomly sampled 90 pairs of characters and prompted GPT-4 with their relationships:
+\begin{quote}
+    \small
+    \texttt{Please generate a fictional relationship with a background story \footnote{We don't use the background story in our experiments.} between two agents based on the following agents' profiles. <agent profile 1>, <agent profile 2> ... The acceptable relationships are: family, friend, romantic, and acquaintance.}
+\end{quote}
+Then, we manually check and correct the generated relationships to ensure quality. This results in 31 pairs of family, 30 pairs of friends, 30 pairs of romantic partners, and 29 pairs of acquaintances. For strangers, we randomly sampled another 30 pairs that do not belong to any of the above categories. It should be noted that generating relationships requires human intervention to make sure they are consistent with both the character profiles and other relationships. Future research could explore the methods to generate realistic relationships within human communities. 
+
+\subsubsection*{Scenarios}
+To generate scenarios, we propose two methods to generate the scenario context and social goals. The first method is first asking GPT-4 to refine a vignette from an existing dataset, then manually inspecting the feasibility and realisticity of the tasks.
+\begin{quote}
+    \small
+    \texttt{Please generate scenarios and goals based on the examples below as well as the inspirational prompt, when creating the goals, try to find one point that both sides may not agree upon initially and need to collaboratively resolve it.
+    Inspirational prompt: <the selected vignette>}
+\end{quote}
+Specifically, we select 20 vignettes from Social Chemistry \citep{forbes-etal-2020-social}, 20 from Social IQa \citep{sap-etal-2019-social}, 10 from Deal-or-no-Deal \citep{lewis-etal-2017-deal}, and 10 vignettes from Normbank \citep{ziems-etal-2023-normbank} to generate 60 scenarios focusing on general daily-life social interactions. 
+
+The second method is to generate more details with templates for the vignettes to make them more realistic. For example, here is the prompt for converting CraigslistBargins \citep{he-etal-2018-decoupling} vignettes into scenario context:
+\begin{quote}
+    \small
+    \tt
+    The following sentence is automatically generated with the following template: "One person is selling <item> for <price>, and another person is trying to buy it." Here is the description of the item: "<description>. with item = <title>, price=<price>, and description=<description>" Please make the sentence fluent and natural.
+\end{quote}
+where the \texttt{<item>}, \texttt{<title>}, and \texttt{<price>} are from the data in CraigslistBargins \citep{he-etal-2018-decoupling}.
+The goals are generated with the following prompt:
+\begin{quote}
+    \small
+    \tt
+    The following sentence is automatically generated with the following template:
+    "You want to <role> this item. Your target price is \$<price> (round up to two decimals). You will get a penalty if you sell or buy it for a price that is significantly lower than (if <role> is seller) or significantly higher than (if <role> is buyer) the target price, but will get a bonus if you successfully sell it higher than the target price (if <role> is seller) or buy it for lower than the target price (if <role> is buyer)" with role = <role> and price = <price>. Please make the sentence fluent and natural. Do not change the original meaning of the sentence.
+\end{quote}
+where \texttt{<role>} could be a ``buyer'' or a ``seller'', the buyer's target \texttt{<price>} is from CraigslistBargins \citep{he-etal-2018-decoupling}, and the seller's \texttt{<price>} is generated by first sample a markup ratio from an exponential distribution with rate parameter 0.5, then divide the price in the scenario context with (1+markup ratio). A similar process is also done for MutualFriends \citep{he-etal-2017-learning}.
+This results in 30 scenarios from CraigslistBargins \citep{he-etal-2018-decoupling} and MutualFriends \citep{he-etal-2017-learning}. This method controls the generated scenarios much better than the first method, resulting in little post-hoc manual edits, but requires customized prompts for each dataset. 

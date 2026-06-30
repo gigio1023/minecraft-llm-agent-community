@@ -1,0 +1,1550 @@
+\documentclass{article}
+
+
+% if you need to pass options to natbib, use, e.g.:
+     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2022
+
+
+% ready for submission
+\usepackage[preprint]{neurips_2022}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2022}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2022}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2022}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+%\pdfstringdefDisableCommands{\renewcommand*{\bm}[1]{#1}}
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage[dvipsnames]{xcolor}         % colors
+
+\usepackage{amstext,amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage{multirow,array}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{natbib}
+\usepackage{threeparttable}
+%\usepackage{caption}
+%\usepackage{subfigure}
+\usepackage[font=footnotesize, labelformat=simple]{subcaption}%
+\renewcommand\thesubfigure{(\alph{subfigure})}
+\usepackage{mathtools}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\usepackage{enumerate}
+\usepackage{enumitem}
+\usepackage{adjustbox}
+
+
+\hypersetup{
+	colorlinks=true,%
+	citecolor={blue!50!black},
+	linkcolor={red!50!black},
+	urlcolor={green!50!black}
+}
+
+\title{Model-Based Opponent Modeling}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{%
+
+  Xiaopeng Yu \quad Jiechuan Jiang \quad Wanpeng Zhang \quad Haobin Jiang \quad Zongqing Lu \\
+  \\
+  {Peking University}
+  % examples of more authors
+  \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \AND
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\begin{abstract}
+When one agent interacts with a multi-agent environment, it is challenging to deal with various opponents unseen before. Modeling the behaviors, goals, or beliefs of opponents could help the agent adjust its policy to adapt to different opponents. In addition, it is also important to consider opponents who are learning simultaneously or capable of reasoning. However, existing work usually tackles only one of the aforementioned types of opponents. In this paper, we propose \textit{model-based opponent modeling} (MBOM), which employs the environment model to adapt to all kinds of opponents. MBOM simulates the recursive reasoning process in the environment model and imagines a set of improving opponent policies. To effectively and accurately represent the opponent policy, MBOM further mixes the imagined opponent policies according to the similarity with the real behaviors of opponents. Empirically, we show that MBOM achieves more effective adaptation than existing methods in a variety of tasks, respectively with different types of opponents, \emph{i.e.}, fixed policy, na\"ive learner, and reasoning learner.
+\end{abstract}
+
+\section{Introduction}
+
+Reinforcement learning (RL) has made great progress in multi-agent competitive games, \emph{e.g.}, AlphaGo \citep{silver2016mastering}, OpenAI Five \citep{OpenAI_dota}, and AlphaStar \citep{vinyals2019grandmaster}. In multi-agent environments, an agent usually has to compete against or cooperate with diverse other agents (collectively termed as \emph{opponents} whether collaborators or competitors) unseen before. Since the opponent policy influences the transition dynamics experienced by the agent, interacting with diverse opponents makes the environment nonstationary from the agent's perspective. Due to the complexity and diversity in opponent policies, it is very challenging for the agent to retain overall supremacy.
+
+Explicitly modeling the behaviors, goals, or beliefs of opponents \citep{albrecht2018autonomous}, rather than treating them as a part of the environment, could help the agent adjust its policy to adapt to different opponents. Many studies rely on predicting the actions \citep{he2016opponent,hong2018deep,grover2018learning,papoudakis2020variational} and goals \citep{rabinowitz2018machine, raileanu2018modeling} of opponents during training. When facing diverse or unseen opponents, the agent policy conditions on such predictions or representations generated by corresponding modules. However, opponents may also have the same reasoning ability, \emph{e.g.}, an opponent who makes predictions about the agent's goal. In this scenario, higher-level reasoning and some other modeling techniques are required to handle such sophisticated opponents \citep{wen2018probabilistic,yang2019efficient,yuan2020emergence}. In addition, the opponents may learn simultaneously, the modeling becomes unstable, and the fitted models with historical experiences lag behind. To enable the agent to continuously adapt to learning opponents, LOLA \citep{foerster2018learning} takes into account the gradients of the opponent's learning for policy updates, Meta-PG \citep{shedivat2017continuous} formulates continuous adaptation as a meta-learning problem, and Meta-MAPG \citep{kim2021policy} combines meta-learning with LOLA. However, LOLA requires knowing the learning algorithm of opponents, while Meta-PG and Meta-MAPG require all opponents use the same learning algorithm.  
+
+Unlike existing work, we do not make such assumptions and focus on enabling the agent to learn effectively by directly representing the policy improvement of opponents when interacting with them, even if they may be also capable of reasoning. Inspired by the intuition that humans could anticipate the future behaviors of opponents by simulating the interactions in the brain after knowing the rules and mechanics of the environment, in this paper, we propose \textit{model-based opponent modeling} (MBOM), which employs the environment model to predict and capture the policy improvement of opponents. By simulating the interactions in the environment model, we could obtain the best responses of opponents to the agent policy that is conditioned on the opponent model. Then, the opponent model can be finetuned using the simulated best responses to get a higher-level opponent model. 
+%The higher-level opponent model reasons more deeply and thus more competitive. 
+By recursively repeating the simulation and finetuning, MBOM imagines the learning and reasoning of opponents and generates a set of opponent models with different levels, which could also be seen as recursive reasoning. However, since the learning and reasoning of opponents are \textit{unknown}, a certain-level opponent model might erroneously estimate the opponent. To effectively and accurately represent the opponent policy, we further propose to mix the imagined opponent policies according to the similarity with the real behaviors of opponents updated by the Bayesian rule.
+
+We empirically evaluate MBOM in a variety of competitive tasks, against three types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner. MBOM outperforms strong baselines, especially when against na\"ive learner and reasoning learner. Ablation studies verify the effectiveness of recursive imagination and Bayesian mixing. We also show that MBOM can be applied in cooperative tasks.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Related Work}
+
+\textbf{Opponent Modeling.}
+In multi-agent reinforcement learning (MARL), it is a big challenge to form robust policies due to the unknown opponent policy. From the perspective of an agent, if opponents are considered as a part of the environment, the environment is unstable and complex for policy learning when the policies of opponents are also changing. If the information about opponents is included, \emph{e.g.}, behaviors, goals, and beliefs, the environment may become stable, and the agent could learn using single-agent RL methods. This line of research is \emph{opponent modeling}. 
+
+One simple idea of opponent modeling is to build a model each time a new opponent or group of opponents is encountered \citep{zheng2018deep}. However, learning a model every time is not efficient. A more computationally tractable approach is to represent an opponent's policy with an embedding vector. \citet{grover2018learning} uses a neural network as an encoder, taking as input the trajectory of one agent. Imitation learning and contrastive learning are used to train the encoder. Then, the learned encoder can be combined with RL by feeding the generated representation into policy or/and value networks. Learning of the model can also be performed simultaneously with RL, as an auxiliary task \citep{2016Reinforcement}. Based on DQN \citep{mnih2015DQN}, DRON \citep{he2016opponent} and DPIQN \citep{hong2018deep} use a secondary network that takes observations as input and predicts opponents’ actions. The hidden layer of this network is used by the DQN module to condition on for a better policy. It is also feasible to model opponents using variational auto-encoders \citep{papoudakis2020variational}, which means the generated representations are no longer deterministic vectors, but high-dimensional distributions. ToMnet \citep{rabinowitz2018machine} tries to make agents have the same Theory of Mind \citep{premack1978does} as humans. ToMnet consists of three networks, reasoning about the agent's action and goal based on past and current information. SOM \citep{raileanu2018modeling} implements Theory of Mind from a different perspective. SOM uses its own policy, opponent's observation, and opponent's action to work backward to learn opponent's goal by gradient ascent.
+
+%The methods aforementioned only consider opponent policies which are independent of the agent. If opponents hold a belief about the agent, the agent can form a higher-level belief about opponents' beliefs. This process can perform recursively, termed \emph{recursive reasoning}. PR2 \citep{wen2018probabilistic} uses SAC \citep{haarnoja2018soft} to approximate opponents' policies conditioning on the agent's action. Since PR2 uses the agent's Q-function to estimate opponents' policies, it can only be applied in cooperative environments. 
+%\textcolor{Maroon}{GR2 \citep{wen2020modeling} uses the agent’s joint Q-function to obtain recursive reasoning, but assumes the distribution of reasoning levels is Poisson distribution.}
+%\citet{yuan2020emergence} takes both level-0 and level-1 beliefs as input to the value function. Level-0 belief is updated according to Bayesian rule, and level-1 belief is updated using a learnable neural network. However, these methods use centralized training decentralized execution algorithms to train a set of fixed agents that cannot handle diverse opponents in execution. Bayes-ToMoP \citep{yang2019efficient} is developed to detect and handle different reasoning opponents, but the implementation is complex and not scalable. %\textcolor{red}{IPOMDP-Net \citep{han2019ipomdpnet} is a neural analogy of the I-POMDP framework \citep{gmytrasiewicz2005framework}, which builds the intentional models about environment state and opponents and solves the intentional models by alternate recursion to achieve recursive reasoning. However, the limitations in solvability making it inapplicable to complex environments.}
+
+
+The methods aforementioned only consider opponent policies that are independent of the agent. If opponents hold a belief about the agent, the agent can form a higher-level belief about opponents' beliefs. This process can perform recursively, termed \emph{recursive reasoning}.
+In repeated games, R2-B2 \citep{dai2020r2} performs recursive reasoning by assuming that all agents select actions according to GP-UCB acquisition function \cite{srinivas2009gaussian}, and shows that recursive reasoning on one level higher than the other agents leads to faster regret convergence. 
+When it comes to more complicated stochastic games, recursive reasoning should be compatible with reinforcement learning algorithms. PR2 \citep{wen2018probabilistic} and GR2 \citep{wen2020modeling} use the agent’s joint Q-function to obtain recursive reasoning. \citet{yuan2020emergence} takes both level-0 and level-1 beliefs as input to the value function, where level-0 belief is updated according to the Bayesian rule and level-1 belief is updated using a learnable neural network. However, these methods \cite{wen2018probabilistic,wen2020modeling,yuan2020emergence} use centralized training with decentralized execution algorithms to train a set of fixed agents that cannot handle diverse opponents in execution. %Bayes-ToMoP \citep{yang2019efficient} is developed to detect and handle different reasoning opponents by learning many diverse policies, but the implementation is complex and not scalable. 
+
+
+If the opponents are also learning, the modeling mentioned above becomes unstable and the fitted models with historical experiences lag behind. So it is beneficial to take into consideration the learning process of opponents. LOLA \citep{foerster2018learning} introduces the impact of the agent's policy on the anticipated parameter update of the opponent. A neural network is used to model the opponent's policy and estimate the learning gradient of the opponent's policy, implying that the learning algorithm used by the opponent should be known, otherwise the estimated gradient will be inaccurate. Further, the opponents may still be learning continuously during execution. Meta-PG \citep{shedivat2017continuous} is a method based on meta policy gradient, using trajectories from the current opponents to do multiple meta-gradient steps and construct a policy that is good for the updated opponents. Meta-MAPG \citep{kim2021policy} extends this method by including an additional term that accounts for the impact of the agent’s current policy on the future policies of opponents, similar to LOLA. These meta-learning based methods require that the distribution of trajectories matches across training and test, which implicitly means all opponents use the same learning algorithm.
+
+Unlike existing work, we go one step further and consider a more general setting, where the opponents could be fixed, randomly sampled from an unknowable policy set, or continuously learning using an unknowable and changeable RL algorithm, both in training and execution. We learn an environment model that allows the agent to perform recursive reasoning against opponents who may also have the same reasoning ability.
+
+\textbf{Model-based RL and MARL.}
+Model-based RL allows the agent to have access to the transition function. There are two typical branches of model-based RL approaches: background planning and decision-time planning. 
+In background planning, the agent could use the learned model to generate additional experiences for assisting learning. For example, Dyna-style algorithms \citep{sutton1990integrated,kurutach2018model,luo2019algorithmic} perform policy optimization on simulated experiences, and model-augmented value expansion algorithms \citep{feinberg2018model,oh2017value,buckman2018sample} use model-based rollouts to improve the update targets. In decision-time planning \citep{chua2018deep}, the agent could use the model to rollout the optimal action at a given state by looking forward during execution, \emph{e.g.}, model predictive control. %Our work follows the direction and uses the model to obtain the best response of opponents.
+Recent studies have extended model-based methods to multi-agent settings for sample efficiency \citep{zhang2020model,AORPO}, centralized training \citep{willemsen2021mambpo}, and communication \citep{kim2020communication}. Unlike these studies, we exploit the environment model for opponent modeling.
+
+%The model-based MARL methods could be divided into two classes: centralized model and decentralized model. AMLAPN \citep{park2019multi} builds a centralized auxiliary prediction network to model the environment dynamics and the opponent actions to alleviate the non-stationary dynamics. A centralized multi-step generative model \citep{krupnik2020multi} with a disentangled variational auto-encoder has been proposed for performing trajectory planning. For decentralized model, IS \citep{kim2021communication} uses the model to generate imagined trajectories for multi-agent communication to share intention. HPP \citep{wang2020model} uses the models to propose and evaluate navigation subgoals for the rendezvous task.
+
+%\vspace{0.2cm}
+%\textit{Unlike existing work, we consider a more general setting, where the opponents could be fixed, randomly sampled from an unknowable policy set, or continuously learning using an unknowable and changeable RL algorithm, both in training and execution. We learn an environment model that allows the agent to perform recursive reasoning against opponents who may also have the same reasoning ability.}
+
+%\textsl{Our method relaxes the limitations on opponent modeling. We make no assumptions about the variation of opponents' policies. They could be fixed, randomly sampled from an unknowable policy set, or continuously learning using an unknowable and changeable RL algorithm, both in training and execution. We learn an environment model that allows the agent to perform recursive reasoning against opponents who may also have the same reasoning ability.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Preliminaries}
+
+In general, we consider an $n$-agent stochastic game $(\mathcal{S},\mathcal{A}^1, \dots, \mathcal{A}^n,\mathcal{P},\mathcal{R}^1,\dots,\mathcal{R}^n,\gamma)$, where $\mathcal{S}$ is the state space, $\mathcal{A}^i$ is the action space of agent $i \in [1,\dots,n]$, $\mathcal{A}=\prod_{i=1}^n\mathcal{A}^i$ is the joint action space of agents, $\mathcal{P}:\mathcal{S} \times \mathcal{A} \times \mathcal{S} \to [0, 1]$ is a transition function, $\mathcal{R}^i: \mathcal{S} \times \mathcal{A} \to \mathbb{R}$ is the reward function of agent $i$ , and $\gamma$ is the discount factor. The policy of agent $i$ is $\pi^i$, and the joint policy of other agents is $\pi^{-i}(a^{-i}|s) = \prod_{j \neq i}\pi^j(a^j|s)$, where $a^{-i}$ is the joint action except agent $i$.
+All agents interact with the environment simultaneously without communication. The historical trajectory is available, \emph{i.e.}, for agent $i$ at timestep $t$, $\{s_0, a_0^i, a_0^{-i}, \dots, s_{t-1}, a_{t-1}^i, a_{t-1}^{-i}\}$ is observable. The goal of the agent $i$ is to maximize its expected cumulative discount rewards
+%\begin{small}
+\begin{equation}
+	\label{eq_agent_goal}
+	\mathop{\mathbb{E}}\limits_{\substack{s_{t+1}\sim\mathcal{P}(\cdot|s_t, a_t^i, a_t^{-i}), \\a^i\sim\pi^i(\cdot |s_t), a_t^{-i}\sim\pi^{-i}(\cdot |s_t)}}\left [ \sum_{t=0}^{\infty}\gamma^t\mathcal{R}^i(s_t,a_t^i,a_t^{-i})  \right ].
+\end{equation}
+%\end{small}
+For convenience, the learning agent treats all other agents as a joint opponent with the joint action $a^o \sim \pi^o(\cdot|s)$ and reward $r^o$. The action and reward of the learning agent are denoted as $a \sim \pi(\cdot|s)$ and $r$, respectively.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Model-Based Opponent Modeling}
+\label{method}
+MBOM employs the environment model to predict and capture the learning of opponent policy. By simulating recursive reasoning via the environment model, MBOM imagines the learning and reasoning of the opponent and generates a set of opponent models. To obtain a stronger representation ability and accurately capture the adaptation of the opponent, MBOM mixes the imagined opponent policies according to the similarity with the real behaviors of the opponent.
+
+\subsection{Recursive Imagination}
+If the opponent is also learning during the interaction, the opponent model fitted with historical experiences always lags behind, making the agent hard to adapt to the opponent. Moreover, if the opponent could adjust its policy according to the actions, intentions, or goals of the agent, then recursive reasoning may occur between agent and opponent. However, based on the lagged opponent model, the agent would struggle to keep up with the learning of opponent. To adapt to the learning and reasoning opponent, the agent should predict the current opponent policy and reason more deeply than the opponent. 
+
+\begin{figure}[t]
+  \centering
+  %\fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+  \includegraphics[width=.95\textwidth]{figure/Architectures_nips.pdf}
+  \caption{Architectures of MBOM}
+  \label{fig-overview}
+  \vspace{-2mm}
+\end{figure}
+
+%MBOM explicitly simulates the recursive reasoning process utilizing the environment model, called \textit{recursive imagination}, to generate a series of opponent models, called Imagined Opponent Policies (IOPs). Initially, the agent interacts with $\nu$ different opponents which are learning with PPO \citep{schulman2017proximal}, and collect a buffer $\mathcal{D}$ which contains the experience $\left<s, a, a^o, s' , \bm{r}\right>$, where $\bm{r} = \left<r,r^o\right>$. 
+%For zero-sum game ($r+r^o=0$) and fully cooperative game ($r=r^o$), $r^o$ can be easily obtained, while for general-sum game we make a mild assumption that $r^o$ can be accessed during experience collection. 
+%Using the experience buffer $\mathcal{D}$, we can train the the environment model $\Gamma(s', \bm{r} | s, a, a^o;\zeta)$ by minimizing the mean square error
+%\begin{equation}
+%\mathop{\mathbb{E}}\limits_{\substack{s, a, a^o, s' ,\bm{r} \sim %\mathcal{D}}} \frac{1}{2}\|s' - \hat{s}'\|^2 +\frac{1}{2}\|\bm{r} - %\hat{\bm{r}}\|^2,
+%\end{equation}
+%where $\hat{s}',\hat{\bm{r}} = \Gamma(s, a, a^o;\zeta)$, obtain the level-0 IOP $\tilde{\pi}^o_0(\cdot|s;\phi_0)$ by maximum-likelihood estimation
+%\begin{equation}
+%\mathop{\mathbb{E}}\limits_{s, a^o \sim \mathcal{D}} \log %\tilde{\pi}^o_0(a^o|s;\phi_0),
+%\end{equation}
+%and learn the policy of the agent $\pi(\cdot | s, \tilde{a}^o \sim \tilde{\pi}^o_0(\cdot|s;\phi_0); \theta)$ using PPO. By running PPO, we could also get the value function $V(s)$ of the agent.
+%To imagine the learning of the opponent, as shown in Figure~\ref{fig-overview}, we use the rollout algorithm \citep{Tesauro1996On} to get the best response of the opponent under the agent policy $\pi$. 
+
+
+MBOM explicitly simulates the recursive reasoning process utilizing the environment model, called \textit{recursive imagination}, to generate a series of opponent models, called Imagined Opponent Policies (IOPs). 
+First, we pretrain the agent's policy $\pi$ using PPO \citep{schulman2017proximal} while interacting with $\nu$ different opponents with diverse policies that can be learned for example by \citep{tang2021discovering}.
+%\textcolor{red}{ $\tilde{\pi}^o$. For the preparation phase, the agent interacts with $\nu$ different opponents to train its policy $\pi(\cdot | s, \tilde{a}^o \sim \tilde{\pi}^o(\cdot|s;\phi); \theta)$ using PPO \citep{schulman2017proximal},} 
+and collects a buffer $\mathcal{D}$ which contains the experience $\left<s, a, a^o, s' , \bm{r}\right>$, where $\bm{r} = \left<r,r^o\right>$. 
+For zero-sum game ($r+r^o=0$) and fully cooperative game ($r=r^o$), $r^o$ can be easily obtained, while for general-sum game we make an assumption that $r^o$ can be accessed during experience collection. 
+Then, using the experience buffer $\mathcal{D}$, we can train the environment model $\Gamma(s', \bm{r} | s, a, a^o;\zeta)$ by minimizing the mean square error
+\begin{equation}
+\mathop{\mathbb{E}}\limits_{\substack{s, a, a^o, s' ,\bm{r} \sim \mathcal{D}}} \frac{1}{2}\|s' - \hat{s}'\|^2 +\frac{1}{2}\|\bm{r} - \hat{\bm{r}}\|^2,
+\end{equation}
+where $\hat{s}',\hat{\bm{r}} = \Gamma(s, a, a^o;\zeta)$, and obtain the level-0 IOP $\tilde{\pi}^o_0(\cdot|s;\phi_0)$ by maximum-likelihood estimation,
+\begin{equation}
+\mathop{\mathbb{E}}\limits_{s, a^o \sim \mathcal{D}} \log \tilde{\pi}^o_0(a^o|s;\phi_0).
+\end{equation}
+%
+%\textcolor{red}{For the interaction phase, the algorithm architecture is shown in Figure~\ref{fig-overview}.} 
+To imagine the learning of the opponent, as illustrated in Figure~\ref{fig-overview}, we use the rollout algorithm \citep{Tesauro1996On} to get the best response of the opponent to the agent policy $\pi$. For each opponent action $a^o_t$ at timestep $t$, we uniformly sample the opponent action sequences in the next $k$ timesteps, simulate the trajectories using the learned environment model $\Gamma_\zeta$, and select the best response with the highest rollout value
+\begin{equation}
+\label{eq:best}
+a^{o *}_t = \mathop{\operatorname{argmax}}\limits_{a_t^{o}}\max\limits_{\substack{a_{t+1}^o,\cdots, a_{t+k}^o \sim \text{Unif}}} \sum_{j = 0}^{k}\gamma^{j} {r}_{t+j}^{o}.
+\end{equation}
+During the simulation, the agent acts according to the policy conditioned on the modeled opponent policy, $a_t \sim\pi(\cdot |s_t, \tilde{a}_t^o \sim \tilde{\pi}^o_0(\cdot|s_t;\phi_0);\theta)$, and the learned environment model provides the transition $s_{t+1},\bm{r_t} = \Gamma(s_t, a_t, a_t^o;\zeta)$. With larger $k$, the rollout has a longer planning horizon, and thus could evaluate the action $a^{o*}$ more accurately, assuming a perfect environmental model. However, the computation cost of rollout increases exponentially with the planning horizon to get an accurate estimate of $a^{o*}$, while in practice the compounding error of the environmental model also increases with the planning horizon \citep{janner2019trust}. Therefore, the choice of $k$ is a tradeoff between accuracy and cost. Specifically, for zero-sum game and fully cooperative game, we can approximately estimate the opponent state value $V^o(s)$ as $-V(s)$ and $V(s)$, respectively, and modify the rollout value like $n$-step return \citep{sutton2018reinforcement} to obtain a longer horizon (see Appendix \ref{app:ablation} for the empirical effect of $k$)
+\begin{equation}
+\label{eq:best_1}
+a^{o *}_t = \mathop{\operatorname{argmax}}\limits_{a_t^{o}}\max\limits_{\substack{a_{t+1}^o,\cdots, a_{t+k}^o \sim \text{Unif}}} \left[ \sum_{j = 0}^{k}\gamma^{j} {r}_{t+j}^{o} + \gamma^{k+1} V^o(s_{t+k+1}) \right].
+\end{equation}
+By imagination, we can obtain the best response of the opponent to the agent policy $\pi$ and construct the simulated data $\{\left<s, a^{o*}\right>\}$. Then, we use the data to finetune the level-0 IOP $\tilde{\pi}^o_0(\cdot|s;\phi_0)$ by maximum-likelihood estimation, and obtain the level-1 IOP $\tilde{\pi}^o_1(\cdot|s;\phi_1)$. The level-1 IOP can be seen as the best \textit{response} of the opponent to the \textit{response} of the agent conditioned on level-0 IOP. In the imagination, it is the nested form as ``the opponent believes [that the agent believes (that the opponent believes ...)].'' The existing imagined opponent policy is the innermost ``(that the opponent believes),'' while the outermost ``the opponent believes'' is $a^{o*}$ which is obtained by the rollout process. Recursively repeating the rollout and finetuning, where the agent policy is conditioned on the IOP $\tilde{\pi}^o_{m-1}(\cdot|s;\phi_{m-1})$, we could derive the level-$m$ IOP $\tilde{\pi}^o_m(\cdot|s;\phi_m)$. %The higher-level IOP reasons more deeply, and thus more competitive. 
+%\begin{algorithm}[t]
+%	\caption{MBOM}
+%	\label{alg:1}
+%	\begin{algorithmic}[1]
+%		\STATE \textit{\textbf{Pretraining:}}
+%		\STATE Initialize the recursive imagination layer $M$.	
+%		\STATE Initialize the weights $\bm{\alpha}$ with $(1/M, 1/M, \dots, 1/M)$.
+%		\STATE Interact with $\eta$ learning opponents and collect the experience buffer $\mathcal{D}$.
+%		\STATE Train the level-0 IOP $\phi_0$, the environment model $\Gamma_{\zeta}$, and the agent policy $\theta$ using the experience buffer $\mathcal{D}$.
+%		\STATE \textit{\textbf{Interaction:}}					
+%		\FOR{$t = 1, \ldots, \text{ max\_epoch}$}		
+%		\STATE Interact with the opponent to observe the real opponent actions.\\
+%		\COMMENT {\textit{//Recursive Imagination}}
+%		\STATE Finetune $\phi_0$ with the real opponent actions
+%		\FOR{$i = m, \ldots, M-1$}	
+%		\STATE Rollout in $\Gamma_\zeta$ with $\pi(\cdot |s, a^o \sim \tilde{\pi}^o(\cdot|s;\phi_{m-1});\theta)$ to get best responses of opponent $a^{o*}$ by \eqref{eq:best} or \eqref{eq:best_1}.
+%		\STATE Finetune $\phi_{m-1}$ with best responses to get the $\phi_m$.
+%		\ENDFOR	\\
+%		\COMMENT {\textit{//Bayesian Mixing}}
+%		\STATE Update $\bm{\alpha}$ by \eqref{eq:mixture_weights}.	
+%		\STATE Mix the IOPs to get $\tilde{\pi}_{\operatorname{mix}}^o$ by \eqref{eq:phi_mix}.
+%		\ENDFOR		
+%	\end{algorithmic}
+%\end{algorithm}
+
+\subsection{Bayesian Mixing}
+
+% By recursive imagination, we get $M$ IOPs with different reasoning levels. However, since the learning and reasoning of the opponent are unknown, a single IOP might overestimate or underestimate the opponent. To obtain stronger representation ability and accurately capture the learning of the opponent, as illustrated in Figure~\ref{fig-overview}, we linearly combine the IOPs to get a mixed  policy,
+% \begin{equation}
+% \label{eq:phi_mix}
+% \tilde{\pi}^{o}_{\operatorname{mix}}(\cdot | s) = \sum_{m=0}^{M-1}\alpha_m\tilde{\pi}^o(\cdot|s; \phi_m),
+% \end{equation}
+% where $\alpha_m$ is the weight of level-$m$ IOP, which is produced by the IOPs mixer, 
+% \begin{equation}
+% \begin{aligned}
+% \label{eq:mixture_weights}
+%     \bm{\alpha} &= (\alpha_0, \dots, \alpha_{M-1}) \\ &= \text{softer-softmax}(\Psi_0, \dots, \Psi_{M-1}).
+% \end{aligned}
+% \end{equation}
+% Softer-softmax \citep{hinton2015distilling} is a variant of softmax, which uses higher temperature to control a softy of the probability distribution over classes. $\Psi_m$ is the decayed moving average of $p(m|a^o)$, which is the probability of using the level-$m$ IOP given the action of the opponent $a^o$. By Bayesian rule, we have
+% \begin{equation}
+% \label{eq:bayes}
+% \begin{aligned}
+%     p(m|a^o) &= \frac{p(a^o|m)p(m)}{\sum_{i=0}^{M-1}p(a^o|i)p(i)} 
+%     \\ &= \frac{\tilde{\pi}^o(a^o|s;\phi_m)p(m)}{\sum_{i=0}^{M-1}\left[\tilde{\pi}^o(a^o|s;\phi_i)p(i)\right]},
+% \end{aligned}
+% \end{equation}
+% where $p(m)$ is the probability of using the level-$m$ IOP, and we estimate it as the moving average of $p(m|a^o)$. $\Psi_m$ indicates the similarity between the level-$m$ IOP and the opponent in the most recent stage. Given the opponent actions, the higher $\Psi_m$ means that the actions are more likely to be generated from the level-$m$ IOP, and thus the level-$m$ IOP is more similar to the opponent. Adjusting the weights $\bm{\alpha}$ according to the similarity could obtain a more accurate estimate of the improving opponent policy. Moreover, the IOPs mixer is non-parametric, which could be updated quickly and efficiently without parameter training and too many interactions. Therefore, the IOPs mixer could adapt to the fast-improving opponent.
+
+By recursive imagination, we get $M$ IOPs with different reasoning levels. However, since the learning and reasoning of the opponent are unknown, a single IOP might erroneously estimate the opponent. To obtain stronger representation capability and accurately capture the learning of the opponent, we linearly combine the IOPs to get a mixed IOP,
+\begin{equation}
+\label{eq:phi_mix}
+\tilde{\pi}^{o}_{\operatorname{mix}}(\cdot | s) = \sum_{m=0}^{M-1}\alpha_m\tilde{\pi}^o_m(\cdot|s; \phi_m),
+\end{equation}
+where $\alpha_m$ is the weight of level-$m$ IOP, which is taken as $p(\tilde{\pi}^o_m|a^o)$, also denoted as  $p(m|a^o)$, the probability that the opponent action $a^o$ is generated from the level-$m$ IOP. Thus, $p(m|a^o)$ indicates the similarity between the level-$m$ IOP $\tilde{\pi}^o_m$ and the opponent policy $\pi^o$ in the most recent stage. By Bayesian rule, we have
+\begin{equation}
+\label{eq:bayes}
+    p(m|a^o) = \frac{p(a^o|m)p(m)}{\sum_{i=0}^{M-1}p(a^o|i)p(i)} = \frac{\tilde{\pi}^o_m(a^o|s;\phi_m)p(m)}{\sum_{i=0}^{M-1}\left[\tilde{\pi}^o_i(a^o|s;\phi_i)p(i)\right]}.
+\end{equation}
+Updating $p(m|a^o)$ during interaction can obtain a more accurate estimate of the improving opponent policy. 
+
+In practice, we use the moving average of $p(m|a^o)$ as the prior $p(m)$, take the decayed moving average of $p(m|a^o)$ as $\Psi_m$, and obtain $\bm{\alpha}$ by the IOPs mixer,
+\begin{equation}
+\label{eq:mixture_weights}
+    \bm{\alpha} = (\alpha_0, \dots, \alpha_{M-1}) = \text{softer-softmax}(\Psi_0, \dots, \Psi_{M-1}).
+\end{equation}
+Softer-softmax \citep{hinton2015distilling} is a variant of softmax, which uses higher temperature to control a softy of the probability distribution. The IOPs mixer is non-parametric, which could be updated quickly and efficiently without parameter training and too many interactions (see Appendix~\ref{app:alpha} for empirical analysis on $\bm{\alpha}$). Therefore, the IOPs mixer could adapt to the fast-improving opponent.
+
+\newcommand{\unsim}{\mathord{\sim}}
+\begin{algorithm}[t]
+	\caption{MBOM}
+	\label{alg:1}
+\small
+\begin{algorithmic}[1]
+		\STATE \textit{\textbf{Pretraining:}}
+		\STATE Initialize the recursive imagination layer $M$.	
+		\STATE Initialize the weights $\bm{\alpha}$ with $(1/M, 1/M, \dots, 1/M)$.
+		\STATE Interact with $\nu$ learning opponents to train the agent policy $\theta$ and collect the experience buffer $\mathcal{D}$.
+		\STATE Train the level-0 IOP $\phi_0$, the environment model $\Gamma_{\zeta}$ using the experience buffer $\mathcal{D}$.
+		\STATE \textit{\textbf{Interaction:}}					
+		\FOR{$t = 1, \ldots, \text{ max\_epoch}$}		
+		\STATE Interact with the opponent to observe the real opponent actions.\\
+		\COMMENT {\textit{//Recursive Imagination}}
+		\STATE Finetune $\phi_0$ with the real opponent actions
+		\FOR{$m = 1, \ldots, M-1$}	
+		\STATE Rollout in $\Gamma_\zeta$ with $\pi(\cdot |s, \tilde{a}^o \unsim \tilde{\pi}^o_{m-1}(\cdot|s;\phi_{m-1});\theta)$ to get $a^{o*}$ by \eqref{eq:best} or \eqref{eq:best_1}.
+		\STATE Finetune $\phi_{m-1}$ with best responses to get the $\phi_m$.
+		\ENDFOR	\\
+		\COMMENT {\textit{//Bayesian Mixing}}
+		\STATE Update $\bm{\alpha}$ by \eqref{eq:mixture_weights}.	
+		\STATE Mix the IOPs to get $\tilde{\pi}_{\operatorname{mix}}^o$ by \eqref{eq:phi_mix}.
+		\ENDFOR		
+\end{algorithmic}
+\end{algorithm}
+
+For completeness, the full procedure of MBOM in given in Algorithm~\ref{alg:1}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Theoretical Analysis}
+
+MBOM consists of several components, including a conditional policy, an environment model, and $M$ IOPs. They all interact with each other through model rollouts, which however makes it extremely hard to give an error analysis based on each component of MBOM. Therefore, we instead focus mainly on recursive imagination and Bayesian mixing, and give a profound understanding of MBOM. Proofs are available in Appendix~\ref{app:proof}.
+
+Without loss of generality, we define $\delta_m$ as the discrepancy between level-$m$ and $m$-$1$ IOPs in terms of estimated value function given the IOP, and $\varepsilon_m$ as the error of level-$m$ IOP compared to the true value function given the opponent policy, \textit{i.e.}, $\delta_m \doteq |\widehat{V}_m-\widehat{V}_{m-1}|$, $\varepsilon_m \doteq |\widehat{V}_m - V|$, and $\delta_0 \doteq \varepsilon_0$. Then, we have the following two lemmas. 
+
+\begin{lemma}
+For the mixed imagined opponent policy (IOP) $\tilde{\pi}_{\operatorname{mix}}^o(\cdot|s) = \sum_{m=0}^{M-1}\alpha_m\tilde{\pi}^o_m(\cdot|s; \phi_m)$, the total error $\varepsilon_{total} = \sum_{m=0}^{M-1}\alpha_m\varepsilon_m$ satisfies the following inequality:
+\begin{equation*}\label{eq:total-bound}
+    \varepsilon_{total}\leq\sum_{m=0}^{M-1}\delta_m\sum_{i=m}^{M-1}\alpha_i.
+\end{equation*}
+\label{lem:total-error}
+\end{lemma}
+
+
+\begin{lemma}
+Suppose the value function is Lipschitz continuous on the state space $\mathcal{S}$, $K$ is the Lipschitz constant, $\widehat{\mathcal{M}}_i(s,a) \doteq \Gamma(s,a,a^o;\zeta) \cdot \tilde{\pi}^o_i(a^o|s;\phi_i)$ is the transition distribution given $s$ and $a$, then
+
+\begin{equation*}
+\left|\widehat{V}_i-\widehat{V}_{j}\right| \leq\frac{\gamma K}{1-\gamma} \cdot\underset{s,a\sim \pi,\widehat{\mathcal{M}}_j}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_i(s, a)-\widehat{\mathcal{M}}_j(s, a)\right\|.
+\end{equation*}
+\label{lem:obj-bound}
+\end{lemma}
+According to \eqref{eq:phi_mix} and \eqref{eq:bayes}, we can express $\alpha_m$ as the following
+\begin{align*}
+    \alpha_m & \doteq \mathbb{E}\left[p(m | a^o)\right] = \sum\limits_{s,a^o} d(s,a^o) \frac{\tilde{\pi}^o_m\left(a^{o} | s ; \phi_{m}\right)p(m)}{\sum_{i=0}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)},
+\end{align*}
+where $d(s,a^o)$ is the stationary distribution of pairs of state and action of opponent. Then,
+based on Lemma \ref{lem:total-error} and \ref{lem:obj-bound}, we can obtain the following theorem, where $\widehat{\mathcal{M}}_{-1}$ denotes $\mathcal{P}(\cdot|s,a,a^o) \cdot \pi^o(a^o|s)$, the true transition dynamics of agent. 
+
+\begin{theorem}\label{the:error-bound}
+Define the error between the approximated value function of the Bayesian mixing IOP and the true value function as $\varepsilon_{true}\doteq \left|\widehat{V}-V\right|$. For the Bayesian mixing IOP, the true error satisfies the following inequality:
+\begin{equation*}\small
+\label{eq:full-total-bound}
+\varepsilon_{true} \leq \varepsilon_{total} \leq \sum\limits_{s,a^o}\frac{\gamma K d(s,a^o)}{1-\gamma} 
+  \cdot \frac{\sum\limits_{m=0}^{M-1}\underset{s,a\sim\pi,\widehat{\mathcal{M}}_{m-1}}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_m-\widehat{\mathcal{M}}_{m-1}\right\|\sum\limits_{i=m}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)}.
+\end{equation*}
+\end{theorem}
+
+Theorem \ref{the:error-bound} tells us the error accumulates as level $M$ increases. However, larger $M$ also has advantages. To analyze, we first define the benefit using the mixed IOP as
+In the error bound of Theorem \ref{the:error-bound}, it is easy to see that the error accumulates as level $M$ increases, but at the same time, higher level also has advantages. To analyze, we need to define the benefit of using the mixed IOP as
+the optimization. We use the negative distribution distance $\eta\doteq -\|\hat{\pi}-\pi\|$ to denote the benefit of using policy in different levels, where $\hat{\pi}$ is the estimated opponent policy, $\pi$ is the true opponent policy and $\|\cdot\|$ is a general form of distribution distance function. For a mixing policy, we can define the benefit as:
+\begin{align*}
+    \eta_M=-\|(\alpha_0\tilde{\pi}^o_0+\cdots+\alpha_{M-1}\tilde{\pi}^o_{M-1})-\pi^o\|.
+\end{align*}
+Then, we have the following lemma and theorem.
+\begin{lemma}\label{lem:max-benefit}
+Assume that the true opponent policy $\pi^o$ has a probability distribution over the given set of IOPs $\{\tilde{\pi}^o_0,\ldots,\tilde{\pi}^o_{M-1}\}$, and a probability $\mathrm{Pr}\{\pi^o=\tilde{\pi}_m^o\} = p_m$ for each $\tilde{\pi}_m^o$, then the maximum expectation of $\eta_M$ can be achieved if and only if $\alpha_m=p_m, \forall m\in[0,M-1].$
+\end{lemma}
+
+\begin{theorem}\label{the:mix-benefit}
+Given the action trajectory of opponent $\{a^o_0,a^o_1,\ldots,a^o_t\}$, the posterior probability updated by Bayesian mixing approximates the true probability of opponent as the length of the trajectory grows, \textit{i.e.},
+
+\begin{equation*}
+    P(m|a^o_t,\cdots,a^o_1,a^o_0)\to P_{\operatorname{true}}(m)\doteq p_m, \quad t\to \infty.
+\end{equation*}
+
+Then the maximum expectation of $\eta_M$ can be achieved with $\alpha_m=\mathbb{E}[P(m|a^o_t,\cdots,a^o_1,a^o_0)]$.
+\end{theorem}
+
+%According to Theorem \ref{the:mix-benefit}, we know that when the samples are sufficient, the estimated probability distribution of opponent can approximate the true distribution of opponent, so that the benefit can achieve the maximum expectation. It is obvious that larger $M$ improves the representation capability of IOPs and thus better satisfies the assumption in Lemma \ref{lem:max-benefit}, but also increases the error bound in Theorem \ref{the:error-bound}. Therefore, the selection of $M$ is a tradeoff between them.
+
+According to Theorem \ref{the:mix-benefit}, we know that the estimated probability distribution of the opponent converges to the true distribution of the opponent. It is obvious that larger $M$ improves the representation capability of IOPs and thus better satisfies the assumption in Lemma \ref{lem:max-benefit}, but also increases the error bound in Theorem \ref{the:error-bound}. Therefore, the selection of $M$ is a tradeoff between them (see Appendix~\ref{app:ablation} for empirically study on $M$).
+%This may also manifest the reason most people only do two levels of recursive reasoning (need a reference). 
+%%%%(this is verified empirically in Appendix~\ref{app:ablation})
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\subsection{Theoretical Analysis}
+
+%MBOM consists of several components, including a conditional policy, an environment model, and $M$ IOPs. They all interact with each other through model rollouts, which however makes it extremely hard to give an error analysis based on each component of MBOM. Therefore, we instead focus mainly on recursive imagination and Bayesian mixing, and give a profound understanding of MBOM. 
+
+%\textcolor{Maroon}{Recursive imagination generates IOPs that improve representation capability on opponent's policy space than traditional opponent modeling. The larger $M$ improves the representation capability of IOPs, but also increases the error bound between mixed imagined opponent policy and true value function given the opponent policy. Therefore, the selection of $M$ is a tradeoff between them.}
+
+%Bayesian mixing, the samples are sufficient, the estimated probability distribution of opponent can approximate the true distribution of opponent, so that the benefit can achieve the maximum expectation.
+
+%Detailed discussion is provided in Appendix~\ref{app:theoretical analysis}. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Experiments}
+
+We first evaluate MBOM thoroughly in two-player zero-sum tasks. Then, we investigate MBOM when against multiple opponents and in a cooperative task. In all the experiments, the baselines have the same neural network architectures as MBOM. All the methods are trained for five runs with different random seeds, and results are presented using mean and 95\% confidence intervals. More details about experimental settings and hyperparameters are available in Appendix~\ref{app:settings}.
+
+\subsection{Two-Player Zero-Sum Tasks}
+
+%\subsection{Settings}
+%We evaluate MBOM in two competitive tasks:
+% \begin{figure}[t]
+% 	\centering
+% 	\subfigure[Triangle Game]
+% 	{
+% 		\includegraphics[scale=0.26]{figure/trigame.png}
+% 		\label{fig:trigame}
+% 	}
+% 	\subfigure[One-on-One]
+% 	{
+% 		\includegraphics[scale=0.26]{figure/football.png}
+% 		\label{fig:oneonone}
+% 	}
+% 	\vspace{-0.30cm}
+% 	\caption{Illustrations of the scenarios.}
+% 	\label{fig:scenarios}
+% 	%\vspace{-0.20cm}
+% \end{figure}
+
+%\textbf{Triangle Game} is an asymmetric zero-sum game on two-dimension with multi-step actions, implemented on MPE \citep{lowe2017multi}. As shown in Figure~\ref{fig:trigame}, there are two moving players, $P1$ and $P2$, and three fixed landmarks, $L1-L3$, in a square field. The landmarks are located at the three vertexes of an equilateral triangle with the side length $0.6$. When the distance between a player and a landmark is less than $0.15$, the agent touches the landmark and has the state $T$. $T1$ indicates that the player touches the landmark $L1$, and so on. If the player does not touch any landmark, the player state is $F$. The payoff matrix of the two players is shown in Table~\ref{tb:trigame_reward} in Appendix~\ref{app:settings}, where $P2$ has inherent disadvantages since the optimal solution of $P2$ always strictly depends on the state of $P1$. When facing different policies of $P1$, $P2$ has to adjust its policy to adapt to $P1$ for higher reward. We control $P2$ as the agent and take $P1$ as the opponent.
+
+%\textbf{One-on-One} is a two-player competitive game implemented on Google Research Football Environment \citep{kurach2020google}, a physics-based 3D simulator. As shown in Figure~\ref{fig:oneonone}, there are two players, the shooter, which could dribble and shoot the ball, and the goalkeeper. The shooter controls the ball in the initial state. The episode ends after $30$ timesteps or when the shooter loses possession of the ball. At the end of an episode, if the shooter shoots the ball into the goal, the shooter will get a reward $+1$, and the goalkeeper will get a reward $-1$. Otherwise, the shooter will get a reward of $-1$, and the goalkeeper will get a reward of $+1$. The goalkeeper could only passively react to the strategies of the shooter and makes policy adaptation when the shooter strategy changes. We control the goalkeeper as the agent and take the shooter as the opponent.
+
+%We evaluate MBOM in two competitive tasks. (1) \textsf{Triangle Game} is an asymmetric zero-sum game implemented on MPE (MIT license)\citep{lowe2017multi}, as illustrated in Figure~\ref{fig:trigame}. When facing different policies of the opponent, the agent has to adjust its policy to adapt to the opponent for higher reward. (2) \textsf{One-on-One} is a two-player competitive game implemented on Google Research Football (Apache-2.0 License) \citep{kurach2020google}, as illustrated in Figure~\ref{fig:oneonone}. The goalkeeper controlled by the agent could only passively react to the strategies of the shooter controlled by the opponent and makes policy adaptation when the shooter strategy changes.
+
+We evaluate MBOM in two competitive tasks: (1) \textbf{Triangle Game} is an asymmetric zero-sum game implemented on Multi-Agent Particle Environments (MPE) \citep{lowe2017multi}. When facing different policies of the opponent, the agent has to adjust its policy to adapt to the opponent for higher reward. (2) \textbf{One-on-One} is a two-player competitive game implemented on Google Research Football  \citep{kurach2020google}. The goalkeeper controlled by the agent could only passively react to the strategies of the shooter controlled by the opponent and makes policy adaptation when the shooter strategy changes. 
+
+%\textsf{Triangle Game} is an asymmetric zero-sum game implemented on MPE (MIT license) \citep{lowe2017multi}. As shown in Figure~\ref{fig:trigame}, there are two moving players, $P1$ and $P2$, and three fixed landmarks, $L1-L3$. The payoff matrix of the two players, which depends on whether the agents touch the landmark or not, is shown in Table~\ref{tb:trigame_reward}, where $P2$ has inherent disadvantages since the optimal solution of $P2$ always strictly depends on the state of $P1$. When facing different policies of $P1$, $P2$ has to adjust its policy to adapt to $P1$ for higher reward. We control $P2$ as the agent and take $P1$ as the opponent.
+
+%\textsf{One-on-One} is a two-player competitive game implemented on Google Research Football (Apache-2.0 License) \citep{kurach2020google}. As shown in Figure~\ref{fig:oneonone}, There is a goalkeeper and a shooter who controls the ball in the initial state and could dribble or shoot the ball. At the end of an episode, if the shooter shoots the ball into the goal, the shooter will get a reward $+1$, and the goalkeeper will get a reward $-1$. Otherwise, the shooter will get a reward $-1$, and the goalkeeper will get a reward $+1$. The goalkeeper could only passively react to the strategies of the shooter and makes policy adaptation when the shooter strategy changes. We control the goalkeeper as the agent and take the shooter as the opponent.
+
+% \begin{figure}[t]
+% 	\centering
+% 	%\setlength{\abovecaptionskip}{0pt}
+% 	\begin{subfigure}{0.215\textwidth}
+% 	    \centering
+% 	    %\setlength{\abovecaptionskip}{2pt}
+%         \includegraphics[width=1\textwidth]{figure/trigame.png}
+%         \caption{Triangle Game}
+% 		\label{fig:trigame}
+%     \end{subfigure}
+% 	\hspace{0.2cm}
+% 	\begin{subfigure}{0.26\textwidth}
+%     	\centering
+%     	%\setlength{\abovecaptionskip}{2pt}
+% 		\includegraphics[width=1\textwidth]{figure/football.png}
+% 	    \caption{One-on-One}
+% 	    \label{fig:oneonone}
+%     \end{subfigure}
+%     \hspace{0.3cm}
+% 	\begin{subfigure}{0.2\textwidth}
+%     	\centering
+%     	\setlength{\abovecaptionskip}{0pt}
+% 		\includegraphics[width=1\textwidth]{figure/coin_game.png}
+% 	    \caption{Coin Game}
+% 	    \label{fig:coingame}
+%     \end{subfigure}
+% 	\caption{Illustrations of the scenarios.}
+% 	\label{fig:scenarios}
+% 	%\vspace{-0.40cm}
+% \end{figure}
+
+
+% \newcommand{\rbcell}[3]{\begin{tabular}{@{}#1@{}}\textcolor{red}{#2}\\\textcolor{blue}{#3}\end{tabular}}
+% \newcommand{\rbtext}[2]{\textcolor{red}{#1}/ \textcolor{blue}{#2}}
+% \renewcommand\tabcolsep{5pt}
+% %\renewcommand\arraystretch{0.9}
+% \begin{table}[t]
+% 	\caption{Payoff matrix of Triangle Game.}
+% 	\vspace{0.2cm}
+% 	\label{tb:trigame_reward}
+% 	\centering
+% 	\begin{tabular}{llcccc}
+% 		\toprule
+% 		\multicolumn{2}{l}{\multirow{2}{*}{}} & \multicolumn{4}{c}{\textcolor{blue}{Player 2}} \\ \cmidrule(r){3-6}
+% 		\multicolumn{2}{l}{} & F & T1 & T2 & T3 \\ \midrule
+% 		\multirow{4}{*}{\rotatebox{90}{\textcolor{red}{Player1\ \ \ \ }}} & F & \rbtext{$0$}{$0$} & \rbcell{c}{$-0.5$}{$+0.5$} & \rbcell{c}{$-0.5$}{$+0.5$} & \rbcell{c}{$-0.5$}{$+0.5$} \\ 
+% 		\cmidrule(r){3-6}
+% 		& T1 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$+1$}{$-1$} & \rbtext{$+1$}{$-1$} & \rbtext{$-1$}{$+1$} \\ 
+% 		\cmidrule(r){3-6}
+% 		& T2 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$-1$}{$+1$} & \rbtext{$+1$}{$-1$} & \rbtext{$+1$}{$-1$} \\  
+% 		\cmidrule(r){3-6}
+% 		& T3 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$+1$}{$-1$} & \rbtext{$-1$}{$+1$} & \rbtext{$+1$}{$-1$} \\
+% 		\bottomrule
+% 	\end{tabular}
+% 	%\vspace{-0.2cm}
+% \end{table}
+
+
+
+
+
+\textbf{Baselines.} In the experiments, we compare {MBOM} with the following methods:  
+\vspace{-2mm}
+\begin{itemize}[leftmargin = 2em]
+	\setlength\itemsep{0em}
+	\item {LOLA-DiCE} \citep{foerster2018dice} is an expansion of the LOLA, which uses Differentiable Monte-Carlo Estimator (DiCE) operation to consider how to shape the learning dynamics of other agents. 
+	\item {Meta-PG} \citep{shedivat2017continuous} uses trajectories from the current opponents to do multiple meta-gradient steps and construct a policy that is good for the updated opponents.
+	\item {Meta-MAPG} \citep{kim2021policy} includes an additional term that accounts for the impact of the agent’s current policy on the future policies of opponents, compared with Meta-PG. 
+	\item {PPO} \citep{schulman2017proximal} is a classical single-agent RL algorithm, without any other modules.
+%	%%\item \textsf{MBOM w/o IOPs} uses $\phi_0$ as the opponent model, without recursive imagination and Bayesian mixing.
+\end{itemize}
+\vspace{-1mm}
+%The baselines have the same neural network architectures as MBOM. All the methods are trained for five runs with different random seeds. All figures are plotted using mean and 95\% confidence intervals. More details about experimental settings and hyperparameters are available in Appendix~\ref{app:settings}.
+
+
+
+
+%\newcommand{\rbcell}[3]{\begin{tabular}{@{}#1@{}}\textcolor{red}{#2}\\\textcolor{blue}{#3}\end{tabular}}
+%\newcommand{\rbtext}[2]{\textcolor{red}{#1}/ \textcolor{blue}{#2}}
+%\renewcommand\tabcolsep{5pt}
+%\renewcommand\tabrows
+%\makeatletter
+%\newcommand\figcaption{\def\@captype{figure}\caption}
+%\newcommand\tabcaption{\def\@captype{table}\caption}
+%\makeatother
+%\begin{figure}
+%    \hfill
+%    \begin{minipage}{0.26\textwidth}
+%        \centering
+%        \setlength{\abovecaptionskip}{4pt}
+%        \includegraphics[width=1\textwidth]{figure/trigame.png}
+%        \figcaption{Triangle Game}
+%		\label{fig:trigame}
+%    \end{minipage}
+%    \hfill
+%    \begin{minipage}{0.6\textwidth}
+%    \centering
+    %%\begin{table}[h]
+%    \renewcommand\arraystretch{1}
+%	\tabcaption{Payoff matrix of Triangle Game}
+%	\label{tb:trigame_reward}
+%	\centering
+%	\begin{scriptsize}
+%	\begin{tabular}{llcccc}
+%		\toprule
+%		\multicolumn{2}{l}{\multirow{2}{*}{}} & \multicolumn{4}{c}{\textcolor{blue}{Player 2}} \\ \cmidrule(r){3-6}
+%		\multicolumn{2}{l}{} & F & T1 & T2 & T3 \\ \midrule
+%		\multirow{4}{*}{\rotatebox{90}{\textcolor{red}{Player1\ \ \ \ }}} & F & \rbtext{$0$}{$0$} & \rbtext{$-0.5$}{$+0.5$} & \rbtext{$-0.5$}{$+0.5$} & \rbtext{$-0.5$}{$+0.5$} \\ 
+%		\cmidrule(r){3-6}
+%		& T1 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$+1$}{$-1$} & \rbtext{$+1$}{$-1$} & \rbtext{$-1$}{$+1$} \\ 
+%		\cmidrule(r){3-6}
+%		& T2 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$-1$}{$+1$} & \rbtext{$+1$}{$-1$} & \rbtext{$+1$}{$-1$} \\  
+%		\cmidrule(r){3-6}
+%		& T3 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$+1$}{$-1$} & \rbtext{$-1$}{$+1$} & \rbtext{$+1$}{$-1$} \\
+%		\bottomrule
+%	\end{tabular}
+%	\end{scriptsize}
+    %%\end{table}
+%    \end{minipage}
+%\end{figure}
+
+
+
+
+%\textbf{Opponents.} For the opponents, we run independent PPO \citep{schulman2017proximal} algorithm for $10$ times. During each run, we store $20$ opponent policies in the training set, $3$ opponent policies in the validation set, and $3$ opponent policies in the test set. So the sizes of the training set, validation set, and test set are $200$, $30$, and $30$, respectively. We pretrain the agent with the opponents in the training set and make the agent interact with the opponents in the test set to evaluate the ability of adaptation. The validation set is only required by Meta-PG and Meta-MAPG. We construct three types of opponents:
+
+\textbf{Opponents.} We construct three types of opponents:
+\vspace{-2mm}
+\begin{itemize}[leftmargin = 2em]
+	\setlength\itemsep{0em}
+	\item {Fixed policy.} The opponents are pre-trained but not updated during interaction.
+	\item {Na\"ive learner.} The opponents are pre-trained and updated using PPO during interaction.
+	\item {Reasoning learner.} The opponents are pre-trained and can model the behavior of the agent. The model is finetuned during interaction and their policy is conditioned on the predicted action of the model. %%% there is another training process
+\end{itemize}
+\vspace{-1mm}
+%To increase the diversity of the opponents, we adopt the reward shaping technique and add invisible barriers in the environment during the training.
+
+% \begin{figure}[ht]
+%     \centering
+%     \subfigure[Triangle Game, versus fixed policy]
+%     {
+%     \includegraphics[scale=0.25]{figure/trigame_0.pdf}
+%     \label{fig:curve_trigame_0}
+%     }
+%     \subfigure[Triangle Game, versus na\"ive learner]
+%     {
+%     \includegraphics[scale=0.25]{figure/trigame_1.pdf}
+%     \label{fig:curve_trigame_1}
+%     }
+%     \subfigure[Triangle Game, versus reasoning learner]
+%     {
+%     \includegraphics[scale=0.25]{figure/trigame_2.pdf}
+%     \label{fig:curve_trigame_2}
+%     }
+%     \textcolor[RGB]{76,114,176}{$\bullet\ \ $}Meta-MAPG\ \ \ \ \ \textcolor[RGB]{221,132,82}{$\bullet\ \ $}Meta-PG\ \ \ \ \ \textcolor[RGB]{129,114,179}{$\bullet\ \ $}LOLA-DiCE\ \ \ \ \ \textcolor[RGB]{147,120,96}{$\bullet\ \ $}PPO\ \ \ \ \ 
+%     \textcolor[RGB]{85,168,104}{$\bullet\ \ $}MBOM w/o IOPs\ \ \ \ \ \textcolor[RGB]{196,78,82}{$\bullet\ \ $}MBOM
+%     \vspace{-0.1cm}
+%     \caption{Performance of adaptation against different types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner. The results are plotted using mean and standard deviation with five different random seeds (\textit{x}-axis is opponent index). The results show that MBOM can outperform other baselines, especially against na\"ive learner and reasoning learner.}
+% \label{fig:performance-trigame}
+% \end{figure}
+
+% \begin{figure}[ht]
+%     \centering
+%     \subfigure[One-on-One, versus fixed policy]
+%     {
+%     \includegraphics[scale=0.2]{figure/football_0.pdf}
+%     \label{fig:curve_oneonone_0}
+%     }
+%     \subfigure[One-on-One, versus na\"ive learner]
+%     {
+%     \includegraphics[scale=0.2]{figure/football_1.pdf}
+%     \label{fig:curve_oneonone_1}
+%     }
+%     \subfigure[One-on-One, versus reasoning learner]
+%     {
+%     \includegraphics[scale=0.2]{figure/football_2.pdf}
+%     \label{fig:curve_oneonone_2}
+%     }
+%     \textcolor[RGB]{76,114,176}{$\bullet\ \ $}Meta-MAPG\ \ \ \ \ \textcolor[RGB]{221,132,82}{$\bullet\ \ $}Meta-PG\ \ \ \ \ \textcolor[RGB]{129,114,179}{$\bullet\ \ $}LOLA-DiCE\ \ \ \ \ \textcolor[RGB]{147,120,96}{$\bullet\ \ $}PPO\ \ \ \ \ 
+%     \textcolor[RGB]{85,168,104}{$\bullet\ \ $}MBOM w/o IOPs\ \ \ \ \ \textcolor[RGB]{196,78,82}{$\bullet\ \ $}MBOM
+%     \vspace{-0.1cm}
+%     \caption{Performance of adaptation against different types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner. The results are plotted using mean and standard deviation with five different random seeds (\textit{x}-axis is opponent index). The results show that MBOM can outperform other baselines, especially against na\"ive learner and reasoning learner.}
+% \label{fig:performance-oneonone}
+% \end{figure}
+
+
+\begin{figure}[t]
+    \centering
+    %\setlength{\abovecaptionskip}{0pt}
+	\begin{subfigure}{.32\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_0.pdf}
+        \caption{Triangle Game, versus fixed policy}
+		\label{fig:curve_trigame_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+        \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_1.pdf}
+        \caption{Triangle Game, versus na\"ive learner}
+		\label{fig:curve_trigame_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_2.pdf}
+        \caption{Triangle Game, versus reasoning learner}
+		\label{fig:curve_trigame_2}
+    \end{subfigure}
+    \\\vspace{0.15cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_0.pdf}
+        \caption{One-on-One, versus fixed policy}
+		\label{fig:curve_oneonone_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_1.pdf}
+        \caption{One-on-One, versus na\"ive learner}
+		\label{fig:curve_oneonone_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_2.pdf}
+        \caption{One-on-One, versus reasoning learner}
+		\label{fig:curve_oneonone_2}
+    \end{subfigure}
+
+    \vspace{1.5mm}
+    \begin{small}
+    \textcolor[RGB]{129,114,179}{$\bullet\ \ $}LOLA-DiCE\ \ \ \ \ \ \
+    \textcolor[RGB]{147,120,96}{$\bullet\ \ $}Meta-PG\ \ \ \ \ \ \ 
+    \textcolor[RGB]{76,114,176}{$\bullet\ \ $}Meta-MAPG\ \ \ \ \ \ \
+    \textcolor[RGB]{85,168,104}{$\bullet\ \ $}PPO\ \ \ \ \ \ \ 
+    \textcolor[RGB]{196,78,82}{$\bullet\ \ $}MBOM\ \ 
+    \end{small}
+    %\textcolor[RGB]{221,132,82}{$\bullet\ \ $}MBOM w/o IOPs\ \ \ \ \
+    \caption{Performance against different types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner, where \textit{x}-axis is opponent index. The results show that MBOM outperforms other baselines, especially against na\"ive learner and reasoning learner.}
+    \label{fig:performance}
+    \vspace*{-3mm}
+\end{figure}
+
+\renewcommand\tabcolsep{2.0pt}
+\newcommand{\meanstd}[2]{\begin{tabular}{c}{$#1$ $\pm$ $#2$}\end{tabular}}
+\newcommand{\textincell}[2]{\begin{tabular}{@{}#1@{}}#2\end{tabular}}
+\begin{table*}[t]
+    \renewcommand\arraystretch{1}
+    \centering
+    \caption{Performance on Triangle Game and One-on-One}
+    \label{table:performance}
+    \vskip -2mm
+    %\begin{scriptsize}
+    \begin{adjustbox}{width=1.0\textwidth}
+    \begin{tabular}{@{}l||rrr||rrr@{}}
+    \toprule
+    \multirow{3}{*}{Methods}
+     & \multicolumn{3}{c||}{Triangle Game (score $\uparrow$)} & \multicolumn{3}{c}{One-on-One (win rate \%)} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7} 
+     & Fixed Policy & Na\"ive Learner & Reasoning Learner & Fixed Policy & Na\"ive Learner & Reasoning Learner \\ \midrule
+    LOLA-DiCE & \meanstd{-22.51}{5.22}  & \meanstd{-20.48}{4.02} & \meanstd{-21.55}{4.43} &  \meanstd{33.0}{0.5} &  \meanstd{25.2}{1.2} &  \meanstd{18.4}{0.9} \\ 
+    Meta-PG & \meanstd{\ \ -3.78}{0.13} & \meanstd{\ \ -6.72}{0.18} & \meanstd{\ \ -8.35}{1.87} &  \meanstd{41.7}{0.7} &  \meanstd{35.4}{2.5} & \meanstd{28.0}{0.6} \\ 
+    Meta-MAPG & \meanstd{\ \ -2.01}{0.06} & \meanstd{\ \ -5.76}{0.29} & \meanstd{\ \ -6.14}{0.84} &  \meanstd{44.4}{1.5} &  \meanstd{36.6}{1.6} & \meanstd{31.1}{1.9} \\
+    PPO & \meanstd{-13.29}{1.80} & \meanstd{-18.42}{1.28} & \meanstd{-20.51}{1.80} & \meanstd{40.6}{0.7} &  \meanstd{21.5}{0.7} & \meanstd{25.8}{1.0} \\
+    %MBOM w/o IOPs & \meanstd{\bm{\ \ -1.14}}{\bm{0.03}} & \meanstd{\ \ -3.23}{0.07} & \meanstd{\ \ -7.10}{2.00} &  \meanstd{59.4}{0.7} &  \meanstd{48.8}{1.7} & \meanstd{55.7}{1.9} \\ 
+    MBOM & \meanstd{\ \ \bm{-1.19}}{\bm{0.03}} & \meanstd{\bm{\ \ -1.66}}{\bm{0.29}} & \meanstd{\bm{\ \ -2.75}}{\bm{0.89}} &  \meanstd{\bm{59.5}}{\bm{0.9}} &  \meanstd{\bm{51.3}}{\bm{1.0}} & \meanstd{\bm{64.2}}{\bm{1.8}} \\ \bottomrule
+    \end{tabular}
+    \end{adjustbox}
+    \vspace{-2mm}
+\end{table*}
+
+% The experimental results against test opponents in Triangle Game and One-on-One are shown in Figure~\ref{fig:performance}, and the mean performance with standard deviation over all test opponents is summarized in Table \ref{table:performance}. In Triangle Game, the opponent could take different strategies, \textit{e.g.}, hovering around a landmark, commuting between two landmarks, or rotating among three landmarks, whereas the agent has to anticipate and adapt to the opponent strategies. The learning of LOLA-DiCE depends on the gradient of the opponent model. However, the gradient information cannot clearly reflect the distinctions between diverse opponents,
+% %The restriction of the gradient leads to no clear distinction between opponents with different strategies, 
+% which leads to that LOLA-DiCE cannot adapt to the unseen opponent quickly and effectively. Meta-PG and Meta-MAPG show stronger adaptation abilities than LOLA-DiCE when facing different opponents, but fail on some opponents (index $0$, $1$, and $2$ in Figure~\ref{fig:curve_trigame_0}, \ref{fig:curve_trigame_1}, and \ref{fig:curve_trigame_2}). By visualization, we find that those opponents are hovering around one landmark, which are out of the training set. Since Meta-PG and Meta-MAPG assume that the test set follows the distribution of the training set, these two methods are unable to adapt to the out-of-distribution opponents. Without explicitly considering opponent policy, PPO performs worse than Meta-PG and Meta-MAPG. 
+% MBOM slightly outperforms Meta-MAPG and Meta-PG when against fixed policy opponent, since the opponent model of MBOM improves the ability to adapt to different opponents.
+% %MBOM w/o IOPs obtains similar results to MBOM when facing fixed policy opponents because $\phi_0$ could accurately predict the opponent behaviors if the opponent is fixed. However, if the opponent is learning and reasoning, $\phi_0$ cannot accurately represent the opponent, and thus the performance of MBOM w/o IOPs drops. 
+% By explicitly simulating the recursive reasoning process, MBOM shows more obvious performance gain against na\"ive learner and reasoning learner.
+% In One-on-One, the shooter has absolute dominance and more flexible strategy choices, including shooting location, shooting angle, and shooting time. Due to the limitation of gradient information, LOLA-DiCE still shows poor adaptability. Meta-PG and Meta-MAPG heavily rely on the reward signal, and thus adaptation is difficult for the two methods in this sparse reward task, where they perform slightly better than PPO against na\"ive learner and reasoning learner. 
+% %MBOM w/o IOPs and MBOM achieve similar performance with fixed policy, but the performance of MBOM outperforms MBOM w/o IOPs if the opponent is also learning as shown in Table~\ref{table:performance}, which is contributed to the recursive reasoning capability brought by recursive imagination in the environment model and Bayesian mixing that quickly captures the learning of opponent. 
+% MBOM achieved the best results by significant gaps when against fixed policy opponents, as shown in Table~\ref{table:performance}. It can be noticed that the gaps become larger when facing na\"ive learner and reasoning learner, which is contributed to the recursive reasoning capability brought by recursive imagination in the environment model and Bayesian mixing that quickly captures the learning of opponent. 
+
+
+\textbf{Performance.} The experimental results against test opponents in Triangle Game and One-on-One are shown in Figure~\ref{fig:performance}, and the mean performance with standard deviation over all test opponents is summarized in Table \ref{table:performance}. Without explicitly considering opponent policy, PPO achieves poor performance. The learning of LOLA-DiCE depends on the gradient of the opponent model. However, the gradient information cannot clearly reflect the distinctions between diverse opponents, which leads to that LOLA-DiCE cannot adapt to the unseen opponent quickly and effectively. Meta-PG and Meta-MAPG show mediocre performance in Triangle Game. In One-on-One, since Meta-PG and Meta-MAPG heavily rely on the reward signal, adaptation is difficult for the two methods in this sparse reward task. MBOM outperforms Meta-MAPG and Meta-PG, because the opponent model of MBOM improves the ability to adapt to different opponents. And the performance gain becomes more significant when the opponent is na\"ive learner or reasoning learner, which is attributed to the recursive reasoning capability brought by recursive imagination in the environment model and Bayesian mixing that quickly captures the learning of the opponent. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\textbf{Ablation Studies.} The opponent modeling module of MBOM is composed of both recursive imagination and Bayesian mixing. 
+%MBOM only uses $\phi_0$ as the opponent model, without recursive imagination and Bayesian mixing, denoted as MBOM w/o IOPs. 
+We respectively test the functionality of the two components.
+
+In \textit{recursive imagination}, MBOM generates a sequence of different levels of IOPs finetuned by the imagined best response of the opponent in the environment model. For comparison, we use only $\phi_0$ as the opponent model (\textit{i.e.}, without recursive imagination), denoted as MBOM w/o IOPs, and use random actions to finetune the IOPs rather than using the best response, denoted as MBOM-BM. 
+%Note that MBOM w/o IOPs can be seen as the improved version of the simple opponent modeling methods \citep{he2016opponent,hong2018deep,grover2018learning} that predict opponents' actions with online finetuning.
+Note that MBOM w/o IOPs is essentially the same as the simple opponent modeling methods that predict opponents' actions, like \citep{he2016opponent,hong2018deep,grover2018learning}.
+%As a comparison, we use random actions to finetune the IOPs rather than using the best response, denoted as MBOM-BM. 
+The experimental results of MBOM, MBOM w/o IOPs, and MBOM-BM are shown in Figure~\ref{fig:ablation_trigame_bm} and \ref{fig:ablation_football_bm}. MBOM w/o IOPs obtains similar results to MBOM when facing fixed policy opponents because $\phi_0$ could accurately predict the opponent behaviors if the opponent is fixed, which corroborates the empirical results in \citep{he2016opponent,hong2018deep,grover2018learning}. However, if the opponent is learning or reasoning, $\phi_0$ cannot accurately represent the opponent, thus the performance of MBOM w/o IOPs drops. The methods with IOPs perform better than MBOM w/o IOPs, which means that a variety of IOPs can capture the policy changes of learning opponents. When facing the reasoning learner, MBOM outperforms MBOM-BM, indicating that the IOPs finetuned by the imagined best response have a stronger ability to represent the reasoning learner.
+
+%In \textit{Bayesian mixing}, MBOM mixes the generated IOPs to obtain a policy that is close to the real opponent. As a comparison, we directly use the individual level-$m$ IOP generated by recursive imagination without mixing, denoted as MBOM-$\phi_m$, \textcolor{Maroon}{and use uniformly mixing instead of Bayesian mixing, denoted as MBOM-$unif$. The experimental results are illustrated in Figure~\ref{fig:ablation_trigame_ri} and \ref{fig:ablation_football_ri}. Attributed to recursive imagination, MBOM-$\phi_1$ and MBOM-$\phi_2$ are more competitive than MBOM-$\phi_0$. MBOM consistently outperforms the ablation baselines without mixing when fighting against reasoning learners, and the middling performance of MBOM-$unif$ due to not effectively exploiting the advantageous information in MBOM-$\phi_m$, indicating that Bayesian mixing could obtain a more accurate estimate of reasoning opponents.}
+
+In \textit{Bayesian mixing}, MBOM mixes the generated IOPs to obtain a policy that is close to the real opponent. As a comparison, we directly use the individual level-$m$ IOP generated by recursive imagination without mixing, denoted as MBOM-$\phi_m$, and use uniformly mixing instead of Bayesian mixing, denoted as MBOM-$\rm unif$. The experimental results are illustrated in Figure~\ref{fig:ablation_trigame_ri} and \ref{fig:ablation_football_ri}. Benefited from recursive imagination, MBOM-$\phi_1$ and MBOM-$\phi_2$ show stronger performance than MBOM-$\phi_0$. MBOM consistently outperforms the ablation baselines without mixing when fighting against reasoning learners. The middling performance of MBOM-$\rm unif$ is due to not exploiting the more representative IOPs, indicating that Bayesian mixing could obtain a more accurate estimate of reasoning opponents.
+
+We additionally provide analysis on the weight $\bm{\alpha}$ and ablation studies on hyperparameters including the rollout length $k$ and the level of recursive imagination $M$, which are available in Appendix~\ref{app:alpha} and \ref{app:ablation}, respectively.
+
+
+\begin{figure}[!t]
+    \centering
+    \begin{subfigure}{.23\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_BM.pdf}
+        \caption{Triangle Game}
+		\label{fig:ablation_trigame_bm}
+    \end{subfigure}
+    \begin{subfigure}{.23\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_BM.pdf}
+        \caption{One-on-One}
+		\label{fig:ablation_football_bm}
+    \end{subfigure}
+    \hspace{0.6cm}
+    \begin{subfigure}{.23\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_RI.pdf}
+        \caption{Triangle Game}
+		\label{fig:ablation_trigame_ri}
+    \end{subfigure}
+    \begin{subfigure}{.23\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_RI.pdf}
+        \caption{One-on-One}
+		\label{fig:ablation_football_ri}
+    \end{subfigure}
+    \begin{minipage}{0.49\textwidth}\begin{tiny}\begin{center}
+        \textcolor[RGB]{76,114,176}{$\blacksquare\ \ $}MBOM w/o IOPs\ \ \ \ \ \textcolor[RGB]{85,168,104}{$\blacksquare\ \ $}MBOM-BM\ \ \ \ \ \textcolor[RGB]{196,78,82}{$\blacksquare\ \ $}MBOM
+    \end{center}\end{tiny}\end{minipage}
+    \hfill
+    \begin{minipage}{0.49\textwidth}\begin{tiny}\begin{center}
+        \textcolor[RGB]{76,114,176}{$\blacksquare\ $}MBOM-$\phi_0$\ \ \ \textcolor[RGB]{221,132,82}{$\blacksquare\ $}MBOM-$\phi_1$\ \ \ \textcolor[RGB]{85,168,104}{$\blacksquare\ $}MBOM-$\phi_2$\ \ \ \textcolor[RGB]{133,122,171}{$\blacksquare\ $}MBOM-$\rm unif$\ \ \ \textcolor[RGB]{196,78,82}{$\blacksquare\ $}MBOM
+    \end{center}\end{tiny}\end{minipage}
+    
+    \caption{Ablation study of MBOM. MBOM is compared with MBOM-BM and MBOM w/o IOPs on \textit{recursive imagination} in \subref{fig:ablation_trigame_bm} Triangle Game and \subref{fig:ablation_football_bm} One-on-One. MBOM is compared with MBOM-$\phi_0$, MBOM-$\phi_1$, MBOM-$\phi_2$, and MBOM-$\rm unif$ on \textit{Bayesian mixing} in \subref{fig:ablation_trigame_ri} Triangle Game and \subref{fig:ablation_football_ri} One-on-One.}
+    \label{fig:ablation_bm}
+    \vspace*{-1mm}
+\end{figure}
+
+
+\subsection{Multiple Opponents}
+
+When facing multiple opponents, MBOM takes them as a joint opponent, which is consistent with the single-opponent case. We perform experiments in Predator-Prey \citep{lowe2017multi}. We control the prey as the agent and take the three predators as opponents. In this task, the agent tries not to be touched by the three opponents. When the policies of opponents are fixed (\textit{e.g.}, enveloping the agent), it is difficult for the agent to get high reward. However, if the policies of opponents change during interaction, there may be changes for the agent to escape.   
+%As shown in Figure ?, our agent (green) are faster and want to avoid being hit by opponents (red). Opponents are slower and want to hit the agent. Obstacles (large black circles) block the way. The episode length is 200 timesteps. Detailed experimental setting in Appendix~\ref{app:settings}.
+The results are shown in Figure \ref{fig:performance_predator_prey}. When facing learning opponents, MBOM achieves performance gain, especially competing with the reasoning learner, which indicates that MBOM adapts to the learning and reasoning of the opponents and responds effectively. Meta-MAPG and Meta-PG do not effectively adapt to the changes of opponents' policies and are prone to be touched by the opponents many times in a small area, resulting in poor performance. LOLA-DiCE, Meta-PG and Meta-MAPG underperforms PPO when against multiple reasoning learners, indicating their adaptation may induce a negative affect on the agent performance. Detailed experimental results with different opponents are available in Appendix~\ref{app:predator-prey}. 
+
+%\textcolor{red}{The results are shown in Figure \ref{fig:performance_predator_prey}. Although MBOM performs slightly worse than others when competing with fixed policy, after the opponents starts learning (na\"ive learner), the touch number of MBOM decreases while the ones of other methods increase, which indicates that MBOM adapts to the learning of the opponents and responds effectively. For reasoning learner, opponents may not high-intensitive chase as \textit{fixed policy} because modeling the agent. Meta-MAPG and Meta-PG do not effectively use the opponents' policy changes, and are prone to make the mistake of being touched by the opponents many times in a small area, resulting in not a good performance. PPO and MBOM take advantage of the opponents' hesitation and stayed away from the predators. When against different opponents, MBOM was more robust and achieved a better performance than PPO. Detailed experimental results with different opponents in Appendix~\ref{app:predator-prey}.}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\subsection{Cooperative Task}
+
+
+MBOM could also be applied to cooperative tasks. We test MBOM on a cooperative scenario, Coin Game, which is a high-dimension expansion of the iterated prisoner dilemma with multi-step actions \citep{lerer2018maintaining, foerster2018learning}. Both agents simultaneously update their policies using MBOM or the baseline methods to maximize the sum of rewards. 
+%The length of the game is $150$ timesteps. 
+The experiment results are shown in Figure~\ref{fig:curve_coin_game}. Meta-PG and Meta-MAPG degenerate to Policy Gradients for this task as there is no training set. Both learn a greedy strategy that collects any color coin, which leads to a zero total score of two players. LOLA-DiCE learns too slow and does not learn to cooperate within 200 iterations, indicating the inefficiency of estimating the opponent gradients. 
+PPO learns to cooperate quickly and successfully, which corroborates the good performance of independent PPO in cooperative multi-agent tasks as pointed out in \cite{deWitt2020independent,yu2021surprising}. MBOM slightly outperforms PPO, which indicates that MBOM can also be applied to cooperative tasks without negative effects. Note that we do not compare other cooperative MARL methods like QMIX \citep{QMIX}, as they require centralized training. 
+%MBOM and PPO learn to cooperate quickly and successfully, while MBOM slightly outperforms PPO and induces more stable learning (smaller standard deviation), indicating that MBOM can also be applied to cooperative tasks without negative effects.
+%MBOM and PPO learn to cooperate quickly and successfully, \textcolor{red}{and,  the standard deviation of MBOM is significantly less than PPO's,} indicating that MBOM can also be applied to cooperative tasks without negative effects.
+%MBOM learns to cooperate quickly and successfully, indicating that MBOM can also be applied to cooperative tasks without negative effects.
+
+
+% \newcommand{\meanstdcell}[3]{\begin{tabular}{@{}#1@{}}{#2}\\{\begin{small}
+
+% (#3)\end{small}}\end{tabular}}
+% \newcommand{\textincell}[2]{\begin{tabular}{@{}#1@{}}#2\end{tabular}}
+% %\renewcommand\arraystretch{0.9}
+% \begin{table}[t]
+% \centering
+% \caption{Performance on Triangle Game}
+% \label{table:tg}
+% \vspace{0.2cm}
+% \begin{threeparttable}
+% \begin{tabular}{lccc}
+% \toprule
+%  & \textincell{c}{Fixed \\ Policy} & \textincell{c}{Na\"ive \\ Learner} & \textincell{c}{Reasoning \\ Learner} \\ \midrule
+% LOLA-DiCE & \meanstdcell{c}{-22.513}{18.208} & \meanstdcell{c}{-20.477}{18.914} & \meanstdcell{c}{-21.554}{18.708} \\ 
+% Meta-PG & \meanstdcell{c}{-3.777}{6.034} & \meanstdcell{c}{-6.718}{5.245} & \meanstdcell{c}{-8.350}{11.779} \\ 
+% Meta-MAPG & \meanstdcell{c}{-2.007}{5.639} & \meanstdcell{c}{-5.764}{5.180} & \meanstdcell{c}{-6.136}{9.911} \\ PPO & \meanstdcell{c}{-13.292}{8.223} & \meanstdcell{c}{-18.416}{8.084} & \meanstdcell{c}{-20.508}{12.335} \\
+% MBOM w/o IOPs & \meanstdcell{c}{\textbf{-1.142}}{\textbf{3.895}}  & \meanstdcell{c}{-3.230}{2.583} & \meanstdcell{c}{-7.101}{16.985} \\ 
+% MBOM & \meanstdcell{c}{-1.188}{3.871} & \meanstdcell{c}{\textbf{-1.659}}{\textbf{2.817}} & \meanstdcell{c}{\textbf{-2.746}}{\textbf{14.243}} \\ \bottomrule
+% \end{tabular}
+% %\vspace{0.1cm}
+% \end{threeparttable}
+% \vspace{-0.2cm}
+% \end{table}
+
+%\renewcommand\arraystretch{0.9}
+% \begin{table}[t]
+% \centering
+% \vspace{-0.2cm}
+% \caption{Performance on One-on-One}
+% \label{table:oo}
+% \vspace{0.2cm}
+% \begin{threeparttable}
+% \begin{tabular}{lccc}
+% \toprule
+%  & \textincell{c}{Fixed \\ Policy} & \textincell{c}{Na\"ive \\ Learner} & \textincell{c}{Reasoning \\ Learner} \\ \midrule
+% LOLA-DiCE & \meanstdcell{c}{-0.339}{0.414} & \meanstdcell{c}{-0.496}{0.365}  & \meanstdcell{c}{-0.632}{0.433} \\ 
+% Meta-PG & \meanstdcell{c}{-0.165}{0.417} & \meanstdcell{c}{-0.291}{ 0.371} & \meanstdcell{c}{-0.356}{0.439} \\ 
+% Meta-MAPG & \meanstdcell{c}{-0.112}{0.419} & \meanstdcell{c}{-0.268}{0.365} & \meanstdcell{c}{-0.378}{0.433} \\ PPO & \meanstdcell{c}{-0.188}{0.274} & \meanstdcell{c}{-0.569}{0.260} & \meanstdcell{c}{-0.483}{0.309} \\
+% MBOM w/o IOPs & \meanstdcell{c}{0.188}{0.372} & \meanstdcell{c}{-0.023}{0.382} & \meanstdcell{c}{0.113}{0.465} \\ 
+% MBOM & \meanstdcell{c}{\textbf{0.190}}{\textbf{0.378}} & \meanstdcell{c}{\textbf{0.025}}{\textbf{0.377}} & \meanstdcell{c}{\textbf{0.284}}{\textbf{0.403}} \\ \bottomrule
+% \end{tabular}
+% \begin{tablenotes}
+% \item \footnotesize{The numbers in table refer to  mean and standard deviation of return over 30 opponents with 5 different random seeds.}
+% \end{tablenotes}
+% \vspace{-0.4cm}
+% \end{threeparttable}
+% \end{table}
+
+%\begin{figure}[!t]
+%    \centering
+%	%\setlength{\abovecaptionskip}{0pt}
+%	\includegraphics[width=.39\textwidth]{nips-2022/figure/simple_tag.pdf}
+%    \caption{ Performance against different types of opponents in Predator-prey. Smaller touch number means better performance.}
+%    \label{fig:performance_predator_prey}
+%\end{figure}
+
+% \begin{figure}[!t]
+%     \centering
+% 	%\setlength{\abovecaptionskip}{0pt}
+% 	\begin{subfigure}{.45\textwidth}
+% 	    \centering
+% 	    \setlength{\abovecaptionskip}{2pt}
+%         \includegraphics[width=1\textwidth]{figure/simple_tag.pdf}
+%         \caption{Predator-Prey}
+% 		\label{fig:performance_predator_prey}
+%     \end{subfigure}
+%     \hspace{0.1cm}
+% 	\begin{subfigure}{.2\textwidth}
+% 	    \centering
+% 	    \setlength{\abovecaptionskip}{4pt}
+%         \includegraphics[width=1\textwidth]{figure/coin_game.png}
+%         \caption{Coin Game}
+% 		\label{fig:coin_game}
+%     \end{subfigure}
+%     \hspace{0.1cm}
+%     \begin{subfigure}{.28\textwidth}
+% 	    \centering
+% 	    \setlength{\abovecaptionskip}{0pt}
+%         \includegraphics[width=1\textwidth]{figure/curve_coin_game.pdf}
+%         \caption{Learning curves on Coin Game}
+% 		\label{fig:curve_coin_game}
+%     \end{subfigure}
+%     \caption{\subref{fig:performance_predator_prey} Performance against different types of opponents in Predator-prey. Smaller touch number means better performance; \subref{fig:coin_game} Illustration of Coin Game; \subref{fig:curve_coin_game} Learning curves in Coin Game.
+%     %, which are plotted using mean and standard deviation with five runs with different random seeds.
+%     The numbers in the legend are the mean and standard deviation over 200 iterations.}
+%     \label{fig:performance_coin_game}
+% 	%\vspace{-0.40cm}
+% \end{figure}
+
+
+\begin{figure}[!t]
+    \centering
+	\setlength{\abovecaptionskip}{3pt}
+	\begin{subfigure}{.45\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/simple_tag.pdf}
+        \caption{Predator-Prey}
+		\label{fig:performance_predator_prey}
+    \end{subfigure}
+    \hspace{0.1cm}
+%	\begin{subfigure}{.2\textwidth}
+%	    \centering
+%	    \setlength{\abovecaptionskip}{4pt}
+%        \includegraphics[width=1\textwidth]{figure/coin_game.png}
+%        \caption{Coin Game}
+%		\label{fig:coin_game}
+%    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.28\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{0pt}
+        \includegraphics[width=1\textwidth]{figure/curve_coin_game.pdf}
+        \caption{Learning curves on Coin Game}
+		\label{fig:curve_coin_game}
+    \end{subfigure}
+    \caption{\subref{fig:performance_predator_prey} Performance against different types of opponents in Predator-Prey, where smaller touch number means better performance.
+    \subref{fig:curve_coin_game} Learning curves in Coin Game.
+    %, which are plotted using mean and standard deviation with five runs with different random seeds.
+    %The numbers in the legend are the mean and standard deviation over 200 iterations.
+}
+    \label{fig:performance_coin_game}
+	\vspace{-0.20cm}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusion}
+
+We have proposed MBOM, which employs recursive imagination and Bayesian mixing to predict and capture the learning and improvement of opponents. Empirically, we evaluated MBOM in a variety of competitive tasks and demonstrated MBOM adapts to learning and reasoning opponents much better than the baselines. These make MBOM a simple and effective RL method whether opponents be fixed, continuously learning, or reasoning in competitive environments. Moreover, MBOM can also be applied in cooperative tasks. 
+%we also verified the adaptation ability of MBOM in cooperative tasks. 
+
+%In MBOM, the learning agent treats all opponents as a joint opponent. If the size of the joint opponent is large, the agent will need a lot of rollouts to get an accurate best response. The cost increases dramatically with the size of the joint opponent. How to reduce the computation overhead in such scenarios will be considered in future work. Moreover, MBOM implicitly assumes that the relationship between opponents is fully cooperative. Dealing with the case where their relationship is non-cooperative is also left as future work.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliography{mbom}
+\bibliographystyle{plainnat}
+%\bibliographystyle{plain}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+\appendix
+
+%\setcounter{lemma}{0}
+%\setcounter{theorem}{0}
+
+%\section{Theoretical Analysis}
+%\label{app:theoretical analysis}
+
+%Without loss of generality, we define $\delta_m$ as the discrepancy between level-$m$ and $m$-$1$ IOPs in terms of estimated value function given the IOP, and $\varepsilon_m$ as the error of level-$m$ IOP compared to the true value function given the opponent policy, \textit{i.e.}, $\delta_m \doteq |\widehat{V}_m-\widehat{V}_{m-1}|$, $\varepsilon_m \doteq |\widehat{V}_m - V|$, and $\delta_0 \doteq \varepsilon_0$. Then, we have the following two lemmas. Proofs are available in Appendix~\ref{app:proof}.  
+
+%\begin{lemma}
+%For the mixed imagined opponent policy (IOP) $\tilde{\pi}_{\operatorname{mix}}^o(\cdot|s) = \sum_{m=0}^{M-1}\alpha_m\tilde{\pi}^o_m(\cdot|s; \phi_m)$, the total error satisfies the following inequality:
+%\begin{equation*}\label{eq:total-bound}
+%    \varepsilon_{total}\leq\sum_{m=0}^{M-1}\delta_m\sum_{i=m}^{M-1}\alpha_i.
+%\end{equation*}
+%\label{lem:total-error}
+%\end{lemma}
+
+
+%\begin{lemma}
+%Suppose the value function is Lipschitz continuous on the state space $\mathcal{S}$, $K$ is the Lipschitz constant, $\widehat{\mathcal{M}}_i(s,a) \doteq \Gamma(s,a,a^o;\zeta) \cdot \tilde{\pi}^o_i(a^o|s;\phi_i)$ is the transition distribution given $s$ and $a$, then
+
+%\begin{equation*}
+%\left|\widehat{V}_i-\widehat{V}_{j}\right| \leq\frac{\gamma K}{1-\gamma} \cdot\underset{s,a\sim \pi,\widehat{\mathcal{M}}_j}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_i(s, a)-\widehat{\mathcal{M}}_j(s, a)\right\|.
+%\end{equation*}
+%\label{lem:obj-bound}
+%\end{lemma}
+%According to \eqref{eq:phi_mix} and \eqref{eq:bayes}, we can express $\alpha_m$ as the following
+%\begin{align*}
+%    \alpha_m & \doteq \mathbb{E}\left[p(m | a^o)\right] = \sum\limits_{s,a^o} d(s,a^o) \frac{\tilde{\pi}^o_m\left(a^{o} | s ; \phi_{m}\right)p(m)}{\sum_{i=0}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)},
+%\end{align*}
+%where $d(s,a^o)$ is the stationary distribution of pairs of state and action of opponent. Then,
+%based on Lemma \ref{lem:total-error} and \ref{lem:obj-bound}, we can obtain the following theorem, where $\widehat{\mathcal{M}}_{-1}$ denotes $\mathcal{P}(\cdot|s,a,a^o) \cdot \pi^o(a^o|s)$, the true transition dynamics of agent. 
+
+%\begin{theorem}\label{the:error-bound}
+%For the Bayesian mixing IOP, the total error satisfies the following inequality:
+%\begin{equation*}
+%\label{eq:full-total-bound}
+%\varepsilon_{total} \leq \sum\limits_{s,a^o}\frac{\gamma K d(s,a^o)}{1-\gamma} 
+%  \cdot \frac{\sum\limits_{m=0}^{M-1}\underset{s,a\sim\pi,\widehat{\mathcal{M}}_{m-1}}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_m-\widehat{\mathcal{M}}_{m-1}\right\|\sum\limits_{i=m}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)}.
+%\end{equation*}
+%\end{theorem}
+
+%Theorem \ref{the:error-bound} tells us the error accumulates as level $M$ increases. However, larger $M$ also has advantages. To analyze, we first define the benefit using the mixed IOP as
+%In the error bound of Theorem \ref{the:error-bound}, it is easy to see that the error accumulates as level $M$ increases, but at the same time, higher level also has advantages. To analyze, we first define the benefit of using the mixed IOP as
+%the optimization, we define $\eta\doteq -\|\hat{\pi}-\pi\|$ to denote the benefit of using policy in different levels, where $\hat{\pi}$ is the estimated opponent policy and $\pi$ is the true opponent policy. For a mixing policy, we can define the benefit as:
+%\begin{align*}
+%    \eta_M=-\|(\alpha_0\tilde{\pi}^o_0+\cdots+\alpha_{M-1}\tilde{\pi}^o_{M-1})-\pi^o\|.
+%\end{align*}
+%Then, we have the following lemma and theorem.
+%\begin{lemma}\label{lem:max-benefit}
+%Assume that the true opponent policy $\pi^o$ has a probability distribution over the given set of IOPs $\{\tilde{\pi}^o_0,\ldots,\tilde{\pi}^o_{M-1}\}$, and a probability $\mathrm{Pr}\{\pi^o=\tilde{\pi}_m^o\} = p_m$ for each $\tilde{\pi}_m^o$, then the maximum expectation of $\eta_M$ can be achieved if and only if $\alpha_m=p_m, \forall m\in[0,M-1].$
+%\end{lemma}
+
+%\begin{theorem}\label{the:mix-benefit}
+%Given the action trajectory of opponent $\{a^o_0,a^o_1,\ldots,a^o_t\}$, the posterior probability updated by Bayesian mixing approximates the true probability of opponent as the length of the trajectory grows, \textit{i.e.},
+
+%\begin{equation*}
+%    P(m|a^o_t,\cdots,a^o_1,a^o_0)\to P_{\operatorname{true}}(m)\doteq p_m, \quad t\to \infty.
+%\end{equation*}
+
+%Then the maximum expectation of $\eta_M$ can be achieved with $\alpha_m=\mathbb{E}[P(m|a^o_t,\cdots,a^o_1,a^o_0)]$.
+%\end{theorem}
+
+%According to Theorem \ref{the:mix-benefit}, we know that when the samples are sufficient, the estimated probability distribution of opponent can approximate the true distribution of opponent, so that the benefit can achieve the maximum expectation. It is obvious that larger $M$ improves the representation capability of IOPs and thus better satisfies the assumption in Lemma \ref{lem:max-benefit}, but also increases the error bound in Theorem \ref{the:error-bound}. Therefore, the selection of $M$ is a tradeoff between them.
+%(this is verified empirically in Appendix~\ref{app:ablation})
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setcounter{lemma}{0}
+\setcounter{theorem}{0}
+\newpage
+
+\section{Proofs}
+\label{app:proof}
+
+\begin{lemma}
+For the mixed imaged opponent policy (IOP) $\tilde{\pi}_{\operatorname{mix}}^o(\cdot|s) = \sum\limits_{m=0}^{M-1}\alpha_m\tilde{\pi}^o_m(\cdot|s; \phi_m)$, the total error satisfies the following inequality:
+\begin{equation*}\label{eq:total-bound-1}
+    \varepsilon_{total}\leq\sum_{m=0}^{M-1}\delta_m\sum_{i=m}^{M-1}\alpha_i.
+\end{equation*}
+\begin{proof}
+By the definitions of $\delta_m$ and $\varepsilon_m$, it is clear that 
+\begin{align*}
+\varepsilon_{m} &= |\widehat{V}_{m}-V| \leq |\widehat{V}_{m}-\widehat{V}_{m-1}| + \cdots + |\widehat{V}_{1}-\widehat{V}_{0}| + |\widehat{V}_0-V|\\
+                & = \delta_{m} + \cdots + \delta_{1} + \delta_0
+\end{align*}
+Then, we can derive the following inequality,
+\begin{align*}
+\varepsilon_{total} & = \sum_{m=0}^{M-1}\alpha_m\varepsilon_m \leq \sum_{m=0}^{M-1}\alpha_m\sum_{k=0}^{m}\delta_{k}\\
+ & = \sum_{m=0}^{M-1}\delta_m\sum_{i=m}^{M-1}\alpha_i
+\end{align*}
+\end{proof}
+\end{lemma}
+
+
+\begin{lemma}
+Suppose the value function is Lipschitz continuous on the state space $\mathcal{S}$, $K$ is the Lipschitz constant, $\widehat{\mathcal{M}}_i(s,a) \doteq \Gamma(s,a,a^o;\zeta) \cdot \tilde{\pi}^o_i(a^o|s;\phi_i)$ is the transition distribution given $s$ and $a$, then
+\begin{equation*}
+\left|\widehat{V}_i-\widehat{V}_{j}\right| \leq\frac{\gamma K}{1-\gamma} \cdot\underset{s,a\sim \pi,\widehat{\mathcal{M}}_j}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_i(s, a)-\widehat{\mathcal{M}}_j(s, a)\right\|.
+\end{equation*}
+\begin{proof}
+Lemma \ref{lem:obj-bound} is a directly cited theorem in \citep{algo2019luo}, and we make some modifications to fit our context.
+\end{proof}
+\end{lemma}
+
+% \begin{theorem}
+% For the Bayesian mixing IOP, the total error satisfies the following inequality:
+% \begin{equation*}
+% \varepsilon_{total} \leq \sum\limits_{s,a^o}\frac{\gamma K d(s,a^o)}{1-\gamma}
+%   \cdot \frac{\sum\limits_{m=0}^{M-1}\underset{s,a\sim\pi,\widehat{\mathcal{M}}_{m-1}}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_m-\widehat{\mathcal{M}}_{m-1}\right\|\sum\limits_{i=m}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)}.
+% \end{equation*}
+
+\begin{theorem}
+Define the error between the approximated value function of the Bayesian mixing IOP and the true value function as $\varepsilon_{true}\doteq \left|\widehat{V}-V\right|$. For the Bayesian mixing IOP, the true error satisfies the following inequality:
+\begin{equation*}\small
+\varepsilon_{true} \leq \varepsilon_{total} \leq \sum\limits_{s,a^o}\frac{\gamma K d(s,a^o)}{1-\gamma} 
+  \cdot \frac{\sum\limits_{m=0}^{M-1}\underset{s,a\sim\pi,\widehat{\mathcal{M}}_{m-1}}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_m-\widehat{\mathcal{M}}_{m-1}\right\|\sum\limits_{i=m}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)}.
+\end{equation*}
+\begin{proof}
+
+It is clear that
+
+\begin{align*}
+    \varepsilon_{true} & \doteq\left|\widehat{V}-V\right|=\left|\sum_{m=0}^{M-1}\alpha_m\widehat{V}_m-V\right|\\
+    &\leq\sum_{m=0}^{M-1}\alpha_m\left|\widehat{V}_m - V\right|\\
+    &=\sum_{m=0}^{M-1}\alpha_m\varepsilon_m=\varepsilon_{total}
+\end{align*}
+
+Then, we can derive the following inequality,
+
+\begin{align*}
+\varepsilon_{true}\leq\varepsilon_{total} & \leq \sum\limits_{m=0}^{M-1}\delta_m\sum\limits_{i=m}^{M-1}\alpha_i = \sum\limits_{m=0}^{M-1}\delta_m\sum\limits_{i=m}^{M-1}\sum\limits_{s,a^o}d(s,a^o) \frac{\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)}\\
+& = \sum\limits_{s,a^o}d(s,a^o)\frac{\sum\limits_{m=0}^{M-1}\delta_m\sum\limits_{i=m}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)}\\
+& = \sum\limits_{s,a^o}\frac{\gamma K d(s,a^o)}{1-\gamma}
+  \cdot \frac{\sum\limits_{m=0}^{M-1}\underset{s,a\sim\pi,\widehat{\mathcal{M}}_{m-1}}{\mathbb{E}}\left\|\widehat{\mathcal{M}}_m-\widehat{\mathcal{M}}_{m-1}\right\|\sum\limits_{i=m}^{M-1}\tilde{\pi}^o_i\left(a^{o} | s ; \phi_{i}\right) p(i)}{\sum\limits_{j=0}^{M-1}\tilde{\pi}^o_j\left(a^{o} | s ; \phi_{j}\right) p(j)},
+\end{align*}
+where $d(s,a_o)$ is the stationary distribution of pairs of state and action of opponent and $\widehat{\mathcal{M}}_{-1}$ denotes $\mathcal{P}(\cdot|s,a,a^o) \cdot \pi^o(a^o|s)$.
+\end{proof}
+\end{theorem}
+
+\begin{lemma}
+Assume that the true opponent policy $\pi^o$ has a probability distribution over the given set of IOPs $\{\tilde{\pi}^o_0,\ldots,\tilde{\pi}^o_{M-1}\}$, and a probability $\mathrm{Pr}\{\pi^o=\tilde{\pi}_m^o\} = p_m$ for each $\tilde{\pi}_m^o$, then the maximum expectation of $\eta_M$ can be achieved if and only if $\alpha_m=p_m, \forall m\in[0,M-1].$
+
+\begin{proof}
+\begin{align*}
+\mathbb{E}[\eta_M] &= -\mathbb{E}\|(\alpha_0\tilde{\pi}^o_0+\cdots+\alpha_{M-1}\tilde{\pi}^o_{M-1})-\pi\|\\
+&=-\sum_{m=0}^{M-1}p_m\|(\alpha_0\tilde{\pi}^o_0+\cdots+\alpha_{M-1}\tilde{\pi}^o_{M-1})-\tilde{\pi}^o_m\|\\
+&\geq -\sum_{m=0}^{M-1}\|\alpha_j\tilde{\pi}^o_m-p_m\tilde{\pi}^o_m\|
+\end{align*}
+
+Since $\mathbb{E}[\eta_M]$ is a negative distance function, it is clear that 
+\begin{equation*}
+\mathbb{E}[\eta_M]\leq 0,
+\end{equation*}
+and when $\alpha_m=p_m, \forall m\in[0,M-1]$, 
+
+\begin{equation*}
+    \mathbb{E}[\eta_M] \geq -\sum_{m=0}^{M-1}\|p_m\tilde{\pi}^o_m-p_m\tilde{\pi}^o_m\| = 0
+\end{equation*}
+
+Therefore, the maximum expectation of $\eta_M$ can be achieved if and only if $\alpha_m=p_m, \forall m\in[0,M-1].$
+\end{proof}
+\end{lemma}
+
+\begin{theorem}
+Given the action trajectory of oponent $\{a^o_0,a^o_1,\ldots,a^o_t\}$, the posterior probability updated by Bayesian mixing approximates the true probability of opponent as the length of the trajectory grows, \textit{i.e.},
+\begin{equation*}
+    P(m|a^o_t,\cdots,a^o_1,a^o_0)\to P_{\operatorname{true}}(m), \quad t\to \infty.
+\end{equation*}
+Then the maximum expectation of $\eta_M$ can be achived with $\alpha_m=\mathbb{E}[P(m|a^o_t,\cdots,a^o_1,a^o_0)]$.
+\end{theorem}
+
+\begin{proof}
+According to Bayes' theorem, as we update the posterior probability as \eqref{eq:bayes}, we have the following posterior probabilities
+\begin{align*}
+&p(m|a^o_0) = \frac{p(a^o_0|m)p(m)}{\sum_{i=0}^{M-1}p(a^o_0|i)p(i)}\\
+&p(m|a^o_1, a^o_0) = \frac{p(a^o_1|a^o_0,m)p(a^o_0|m)p(m)}{\left[\sum_{i=0}^{M-1}p(a^o_1|,a^o_0,i)p(i)\right]\cdot\left[\sum_{i=0}^{M-1}p(a^o_0|i)p(i)\right]}\\
+&\qquad\vdots\\
+&p(m|a^o_t, \cdots, a^o_0) = \frac{p(a^o_t|a^o_{t-1},\cdots,a^o_{0},m)\cdots p(a^o_0|m)p(m)}{\left[\sum_{i=0}^{M-1}p(a^o_{t}|a^o_{t-1},\cdots,a^o_0,i)p(i)\right]\cdots\left[\sum_{i=0}^{M-1}p(a^o_0|i)p(i)\right]}
+\end{align*}
+
+Obviously, with sufficient samples,
+\begin{equation*}
+    P(m|a^o_t,\cdots,a^o_0)\to P_{\operatorname{true}}(m)\doteq p_m, \quad t\to \infty.
+\end{equation*}
+This can also be expressed as
+\begin{equation*}
+    \mathbb{E}[P(m|a^o_t,\cdots,a^o_1,a^o_0)] = p_m
+\end{equation*}
+
+When $\alpha_m=\mathbb{E}[P(m|a^o_t,\cdots,a^o_1,a^o_0)]$, we have $\alpha_m = p_m$. Considering Lemma \ref{lem:max-benefit}, the maximum expectation of $\eta_M$ is achieved.
+\end{proof}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+%\section{Weights $\alpha$}
+%\section{Weights $ \bm{\alpha} $}
+%\section[$\alpha$]{Weights $ \bm{\alpha} $}
+\section{\texorpdfstring{Weights $ \bm{\alpha} $}{$\alpha$}}
+\label{app:alpha}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\textwidth]{figure/trigame_alpha_new.pdf}
+    \caption{The change of $\bm{\alpha}$ during the adaptation, colored from red (initial $\alpha$) to green (end), in Triangle Game. In each subplot, the top left number is the opponent index, and from left to right are shown the agent plays against fixed policy, na\"ive learner, reasoning learner.}
+    \label{fig:alpha-weights-trigame}
+\end{figure}
+
+
+
+In Bayesian mixing, $\bm{\alpha}$ is the weights to mix IOPs,
+\begin{equation*}
+\label{eq:mixture_weights_appendix}
+    \bm{\alpha}= (\alpha_0, \dots, \alpha_{M-1})  = \text{softer-softmax}(\Psi_0, \dots, \Psi_{M-1}).
+\end{equation*}
+$\Psi_m^t$ of level-$m$ IOP at timestep $t$ is 
+\begin{equation*}
+\Psi_m^t = \sum_{l=t-H}^{t-1}\lambda^{t-l}p(m|a_l^{o}),
+\end{equation*}
+where $\lambda$ is the decay factor, $H$ is the horizon, $p(m|a_t^{o})$ can be calculated using \eqref{eq:bayes}. Moreover, $p(m)$ at timestep $t$ is the moving average of $p(m|a)$ over the horizon $H$ as
+\begin{equation*}
+    {p}(m)=\sum_{l=t-H}^{t-1}p(m|a_{l}^{o})/H.
+\end{equation*}
+
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=1\textwidth]{figure/football_alpha_new.pdf}
+    \caption{The change of $\bm{\alpha}$ during the adaptation, colored from red (initial $\alpha$) to green (end), in One-on-One. In each subplot, the top left number is the opponent index, and from left to right are shown the agent plays against fixed policy, na\"ive learner, reasoning learner.}
+    \label{fig:alpha-weights-football}
+\end{figure}
+
+
+
+
+%The reason that the weight does not always converge to the corresponding level of IOP when against different types of opponents may be because the mixed policy according to $\bm{\alpha}$ may be capable to well represent the true opponent policy and the compounding model error makes the corresponding IOP inaccurately capture the true opponent policy.
+
+%The reason that the weight does not always converge to the corresponding level of IOP when against different types of opponents is partly because the mixed IOP according to $\bm{\alpha}$ may be capable to well represent the true opponent policy and the compounding model error makes the corresponding IOP inaccurately capture the true opponent policy. However, the representation capability of IOPs offsets the compounding model error, making MBOM almost intact. 
+
+%Figure~\ref{fig:alpha-weights-trigame} and \ref{fig:alpha-weights-football} depict the change of $\bm{\alpha}$ ($M=3$) during the adaptation when the agent plays against different test opponents in Triangle Game and One-one-One, respectively. In each subplot, the top left number is the opponent index, and from left to right are fixed policy, na\"ive learner, reasoning learner. The changing trends of $\bm{\alpha}$ are diverse when against different opponents. 
+
+%As the level-0 IOP is finetuned during interaction, when playing against fixed policy, $\alpha_0$ should be large. When playing against na\"ive learner, intuitively $a_1$ should be large. Similarly, when playing against reasoning learner, $a_2$ should be large. However, as illustrated in Figure~\ref{fig:alpha-weights-trigame} and \ref{fig:alpha-weights-football}, $\bm{\alpha}$ does not always converge to the corresponding level of IOP when against different types of opponents. The reason is two-fold. First, as the level-0 IOP is pre-trained against training opponents that are different from test opponents (will be discussed in Appendix~\ref{app:settings}), the level-0 IOP can be largely different from the opponent policy. Thus, the small number of samples obtained during online interaction may not be enough to finetune the level-0 IOP to accurately model the opponent policy. This is referred to as the error of opponent modeling, Thus, $\bm{\alpha}$ does not always converge to $\alpha_0$ when testing against fixed policy. Second, due to such an inaccurate level-0 IOP and the error of the environment model, higher-level IOPs may also be inaccurate, thus $\alpha$ does not always converge to $\alpha_1$ and $\alpha_2$ when testing against na\"ive learner and reasoning learner, respectively. However, when testing against different types of opponents, the mixed IOP according to $\bm{\alpha}$ may already be capable to well represent the true opponent policy and capture its update, which offsets the errors of opponent modeling and environment model and makes MBOM almost intact and still outperform the baselines. 
+
+Figure~\ref{fig:alpha-weights-trigame} and \ref{fig:alpha-weights-football} depict the change of $\bm{\alpha}$ ($M=3$) during the adaptation when the agent plays against different test opponents in Triangle Game and One-one-One, respectively. In each subplot, the top left number is the opponent index, and from left to right are fixed policy, na\"ive learner, reasoning learner. The changing trends of $\bm{\alpha}$ are diverse when against different opponents. 
+
+As the level-0 IOP is finetuned during interaction, when playing against fixed policy, $\alpha_0$ should be large. When playing against reasoning learner, intuitively $\alpha_1$ should be large. However, the na\"ive learner's policy is updated only with reward, thus it does not have a counterpart in the IOPs. As illustrated in Figure~\ref{fig:alpha-weights-trigame} and \ref{fig:alpha-weights-football}, $\bm{\alpha}$ does not always converge to the corresponding level of IOP when against fixed policy and reasoning learner. The reason is two-fold. First, as the level-0 IOP is pre-trained against training opponents that are different from test opponents (will be discussed in Appendix~\ref{app:settings}), the level-0 IOP can be largely different from the opponent policy. Thus, the small number of samples obtained during online interaction may not be enough to finetune the level-0 IOP to accurately model the opponent policy. This is referred to as the error of opponent modeling, Thus, $\bm{\alpha}$ does not always converge to $\alpha_0$ when testing against fixed policy. Second, due to such an inaccurate level-0 IOP and the error of the environment model, higher-level IOPs may also be inaccurate, thus $\alpha$ does not always converge to $\alpha_1$ when testing against reasoning learner. Essentially, $\bm{\alpha}$ is a mapping from IOPs reasoned by the agent to the true policy generated by the opponent's learning method. When testing against different types of opponents, the mixed IOP according to $\bm{\alpha}$ may already be capable to well represent the true opponent policy and capture its update, which offsets the errors of opponent modeling and environment model and makes MBOM almost intact and outperform the baselines. 
+
+% As the level-0 IOP is finetuned during interaction, when playing against fixed policy, $\alpha_0$ should be large. When playing against na\"ive learner, intuitively $a_1$ should be large. Similarly, when playing against reasoning learner, $a_2$ should be large. However, as illustrated in Figure~\ref{fig:alpha-weights-trigame} and \ref{fig:alpha-weights-football}, $\bm{\alpha}$ does not always converge to the corresponding level of IOP when against different types of opponents. The reason is two-fold. First, as the level-0 IOP is pre-trained against training opponents that are different from test opponents (will be discussed in Appendix~\ref{app:settings}), the level-0 IOP can be largely different from the opponent policy. Thus, the small number of samples obtained during online interaction may not be enough to finetune the level-0 IOP to accurately model the opponent policy. This is referred to as the error of opponent modeling, Thus, $\bm{\alpha}$ does not always converge to $\alpha_0$ when testing against fixed policy. Second, due to such an inaccurate level-0 IOP and the error of the environment model, higher-level IOPs may also be inaccurate, thus $\alpha$ does not always converge to $\alpha_1$ and $\alpha_2$ when testing against na\"ive learner and reasoning learner, respectively. However, when testing against different types of opponents, the mixed IOP according to $\bm{\alpha}$ may already be capable to well represent the true opponent policy and capture its update, which offsets the errors of opponent modeling and environment model and makes MBOM almost intact and still outperform the baselines. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+\section{Ablation on Hyperparameters}
+\label{app:ablation}
+
+\begin{figure}[h]
+    \centering
+    %\setlength{\abovecaptionskip}{0pt}
+	\begin{subfigure}{.32\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_ablation_k_0.pdf}
+        \caption{Triangle Game, versus fixed policy}
+		\label{fig:ablation_k_trigame_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+        \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_ablation_k_1.pdf}
+        \caption{Triangle Game, versus na\"ive learner}
+		\label{fig:ablation_k_trigame_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_ablation_k_2.pdf}
+        \caption{Triangle Game, versus reasoning learner}
+		\label{fig:ablation_k_trigame_2}
+    \end{subfigure}
+    \vspace{0.1cm}\\
+    \begin{footnotesize}
+    \centering
+    \textcolor[RGB]{76,114,176}{$\bullet\ \ $}$k=1$\ \ \ \ \ \textcolor[RGB]{221,132,82}{$\bullet\ \ $}$k=2$\ \ \ \ \ \textcolor[RGB]{85,168,104}{$\bullet\ \ $}$k=3$
+    \end{footnotesize}
+    \\\vspace{0.2cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_ablation_k_0.pdf}
+        \caption{One-on-One, versus fixed policy}
+		\label{fig:ablation_k_oneonone_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_ablation_k_1.pdf}
+        \caption{One-on-One, versus na\"ive learner}
+		\label{fig:ablation_k_oneonone_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_ablation_k_2.pdf}
+        \caption{One-on-One, versus reasoning learner}
+		\label{fig:ablation_k_oneonone_2}
+    \end{subfigure}
+    \vspace{0.1cm}\\
+    \begin{footnotesize}
+    \centering
+    \textcolor[RGB]{76,114,176}{$\bullet\ \ $}$k=1$\ \ \ \ \ \textcolor[RGB]{221,132,82}{$\bullet\ \ $}$k=3$\ \ \ \ \ \textcolor[RGB]{85,168,104}{$\bullet\ \ $}$k=5$
+    \end{footnotesize}
+    \caption{Performance against different types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner with different rollout planning horizon $k$ as in \eqref{eq:best}. The selection of $k$ is a tradeoff between the error of the environment model error and the estimate accuracy of rollout. The results are plotted using mean and 95\% confidence intervals with five different random seeds (\textit{x}-axis is opponent index). }
+    \label{fig:ablation-k}
+\end{figure}
+
+
+
+
+\begin{figure}[h]
+    \centering
+    %\setlength{\abovecaptionskip}{0pt}
+	\begin{subfigure}{.32\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_ablation_M_0.pdf}
+        \caption{Triangle Game, versus fixed policy}
+		\label{fig:ablation_M_trigame_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+        \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_ablation_M_1.pdf}
+        \caption{Triangle Game, versus na\"ive learner}
+		\label{fig:ablation_M_trigame_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame_ablation_M_2.pdf}
+        \caption{Triangle Game, versus reasoning learner}
+		\label{fig:ablation_M_trigame_2}
+    \end{subfigure}
+    \\\vspace{0.15cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_ablation_M_0.pdf}
+        \caption{One-on-One, versus fixed policy}
+		\label{fig:ablation_M_oneonone_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_ablation_M_1.pdf}
+        \caption{One-on-One, versus na\"ive learner}
+		\label{fig:ablation_M_oneonone_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/football_ablation_M_2.pdf}
+        \caption{One-on-One, versus reasoning learner}
+		\label{fig:ablation_M_oneonone_2}
+    \end{subfigure}\\
+    \begin{footnotesize}
+    \centering
+    \textcolor[RGB]{76,114,176}{$\bullet\ \ $}$M=1$\ \ \ \ \ \textcolor[RGB]{221,132,82}{$\bullet\ \ $}$M=2$\ \ \ \ \ \textcolor[RGB]{85,168,104}{$\bullet\ \ $}$M=3$\ \ \ \ \ \textcolor[RGB]{196,78,82}{$\bullet\ \ $}$M=4$
+    \end{footnotesize}
+    \caption{Performance against different types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner with different $M$ (number of recursive imagination levels). The results are plotted using mean and 95\% confidence intervals with five different random seeds (\textit{x}-axis is opponent index). Higher $M$ improves the representative capability of the opponent model, but also accumulates errors. Thus, $M$ is a tradeoff between these two. $M=1,2,3,4$ are performed in Triangle Game, while $M=1,2,3$ are performed in One-on-One. In general, $M\ge 2$ performs similarly, which verifies $M$ is robust. Note that $M=1$ is MBOM w/o IOPs.}
+    \label{fig:ablation-M}
+\end{figure}
+
+Figure~\ref{fig:ablation-k} shows the performance of MBOM with different rollout planning horizon $k$. The selection of $k$ is a tradeoff between the environment model error and the accuracy of value estimation. In addition, the computational complexity of IOPs increases exponentially with $k$. In a sparse reward environment, appropriately increasing $k$ makes the algorithm robust. While in a dense reward environment, a smaller $k$ works well. 
+
+Figure~\ref{fig:ablation-M} shows the performance of MBOM with different recursive imagination levels $M$. From our theoretical analysis, we know higher $M$ improves the representation capability of the opponent model, but also accumulates the model error. As illustrated in Figure~\ref{fig:ablation-M}, except $M=1$ (\textit{i.e.}, MBOM w/o IOPs), $M=2,3,4$ perform similarly. This indicates that $M \ge 2$ is robust. Larger $M$ increases the representation capability of IOPs, but does not always improve the performance, \textit{i.e.}, the gain is vanishing when $M$ increases due to the compounding error. Moreover, in practice $M$ also linearly increases the computational cost, thus in general smaller $M$ are preferred, \textit{e.g.}, 2 or 3. 
+%Another insight is humans seldom perform more than levels of recursive reasoning, our results may also explain this. 
+
+%a too high $M$ will make it difficult to infer the relationship between IOPs and the real opponent. From an opponent's perspective, changes of $M$ may make uneven performance; while overall, there is no significant change in average performance for fixed policy, and for na\"ive learner and reasoning learner, an appropriate $M$ can improve performance. It is also necessary to consider the computational cost of IOPs, since it rises linearly with $M$.
+
+\newpage
+\section{Detailed Results on Predator-Prey}
+\label{app:predator-prey}
+
+\begin{figure}[h!t]
+    \centering
+    %\setlength{\abovecaptionskip}{0pt}
+	\begin{subfigure}{.32\textwidth}
+	    \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/simple_tag_0.pdf}
+        \caption{versus fixed policy}
+		\label{fig:simple_tag_curve_0}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+        \centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/simple_tag_1.pdf}
+        \caption{versus na\"ive learner}
+		\label{fig:simple_tag_curve_1}
+    \end{subfigure}
+    \hspace{0.1cm}
+    \begin{subfigure}{.32\textwidth}
+    	\centering
+	    \setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/simple_tag_2.pdf}
+        \caption{versus reasoning learner}
+		\label{fig:simple_tag_curve_2}
+    \end{subfigure}\\
+    \centering
+    \begin{small}
+    \textcolor[RGB]{76,114,176}{$\bullet\ \ $}Meta-MAPG\ \ \ \ \ \textcolor[RGB]{221,132,82}{$\bullet\ \ $}Meta-PG\ \ \ \ \ \textcolor[RGB]{85,168,104}{$\bullet\ \ $}PPO\ \ \ \ \  \textcolor[RGB]{129,114,179}{$\bullet\ \ $}LOLA-DiCE\ \ \ \ \
+    \textcolor[RGB]{196,78,82}{$\bullet\ \ $}MBOM
+    \end{small}
+    \caption{Performance against different types of opponents, \textit{i.e.}, fixed policy, na\"ive learner, and reasoning learner in Predator-Prey, where \textit{x}-axis is joint opponent index. Smaller touch number means better performance.}
+    \label{fig:pp}
+\end{figure}
+
+Figure~\ref{fig:pp} shows the performance when against different types of opponents compared with the baselines. For each type, there are ten test joint opponent policies. The results show MBOM substantially outperforms the baselines against reasoning learners. 
+LOLA-DiCE, Meta-PG and Meta-MAPG underperform PPO when against multiple reasoning learners, indicating their adaptation may induce a negative effect on the agent performance. The reasons may be as follows. LOLA-DiCE exploits the opponent model to estimate the learning gradient of opponent policy. However, when against multiple reasoning learners, the estimated gradient of their joint policy can hardly be accurate enough to capture the change of their individual policies as each opponent learns conditioned on the agent's policy. Meta-PG and Meta-MAPG both update the agent' policy to accommodate the future policy of opponent. However, the future joint policy of multiple reasoning opponents is much harder to anticipate than in single-opponent cases. 
+
+
+% \section{Discussions on Coin Game}
+
+% Coin Game is a cooperative task, where both agents simultaneously update their policies using MBOM or the baseline methods to maximize the sum of rewards. MBOM and PPO both learn to cooperate quickly and successfully, much better than other baselines. Recent studies \cite{deWitt2020independent,yu2021surprising} show that PPO has the surprising effectiveness in cooperative multi-agent tasks. The experiment results in Coin Game corroborates this. That MBOM and PPO perform similarly indicates MBOM can also be applied to cooperative tasks without negative effects. More studies in cooperative tasks (\textit{e.g.}, MBOM learn together with na\"ive learner or reasoning learner in complex tasks) are left as future work.
+
+
+\section{Experiment Settings}
+\label{app:settings}
+
+The experiment environments are detailed as follows:
+
+\textsf{Triangle Game.} As shown in Figure~\ref{fig:trigame}, there are two moving players, player 1 and 2, and three fixed landmarks, $L1-L3$, in a square field. The landmarks are located at the three vertexes of an equilateral triangle with a side length $0.6$. When the distance between a player and a landmark is less than $0.15$, the agent touches the landmark and has the state $T$. $T1$ indicates that the player touches the landmark $L1$, and so on. If the player does not touch any landmark, the player state is $F$. The payoff matrix of the two players is shown in Table~\ref{tb:trigame_reward}, where player 2 has inherent disadvantages since the optimal solution of player 2 always strictly depends on the state of player 1. When facing different policies of player 1, player 2 has to adjust its policy to adapt to player 1 for higher reward. We control player 2 as the agent and take player 1 as the opponent.
+
+\textsf{One-on-One.} As shown in Figure~\ref{fig:oneonone}, there is a goalkeeper and a shooter who controls the ball in the initial state and could dribble or shoot the ball. At the end of an episode, if the shooter shoots the ball into the goal, the shooter will get a reward $+1$, and the goalkeeper will get a reward $-1$. Otherwise, the shooter will get a reward $-1$, and the goalkeeper will get a reward $+1$. The goalkeeper could only passively react to the strategies of the shooter and makes policy adaptation when the shooter strategy changes. We control the goalkeeper as the agent and take the shooter as the opponent.
+
+\textsf{Predator-Prey.} We follow the setting in MPE \cite{lowe2017multi}. In each game, the agent plays against three opponents (predators), and the episode length is 200 timesteps. 
+
+\textsf{Coin Game.} As shown in Figure~\ref{fig:coin_game}, there are two players, red and blue, moving on a $3 \times 3$ grid field, and two types of coins, red and blue, randomly generated on the grid field. If the player moves to the position of the coin, the player collects the coin and receives a reward of $+1$. However, if the color of the collected coin is different from the player's color, the other player receives a reward of $-2$. The length of the game is $150$ timesteps. 
+
+\begin{figure}[h]
+	\centering
+	%\setlength{\abovecaptionskip}{0pt}
+	\begin{subfigure}{0.322\textwidth}
+	    \centering
+	    %\setlength{\abovecaptionskip}{2pt}
+        \includegraphics[width=1\textwidth]{figure/trigame.png}
+        \caption{Triangle Game}
+		\label{fig:trigame}
+    \end{subfigure}
+    %\hspace{10pt}
+	\begin{subfigure}{0.39\textwidth}
+    	\centering
+    	%\setlength{\abovecaptionskip}{2pt}
+		\includegraphics[width=1\textwidth]{figure/football.png}
+	    \caption{One-on-One}
+	    \label{fig:oneonone}
+    \end{subfigure}
+    \hspace{3pt}
+    \begin{subfigure}{0.26\textwidth}
+    	\centering
+    	%\setlength{\abovecaptionskip}{2pt}
+		\includegraphics[width=1\textwidth]{figure/coin_game.png}
+	    \caption{Coin Game}
+	    \label{fig:coin_game}
+    \end{subfigure}
+	\caption{Illustrations of the scenarios.}
+	\label{fig:scenarios}
+	%\vspace{-0.40cm}
+\end{figure}
+
+\newcommand{\rbcell}[3]{\begin{tabular}{@{}#1@{}}\textcolor{red}{#2}\\\textcolor{blue}{#3}\end{tabular}}
+\newcommand{\rbtext}[2]{\textcolor{red}{#1}/ \textcolor{blue}{#2}}
+\renewcommand\tabcolsep{5pt}
+\begin{table}[h]
+\renewcommand\arraystretch{1}
+	\caption{Payoff matrix of Triangle Game.}
+	\vspace{2mm}
+	\label{tb:trigame_reward}
+	\centering
+	\begin{footnotesize}
+	\begin{tabular}{llcccc}
+		\toprule
+		\multicolumn{2}{l}{\multirow{2}{*}{}} & \multicolumn{4}{c}{\textcolor{blue}{Player 2}} \\ \cmidrule(r){3-6}
+		\multicolumn{2}{l}{} & F & T1 & T2 & T3 \\ \midrule
+		\multirow{4}{*}{\rotatebox{90}{\textcolor{red}{Player1\ \ \ \ }}} & F & \rbtext{$0$}{$0$} & \rbtext{$-0.5$}{$+0.5$} & \rbtext{$-0.5$}{$+0.5$} & \rbtext{$-0.5$}{$+0.5$} \\ 
+		\cmidrule(r){3-6}
+		& T1 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$+1$}{$-1$} & \rbtext{$+1$}{$-1$} & \rbtext{$-1$}{$+1$} \\ 
+		\cmidrule(r){3-6}
+		& T2 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$-1$}{$+1$} & \rbtext{$+1$}{$-1$} & \rbtext{$+1$}{$-1$} \\  
+		\cmidrule(r){3-6}
+		& T3 & \rbtext{$+0.5$}{$-0.5$} & \rbtext{$+1$}{$-1$} & \rbtext{$-1$}{$+1$} & \rbtext{$+1$}{$-1$} \\
+		\bottomrule
+	\end{tabular}
+	\end{footnotesize}
+\end{table}
+
+%\textbf{Preparing opponents.} All opponents use independent PPO \citep{schulman2017proximal} algorithm.  for $10$ times. During each run, we store $20$ opponent policies in the training set, $3$ opponent policies in the validation set, and $3$ opponent policies in the test set. So the sizes of the training set, validation set, and test set are $200$, $30$, and $30$, respectively. We pretrain the agent with the opponents in the training set and make the agent interact with the opponents in the test set to evaluate the ability of adaptation. The validation set is only required by Meta-PG and Meta-MAPG. We construct three types of opponents:
+
+\textbf{Preparing opponents.} For the two types of opponents, fixed policy and na\"ive learner, we run independent PPO \citep{schulman2017proximal} algorithm for $10$ times. During each run, we store $20$ opponent policies in the training set, $3$ opponent policies in the validation set, and $3$ opponent policies in the test set. So the sizes of the training set, validation set, and test set are $200$, $30$, and $30$, respectively. The validation set is only required by Meta-PG and Meta-MAPG. The reasoning learner learns a model to predict the action of the agent and a policy conditioned on the predicted action. Since the initial parameters of the reasoning learner should not be shared with the first two types of opponents, we train additional $30$ reasoning learners in the same way aforementioned and add them to the test set.
+
+To increase the diversity of the opponent policy, the method \citep{tang2021discovering} can be adopted, but here we use some tricks to increase the diversity without incurring too much training cost. For the Triangle Game, we trained the opponent set with a modified reward, so that we could get the opponent that commuting between T1 and T2. Other types of opponents, such as hovering around a landmark, commuting between 2 landmarks, or rotating among 3 landmarks, are obtained in a similar way. For One-on-One, we set a barrier in front of the goal (invisible, but can block the ball) and only keep a gap so that the ball can enter the goal. We trained opponents with such gaps in different positions. 
+
+\textbf{Pre-training and Test.} In the pre-training phase, all methods are well trained with $\nu$ learning opponents of training set. The data during this phase is collected to fit the environment model and the level-0 IOP for MBOM. In the test phase, the agent interacts with the opponents in the test set to evaluate the ability to adapt to various opponents. The test phase lasts for 100 episodes, during which the environment model is no longer trained and the agent continuously finetunes parameters. Fixed policy, na\"ive learner, and reasoning learner use the test set to initialize parameters and continuously learn by respective learning ways. All methods use the same training set, validation set, and test set. There are enough opponents with different policies for testing to ensure that experimental results are unbiased.
+
+
+
+
+
+
+%In Coin Game, the episode length is $150$ timesteps. 
+
+
+
+The hyperparameters of MBOM are summarized in Table~\ref{tb:hyper-param}.
+
+\begin{table}[h]
+\renewcommand\arraystretch{1.1}
+	\caption{Hyperparameters}
+	\label{tb:hyper-param}
+    \centering
+    \begin{small}
+    \begin{tabular}{llcccc}
+    \toprule
+    \multicolumn{2}{c}{} &Triangle Game & One-on-One  & Predator-prey & Coin Game\\\midrule
+    \multirow{9}{*}{PPO}
+    &policy hidden units & MLP[64,32] & LSTM[64,32] & MLP[64,32] & MLP[64,32]\\
+    &value hidden units & MLP[64,32] & MLP[64,32] & MLP[64,32]& MLP[64,32]\\
+    &activation function & ReLU & ReLU & ReLU & ReLU\\
+    &optimizer & Adam & Adam & Adam & Adam\\
+    &learning rate & 0.001 & 0.001 & 0.001 & 0.001\\
+    &num. of updates & 10 & 10 & 10 & 10\\
+    &value discount factor & 0.99 & 0.99 & 0.99 & 0\\
+    &GAE parameter & 0.99 & 0.99 & 0.99 & 0\\
+    &clip parameter & 0.115 & 0.115 & 0.115 & 0.115\\ \midrule
+    \multirow{4}{*}{Opponent model}
+    &hidden units & MLP[64,32] & MLP[64,32] & MLP[64,32] & MLP[64,32]\\
+    &learning rate & 0.001 & 0.001 & 0.001 & 0.001\\
+    &batch size & 64 & 64 & 64 & 64\\
+    &num. of updates & 10 & 10 & 10 & 10\\ \midrule
+    \multirow{7}{*}{IOPs}
+    &num. of levels $M$ & 3 & 3 & 2 & 2\\
+    &learning rate & 0.005 & 0.005 & 0.005 & 0.005\\
+    &update times & 3 & 3 & 3 & 3\\ 
+    &rollout horizon & 2 & 5 & 1 & 1 \\
+    &decayed factor of $\Psi$ & 0.9 & 0.9 & 0.9 & 0.9 \\
+    &horizon of $\Psi$ & 10 & 10 & 10 & 10 \\
+    &s-softmax parameter & 1 & $1.1/e$ & 1 & 1\\
+    \bottomrule
+    \end{tabular}
+    \end{small}
+\end{table}
+
+\section{Future Work}
+\label{app:future work}
+In MBOM, the learning agent treats all opponents as a joint opponent. If the size of the joint opponent is large, the agent will need a lot of rollouts to get an accurate best response. The cost increases dramatically with the size of the joint opponent. How to reduce the computation overhead in such scenarios will be considered in future work. Moreover, MBOM implicitly assumes that the relationship between opponents is fully cooperative. How to deal with the case where their relationship is non-cooperative is also left as future work.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\end{document}

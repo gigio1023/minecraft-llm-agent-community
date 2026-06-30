@@ -1,0 +1,59 @@
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+& \multicolumn{2}{c|}{IPD}   &  \multicolumn{2}{c|}{IMP} \\
+& $\%$TFT & R(std) & $\%$Nash & R(std)\\
+\hline
+NL-Ex. &20.8 &-1.98(0.14) & 0.0& 0(0.37) \\
+\hline
+LOLA-Ex. &81.0 &-1.06(0.19) & 98.8 & 0(0.02) \\
+\hline
+NL-PG &20.0 & -1.98(0.00) & 13.2 & 0(0.19) \\
+\hline
+LOLA-PG &66.4  & -1.17(0.34) & 93.2 & 0(0.06) \\
+\hline
+\end{tabular}
+\caption{We summarise results for NL vs. NL and LOLA vs. LOLA settings with either exact gradient evaluation (-Ex) or policy gradient approximation (-PG). Shown is the probability of agents playing TFT and Nash for the IPD and IMP respectively as well as the average reward per step, R, and standard deviation (std) at the end of training for 50 training runs.}
+\label{tab:results}
+\end{center}
+\end{table}
+
+\subsection{Coin Game}
+\label{subsec:coin}
+Next, we study LOLA in a more complex setting called Coin Game. This is a sequential game and the agents' policies are  parametrised as deep neural networks. Coin Game was first proposed by \citet{lerer2017maintaining} as a higher dimensional alternative to the IPD with multi-step actions. As shown in Figure~\ref{fig:fig_coin_game}, in this setting two agents, `red' and `blue', are tasked with collecting coins. 
+
+The coins are either blue or red, and appear randomly on the grid-world. A new coin with random colour and random position appears after the last one is picked up. Agents pick up coins by moving onto the position where the coin is located. While every agent receives a point for picking up a coin of any colour, whenever an picks up a coin of different colour, the other agent loses 2 points. 
+
+As a result, if both agents greedily pick up any coin available, they receive 0 points in expectation. Since the agents' policies are parameterised as a recurrent neural network, one cannot obtain the future discounted reward as a function of both agents' policies in closed form. Policy gradient-based learning is applied for both NL and LOLA agents in our experiments. We further include experiments of LOLA with opponent modelling (LOLA-OM) in order to examine the behavior of LOLA agents without access to the opponent's policy parameters.
+
+
+\begin{figure}[ht]
+\includegraphics[width=0.95\columnwidth]{figures/coingame_outcomes}
+ 	\vspace{-3ex}
+\caption{In the Coin Game, two agents, `red' and `blue', get 1 point for picking up any coin. However, the `red agent' loses 2 points when the `blue agent' picks up a red coin and vice versa. Effectively, this is a world with an embedded social dilemma where cooperation and defection are temporally extended.}
+\label{fig:fig_coin_game}
+\end{figure}
+
+
+\subsection{Training Details}
+In policy gradient-based NL and LOLA settings, we train agents with an actor-critic method \citep{sutton1998reinforcement} and parameterise each agent with a policy actor and -critic for variance reduction during policy updates. 
+
+During training, we use gradient descent with step size, $\delta$, of 0.005 for the actor, 1 for the critic, and the batch size 4000 for rollouts. The discount rate $\gamma$ is set to $0.96$ for the prisoners' dilemma and Coin Game and $0.9$ for matching pennies. The high value of $\gamma$ for Coin Game and the IPD was chosen in order to allow for long time horizons, which are known to be required for cooperation. We found that a lower $\gamma$ produced more stable learning on IMP.% the  and the episodes last for $120$ steps.
+
+For Coin Game the agent's policy architecture is a recurrent neural network with $32$ hidden units and 2 convolutional layers with $3\times3$ filters, stride $1$, and ReLU activation for input processing. The input is presented as a 4-channel grid, with 2 channels encoding the positions of the 2 agents and 2 channels for the red and blue coins respectively.
+
+For the tournament, we use baseline algorithms and the corresponding hyperparameter values as provided in the literature~\citep{bowling2002multiagent}.
+The tournament is played in a round-robin fashion between all pairs of agents for 1000 episodes, 200 steps each.
+
+
+\begin{figure*}[t!]
+ 	\centering
+ 	\includegraphics[width=0.4\textwidth]{figures/tnt-results-IPD}
+ 	\hfil
+ 	\includegraphics[width=0.4\textwidth]{figures/tnt-results-IMP}
+ 	\vspace{-3ex}
+ 	\caption{Normalised returns of a round-robin tournament on the IPD (left) and IMP (right). LOLA-Ex achieves the best performance in the IPD and is within error bars for IMP. Shading indicates a 95\% confidence interval for the mean. Baselines from~\citep{bowling2002multiagent}: naive Q-learner (NL-Q), joint-action Q-learner (JAL-Q), policy hill-climbing (PHC), and ``Win or Learn Fast'' (WoLF).}
+ 	\label{fig:tournament}
+\end{figure*}

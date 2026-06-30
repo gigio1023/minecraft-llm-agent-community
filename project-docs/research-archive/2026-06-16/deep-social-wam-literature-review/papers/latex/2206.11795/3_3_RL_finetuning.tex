@@ -1,0 +1,67 @@
+\subsection{Fine-Tuning with Reinforcement Learning}
+\label{section:RL_finetuning}
+\begin{figure}[h]
+\vspace{-8px}
+\begin{center}
+\includegraphics[width=\linewidth]{assets/curriculum_small.pdf}
+\end{center}
+\vspace{-8px}
+\caption{
+Typical sequence of items for obtaining a diamond pickaxe. 
+Below each item is the median time and number of actions contractors required to obtain that item and the percentage of contractors that got the item within 10 minutes. The median time to obtain a diamond pickaxe is unknown (except that it is $>20$m) because contractors obtained this item in less than $50\%$ of 20-minute episodes.}
+\label{fig:rlft_curriculum}
+\end{figure}
+
+To demonstrate the efficacy of RL fine-tuning, we chose the challenging goal of obtaining a diamond pickaxe within 10 minutes starting from a fresh Minecraft survival world.
+Doing so involves acquiring a sequence of difficult-to-obtain items that require complex skills like mining, inventory management, crafting with and without a crafting table, tool use, operating a furnace, and mining at the lowest depths, where many hazards like enemies and lava exist (Fig.~\ref{fig:rlft_curriculum}). Adding to the difficulty, progress can be easily lost by dropping items, destroying items, or dying.
+Obtaining a diamond pickaxe more often than not takes a proficient human over 20 minutes (24,000 actions).
+
+Agents are rewarded for each item obtained in the sequence, with 
+%reward caps for all items except diamonds and diamond pickaxes, and 
+lower rewards for items that have to be collected in bulk and higher rewards for items near the end of the sequence. Agents are optimized with the phasic policy gradient~\cite{pmlr-v139-cobbe21a} RL algorithm for $\sim$1.3 million episodes (roughly $1.4\times 10^{10}$ frames). Episodes last for 10 minutes. See Appendix~\ref{Appendix:RLTrainingDetails} for reward function and RL training details. Due to computational constraints, RL experiments use a $\sim248$ million parameter VPT model (Appendix \ref{Appendix:FoundationModelScaling}).
+
+A major problem when fine-tuning with RL is catastrophic forgetting \cite{kudithipudi2022biological, kirkpatrick2017overcoming} because previously learned skills can be lost before their value is realized.
+For instance, while our VPT foundation model never exhibits the entire sequence of behaviors required to smelt iron zero-shot, it \textit{did} train on examples of players smelting with furnaces. It therefore may have some latent ability to smelt iron once the many prerequisites to do so have been performed.
+To combat the catastrophic forgetting of latent skills such that they can continually improve exploration throughout RL fine-tuning, we add an auxiliary Kullback-Leibler (KL) divergence loss between the RL model and the frozen pretrained policy.\cite{vinyals2019grandmaster}
+
+Training from a randomly initialized policy fails to achieve almost \emph{any} reward, underscoring how hard an exploration challenge the diamond pickaxe task is for RL in the native human action space (Fig.~\ref{fig:rlft_items}a).
+The model never learns to reliably collect logs, typically the first of many steps to obtaining a diamond pickaxe (Fig.~\ref{fig:rlft_items}b).
+RL fine-tuning from the VPT foundation model does substantially better (Fig.~\ref{fig:rlft_items}a), learning everything up to mining iron ore and crafting furnaces. (Fig.~\ref{fig:rlft_items}c). However, this agent fails at smelting an iron ingot, the next item required to get further into the tech tree, likely because the zero-shot probability that the VPT foundation model smelts an iron ingot is too low, even when given the prerequisite materials.
+
+\begin{figure}[t]
+\begin{center}
+\begin{overpic}[width=0.49\linewidth]{assets/rlft-reward-over-episodes.pdf}
+\put(0, 27){\tiny(\textbf{a})}
+\end{overpic}
+\begin{overpic}[width=0.49\linewidth]{assets/randomeval.pdf}
+\put(0, 27){\tiny(\textbf{b})}
+\end{overpic}
+\begin{overpic}[width=0.49\linewidth]{assets/foundationeval.pdf}
+\put(0, 36){\tiny(\textbf{c})}
+\end{overpic}
+\begin{overpic}[width=0.49\linewidth]{assets/earlygameeval.pdf}
+\put(0, 36){\tiny(\textbf{d})}
+\end{overpic}
+\end{center}
+\vspace{-8px}
+\caption{
+% Brief text
+% (\textbf{a}) Reward over training for (1) RL from a randomly initialized policy and no KL loss, (2) RL fine-tuning from the VPT foundation model (Sec.~\ref{section:results_foundation}), (3) RL fine-tuning from from the VPT foundation model first BC fine-tuned to the \texttt{earlygame\_keyword} dataset (Sec.~\ref{section:BC_finetuning}), and (4) the same treatment as (3) but with no KL loss. (\textbf{b-d}) Per-episode success rate over the course of training of obtaining each item the agent is rewarded for collecting. \jc{some good info was lost in this caption rewrite, including that RL from scratch learns nearly nothing, and that from early game has 1.5\% on diamond pickaxe. We should add that in (and in general, the takeaway messages)}\bba{Those things were just repeating what is in the text, you want to say it twice? -- though if we have space i agree seems good to add in}
+% Long text
+RL Fine-tuning results. \textbf{(a)} RL from a randomly initialized model fails to get almost any reward, RL fine-tuning from the VPT foundation model performs substantially better with a reward near 13, and RL fine-tuning from the early-game model performs best with a reward of 25.
+When training the early-game model without a KL loss to the original policy (\emph{No KL-loss}) progress stalls after 100,000 episodes, suggesting that the skills necessary to make further progress have been catastrophically forgotten.
+\textbf{(b)} RL from a randomly initialized model occasionally collects sticks by breaking leaves (an easy but inefficient method of getting sticks that does not require logs or planks) and never learns to reliably collect logs.
+\textbf{(c)} RL fine-tuning from the VPT Foundation model learns everything in the curriculum up to iron ore and making furnaces, but fails to learn to use the furnace to smelt iron ingots.
+\textbf{(d)} RL fine-tuning from the early-game model learns to obtain (at human-level) all items in the sequence towards a diamond pickaxe and crafts a diamond pickaxe in $2.5\%$ of episodes.
+}
+\vspace{-8px}
+\label{fig:rlft_items}
+\end{figure}
+
+Results further improve by first BC fine-tuning the VPT Foundation Model to the \texttt{earlygame\_keyword} dataset (the \emph{early-game model}, Sec.~\ref{section:BC_finetuning}) and then fine-tuning with RL (Fig.~\ref{fig:rlft_items}a), which in preliminary experiments we found to perform better than first fine-tuning to \texttt{contractor\_house} followed by fine-tuning with RL (Appendix~\ref{Appendix:RLPreliminary}).
+The three-phase training (pretraining, BC fine-tuning, and then RL fine-tuning) succeeds in learning extremely difficult tasks: it achieves over $80\%$ reliability on iron pickaxes, almost $20\%$ reliability on collecting diamonds, and $2.5\%$ reliability on obtaining a diamond pickaxe (Fig.~\ref{fig:rlft_items}d). 
+For comparison, human players given the objective of obtaining a diamond pickaxe collect these items in $57\%$, $15\%$, and $12\%$ of episodes, respectively, meaning our model is human-level for crafting iron pickaxes and mining diamonds.
+Others have managed to obtain diamonds with $\sim0.1\%$ reliability in 15 minutes\cite{skrynnik2020forgetful, patil2020align} but always with a simplified action space designed to ease exploration. To the best of our knowledge, \textbf{we are the first to report non-zero success rates on crafting a diamond pickaxe}. Qualitatively, the model developed useful skills for diamond mining, such as efficient mining patterns, cave exploration, returning to previously placed objects like crafting tables, and advanced techniques like using wooden pickaxes as fuel when moving on to iron tools.\footnote{Videos found at \href{https://www.youtube.com/playlist?list=PLNAOIb\_agjf3e\_UKweM5pQUSfTw8r-Wfc}{https://www.youtube.com/playlist?list=PLNAOIb\_agjf3e\_UKweM5pQUSfTw8r-Wfc}}
+
+Finally, we validated the importance of the KL loss to the pretrained model during RL fine-tuning. The treatment without a KL loss obtains only items early in the sequence (logs, planks, sticks, and crafting tables) limiting its reward (Fig.~\ref{fig:rlft_items}a).
+This failure to progress further into the sequence is likely because, while the initial skills of chopping logs and crafting planks are being learned with RL, subsequent skills like crafting a wooden pickaxe are lost due to catastrophic forgetting.

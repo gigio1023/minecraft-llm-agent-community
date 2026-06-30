@@ -1,0 +1,62 @@
+\begin{algorithm}[H]
+\caption{\textsc{iris}}
+\label{alg:iris}
+\DontPrintSemicolon
+
+\SetKwProg{Proc}{Procedure}{:}{}
+\SetKwFunction{FTrain}{training\_loop}
+\SetKwFunction{FCollect}{collect\_experience}
+\SetKwFunction{FUpdateWorldModel}{update\_world\_model}
+\SetKwFunction{FUpdateBehavior}{update\_behavior}
+
+
+\Proc{\FTrain{}}
+{
+    \For{epochs}{
+        \texttt{collect\_experience(}\textit{steps\_collect}\texttt{)} \;
+        \For{steps\_world\_model}{
+            \texttt{update\_world\_model()} \; 
+        }
+        \For{steps\_behavior}{
+            \texttt{update\_behavior()} \; 
+        }
+    }
+}
+
+\Proc{\FCollect{$n$}}
+{
+    $x_0 \gets \texttt{env.reset()}$ \;
+    \For{$t = 0$ \KwTo $n - 1$}{
+        $\hat{x}_t \gets D(E(x_t))$ \tcp*[f]{forward frame through discrete autoencoder} \; 
+        Sample $a_t \sim \pi(a_t | \hat{x}_t)$ \;
+        $x_{t+1}, r_t, d_t \gets \texttt{env.step(}a_t\texttt{)}$ \;
+        \If{$d_t = 1$}{
+            $x_{t+1} \gets \texttt{env.reset()}$ \;
+        }
+    }
+    $\mathcal{D} \gets \mathcal{D} \cup \{ x_t, a_t, r_t, d_t \}_{t=0}^{n-1} $ \;
+}
+
+\Proc{\FUpdateWorldModel{}}
+{
+    Sample $ \{ x_t, a_t, r_t, d_t \}_{t=\tau}^{\tau + L - 1} \sim \mathcal{D} $ \; 
+    Compute $ z_t \coloneqq E(x_t) $ and $ \hat{x}_t \coloneqq D(z_t) $ for $t = \tau, \dots, \tau + L - 1$ \;
+    Update $E$ and $D$ \;
+    Compute $ p_G( \hat{z}_{t+1}, \hat{r}_t, \hat{d}_t \mid z_\tau, a_\tau, \dots, z_t, a_t) $ for $t = \tau, \dots, \tau + L - 1$ \;
+    Update $G$ \;
+}
+
+\Proc{\FUpdateBehavior{}}
+{
+    Sample $ x_0 \sim \mathcal{D} $ \;
+    $z_0 \gets E(x_0)$ \;
+    $\hat{x}_0 \gets D(z_0)$ \;
+    \For{$t=0$ \KwTo $H - 1$}{
+        Sample  $a_t \sim \pi(a_t | \hat{x}_t)$ \;
+        Sample $ \hat{z}_{t+1}, \hat{r}_t, \hat{d}_t \sim p_G(\hat{z}_{t+1}, \hat{r}_t, \hat{d}_t \mid z_0, a_0, \dots, \hat{z}_t, a_t) $ \;
+        $\hat{x}_{t+1} \gets D(\hat{z}_{t+1})$ \;
+    }
+    Compute $ V(\hat{x}_t) $ for $t = 0, \dots, H$ \;
+    Update $\pi$ and $V$ \;
+}
+\end{algorithm}

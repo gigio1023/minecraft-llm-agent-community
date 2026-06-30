@@ -1,0 +1,843 @@
+
+% This class has a lot of options, so please check deepmind.cls for more details. 
+% This is a minimal set for most needs.
+\documentclass[11pt, a4paper, logo, one column]{craftjarvis}
+
+% Omit dates for reproducibility.
+\pdfinfoomitdate 1
+\pdftrailerid{redacted}
+
+% This avoids duplicate hyperref bookmark entries when using \bibentry (e.g. via \citepas).
+\makeatletter
+\renewcommand\bibentry[1]{\nocite{#1}{\frenchspacing\@nameuse{BR@r@#1\@extra@b@citeb}}}
+\makeatother
+
+% \usepackage{kantlipsum, lipsum}
+% \usepackage{dsfont}
+% \usepackage{dm-colors}
+% \usepackage{multicol}
+% \usepackage{algorithm}
+% \usepackage{algpseudocode}
+\input{config}
+
+% Sometimes you will get errors about pdflink ending up in diffrent position. Try this and 
+% comment it out again when you are done with your document.
+%\hypersetup{draft}
+
+% Set the bibliography options here.
+\usepackage[authoryear, sort&compress, round]{natbib} 
+
+% Images will be looked for in this path, removes need for explicit path when including images.
+% \graphicspath{{figures/}}
+
+% Important Information about your paper.
+\title{\agent: Learning to Follow Instructions by Watching Gameplay Videos}
+
+% Can leave this option out if you do not wish to add a corresponding author.
+% \correspondingauthor{my-email@deepmind.com}
+
+% Remove these if they are not needed 
+% \keywords{\LaTeX, Publications process, tools}
+% \paperurl{deepmind.com/papers/2019/dm001.pdf}
+
+% Use the internally issued paper ID, if there is one
+\reportnumber{} % Leave blank if n/a 
+
+% Assign your own date to the report. 
+% Can comment out if not needed or leave blank if n/a.
+\renewcommand{\today}{} 
+
+% Can have as many authors and as many affiliations as needed. Best to indicate joint 
+% first-authorship as shown below.
+\author[1]{Shaofei~Cai}
+\author[1]{Bowei~Zhang}
+\author[1]{Zihao~Wang}
+\author[3]{Xiaojian~Ma}
+\author[2]{Anji~Liu}
+\author[1]{Yitao~Liang}
+
+% \correspondingauthor{Yitaoi}
+
+% Affiliations *must* come after the declaration of \author[]
+% \affil[1]{Peking~University}
+% \affil[2]{University~of~California,~Los Angeles}
+% \affil[3]{Beijing~University~of~Posts~and~Telecommunications}
+% \affil[4]{Beijing~Institute~for~General~Artificial~Intelligence}
+\affil[1]{PKU}
+\affil[2]{UCLA}
+\affil[3]{BIGAI}
+\affil[ \hspace{-0.73ex}]{All authors are affiliated with Team CraftJarvis\\} 
+
+
+
+
+
+% % Authors must not appear in the submitted version. They should be hidden
+% % as long as the \iclrfinalcopy macro remains commented out below.
+% % Non-anonymous submissions will be rejected without review.
+
+% \author{
+%     Shaofei Cai$^{1,2}$, Bowei Zhang$^{3}$, Zihao Wang$^{1,2}$, Xiaojian Ma$^{5}$, Anji Liu$^{4}$, Yitao Liang$^{1}$\thanks{Corresponding Author. } \vspace{3pt}\\
+%     \multicolumn{1}{c}{\textbf{Team CraftJarvis}} \vspace{3pt}\\
+%     $^{1}$Institute for Artificial Intelligence, Peking University\\
+%     $^{2}$School of Intelligence Science and Technology, Peking University \\
+%     $^{3}$School of Electronics Engineering and Computer Science, Peking University \\
+%     $^{4}$Computer Science Department, University of California, Los Angeles \\
+%     $^{5}$Beijing Institute for General Artificial Intelligence (BIGAI) \\
+%     {\tt \small \{caishaofei,zhangbowei,zhwang\}@stu.pku.edu.cn} \\
+%     {\tt \small xiaojian.ma@ucla.edu,liuanji@cs.ucla.edu,yitaol@pku.edu.cn} \vspace{3pt} \\
+%     \url{https://craftjarvis-groot.github.io} 
+% }
+
+
+
+\begin{abstract}
+% We study the problem of following user instructions in 
+
+% We further introduce \golem, \snowgolem, \irongolem
+
+% We study the problem of learning instruction-following agents in open-world environments. Compared to canonical close-world domains like Meta-World, open-world games like Minecraft offer a much more diverse set of tasks that an agent can accomplish, therefore eliciting a complicated 
+
+% Developing generalist agents in open-world environments (such as Minecraft) heavily relies on instruction-following controllers.
+We study the problem of building a controller that can follow open-ended instructions in open-world environments.
+We propose to follow reference videos as instructions, which offer expressive goal specifications while eliminating the need for expensive text-gameplay annotations.
+A new learning framework is derived to allow learning such instruction-following controllers from gameplay videos while producing a video instruction encoder that induces a structured goal space. We implement our agent \agent in a simple yet effective encoder-decoder architecture based on causal transformers. We evaluate \agent against open-world counterparts and human players on a proposed \textbf{Minecraft SkillForge} benchmark. The Elo ratings clearly show that \agent is closing the human-machine gap as well as exhibiting a 70\% winning rate over the best generalist agent baseline. Qualitative analysis of the induced goal space further demonstrates some interesting emergent properties, including the goal composition and complex gameplay behavior synthesis. The project page is available at \url{https://craftjarvis-groot.github.io}. 
+
+% We first discover a general video-based goal space from the principle of learning to predict future states. 
+% Compared with previous text-based and image-based spaces, the video-based spaces are more flexible and expressive to represent customized tasks that rarely appear in the training data. 
+% Following this principle, we implement the agent, named \agent, with an encoder-decoder-style transformer, where the video encoder is a non-causal transformer to understand the video instruction, and the policy decoder predicts actions corresponding to the instruction. 
+% The agent is trained using imitation learning under a goal space constraint. We evaluate \agent against open-world counterparts and human players on the newly-introduced \textbf{Minecraft SkillForge} benchmark. The Elo ratings clearly show that \agent is closing the human-machine gap as well as exhibiting a 71\% winning rate over the best generalist baseline. Qualitative analysis of the induced goal space further demonstrates some interesting emergent properties, including the goal composition, complex gameplay behavior synthesis, \etc.
+
+% To comprehensively evaluate agents in Minecraft, we designed a benchmark, \textbf{Minecraft SkillForge}, which covers a spread spectrum of tasks. Using the Elo rating system , \agent exhibit 
+% \yitao{descriptions of the results need to be more convincing}
+
+
+\end{abstract}
+
+
+\begin{document}
+
+\correspondingauthor{Yitao~Liang\\
+Shaofei Cai<caishaofei@stu.pku.edu.cn>, Bowei Zhang<zhangbowei@stu.pku.edu.cn>,Zihao Wang<zhwang@stu.pku.edu.cn>, Xiaojian~Ma<xiaojian.ma@ucla.edu>, Anji Liu<liuanji@cs.ucla.edu>, Yitao Liang<yitaol@pku.edu.cn>}
+
+\maketitle
+
+\begin{figure*}[h]
+\begin{center}
+\includegraphics[scale = 0.14]{figures/groot.png}
+\end{center}
+\caption{ Through the cultivation of extensive gameplay videos, \agent has grown a rich set of skill fruits (number denotes success rate; skills shown above do not mean to be exhaustive; kudos to our artist Haowei). } \label{fig:groot}
+\end{figure*}
+
+
+\section{Introduction}
+Developing human-level embodied agents that can solve endless tasks in open-world environments, such as Minecraft \citep{malmo, minedojo}, has always been a long-term goal pursued in AI. Recent works have explored using Large Language Models (LLMs) to generate high-level plans, which guide the agent to accomplish challenging long-horizon tasks \citep{deps, voyager, gitm}. However, a major gap between these LLM-based agents and generalist agents that can complete endless amounts of tasks is the capability of their low-level controllers, which map the plans to motor commands. Recently developed controllers are only capable of completing a predefined and narrow set of programmatic tasks \citep{juewu, vpt, worldmc}, which hinders LLM-based planning agents from unleashing their full potential.
+% Although they have demonstrated extraordinary capabilities in solving long-horizon tasks, they cannot directly handle low-level control. Therefore, improving the breadth and complexity of controller mastery skills is the key to moving toward higher intelligence. At present, most efforts on controllers \citep{juewu, vpt, worldmc} focused mainly on solving a narrow set of programmatic tasks rather than open-ended tasks. 
+We attribute the limitation of these low-level controllers to how the goal is specified.
+Specifically, existing controllers use task indicator \citep{metaworld}, future outcome \citep{dt, steve1}, and language \citep{rt-1} to represent the goal. While it is easy to learn a controller with some of these goal specifications, they may not be expressive enough for diverse tasks. 
+Taking future outcome goals as an example, an image of a desired house clearly lacks procedural information on how the house was built. One exception is language, but learning a controller that can receive language goals is prohibitively expensive as it requires a huge number of trajectory-text pairs with text that precisely depicts the full details of the gameplay, therefore preventing them from scaling up to more open-ended tasks.
+
+Having observed the limitations of goal specification in the prior works, this paper seeks to find a balance between the capacity of goal specification and the cost of controller learning. Concretely, we propose to specify the goal as a reference gameplay video clip. While such video instruction is indeed expressive, there are two challenges: 1) How can the controller understand the actual goal being specified as the video itself can be ambiguous, \ie a goal space or video instruction encoder has to be learned; 2) How to ultimately map such goal to actual motor commands? To this end, we introduce a learning framework that simultaneously produces a goal space and a video instruction following controller from gameplay videos. The fundamental idea is casting the problem as future state prediction based on past observations:
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item The predicting model needs to identify which goal is being pursued from the past observations, which requires a good goal space (induced by a video instruction encoder);
+    \item Since the transition dynamics model is fixed, a policy that maps both the state and the recognized goal to action is also needed by the predicting model when rolling the future state predictions. 
+\end{itemize}
+Effectively, this results in the goal space and control policy we need. We introduce a variational learning objective for this problem, which leads to a combination of a cloning loss and a KL regularization loss. Based on this framework, we implement \agent, an agent with an encoder-decoder architecture to solve open-ended Minecraft tasks by following video instructions. The video encoder is a non-causal transformer that extracts the semantic information expressed in the video and maps it to the latent goal space. The controller policy is a decoder module implemented by a causal transformer, which decodes the goal information in the latent space and translates it into a sequence of actions in the given environment states in an autoregressive manner. 
+
+To comprehensively evaluate an agent's mastery of skills, we designed a benchmark called \textbf{Minecraft SkillForge}. The benchmark covers six common Minecraft task groups: \texttt{collect}, \texttt{build}, \texttt{survive}, \texttt{explore}, \texttt{tool}, and \texttt{craft}, testing the agent's abilities in resource collection, structure building, environmental understanding, and tool usage, in a total of 30 tasks. We calculate Elo ratings among \agent, several counterparts, and human players based on human evaluations. Our experiments showed that \agent is closing the human-machine gap and outperforms the best baseline by 150 points (or 70\% winning rate) in an Elo tournament system. Our qualitative analysis of the induced goal space further demonstrates some interesting emergent properties, including the goal composition and complex gameplay behavior synthesis. 
+
+To sum up, our main contributions are as follows: 
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item Start by maximizing the log-likelihood of future states given past ones, we have discovered the learning objectives that lead to a good goal space and ultimately the instruction-following controller from gameplay videos. It provides theoretical guidance for the agent architecture design and model optimization. 
+    \item Based on our proposed learning framework, we implemented a simple yet efficient encoder-decoder agent based on causal transformers. The encoder is responsible for understanding the goal information in the video instruction while the decoder as the policy emits motor commands.
+    \item On our newly introduced benchmark, Minecraft SkillForge, \agent is closing the human-machine gap and surpassing the state-of-the-art baselines by a large margin in the overall Elo rating comparison. \agent also exhibits several interesting emergent properties, including goal composition and complex gameplay behavior synthesis.
+\end{itemize}
+
+
+% We approach this by the principle of predicting future states given past observations. 
+% Specifically, there are two types of information that determine the future states: (i) the transition dynamics of the environment and (ii) which goal is being pursued by the agent. Therefore, if a model is able to accurately predict future states, it inherently encodes information about the agent's current goal. 
+% \xm{I don't quite understand the following. Is this how we remove transition dynamics from the learned representation? Why do we have to get rid of it (I assume you mean forward dynamics, not inverse dynamics -- but forward dynamics is policy-agnostic no?)} However, naively training the agent to maximize the likelihood of future states cannot lead to a good goal space since the model cannot elicit information specific to the policy from that of the transition dynamics. To overcome this problem, this paper presents a variational framework that learns to maximize the likelihood of future states and simultaneously distinguish the policies used in the passive data. 
+
+
+% and build a controller that follows such video instruction by learning from passive data, \ie gameplay videos.
+
+% For example, "future outcome" in describing the task of "building a house" is ambiguous, given a desired future image/video, the agent cannot distinguish whether it should search for such a house or construct such a house. 
+% Even if the goal space is in the form of language, it still requires a large amount of text to precisely describe the full details of building a house task. 
+% This requires expensivanual annotation costs to collect trajectory-text pairs. In addition, this poses high demands on the agent's ability to understand and make decisions across modalities. 
+% \yitao{yep, we really need an illustrative figure here, so the story can fly}
+
+
+% \anji{Maybe motivate our approach differently in the following paragraph: we aim to learn a goal space that is general enough from passive data. We can then use this general goal space to help down-stream tasks.}
+% We aim to learn a goal space that is general enough from passive data. We can then use this general goal space to help down-stream tasks. 
+% Recall that when intelligent students complete a task, they only need to take a glance at a teacher's demonstration to be able to reproduce this solution without the need for complicated verbal communication. 
+% Motivated by this, we believe that video is an ideal goal space that can express instructional information efficiently. 
+% On the one hand, it is open-ended. Theoretically, any complicated behavior can be encoded in a video that is long enough. 
+% On the other hand, it can be learned from passive data. Since pre-training goal space does not require information from other modalities, we can easily utilize internet-scale gameplay videos for self-supervised training. This greatly enhances the efficiency of data utilization.
+
+% Having observed the limitations of pre-specified goal spaces, this paper seeks to learn a goal space that encompasses a wide variety of tasks from passive data, \ie state-only trajectories. More formally, our goal is to simultaneously learn a goal space together with a goal-conditioned policy that covers most ``skills'' observed from passive data. While this may seem to be an ill-defined problem since there are infinitely many goal spaces that encode a wide range of skills, this paper approaches the problem by the principle of predicting future states in the passive data. Specifically, there are two types of information that determine the future states: (i) the transition dynamics of the environment and (ii) which policy (skill) is used by the agent. Therefore, if a model is able to accurately predict future states, it inherently encodes information about the agent's skills. However, naively training the agent to maximize the likelihood of future states cannot lead to a good low-level controller since the model cannot elicit information specific to the policy from that of the transition dynamics. To overcome this problem, this paper presents a variational framework that learns to maximize the likelihood of future states by learning to distinguish the policies used in the passive data.
+% \anji{Then give a brief overview of the model.}
+
+% Imagine that proficient learners are capable of replicating solutions to problems without intricate verbal instruction, after a mere glance at their teacher's demonstration. 
+% Motivated by this, we posit that video exemplifies a perfect interface to impart instructional information effectively. 
+% On the one hand, the video presents an open-ended dimension; practically any complex behavior can be encoded within a lengthy video. On the other hand, this goal space can be learned proficiently from passive data. Pre-training the goal space does not necessitate input from other modalities; therefore, scalable gameplay videos can be utilized for self-supervised training. This increases the efficacy of data utilization significantly. 
+
+% To learn a good video goal space, we first identified the properties that it should satisfy: (1) master a wide spectrum of common behaviors, (2) succinctly describe the task without unnecessary information in the state. The first one guarantees that the agent possesses a broad set of skills that can be prompted. The second one ensures that skills learned by the agent can be generalized in different environments. Interestingly, we found that maximizing the log-likelihood of future states given past states can naturally lead to a goal space that satisfies these two properties. \shaofei{why?} Therefore, we start by maximizing the log-likelihood of future states and derive the final objective, which is to maximize the behavioral cloning ability on demonstrations 
+%while minimizing the increased encoded information caused by lengthening video instructions. 
+% while simultaneously minimizing the escalation of encoded information stemming from the increase in length of video instructions. 
+
+
+
+\section{Preliminaries and Problem Formulation}
+\label{sec:preliminaries}
+
+Reinforcement Learning (RL) concerns the problem in which an agent interacts with an environment at discrete time steps, aiming to maximize its expected cumulative reward \citep{dqn, ppo, impala}. Specifically, the environment is defined as a Markov Decision Process (MDP) $\langle \states, \actions, \rewards, \transition, d_0 \rangle$, where $\states$ is the state space, $\actions$ is the action space, $\rewards: \states \times \actions \rightarrow \mathbb{R}$ is the reward function, $\transition: \states \times \actions \rightarrow \states$ is the transition dynamics, and $d_0$ is the initial state distribution. Our goal is to learn a policy $\pi (a \given s)$ that maximizes the expected cumulative reward $\expectation [ \sum_{t=0}^{\infty} \gamma^t r_t ]$, where $\gamma \in (0, 1]$ is a discount factor.
+
+In goal-conditioned RL (GCRL) tasks, we are additionally provided with a goal $g \in \goals$ \citep{her,gcil,gcrl,worldmc,jxma1,jxma2,jxma3}. And the task becomes learning a goal-conditioned policy $\pi (a \given s, g)$ that maximizes the expected return $\expectation [ \sum_{t=0}^{\infty} \gamma^t r_t^g ]$, where $r_t^g$ is the goal-specific reward achieved at time step $t$. Apart from being a new type of RL task, GCRL has been widely studied as a pre-training stage toward conquering more challenging environments/tasks \citep{hardplay, vpt, eccvpt}. Specifically, suppose we are provided with a good goal-condition policy, the goal can be viewed as a meta-action that drives the agent to accomplish various sub-tasks, which significantly simplifies tasks that require an extended horizon to accomplish. Further, when equipped with goal planners, we can achieve zero- or few-shot learning on compositional tasks that are beyond the reach of RL algorithms \citep{inner, deps, voyager,gitm,jxma4}.
+
+At the heart of leveraging such benefits, a key requirement is to have a properly-defined goal space that (i) has a wide coverage of common tasks/behaviors, and (ii) succinctly describes the task without including unnecessary information about the state. Many prior works establish goal spaces using guidance from other modalities such as language \citep{vlnbert,openvlm, worldmc} or code \citep{voyager, voxposer}. While effective, the requirement on large-scale trajectory data paired with this auxiliary information could be hard to fulfill in practice. Instead, this paper studies the problem of simultaneously learning a rich and coherent goal space and the corresponding goal-conditioned policy, given a pre-trained inverse dynamic model and raw gameplay videos, \ie sequences of states $\{ s_{0:T}^{(i)} \}_i$ collected using unknown policies. 
+
+
+
+\section{Goal Space Discovery via Future State Prediction}
+\label{sec:theory}
+
+This section explains our learning framework: discovering a ``good'' goal space as well as a video instruction following the controller through the task of predicting future states given previous ones. We start with an illustrative example in Minecraft \citep{malmo}. Imagine that an agent is standing inside a grassland holding an axe that can be used to chop the tree in front of them. Suppose in the gameplay video, players either go straight to chop the tree or bypass it to explore the territory. In order to predict future frames, it is sufficient to know (i) which goal (chop tree or bypass tree) is being pursued by the agent, and (ii) what will happen if the agent chooses a particular option (\ie transition dynamics). Apart from the latter information that is irrelevant to the past observations, we only need to capture the goal information, \ie whether the agent decides to chop the tree or bypass the tree. Therefore, the task of establishing a comprehensive yet succinct goal space can be interpreted as predicting future states while conditioning on the transition dynamics of the environment. 
+
+Formally, our learning objective is to maximize the log-likelihood of future states given past ones: $\log \p_\theta (s_{t+1:T} \given s_{0:t})$. Define $g$ as a latent variable conditioned on past states (think of it as the potential goals the agent is pursuing given past states), the evidence lower-bound of the objective given variational posterior $\q_\phi (g \given s_{0:T})$ is the following (see Appendix \ref{appendix:derivation} for the derivation of this and the following equations):
+    \begin{align*}
+        \log \p_\theta (s_{t+1:T} \given s_{0:t}) & = \log \sum_{g} \p_\theta (s_{t+1:T}, g \given s_{0:t}) \\ 
+        & \geq \expectation_{g \sim \q_\phi(\cdot \given s_{0:T})} \left [ \log \p_\theta (s_{t+1:T} \given s_{0:t}, g) \right ] - D_{\mathrm{KL}} \left ( \q_\phi(g \given s_{0:T}) \parallel \p_\theta(g \given s_{0:t}) \right ),
+        \label{eq:seq-elbo}
+    \end{align*}
+\noindent where $D_{\mathrm{KL}} ( \cdot \| \cdot )$ denotes the KL-divergence. Next, we break down the first term (\ie $\p_\theta (s_{t+1:T} \given s_{0:t}, g)$) into components contributed by the (unknown) goal-conditioned policy $\pi_\theta (a \given s, g)$ and the transition dynamics $\p_\theta (s_{t+1} \given s_{0:t}, a_t)$ :
+    \begin{align*}
+        \log \p_\theta (s_{t+1:T} \given s_{0:t}, g) & = \sum_{\tau = t}^{T} \log \sum_{a_{\tau}} \pi_\theta ( a_{\tau} \given s_{0:\tau}, g) \cdot \p_\theta (s_{\tau+1} \given s_{0:\tau}, a_{\tau}) \\
+        & \geq \sum_{\tau = t}^{T} \expectation_{a_{\tau} \sim \p_\theta (a_{\tau} \given s_{0:\tau+1})} \big [ \log \pi_\theta (a_{\tau} \given s_{0:\tau}, g) + C \big ],
+    \end{align*}
+\noindent {where} the constant $C$ contains terms that depend solely on the environment dynamics and are irrelevant to what we want to learn (\ie the goal space and the goal-conditioned policy). Bring it back to the original objective, we have
+    \begin{align*}
+        \log \p (s_{t+1:T} \given s_{0:t}) 
+        \geq \underbrace{\sum_{\tau=t}^{T-1} \expectation_{g \sim \q_\phi (\cdot \given s_{0:T}), a_{\tau} \sim \p_\theta(\cdot \given s_{0:\tau+1})} \left [ \log \pi_\theta (a_{\tau} \given s_{0:\tau}, g) \right ]}_{\text{behaviour cloning}} - \underbrace{D_{\mathrm{KL}} \left ( \q_\phi(g \given s_{0:T}) \parallel \p_{\theta}(g \given s_{0:t}) \right )}_{\text{goal space constraint (KL regularization)}},
+    \end{align*}
+% \begin{footnotesize}
+%     \begin{align} \label{eq:objective}
+%         \log \p (s_{t+1:T} \given s_{0:t}) \geq \sum_{\tau=t}^{T-1} \expectation_{\underbrace{ g \sim \q (\cdot \given s_{0:T})}_{\text{video encoder}}, \underbrace{a_{\tau} \sim \p(\cdot \given s_{0:\tau+1})}_{\text{inverse dynamic model}}} \biggl[ \log \pi (a_{\tau} \given s_{0:\tau}, g) \biggr ] - \underbrace{D_{\mathrm{KL}} \left ( \q(g \given s_{0:T}) \parallel \p_{\omega}(g \given s_{0:t}) \right )}_{\text{constraint}}. 
+%     \end{align}
+% \end{footnotesize}
+
+\noindent {where} $q_\phi(\cdot \given s_{0:T})$ is implemented as a video encoder that maps the whole state sequence into the latent goal space. $p_\theta(\cdot \given s_{0:\tau+1})$ is the inverse dynamic model (IDM) that predicts actions required to achieve a desired change in the states, which is usually a pre-trained model, details are in Appendix \ref{sec:IDM}. 
+Thus, the objective can be explained as jointly learning a video encoder and a goal-controller policy through behavior cloning under succinct goal space constraints. 
+
+% \anji{Maybe use some colors (better not too many) to make the equation more readable.}
+
+
+\section{\agent Architecture Design and Training Strategy}
+
+\begin{figure*}[t]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.48]{figures/method.pdf}
+\end{center}
+\caption{\textbf{Our \agent agent architecture.} \textbf{Left:} In the training stage, a video encoder (non-causal transformer) learns to extract the semantic meaning and transfer the video (state sequence) into the goal embedding space. A goal-conditioned policy (causal transformer) is learned to predict actions following the given instructions. We learn the agent using behavior cloning under a KL constraint. \textbf{Right:} During the inference, any reference video is passed into the video encoder to generate the goal embeddings that drive the policy to interact with the environment. } \label{fig:architecture}
+\vspace{-0.4cm}
+\end{figure*}
+
+
+% This section describes how we design the \agent agent architecture. As depicted by the objective in Equation \ref{eq:objective}, the architecture should consist of three components: a video encoder, a goal-conditioned policy, and an inverse dynamic model. Since the inverse dynamic model is usually a pre-trained model corresponding to a specific environment and is frozen during the training, we omit it in the following paragraph. 
+This section illustrates how to create an agent (we call it \agent) that can understand the semantic meaning of a reference video and interact with the environment based on the aforementioned learning framework. According to the discussion in Section \ref{sec:theory}, the learnable parts of \agent include the video encoder and the goal-conditioned policy. Recently, Transformer \citep{transformer} has demonstrated effectiveness in solving sequential decision-making problems \citep{stable, dt, rt-1}. 
+Motivated by this, we implement \agent with transformer-based encoder-decoder architecture, as shown in Figure \ref{fig:architecture}. The video encoder is a non-causal transformer that extracts semantic information and generates goal embeddings. The policy is a causal transformer decoder that receives the goal embeddings as the instruction and autoregressively translates the state sequence into a sequence of actions. Next, we describe how each module is constructed together with the training strategy. 
+
+\subsection{Video Encoder}
+The video encoder includes a Convolutional Neural Network (CNN) to extract spatial information from image states $s_{1:T}$ and a non-causal transformer to capture temporal information from videos. 
+Specifically, we use a CNN backbone to extract visual embeddings $\{x_{1:T}\}$ for all frames.
+Additionally, motivated by \cite{bert, vit}, we construct a set of learnable embeddings (or summary tokens), represented as $\{c_{1:N}\}$, to capture the semantic information present in the video. The visual embeddings and summary tokens are passed to a non-causal transformer, resulting in the output corresponding to the summary tokens as $\{\hat{c}_{1:N}\}$
+\begin{equation}\label{eq:video_encoder}
+\begin{aligned}
+x_{1:T} &\leftarrow \texttt{Backbone}(s_{1:T}), \\
+\hat{c}_{1:N} &\leftarrow \texttt{Transformer}(\left[ x_{1:T}, c_{1:N} \right]). 
+\end{aligned}
+\end{equation}
+Similar to VAE \citep{vae}, we assume that the latent goal space follows a Gaussian distribution, hence we use two fully connected layers, $\mu(\cdot)$ and $\sigma(\cdot)$, to generate the mean and standard deviation of the distribution, respectively. During training, we use the reparameterization trick to sample a set of embeddings $\{g_{1:N}\}$ from the distribution, where $g_{t} \sim \mathcal{N}(\mu(\hat{c}_{t}), \sigma(\hat{c}_{t}))$. During inference, we use the mean of the distribution as the goal embeddings, i.e. $g_{t} \leftarrow \mu(\hat{c}_{t})$. 
+
+\subsection{Decoder as Policy}
+To introduce our policy module, we start with VPT \citep{vpt}, a Minecraft foundation model trained with standard behavioral cloning. It is built on Transformer-XL \citep{transformerxl} that can leverage long-horizon historical states and predict the next action seeing the current observation. However, the vanilla VPT architecture does not support instruction input. To condition the policy on goal embeddings, we draw the inspiration from Flamingo \citep{flamingo}, that is, to insert \emph{gated cross-attention dense} layers into every Transformer-XL block. The keys and values in these layers are obtained from goal embeddings, while the queries are derived from the environment states
+\begin{equation}\label{eq:decoder_as_policy}
+\begin{aligned}
+        \hat{x}^{(l)}_{1:t} &\leftarrow \texttt{GatedXATTN}(\textit{kv}=g_{1:N},\textit{q}=x^{(l-1)}_{1:t}; \theta_{l}), \\
+    x^{(l)}_{1:t} &\leftarrow \texttt{TransformerXL}(\textit{qkv}=\hat{x}^{(l)}_{1:t}; \theta_{l}), \\
+    \hat{a}_{t} &\leftarrow \texttt{FeedForward}(x^{(M)}_{t}),
+\end{aligned}
+\end{equation}
+% \begin{align}
+% \hat{x}^{(l)}_{1:t} &\leftarrow \texttt{GatedXATTN}(\textit{kv}=g_{1:N},\textit{q}=x^{(l-1)}_{1:t}; \theta_{l}), \\
+% x^{(l)}_{1:t} &\leftarrow \texttt{TransformerXL}(\textit{qkv}=\hat{x}^{(l)}_{1:t}; \theta_{l}), \\
+% \hat{a}_{t} &\leftarrow \texttt{FeedForward}(x^{(M)}_{t}), 
+% \end{align}
+where the policy reuses the visual embeddings extracted by the video encoder, \ie $x^{(0)}_{1:t} = x_{1:t}$, the policy consists of $M$ transformer blocks, $\theta_{l}$ is the parameter of $l$-th block, $\hat{a}_t$ is the predicted action. 
+Since our goal space contains information about how to complete a task that is richer than previous language-conditioned policy \citep{worldmc, steve1}, the cross-attention mechanism is necessary. It allows the \agent to query the task progress from instruction information based on past states, and then perform corresponding behaviors to complete the remaining progress. 
+
+
+
+
+\subsection{Training and Inference}
+The training dataset can be a mixture of Minecraft gameplay videos and offline trajectories. For those videos without actions, an inverse dynamic model \citep{vpt} can be used to generate approximate actions. Limited by the computation resources, we truncated all the trajectories into segments with a fixed length of $T$ without using any prior. We denote the final dataset as $\mathcal{D} = \{(x_{1:T}, a_{1:T})\}_M$, where $M$ is the number of trajectories. We train \agent in a fully self-supervised manner while the training process can be viewed as self-imitating, that is, training \agent jointly using behavioral cloning and KL divergence loss
+\begin{align}
+\mathcal{L}(\theta,\phi) =  \expectation_{(s,a) \sim \mathcal{D}} \left[ \lambda_{BC} \sum_t -\log \pi_\theta(a_t \given s_{1:t}, g) + \lambda_{KL} \sum_{\tau} D_{KL}\left(q_\phi(g \given s_{0:T} ) \parallel \p_{\theta}(g \given s_{0:\tau} )\right) \right],
+\end{align}
+where $\lambda_{BC}, \lambda_{KL}$ are tradeoff coefficients, $\q_{\phi}$ is a posterior visual encoder, $\p_{\theta}$ is a prior video encoder with the same architecture, $g \sim \q_{\phi}(\cdot | s_{0:T})$. 
+%Intuitively, when the capacity of the model and the amount of data are large enough, the video encoder tends to learn an IDM instead of truly understanding the video semantics. Thus, we randomly mask $75\%$ of the frames before passing them to the video encoder, as in MAE \citep{mae}. This step is to prevent the video encoder from degenerating into an IDM, leading the agent to become a simple behavior copy and losing its generalization ability.  During the inference, a reference video $\hat{s}_{1:T}$ can be passed into the video encoder without being masked while the policy module autoregressively predicts corresponding actions to the environment. 
+More details are in the Appendix \ref{appendix:implementation}.
+
+
+
+
+\section{Result}
+
+\subsection{Performance on Mastering Minecraft Skills}
+
+
+
+\textbf{Minecraft SkillForge Benchmark.} In order to comprehensively evaluate the mastery of tasks by agents in Minecraft, we created a diverse benchmark called \textbf{Minecraft SkillForge}. It covers 30 tasks from 6 major categories of representative skills in Minecraft, including \texttt{collect}, \texttt{explore}, \texttt{craft}, \texttt{tool}, \texttt{survive}, and \texttt{build}. 
+%For example, the task ``explore treasure'' in the \texttt{explore} category requires the player to enter a villager's house and then open a chest (\includegraphics[scale=0.1,valign=c]{figures/minecraft/chest.png}), dragging the items (\includegraphics[scale=0.07,valign=c]{figures/minecraft/emerald.png}) inside the chest into its own inventory; 
+For example, the task ``dig three down and fill one up'' in the \texttt{build} category asks the agent to first dig three blocks of dirt, then use the dirt to fill the space above; 
+The task of ``building a snow golem'' (\includegraphics[scale=0.013,valign=c]{figures/minecraft/snow_golem.png}) requires the agent to sequentially stack 2 snow blocks (\includegraphics[scale=0.035,valign=c]{figures/minecraft/snow_block.png}) and 1 carved pumpkin (\includegraphics[scale=0.035,valign=c]{figures/minecraft/carved_pumpkin.png}). 
+We put the details of this benchmark in the Appendix \ref{appendix:benchmark}. 
+Apart from some relatively simple or common tasks such as ``collect wood'' and ``hunt animals'', other tasks require the agent to have the ability to perform multiple steps in succession. 
+
+We compare \agent with the following baselines: (a) VPT \citep{vpt}, a foundation model pre-trained on large-scale YouTube data, with three variants: VPT (fd), VPT(bc), and VPT(rl), indicating vanilla foundation model, behavior cloning finetuned model, and RL finetuned model; (b) STEVE-1 \citep{steve1}, an instruction-following agent finetuned from VPT, with two variants: STEVE-1 (visual) and STEVE-1 (text) that receives visual and test instructions. More details are in Appendix \ref{appendix:baseline}. \emph{It is worth noting that \agent was trained from scratch. }
+
+\begin{figure*}[t]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.60]{figures/elorating.pdf}
+\end{center}
+\caption{
+\textbf{Results on Minecraft SkillForge benchmark. }
+\textbf{Left:} Tournament evaluation of \agent assessed by human players. \agent performs better than state-of-the-art Minecraft agent STEVE-1. A 150-score gap corresponds to a $70\%$ probability of winning. \textbf{Middle:} Winning rate of \agent v.s. other agents on specific task categories. Colors from red to blue denote a decrease in the winning rate. Apart from the human player, \agent surpasses all other baselines. \textbf{Right:} Success rate on 9 representative tasks. \agent champions process-oriented tasks, such as \texttt{dig three and fill one} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/dig3fill1.png}) and \texttt{build snow golems} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/groot.png}).} 
+\label{fig:elo}
+\vspace{-0.4cm}
+\end{figure*}
+
+\textbf{Human Evaluation with Elo Rating.} We evaluated the relative strength of agents by running an internal tournament and reporting their Elo ratings, as in \cite{dqn}. Before the tournament, each agent is required to generate 10 videos of length 600 on each task. Note that, all the reference videos used by \agent are generated from another biome to ensure generalization. 
+Additionally, we also invited 3 experienced players to do these tasks following the same settings. 
+After the video collection, we asked 10 players to judge the quality of each pair of sampled videos from different agents. 
+Considering the diversity of tasks, we designed specific evaluation criteria for every task to measure the quality of rollout trajectories. 
+%For example, in the task of building a snow golem, if the agent does not place any block, it performs worse than if it places at least one block, and it performs worse if it places two kinds of blocks than if it completes the construction of the snow golem. 
+For example, in the task of ``build snow golem'', we rank the completion degree of the task in ascending order: no blocks placed, one type of block placed, two types of blocks placed, and snow golem built successfully. 
+After 1500 comparisons, the Elo rating converged as in Figure \ref{fig:elo} (left). Although there is a large performance gap compared with human players, \agent has significantly surpassed the current state-of-the-art STEVE-1 series and condition-free VPT series on the overall tasks. Additional details are in Appendix \ref{appendix:elo}. 
+
+In Figure \ref{fig:elo} (middle), we compare \agent with other baselines in winning rate on six task groups. 
+We found that except for the performance on \texttt{craft} tasks, where STEVE-1 (visual) outperforms our model, \agent achieves state-of-the-art results. In particular, \agent greatly outperforms other baselines by a large margin on \texttt{build} and \texttt{tool}. For \texttt{build}, the goal space needs to contain more detailed procedural information, which is the disadvantage of methods that use future outcomes as the goal. Moreover, such tasks are distributed sparsely in the dataset, or even absent in the dataset, which requires the agent to have strong generalization ability. As for \texttt{craft} group, \agent is not superior enough, especially on the ``crafting table'' task. We attribute this to the wide task distribution in the dataset. Thus the future outcomes can prompt STEVE-1 to achieve a high success rate. 
+
+
+\textbf{Programmatic Evaluation.} To quantitatively compare the performance of the agents, we selected 9 representative tasks out of 30 and reported the success rate of \agent, STEVE-1 (visual), and VPT (bc) on these tasks in Figure \ref{fig:elo} (right). 
+We found that, based on the success rate on tasks such as \texttt{dye and shear sheep}(\includegraphics[scale=0.04,valign=c]{figures/minecraft/pink_wool.png}), \texttt{enchat sword} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/enchant.png}), \texttt{smelt food} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/furnace.png}), \texttt{use bow} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/bow.png}), \texttt{sleep} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/bed.png}), and \texttt{lead animals} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/lead.png}), \agent has already reached a level comparable to that of human players ($100\%$). 
+However, the success rates for \texttt{build snow golems} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/groot.png}) and \texttt{build obsidian} (\includegraphics[scale=0.04,valign=c]{figures/minecraft/lava.png}) tasks are only $60\%$ and $50\%$. By observing the generated videos, we found that \agent cannot precisely identify the items in Hotbar (such as buckets, lava buckets, snow blocks, and pumpkin heads), resulting in a low probability of switching to the correct item. STEVE-1 also has the same problem. This may be due to the current training paradigm lacking strong supervisory signals at the image level. Future work may introduce auxiliary tasks such as vision-question answering (VQA) to help alleviate this phenomenon. Details are in Appendix \ref{appendix:prog}. 
+
+%Meanwhile, we also found, in the \texttt{dye and shear sheep}(\includegraphics[scale=0.04,valign=c]{figures/minecraft/pink_wool.png}) task, \agent is not superior. We argue that these tasks are common in the dataset and do not require complicated steps. So outcome-oriented methods such as STEVE-1 can also achieve comparable results. On the contrary, \agent significantly outperforms STEVE-1 and VPT in process-oriented tasks, such as \texttt{enchant} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/enchant.png}), \texttt{dig three  and fill one} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/dig3fill1.png}), \texttt{build obsidian} (\includegraphics[scale=0.04,valign=c]{figures/minecraft/lava.png}), and \texttt{build snow golems} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/groot.png}). 
+
+
+\begin{figure*}[t]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.56]{figures/tsne.pdf}
+\end{center}
+\caption{
+\textbf{t-SNE visualization of the goal space. } Each color corresponds to a specific video category. 
+\textbf{(Left):} Space of randomly initialized video encoder. All the videos are entangled together. \textbf{Middle:} Space of \agent trained with self-supervised learning w/ and w/o KL regularization, respectively. The videos are clustered based on their semantics. Visualization shows the subtle differences between the two. \textbf{Right:} Synthesized videos using concatenation manner. The concatenated videos lay on the position between the source videos. 
+} \label{fig:tsne}
+\vspace{-0.4cm}
+\end{figure*}
+
+
+\subsection{Properties of Learned Goal Space}
+
+This section studies the properties of learned goal space. We used the t-SNE algorithm \citep{tsne} to visualize the clustering effect of reference videos encoded in goal space, as in Figure \ref{fig:tsne}. We select 7 kinds of videos, including \texttt{craft items}, \texttt{combat enemies}, \texttt{harvest crops}, \texttt{hunt animals}, \texttt{chop trees}, \texttt{trade with villagers}, and \texttt{mine ores}. These videos are sampled from the contractor data \citep{vpt} according to the meta information (details are in Appendix \ref{appendix:tsne}). Each category contains 1k video segments. As a control group, in Figure \ref{fig:tsne} (left), we showed the initial goal space of the video encoder (with a pre-trained EfficientNet-B0 \citep{eff} as the backbone) before training. We found that the points are entangled together. After being trained on offline trajectories, as in Figure \ref{fig:tsne} (middle), it well understands reference videos and clusters them according to their semantics. This proves that it is efficient to learn behavior-relevant task representations using our self-supervised training strategy. The clustering effect is slightly better with KL regularization, though the difference is not very significant. Inevitably, there are still some videos from different categories entangled together. We attribute this to the possibility of overlap in the performed behaviors of these videos. For example, \texttt{chop trees} and \texttt{harvest crops} both rely on a sequential of ``attack'' actions. 
+
+
+
+\textbf{Condition on Concatenated Videos.} We also study the possibility of conditioning the policy on concatenated videos. First, we collect 3 kinds of source videos, including \texttt{chop trees}, \texttt{hunt animals}, and \texttt{trade with villagers}. We randomly sampled two videos from sources of \texttt{chop trees} and \texttt{hunt animals}, downsampled and concatenated them into a synthetic video, denoted as \texttt{[chop trees, hunt animals]}. By the same token, we can obtain \texttt{[hunt animals, trade with villagers]}. We visualize these videos together with the source videos in Figure \ref{fig:tsne} (right). We found that the source videos lie far away from each other while the concatenated videos are distributed between their source videos. Based on this intriguing phenomenon, we infer that concatenated videos may prompt \agent to solve both tasks simultaneously. To verify this, we evaluate \agent on three kinds of reference videos, \ie \texttt{chop trees}, \texttt{hunt animals}, and \texttt{[chop trees, hunt animals]}. We launched \agent in the forest and in the animal plains, respectively. The collected wood and killed mobs are reported in Figure \ref{fig:space}. We found that although the concatenated video may not be as effective as raw video in driving an agent to complete a single task ($60\%$ of the performance of raw video), it does possess the ability to drive the agent to perform multiple tasks. This is an important ability. As discussed in \cite{deps}, sometimes the high-level planner will propose multiple candidate goals, it will be efficient if the low-level controller can automatically determine which to accomplish based on the current observation. 
+
+\begin{figure}[t]
+\centering
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\includegraphics[scale=0.47]{figures/fig_space.pdf}
+\caption{\textbf{Comparison on using raw and concatenated reference videos as conditions.} \textbf{Left:} Collected wood in the forest biome. \textbf{Right:} Killed mobs in the plains biome. ``concat'' denotes the reference video is \texttt{[chop trees, hunt animals]}. 
+Statistics are measured over 10 episodes. 
+} \label{fig:space}
+\end{minipage}
+\hfill\hspace{0.02\textwidth}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\includegraphics[scale=0.465]{figures/fig_ablation.pdf}
+\caption{\textbf{Ablation study on KL loss. } After being jointly trained with KL loss, \agent can collect $2\times$ more seagrass (\includegraphics[scale=0.04,valign=c]{figures/minecraft/seagrass.png}) underwater and $1.5\times$ wood (\includegraphics[scale=0.03,valign=c]{figures/minecraft/log.png}) in the forest while the difference is not as impressive on the \texttt{use bow} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/bow.png}) task. 
+Statistics are measured over 10 episodes. 
+}
+\label{fig:ablation}
+\end{minipage}
+\vspace{-0.4cm}
+\end{figure}
+
+
+\begin{figure*}
+% \begin{wrapfigure}{r}{0.5\textwidth}
+  % \vspace{-1.5em}
+  \begin{center}
+    \includegraphics[width=1.0\textwidth]{figures/condition_chaining.pdf}
+  \end{center}
+  \caption{\textbf{Results on solving challenging \texttt{obtain diamond} task.} The vertical dashed lines represent the time when a certain item is first obtained. \textbf{Left:} \agent first dug down to the depth of 12 and then mined horizontally to obtain diamonds with an average success rate of $16\%$. \textbf{Right:} STEVE-1 quickly dug down to the specific depth but struggled to maintain its height. } \label{fig:chaining}
+  % \vspace{-0.5em}
+% \end{wrapfigure}
+\vspace{-0.4cm}
+\end{figure*}
+
+% \subsection{Ablation study on KL Divergence Loss}
+\textbf{Ablation on KL Divergence Loss. } To investigate the role of KL loss in training, we evaluated \agent (w/ KL) and its variant (w/o KL) on three tasks: \texttt{collect seagrass} (\includegraphics[scale=0.04,valign=c]{figures/minecraft/seagrass.png}), \texttt{collect wood} (\includegraphics[scale=0.04,valign=c]{figures/minecraft/log.png}), and \texttt{use bow} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/bow.png}). As shown in Figure \ref{fig:ablation}, we found that introducing the constraint of KL loss improved agent performance by $2\times$ and $1.5\times$ in the first two tasks, whereas there was no significant effect in the \texttt{use bow} task. This may be because the first two tasks require the agent to generalize the corresponding skills to different terrains (e.g. locating trees in the environment for collecting wood and sinking to specific locations for collecting seagrass). Therefore, it puts higher demands on the agent's ability to generalize in the goal space, and this is exactly the role played by the KL loss. The \texttt{use bow} task is relatively simple in comparison because it only requires charging and shooting the arrow, without considering environmental factors. 
+
+
+\subsection{Combining Skills for Long-horizon Tasks}
+In this section, we explore whether \agent can combine skills to solve long-horizon tasks, which is key to its integration with a high-level planner. Taking the task of mining diamonds as an example, prior knowledge is that diamond ores are generally distributed between the 7th and 14th floors underground, and the probability of appearing in other depths is almost zero. Therefore, the agent needs to first dig down to the specified depth (12) and then maintain horizontal mining. To achieve this, we designed two reference videos, each $128$ frames long. One describes the policy of starting from the surface and digging down, and the other demonstrates the behaviors of horizontal mining. We show an example in Figure \ref{fig:chaining} (left). In the beginning, \agent quickly digs down to the specified depth and then switches to horizontal mining mode. It maintains the same height for a long time and found diamonds at 11k steps. In addition, we compared STEVE-1 (visual) under the same setting in Figure \ref{fig:chaining} (right). After switching to the horizontal mining prompt, STEVE-1 maintains its height for a short time before it stuck in the bedrock layer (unbreakable in survival mode), greatly reducing the probability of finding diamonds. This indicates that our goal space is expressive enough to instruct the way of mining, and the policy can follow the instructions persistently and reliably. In contrast, STEVE-1, which relies on future outcomes as a condition, was unable to maintain its depth, despite attempts at various visual prompts. We conducted 25 experiments each on \agent and STEVE-1, with success rates of $16\%$ and $0\%$ for finding diamonds. Additional details are in the Appendix \ref{appendix:chaining}. 
+
+
+
+\section{Related Works}
+\vspace{-0.20em}
+\textbf{Pre-train Policy on Offline Data.} Pre-training neural networks on web-scale data has been demonstrated as an effective training paradigm in Nature Language Processing \citep{gpt3} and Computer Vision \citep{sam}. Inspired by this, researchers tried to transfer the success to the field of decision-making from pre-training visual representations and directly distilling the policy from offline data. As the former, \cite{2018play, ap} leveraged temporal information present in videos as the supervision signal to learn visual representations. The representations are then used to generate intrinsic rewards for boosting downstream policy learning, which still requires expensive online interactions with the environment. \cite{udrl, dt} leveraged scalable offline trajectories to train optimal policy by conditioning it on cumulated rewards. 
+\cite{algo-distil} proposed to learn an in-context policy improvement operator that can distill an RL algorithm in high data efficiency. \cite{gato} learned a multi-task agent Gato by doing behavior cloning on a large-scale expert dataset. By serializing task data into a flat of sequence, they use the powerful transformer architecture to model the behavior distribution. 
+However, these methods either require elaborated reward functions or explicit task definitions. This makes it hard to be applied to open worlds, where tasks are infinite while rewards are lacking. 
+Another interesting direction is to use pre-trained language models for reasoning and vision language models for discrimination, to guide the policy in life-long learning in the environment \citep{uni}. 
+% More generally, \cite{eccvpt, vpt} used a pre-trained inverse dynamic model to label actions for YouTube videos and directly distilled the policy with behavior cloning. 
+
+
+\textbf{Condition Policy on Goal Space.}
+Researchers have explored many goal modalities, such as language \citep{vln-clip}, image \citep{ogn1}, and future video \citep{traj}, to build a controllable policy. 
+\cite{rt-1} collected a large-scale dataset of trajectory-text pairs and trained a transformer policy to follow language instructions. Despite the language being a natural instruction interface, the cost of collecting paired training data is expensive. As a solution, \cite{zson} sorted to use hindsight relabeling to first train a policy conditioned on the target image, then aligned text to latent image space, which greatly improves training efficiency. \cite{steve1} moved a big step on this paradigm by replacing the target image with a 16-frame future video and reformulating the modality alignment problem into training a prior of latent goal given text. 
+
+\textbf{Build Agents in Minecraft.} As a challenging open-world environment, Minecraft is attracting an increasing number of researchers to develop AI agents on it, which can be divided into plan-oriented \citep{deps, voyager} and control-oriented methods \citep{vpt, worldmc, steve1} based on their emphasis. Plan-oriented agents aim to reason with Minecraft knowledge and decompose the long-horizon task into sub-tasks followed by calling a low-level controller. Control-oriented works follow the given instructions and directly interact with the environments using low-level actions (mouse and keyboard). \cite{vpt} pre-trained the first foundation model VPT in Minecraft using internet-scale videos. Although it achieves the first obtaining diamond milestone by fine-tuning with RL, it does not support instruction input. \cite{steve1} created the first agent that can solve open-ended tasks by bridging VPT and MineCLIP \citep{minedojo}. 
+However, its goal space is not expressive enough and prevents it from solving multi-step tasks. 
+
+\section{Limitation and Conclusion}
+\vspace{-0.20em}
+
+Although \agent has demonstrated powerful capabilities in expressing open-ended tasks in the form of video instructions, training such a goal space remains highly challenging. We found that \agent is quite sensitive to the selection of reference videos, which we attribute to the fact that the goal space trained from an unsupervised perspective may not be fully aligned with the human intention for understanding the semantics of the reference video. Therefore, it would be a promising research direction in the future to use SFT (supervised fine-tuning, \cite{sft}) and RLHF \citep{rlhf} to align the pre-trained goal space with human preference. 
+
+In conclusion, we propose a paradigm for learning to follow instructions by watching gameplay videos. We prove that video instruction is a good form of goal space that not only expresses open-ended tasks but can be trained through self-imitation (once the IDM is available to label pseudo actions for raw gameplay videos). Based on this, we built an encoder-decoder transformer architecture agent named \agent in Minecraft. Without collecting any text-video data, \agent demonstrated extraordinary instruction-following ability and crowned the Minecraft SkillForge benchmark. Additionally, we also showed its potential as a planner downstream controller in the challenging \texttt{obtain diamond} task. We believe that this training paradigm can be generalized in other complex open-world environments. 
+
+\clearpage
+
+\bibliography{refs}
+\bibliographystyle{iclr2024_conference}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+
+\onecolumn
+
+\section*{\centering {\fontsize{20}{20} \selectfont Appendix}}
+
+
+\section{Derivation}  \label{appendix:derivation}
+In this section, we detail how we derive the final objective. Recall that the goal is to maximize the log-likelihood of future states given past ones: $\log p(s_{t+1:T} \given s_{0:t})$. Using Bayes' theorem and the Jensen's inequality, we have:
+\begin{align} \label{eq:to_be_proved}
+    \log\ p(s_{t+1:T} \given s_{0:t}) &= \log \sum_{z} p(s_{t+1:T}, z \given s_{0:t}), \\ 
+    &= \log \sum_{z} \frac{p(s_{t+1:T}, z  \given s_{0:t})\ q(z|s_{0:T})}{q(z|s_{0:T})}, \\ 
+    &\ge \mathbb{E}_{z\sim q(z \given s_{0:T})} \big[ \log\ p(s_{t+1:T}, z \given s_{0:t}) - \log\ q(z \given s_{0:T})\big], \\
+    &= \mathbb{E}_{z\sim q(z \given s_{0:T})} \big[ \log\ p(s_{t+1:T} \given s_{0:t}, z)+\log\ p(z \given s_{0:t}) - \text{log}\ q(z \given s_{0:T})\big], \\
+    &= \mathbb{E}_{z\sim q(z \given s_{0:T})} \big[ \log\ p(s_{t+1:T} \given s_{0:t}, z) \big] + \mathbb{E}_{z\sim q(z \given s_{0:T})} \big[\log \frac{\ p(z \given s_{0:t})}{\ q(z \given s_{0:T})} \big], \\
+    &=\mathbb{E}_{z\sim q(z \given s_{0:T})} \big[ \log\ p(s_{t+1:T} \given s_{0:t}, z) \big] - D_{\text{KL}}\big( q(z \given s_{0:T}) \parallel p(z \given s_{0:t}) \big).  
+\end{align}
+We break down $p(s_{t+1:T} \given s_{0:t}, z)$ into components: goal-conditioned policy $\pi(a_{\tau} \given s_{0:\tau+1})$ and the transition dynamics $p(s_{t+1} \given s_{0:t}, a_t)$, we have 
+\begin{align}
+    p(s_{t+1:T} \given s_{0:t}, z) = \prod_{\tau=t}^{T-1}\big(\sum_{a_{\tau}} \pi(a_{\tau} \given s_{0:\tau}, z)\cdot p(s_{\tau+1} \given s_{0:\tau}, a_{\tau})\big). 
+\end{align}
+Furthermore, using Jensen's inequality, $\log p(s_{t+1:T} \given s_{0:t}, z)$ can be written as
+\begin{align}
+    \log\ p(s_{t+1:T} \given s_{0:t}, z) &=\sum_{\tau=t}^{T-1} \log \sum_{a_{\tau}} \pi(a_{\tau} \given s_{0:\tau}, z)\cdot p(s_{\tau+1} \given s_{0:\tau}, a_{\tau}), \\
+    &= \sum_{\tau=t}^{T-1} \log \sum_{a_{\tau}} \pi(a_{\tau} \given s_{0:\tau}, z)\cdot \frac{p(a_{\tau} \given s_{0:\tau}, s_{\tau+1})\cdot p(s_{\tau+1} \given s_{0:\tau})}{p(a_{\tau} \given s_{0:\tau})}, \\
+    &\ge \sum_{\tau=t}^{T-1}\mathbb{E}_{a_\tau\sim p(a_{\tau}|s_{0:\tau}, s_{\tau+1})} \big[ \text{log}\ \pi(a_{\tau} \given s_{0:\tau}, z) + C\big], 
+\end{align}
+where the constant $C=\log p(s_{\tau+1} \given s_{0:\tau}) - \log p(a_{\tau} \given s_{0:\tau})$ describes the dataset distribution and is irrelevant to what we want to learn (\ie the goal space and the goal-conditioned policy), we have: 
+\begin{align}
+    \mathbb{E}_{z\sim q(z|s_{0:T})} \big[ \text{log}\ p(s_{t+1:T} | s_{0:t}, z) \big] &\ge \mathbb{E}_{z\sim q(z|s_{0:T})} \big[ \sum_{\tau=t}^{T-1}\mathbb{E}_{a_\tau\sim p(a_{\tau}|s_{0:\tau}, s_{\tau+1})} \big[ \text{log}\ \pi(a_{\tau} | s_{0:\tau}, z)  \big] \big], \\
+    &= \sum_{\tau=t}^{T-1} \mathbb{E}_{z\sim q(z|s_{0:T}),a_\tau\sim p(a_{\tau}|s_{0:\tau}, s_{\tau+1})} \big[ \text{log}\ \pi(a_{\tau} | s_{0:\tau}, z)  \big]. 
+\end{align}
+Thus, we derived the evidence lower-bound of $\log p(s_{t+1:T} \given s_{0:t})$ as follows
+\begin{align}
+    \log p(s_{t+1:T} | s_{0:t}) \ge 
+    \sum_{\tau=t}^{T-1} \mathbb{E}_{\scriptsize z\sim q(z|s_{0:T}),\scriptsize  a_\tau\sim p(a_{\tau}|s_{0:\tau+1})} \big[ \log \pi(a_{\tau} | s_{0:\tau}, z) \big] - D_{\text{KL}}\big( q(z|s_{0:T}) \parallel p(z | s_{0:t}) \big). 
+\end{align}
+
+\section{Minecraft Environment} \label{appendix:environment}
+
+\begin{figure*}[t]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.85]{figures/minecraft2.png}
+\end{center}
+\caption{Examples of Minecraft environment. Tasks from top to bottom, from left to right are building houses, planting wheat, fishing, brewing a potion, mining diamond ores, and combating the ender dragon, respectively. } \label{fig:minecraft}
+\end{figure*}
+
+Minecraft is an extremely popular sandbox game that allows players to freely create and explore their world. This game has infinite freedom, allowing players to change the world and ecosystems through building, mining, planting, combating, and other methods (shown in Figure \ref{fig:minecraft}). 
+It is precisely because of this freedom that Minecraft becomes an excellent AI testing benchmark \citep{malmo, vpt, minedojo, worldmc, steve1, deps, voyager}. In this game, AI agents need to face situations that are highly similar to the real world, making judgments and decisions to deal with various environments and problems. 
+Therefore, Minecraft is a very suitable environment to be used as an AI testing benchmark. By using Minecraft, AI researchers can more conveniently simulate various complex and diverse environments and tasks, thereby improving the practical value and application of AI technology. 
+
+We use the combination of 1.16.5 version MineRL \citep{minerl} and MCP-Reborn\fancyfoot[L]{https://github.com/Hexeption/MCP-Reborn} as our testing platform, which is consistent with the environment used by VPT \citep{vpt} and STEVE-1 \citep{steve1}. Mainly because this platform preserves observation and action space that is consistent with human players to the fullest extent. On the one hand, this design brings about high challenges, as agents can only interact with the environment using low-level mouse and keyboard actions, and can only observe visual information like human players without any in-game privileged information. Therefore, the AI algorithms developed on this platform can have higher generalization ability. On the other hand, this also presents opportunities for us to conduct large-scale pre-training on internet-scale gameplay videos. 
+
+
+\subsection{Observation Space}
+The visual elements included in our observation space are completely consistent with those seen by human players, including the Hotbar, health indicators, player hands, and equipped items. The player's perspective is in the first person with a field of view of $70$ degrees. The simulator first generates an RGB image with dimensions of $640 \times 360$ during the rendering process. Before inputting to the agent, we resize the image to $224 \times 224$ to enable the agent to clearly see item icons in the inventory and important details in the environment. When the agent opens the GUI, the simulator also renders the mouse cursor normally. The RGB image is the only observation that the agent can obtain from the environment during inference. It is worth noting that to help the agent see more clearly in extremely dark environments, we have added a night vision effect for the agent, which increases the brightness of the environment during nighttime. 
+
+
+\subsection{Action Space} \fancyfoot[L]{}
+Our action space is almost identical to that of humans, except for actions that involve inputting strings. It consists of two parts: the mouse and the keyboard. The mouse movement is responsible for changing the player's camera perspective and moving the cursor when the GUI is opened. The left and right buttons are responsible for attacking and using items. The keyboard is mainly responsible for controlling the agent's movement. We list the meaning of each action in the Table \ref{table:action_space}. To avoid predicting null action, we used the same joint hierarchical action space as \cite{vpt}, which consists of button space and camera space. Button space encodes all combinations of keyboard operations and a flag indicating whether the mouse is used, resulting in a total of 8461 candidate actions. The camera space discretizes the range of one mouse movement into 121 actions. Therefore, the action head of the agent is a multi-classification network with 8461 dimensions and a multi-classification network with 121 dimensions. 
+
+
+
+\begin{table}[]
+\caption{Action space descriptions from Minecraft wiki (https://minecraft.fandom.com/wiki/Controls).} \label{table:action_space}
+% \begin{tabular}{@{}llll@{}}
+\resizebox{\linewidth}{!}{
+\begin{tabularx}{\linewidth}{cccY}
+\toprule
+\textbf{Index} & \textbf{Action}  & \textbf{Human Action} & \textbf{Description}                                                                                                                                                                                                                                                                                             \\ \midrule
+1              & Forward          & key W                 & Move forward.                                                                                                                                                                                                                                                                                                    \\
+2              & Back             & key S                 & Move backward.                                                                                                                                                                                                                                                                                                   \\
+3              & Left             & key A                 & Strafe left.                                                                                                                                                                                                                                                                                                     \\
+4              & Right            & key D                 & Strafe right.                                                                                                                                                                                                                                                                                                    \\
+5              & Jump             & key Space             & Jump. When swimming, keeps the player afloat.                                                                                                                                                                                                                                                                    \\
+6              & Sneak            & key left Shift        & Slowly move in the current direction of movement. When used in conjunction with the attack function in the GUI, it can swap items between inventory and Hotbar. When used with the craft function, it crafts the maximum possible number of items instead of just one. \\
+7              & Sprint           & key left Ctrl         & Move quickly in the direction of current motion.                                                                                                                                                                                                                                                                 \\
+8              & Attack           & left Button     & Destroy blocks (hold down); Attack entity (click once).                                                                                                                                                                                                                                                          \\
+9              & Use              & right Button    & Put down the item being held or interact with the block that the player is currently looking at. Within the GUI, pick up a stack of items or place a single item from the stack that is being held by the mouse.                                                                                                 \\
+10             & hotbar.{[}1-9{]} & keys 1 - 9            & Selects the appropriate hotbar item. When in the inventory GUI, swap the contents of the inventory slot under the mouse pointer and the corresponding hotbar slot.                                                                                                                                               \\
+11             & Yaw              & move Mouse X      & Turning; aiming; camera movement.Ranging from -180 to +180.                                                                                                                                                                                                                                                      \\
+12             & Pitch            & move Mouse Y      & Turning; aiming; camera movement.Ranging from -180 to +180.                                                                                                                                                                                                                                                      \\ \bottomrule
+\end{tabularx}
+}
+\end{table}
+
+\section{Inverse Dynamic Model} \label{sec:IDM}
+According to the theory in Section \ref{sec:theory}, we know that our training paradigm relies on the inverse dynamic model (IDM) which generates pseudo action labels for raw gameplay videos to calculate the behavior cloning loss. Therefore, in this section, we introduced the background knowledge of IDM. 
+
+IDM is a non-causal model that aims to uncover the underlying action that caused changes in the current step by observing historical and future states, and it can be formally represented as $p(a_t | o_t, o_{t+1})$. Compared with traditional policies learned via behavior cloning, IDM is more accurate in predicting actions because it can observe the changes between past and future frames. OpenAI \citep{vpt} developed the first inverse dynamic model in the Minecraft domain. By extending the length of the observable sequence to 128 and modeling $p(a_t | o_{t-64:t + 64})$ with a non-causal transformer, the IDM achieved the accuracy of action prediction to over $95\%$ with only 2k hours of game trajectories. This makes it possible for our training paradigm to utilize the large-scale Minecraft data available on the Internet. Moreover, \cite{eccvpt} has also trained an accurate IDM model with a small amount of data in a real autonomous driving environment, which further provides a basic guarantee for our training method to generalize to other complex environments. 
+
+
+\section{Implementation Details} \label{appendix:implementation}
+
+\subsection{Model Architecture}
+
+The video encoder consists of a convolutional neural network backbone and a non-causal transformer. Inspired by \cite{rt-1}, we adopted the EfficientNet \citep{eff} as the backbone. Specifically, we use its variant EfficientNet-B0 for efficiency, which takes in images of size $224 \times 224$ and extracts a feature vector of shape $7 \times 7 \times 1280$, where $7 \times 7$ denotes the spatial dimensions. In order to adaptively enhance the important visual information, we use a shallow transformer to pool the feature map along spatial channels. To fuse global visual features, we construct another learnable embedding \texttt{[sp]}, concatenate it with the $49$ features in space, and obtain a token sequence of length $50$. After being processed by the transformer, the output for the \texttt{[sp]} token corresponds to the pooled visual feature, whose dimension is $d_{hid}=1024$. To capture the temporal features of the video, we remove the code related to the casual mask in the minGPT\fancyfoot[L]{https://github.com/karpathy/minGPT} and obtain a non-causal transformer. 
+% We construct a set of learnable embeddings $c_{1:N}$ for calculating cross-attention with visual features, thus fusing semantic information. 
+The policy decoder consists of 4 identical blocks, where each block contains a Flamingo \emph{gated-attention dense layer} \citep{flamingo} and a Transformer-XL block\citep{transformerxl}. The Transformer-XL block maintains a recurrence memory of past $128$ key-value pairs to memory long-horizon history states. We directly use the Transformer-XL implementation in \cite{vpt} with a simple modification, \ie before passing states into the policy decoder, we add the previous action to the state embedding at each timestep. Notably, We find this modification \textbf{very useful} especially when we need to train the policy from scratch. As it not only accelerates the training process but makes the predicted action more \textbf{consistent} and \textbf{smooth}. Additional hyperparameters can be found in Table \ref{table:parameter}. 
+
+% \begin{tcolorbox}[colback=lightgray!20,colframe=black,arc=0pt,outer arc=0pt,boxrule=0.5pt,left=2pt,right=2pt,top=2pt,bottom=2pt]
+% \begin{footnotesize}
+% \begin{minted}[linenos]{Python}
+% def policy_block(
+%  x, # input state features (fused with previous actions)
+%  y, # input condition embeddings 
+%  memory, # recurrency of memory in TransformerXL
+% ):
+%     x = x + tanh(alpha_xattn) * attention(q=x,
+%     kv=y)
+%     x = x + tanh(alpha_dense) * ffw(s)
+%     x = TransformerXL_block(x)
+%     return x # output condition-informed state features
+% \end{minted}
+% \end{footnotesize}
+% \end{tcolorbox}
+
+
+
+% \subsection{Training}
+
+% Please add the following required packages to your document preamble:
+% \usepackage{booktabs}
+\begin{table*}[h]
+\centering
+\caption{Hyperparameters for training \agent. } \label{table:parameter}
+\begin{tabular}{@{}cc@{}}
+\toprule
+\textbf{Hyperparameter}  & \textbf{Value}   \\ \midrule
+Optimizer                & AdamW     \\
+Weight Decay             & 0.001     \\
+Learning Rate            & 0.0000181 \\
+Warmup Steps             & 2000      \\
+Number of Workers        & 4         \\
+Parallel Strategy        & ddp       \\
+Type of GPUs             & NVIDIA RTX 4090Ti, A40 \\
+Parallel GPUs            & 8         \\
+Accumulate Gradient Batches & 8      \\
+Batch Size/GPU (Total)   & 2 (128)    \\ 
+Training Precision       & bf16      \\
+Input Image Size         & $224 \times 224$ \\
+CNN Backbone                 & EfficientNet-B0  \\
+Encoder Transformer      & minGPT (w/o causal mask)  \\
+Decoder Transformer      & TransformerXL \\
+Number of Encoder Blocks & 8         \\
+Number of Decoder Blocks & 4         \\
+Hidden Dimension         & 1024      \\
+Number of Condition Slots& 1         \\ 
+Trajectory Chunk size    & 128       \\
+Attention Memory Size    & 256       \\
+Weight of BC Loss        & 1         \\
+Weight of KL Loss        & 0.01      \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Inference}
+To generate reference videos, we invited three human players to play each task according to the task description. Each person was asked to produce two videos, so we could prepare six videos for each task in total. Then, we selected the most relevant video to the task description from the six videos and cropped the first 128 frames into a new video, which was used to instruct \agent to complete this task. In addition, we selected a 16-frame segment that best expressed the task information as the visual prompt for STEVE-1 (visual) from these six videos. This ensures fairness in comparison. 
+
+During inference, we found that in some tasks, such as \texttt{build obsidian} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/obsidian.png}), \agent's behavior mixed with the intention of traveling around. We believe this is a bias introduced during training. We draw the inspiration from STEVE-1 \citep{steve1} and subtract this bias in the action logits space before sampling the action. 
+Specifically, we infer two models at the same time, where one model's condition is a specific task video and the other model's condition is a 128-frame video of traveling freely in the environment. The input observations for the two models are exactly the same. At each time step, we use the action logits of the previous model to subtract a certain proportion of the action logits predicted by the latter model before using the Gumbel-Softmax trick to sample the action. 
+The logits calculation equation is directly borrowed from \cite{steve1}
+\begin{equation}
+    \text{logits}_{t} = (1 + \lambda) f_{\theta}(o_{1:t}, g_{\text{goal}}) - \lambda f_{\theta}(o_{1:t}, g_{\text{bias}})
+\end{equation} \fancyfoot[L]{}
+where $f_\theta(o_{1:t}, g_{\text{goal}})$ and $f_\theta(o_{1:t}, g_{\text{bias}})$ are two kinds of action logits generated by feeding forward two reference videos \texttt{goal} and \texttt{bias} to \agent, $\lambda$ is a trade-off parameter. 
+As illustrated in Figure \ref{fig:cond_scale}, we find that this trick can improve the success rate of tasks such as \texttt{build obsidian} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/obsidian.png}), \texttt{build snow golem} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/groot.png}), \texttt{enchant sword} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/enchant.png}), and \texttt{dig three down and fill one up} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/dig3fill1.png}) with the $\lambda=1.5$. 
+Interestingly, we observe that the effective $\lambda$ scale (approximately $1.5$) in our model is much smaller than the scale (approximately $6.5$) used in STEVE-1. We speculate that this may be because STEVE-1 fine-tunes the foundation VPT to gain steerability, but VPT does not receive goal conditions for demonstrations during behavior cloning. This may cause VPT to learn overly smooth behavior distributions, requiring the use of larger lambda scales to activate goal-specific behaviors. Although this technique is effective at inference time, it still requires hyperparameter tuning in practice. In the future, it will be meaningful to directly remove biased behaviors from the training process. 
+
+\begin{figure*}[t]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.52]{figures/fig_condscale.pdf}
+\end{center}
+\caption{\textbf{Ablation on the condition scale $\lambda$.}} \label{fig:cond_scale} 
+\end{figure*}
+
+\subsection{Ablation on Number of Condition Slots}
+{ 
+In this section, we explore the impact of the number of condition slots (number of learnable tokens) on the final performance. We compared the performance of the model on 6 programmatic tasks with $N=1$ and $N=3$ condition slots and computed quantitative metrics for each task. As shown in Table \ref{tab:ablation_slots}, we find that increasing the number of condition slots leads to a significant decrease in the model's performance on most tasks, except for the ``explore run'' task. We speculate that having more condition slots may result in a higher number of dimensions in the goal space, which in turn reduces the generalization ability of the learned goal space. Therefore, we suggest that when applying \agent to other environments, the hyperparameters should be carefully chosen based on the characteristics of the environment or using other parameter selection methods. 
+}
+
+\begin{table}[h]
+\footnotesize
+\caption{\textbf{Ablation on the number of condition slots.} } \label{tab:ablation_slots}
+\renewcommand\arraystretch{1.1}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{@{}ccccccc@{}}
+\toprule
+\shortstack{\textbf{Task Name} \\ \textbf{(Metric)}}    & \shortstack{explore run\ $\uparrow$ \\ (distance) } & \shortstack{build pillar\ $\downarrow$ \\ (height of pillar) } & \shortstack{collect grass\ $\downarrow$ \\ (num of grass) }  & \shortstack{collect seagrass\ $\downarrow$ \\ (num of seagrass) } & \shortstack{collect dirt\ $\downarrow$ \\ (num of dirt) } & \shortstack{mine stone\ $\downarrow$ \\ (num of stones) }   \\ \midrule
+$N=1$ &  $54.0$     &   $37.6$    & $23.8$    &     $3.3$             &      $6.2$         &    $12.2$        \\ 
+$N=3$ &  $59.0$     &    $13.3$         &    $5.6$    &    $0.9$             &      $5.4$         &    $11.2$          \\ 
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+\section{Dataset Details} \label{appendix:dataset}
+
+\subsection{Contractor Data}
+
+The contractor data is a Minecraft offline trajectory dataset provided by \cite{vpt} \fancyfoot[L]{https://github.com/openai/Video-Pre-Training}, which is annotated by professional human players and used for training the inverse dynamic model. In this dataset, human players play the game while the system records the image sequence $\{s_{1:T}\}_{M}$, action sequence $\{a_{1:T}\}_{M}$, and metadata $\{e_{1:T}\}_{M}$ generated by the players. Excluding frames containing empty actions, the dataset contains 1.6 billion frames with a duration of approximately $2000$ hours. The metadata records the events triggered by the agent in the game at each time step, including three types: \texttt{craft item}, \texttt{pickup}, and \texttt{mine block}, which represent the agent's activities of crafting items using the GUI, picking up dropped items and destroying blocks at the current time step, respectively. \emph{In the process of training \agent, we use all trajectories provided by the contractor data, but without including any metadata. We only use the metadata to retrieve relevant trajectory segments during the visualization of the goal space. }
+
+
+% \subsection{YouTube Data}
+
+
+\section{Experimental Setup Details}
+
+\subsection{Baseline Details} \label{appendix:baseline}
+VPT is the first foundation model in the Minecraft domain developed by \cite{vpt}. Its architecture consists of ImpalaCNN and TransformerXL. Using behavior cloning algorithms to pre-train on large-scale YouTube demonstrations, they obtained the first checkpoint of VPT(fd) which can freely explore the environment. To further enhance the agent's abilities in early-game environments, they constructed an ``earlygame'' dataset and fine-tuned the pre-trained foundation model on that dataset, resulting in the VPT(bc) checkpoint. This model significantly improved performance on basic tasks such as ``crafting table'' and ``collecting wood''. Based on VPT(bc), they used online reinforcement learning with a carefully designed reward shaping to obtain the checkpoint VPT(rl) capable of obtaining diamonds entirely from scratch. \emph{It is noteworthy that the models' architectures of all three checkpoints are consistent and do not support instruction input.} That's why their rankings on the Minecraft SkillForge benchmark are low. We also observed that the performance of VPT(bc) surpasses that of VPT(rl) due to the ``earlygame'' dataset's exploratory nature, making it perform better on \texttt{explore} tasks. VPT(rl) is tailored specifically for diamond mining tasks and has thus lost the capability of most tasks outside diamond mining path. No matter where you place it, the first thing VPT(rl) does is to look for trees and prepare to mine diamonds.
+
+STEVE-1 is a Minecraft agent that can follow open-ended text and visual instructions built on MineCLIP \citep{minedojo} and VPT. It can perform a wide range of short-horizon tasks that can be expressed by a 16-frame future video clip. The training of STEVE-1 can be described in two steps. The first step is to train a future-video conditioned policy with packed hindsight relabeling trick. With the frozen MineCLIP visual encoder to embed the visual instruction, they finetune the VPT(bc) on the contractor data to obtain STEVE-1(visual). The second step is to learn a model that translates textual instruction into visual instruction. By training a conditional variational autoencoder (CVAE) on the collected video-text pairs, they created a variant STEVE-1(text) that understands text instructions. This baseline performs well on many simple tasks in the Minecraft SkillForge benchmark, such as "explore run," "collect grass," and "collect wood." However, it struggles with multi-step and less common tasks, like "build snow golems" and "dig three down and fill one up."
+
+\emph{Please note that all baselines, including \agent, were not fine-tuned for tasks in Minecraft SkillForge. }
+
+
+\subsection{t-SNE Visualization Details} \label{appendix:tsne}
+\fancyfoot[L]{}
+This section details how the videos are sampled to do visualization. 
+The selected videos are categorized into seven groups: \texttt{craft items}, \texttt{combat enemies}, \texttt{harvest crops}, \texttt{hunt animals}, \texttt{chop trees}, \texttt{trade with villagers}, and \texttt{mine ores}. Generally, each group contains two types of videos, each with $1000$ data points sampled. The sampling method retrieves the time when a certain event occurs in the metadata and goes back $128$ frames from that time to obtain a video segment that is $128$ frames long. We illustrate video configurations in Table \ref{table:videos}. For example, in the \texttt{combat enemies} task, taking "combat zombies" as an example, we retrieve all the moments when the event "pickup:rotten\_flesh" occurs, because after killing zombies, they will drop rotten flesh, which can then be picked up by players. Through sampling observations, we found that this method can sample videos that are consistent with the descriptions. 
+
+% Please add the following required packages to your document preamble:
+% \usepackage{booktabs}
+\begin{table}[h]
+\caption{Sample videos from the contractor data \citep{vpt} for the goal space visualization. } \label{table:videos}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Group}       & \textbf{Video Description}                 & \textbf{Event in Metadata}  \\ \midrule
+craft items          & craft wodden\_pickaxe with crafting\_table & craft\_item:wooden\_pickaxe \\
+craft items          & craft iron\_pickaxe with crafting\_table   & craft\_item:iron\_pickaxe   \\ 
+combat enemies       & combat zombies                             & pickup:rotten\_flesh        \\
+combat enemies       & combat spiders                             & pickup:spider\_eye          \\
+harvest crops        & harvest wheat                              & mine\_block:wheat           \\
+harvest crops        & harvest melon                              & mine\_block:melon           \\
+hunt animals         & hunt sheep                                 & pickup:mutton               \\
+hunt animals         & hunt cow                                   & pickup:beef                 \\ 
+chop trees           & chop oak trees                             & mine\_block:oak\_log        \\
+chop trees           & chop birch trees                           & mine\_block:birch\_log      \\
+trade with villagers & trade with villagers for emerald           & craft\_item:emerald         \\
+trade with villagers & trade with villagers for enchanted\_book   & craft\_item:enchanted\_book \\
+mine ores            & mine coal ores with pickaxe                & mine\_block:coal\_ore       \\
+mine ores            & mine iron ores with pickaxe                & mine\_block:iron\_ore       \\ \bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Programmatic Evaluation Details} \label{appendix:prog}
+
+In this section, we elaborated on how each episode is regarded as successful. 
+For the \texttt{dye and shear sheep} (\includegraphics[scale=0.04,valign=c]{figures/minecraft/pink_wool.png}) task, dyeing the sheep and shearing its wool must be successfully performed to be considered a success. 
+For the \texttt{use bow} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/bow.png}) task, firing the arrow after charging it to the maximum degree is required to be successful. 
+For the \texttt{sleep} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/bed.png}) task, placing the bed and spending the night on it are required to be successful. 
+For the \texttt{smelt} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/furnace.png}) task, placing the furnace and dragging coal and mutton into the designated slots are required to be successful. 
+For the \texttt{lead} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/lead.png}) task, successfully tethering at least one animal is considered a success. 
+For the \texttt{build obsidian} (\includegraphics[scale=0.04,valign=c]{figures/minecraft/lava.png}) task, pouring a water bucket and a lava bucket to fuse them is required to be successful. 
+For the \texttt{enchant} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/enchant.png}) task, placing the enchantment table, putting a diamond sword and lapis lazuli into the slots, and clicking the enchanting option are required to be successful. 
+For the \texttt{dig down three fill one up} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/dig3fill1.png}) task, the agent must first vertically break three dirt blocks below and then use one dirt block to seal the area above. 
+For the \texttt{build snow golems} (\includegraphics[scale=0.6,valign=c]{figures/minecraft/groot.png}) task, placing 2 snow blocks and 1 carved pumpkin head in order and triggering the creation of a snow golem are required to be successful. 
+
+
+\subsection{Combining Skills Experimental Details} \label{appendix:chaining}
+
+First, we introduce the experimental environment selected for our study. The agent is summoned on the plains biome, holding a diamond pickaxe, and granted the night vision status to enable the agent to see the various ores underground. At the beginning of each episode, we set the agent's condition to \texttt{dig down}. When the agent descends to a depth below 12 layers, the condition automatically switches to \texttt{horizontal mining}. Each round of episodes lasts for 12,000 frames, which is equivalent to 10 minutes in the real world. For \agent, both the reference videos of \texttt{dig down} and \texttt{horizontal mining} were recorded by a human player. For STEVE-1, we invited the same player to carefully record the prompt videos. It is worth noting that while we could easily prompt it to dig down, it was difficult to keep it in the horizontal mining condition. This made STEVE-1 prone to falling into the bedrock layer and getting stuck. Finally, we did not observe STEVE-1 finding any diamonds in the 25 experiments, which can be attributed to the inability of its goal space to encode details such as horizontal mining. 
+
+
+\section{Rating System} \label{appendix:elo}
+
+\subsection{ELO Rating}
+
+The ELO rating system is widely adopted for evaluating the skill levels of multiple players in two-player games, such as Chess and Go \citep{alphago}. In this section, we elaborate on how we introduce human evaluation and use the ELO Rating system to measure the relative performance of agents on the Minecraft SkillForge benchmark. 
+
+In the ELO rating system, each agent's skill level is represented by a numerical rating. We repeatedly let agents play against each other in pairs. Specifically, in each game, we sample a task and two agents, denoted as Agent A and Agent B. Then, we randomly sample a trajectory for each agent corresponding to the designated task. The two trajectories are assigned to a human annotator, who selects the most task-relevant one. We implement the annotating system with Label Studio \citep{studio}, as shown in Figure \ref{fig:label_studio}. We consider the agent that produced this trajectory to be the winner, let's assume it is Agent A. After each round, we update the scores of Agent A and Agent B as follows
+\begin{equation}
+\begin{aligned}
+R_A \leftarrow R_A + K\cdot \frac {1}{1 + 10^{(R_A-R_B)/400}}, \\
+R_B \leftarrow R_B - K\cdot \frac {1}{1 + 10^{(R_A-R_B)/400}},
+\end{aligned}
+\end{equation}
+where K is the update factor and we set it to 8. After calculating the score of the agent, we use VPT (bc) as 1500 points and shift the scores of other agents accordingly. 
+Based on the ELO ratings, we can easily measure the relative winning rate for each paired agent. The win rate of Agent A over Agent B can be represented as $\frac{1}{1 + 10^{(R_B - R_A)/400}}$. For example, the win rate ratio between two agents with a score difference of $100$ scores is $64\%:36\%$. A score difference of $200$ scores implicit $76\%:24\%$. 
+
+\begin{figure*}[t]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.22]{figures/label_studio.png}
+\end{center}
+\caption{Example of the annotating system for human evaluation. } \label{fig:label_studio}
+\end{figure*}
+
+\subsection{TrueSkill Rating}
+
+We also report the comparison results using TrueSkill \fancyfoot[L]{https://trueskill.org/} rating system, which is used by gamers to evaluate their skill level. It was developed by Microsoft Research and is currently used on Xbox LIVE for matchmaking and ranking services. Different from ELO, it can also track the uncertainty of the rankings. This system utilizes the Bayesian inference algorithm to quantify a player's true skill points. 
+In TrueSkill, rating is modeled as a Gaussian distribution which starts from $\mathcal{N}(25,\frac{25}{3}^2)$, where $\mu$ is an average skill of player, and $\sigma$ is a confidence of the guessed rating. A real skill of player is between $\mu \pm 2\sigma$ with $95\%$ confidence. After conducting 1500 updates, the TrueSkill scores converged as in Table \ref{tab:trueskill}. We found that the ranking order of the baseline methods is consistent with that obtained using ELO rating: HUMAN $\succ$ \agent $\succ$ STEVE-1(visual) $\succ$ STEVE-1(text) $\succ$ VPT(bc) $\succ$ VPT(fd) $\succ$ VPT(rl).  
+
+
+% Please add the following required packages to your document preamble:
+% \usepackage{booktabs}
+
+\begin{table}[h]
+\footnotesize
+\caption{TrueSkill rating comparison on the Minecraft SkillForge benchmark.} \label{tab:trueskill}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{@{}cccccccc@{}}
+\toprule
+\textbf{Baseline}    & HUMAN & \agent & STEVE-1(visual) & STEVE-1(text) & VPT(bc) & VPT(fd) & VPT(rl) \\ \midrule
+$\mu \pm \sigma$ &  $34.2 \pm 1.0$     &   $29.1 \pm 0.9$    &    $25.8 \pm 0.8$             &      $24.6 \pm 0.8$         &    $22.2 \pm 0.8$     &   $20.7 \pm 0.8$      &   $19.2 \pm 0.9$      \\ \bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+
+% \begin{figure*}[h]
+% %\framebox[4.0in]{$\;$}
+% \begin{center}
+% \includegraphics[scale = 0.4]{figures/fig_trueskill.pdf}
+% \end{center}
+% \caption{Example of the annotating system for human evaluation. } \label{fig:trueskill}
+% \end{figure*}
+
+\subsection{Human Participation} \fancyfoot[L]{}
+We recruited 15 students with varying degrees of Minecraft game experience, ranging from a few hours to several years, from the Minecraft project group to conduct the evaluation. They are all familiar with the basic operations of Minecraft. Each employee was asked to label 100 matches for ELO Rating or TrueSkill Rating, for a total of 1500 matches. For each employee who is required to collect or assess gameplay videos, we ask them to first read the description of each task in the Minecraft SkillForge Benchmark completely, as well as the evaluation criteria for task completion quality, see Appendix \ref{appendix:benchmark}. Taking the task of building a snow golem as an example, the evaluation criteria are as follows: \textit{Build a snow golem.} $\succ$ \textit{Place both kinds of blocks.} $\succ$ \textit{Place at least one kind of block.} $\succ$ \textit{Place no block.} This enables employees to quantify video quality and ensures that all employees evaluate task completion consistently.
+\emph{All these employees were explicitly informed that the collected data would be used for AI research.}
+
+
+
+\section{Minecraft SkillForge Benchmark}
+\label{appendix:benchmark}
+
+In this section, we detail the benchmark titled "Minecraft SkillForge" which meticulously incorporates a wide spectrum of tasks prevalent within Minecraft. Our aim is to ensure that every task provides a meaningful evaluation of a specific skill that an AI agent might possess. We categorize these tasks into six groups: \texttt{collect}, \texttt{explore}, \texttt{craft}, \texttt{tool}, \texttt{survive}, and \texttt{build}. 
+In the following subsections, we will provide a detailed introduction to each of them. The ``Description'' field provides a brief description of the task, the ``Precondition'' field outlines the initial settings of the testing environment for the task, the ``SkillAssessed'' field indicates which aspect(s) of the agent's ability are being assessed by the task, and the ``Evaluation'' field describes the quality evaluation metrics for task completion (based on which human players judge the quality of two rollout videos). 
+
+\subsection{Collect} \label{appendix:benchmark_collect}
+\input{appendix/collect_task}
+
+\subsection{Explore}
+\input{appendix/explore_task}
+
+\subsection{Craft}
+\input{appendix/craft_task}
+
+\subsection{Tool}
+\input{appendix/tool_task}
+
+\subsection{Survive}
+\input{appendix/survive_task}
+
+\subsection{Build}
+\input{appendix/build_task}
+
+\clearpage
+
+\section{Text Conditioning}
+
+
+
+\begin{figure*}[h]
+%\framebox[4.0in]{$\;$}
+\begin{center}
+\includegraphics[scale = 0.55]{figures/text_cond.pdf}
+\end{center}
+\caption{\textbf{Fine-tuning \agent to understand text instructions.} We replace the original video encoder with a text encoder to embed text instructions. The text encoder is fine-tuned to align with the learned goal space. 
+\textbf{Left:} During the fine-tuning, we freeze the learned decoder to provide the supervisory signal to train the text encoder through behavior cloning. \textbf{Right:} During the inference, we can feed forward the text instructions to drive the policy to interact with the environment. } \label{fig:text_cond} 
+\end{figure*}
+
+Although video instruction has strong expressiveness, it still requires preparing at least one gameplay video for a new task. For most common tasks, such as collecting wood or stones, using natural language to specify a goal is a more natural approach. In this section, we explore the possibility of aligning the pre-trained goal space with other modal instructions, such as text instructions.  
+
+Aligning text instructions with visual instructions in goal space has been validated as feasible by \cite{steve1}. They train a conditional variational autoencoder to project text into video space after collecting 10,000 diversified text-video pairs, similar to what unCLIP did. However, the success of this alignment method depends on the pre-alignment of visual and text spaces through large-scale contrastive pre-training \citep{minedojo}. 
+During the training process of \agent, we did not leverage the MineCLIP visual encoder to encode videos, instead trained goal space from scratch. On the one hand, this is because MineCLIP can only handle short videos (only 16 frames); on the other hand, it is to free our goal space from the expressiveness bounded by pre-trained VLM. 
+
+According to the above discussion, we choose to replace the video encoder in the \agent architecture with a text encoder, BERT, and directly optimize it through behavior cloning, as shown in Figure \ref{fig:text_cond}. In order to keep the original goal space, we freeze the decoder and regard it as a gradient generator that extracts high-level behavioral semantics from the demonstrations. 
+We utilize the meta information in the contractor data to generate text-demonstration pairs. For example, in the task of ``collect wood'', we identify the moment $t$ when event ``mine\_block:oak\_log'' is triggered in the video, and we capture the frames within the range of $[t-127, t]$ to form a video clip, with ``mine block oak log'' assigned as its text, thus constructing a sample. Having been fine-tuned on these data, our model demonstrated some steerabilities in the text instruction space, as shown in Table \ref{tab:text_condition}. 
+We find that the agent fine-tuned on the text-demonstration dataset shows a basic understanding of text instructions. Our method exhibits progress in tasks such as ``mine grass'', ``mine wood'', ``mine stone'', ``mine seagrass'', ``pickup beef'' and ``mine dirt''. However, it falls short in successfully completing tasks such as ``mine seagrass''. We speculate that this may be related to the distribution of the data, as there is much less data available for ``mine seagrass'' compared to the other tasks (about 300 trajectories). 
+
+\emph{\textbf{We emphasize that this experiment is very preliminary. In this experiment, the steerability of the agent fine-tuned on text instructions is still weak and it is hard to solve practical tasks.}} Given the limited diversity of text instructions in the provided contractor data, we don't anticipate the model to possess any significant level of generalization with regard to language instructions. To further verify this point, one needs to collect more diverse and higher-quality text-demonstration pairs data. Anyway, this experimental result still indicates the possibility of optimizing the upstream instruction generator by leveraging the pre-trained decoder. This creates possibilities for developing more interesting applications on \agent. Additional discussions on text-conditioning are beyond the scope of this paper, and we will leave them for future work. 
+
+\begin{table}[t]
+\footnotesize
+\caption{\textbf{Text conditioning results on resource collection tasks.} Each episode lasts 30 seconds (600 frames). Statistics are measured over 10 episodes. The term "baseline" refers to the model before being fine-tuned, while "fine-tuned" refers to the final model after fine-tuning. } \label{tab:text_condition}
+\renewcommand\arraystretch{1.1}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{@{}ccccccc@{}}
+\toprule
+\textbf{Variant}    & mine grass $\uparrow$ & mine wood $\uparrow$ & mine stone $\uparrow$ & mine seagrass $\downarrow$ & pickup beef $\uparrow$ & mine dirt $\uparrow$    \\ \midrule
+baseline &  $3.9$     &   $0.4$    &    $1.8$             &      $1.3$         &    $0.0$     &   $0.0$      \\ 
+fine-tuned &  $17.3\ (4.4\times)$     &   $3.7\ (9.3\times)$    &     $11.5\ (6.4\times)$             &      $1.2\ (92\%)$         &    $0.1$     &   $1.3$     \\ \bottomrule
+\end{tabular}
+}
+\end{table}
+
+\section{Potential Applications and Integration with Planner}
+\agent is specialized in short-horizon instruction-following tasks with its goal being a video clip while LLM has demonstrated the ability to plan for long-horizon tasks in an open-world environment. For example, DEPS~\cite{deps} utilizes a text-conditioned policy from \cite{worldmc} to accomplish tasks such as mining diamonds from scratch. By integrating \agent into the DEPS framework, it can act as a controller and assist with long-sequence tasks. However, while LLM can output language as the current goal, \agent requires a specified video clip as its goal. Therefore, when combining \agent with DEPS, it is necessary to use the visual language model CLIP to select the most suitable video clip based on the language goal produced by LLM. 
+
+The proposed approach involves preparing a pre-existing library of video clips $V = \{v_i\}$ that contains various actions performed by the agent in Minecraft (e.g., ``chopping trees'' or ``mine iron ore''). When given a long-horizon instruction by LLM's Planner, it is decomposed into a series of short-horizon language tasks $\{g_i\}$. During task execution, the CLIP model is utilized to calculate the similarity between each short-horizon clip ${v_i}$ in the library $V$ and task $g_i$, selecting the most similar video clip as \agent's interaction goal with the environment. Additionally, accessing a video library of Minecraft content is effortless due to the abundance of available video data on the internet. 
+
+While \agent mainly relies on videos for input goals, LLM uses both input and output language modalities. These modalities can be aligned using a visual language model, allowing us to combine \agent as a short-horizon control policy with an LLM-based Planner to complete long-sequence tasks. 
+
+\end{document}

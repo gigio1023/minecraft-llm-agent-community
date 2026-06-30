@@ -1,0 +1,43 @@
+\input{figs/pipeline}
+\section{Multiplayer Training Pipeline}
+\label{sec:model_architecture}
+We follow the established practice of first training a bidirectional base model and then adapting it to be causal, enabling auto-regressive generation. We illustrate the stages of our training process in~\cref{fig:pipeline}.
+
+
+\subsection{Stage 1: Bidirectional Single-Player}
+\label{sec:bidirectional_sp_training}
+
+We begin by initializing our model from the weights\footnote{Specifically, we use the \href{https://huggingface.co/Skywork/Matrix-Game-2.0/tree/main/base_distilled_model}{\texttt{base\_distilled\_model}} checkpoint.} of Matrix-Game 2.0~\cite{he2025matrixgame20opensourcerealtime}. \matrixgame is trained to support multiple video games in addition to Minecraft and as a result has a limited action space consisting solely of viewpoint (camera) and directional (WASD) movement. We adapt our model to support the full range of Minecraft actions by finetuning it on the VPT~\cite{baker2022videopretrainingvptlearning} dataset, which contains over 2,000 hours of human gameplay. We train the model with bidirectional attention for 120K steps with a context length of 33 frames. We find this single-player pretraining stage to be highly important as it gives our model an effective initialization for multiplayer modeling. We study this experimentally in~\cref{sec:experiments}. Throughout all stages of training, we  use the 3D VAE from \matrixgame and keep it frozen.
+
+\subsection{Stage 2: Bidirectional Multiplayer} 
+
+We next adapt our single-player model to support multiplayer data. We employ the architectural modifications described in~\cref{subsec:model_architecture} and train the model with full-sequence diffusion on our dataset for 120k steps, where we find that FID on a held-out test set converges at this point. This checkpoint is used as the teacher during Self Forcing (see~\cref{subsec:self-forcing} for details). 
+
+\subsection{Stage 3: Causal Multiplayer}
+
+To save training time, we branch training once the bidirectional model reaches 60k steps. We use this intermediate checkpoint to initialize the causal model, while the bidirectional model continues to train independently to 120k steps to serve as a high-quality teacher. Following \matrixgame, the causal model uses a sliding window attention mask with a window size of 6 latent frames (24 real frames), which serves as the maximum size of the rolling KV cache during inference. We train this model for 60k steps using diffusion forcing, and it serves as the initialization for the generator in Self Forcing. 
+
+Our strategy of using Diffusion Forcing with a causal mask to initialize the generator is simpler than the standard CausVid~\cite{yin2025slowbidirectionalfastautoregressive} initialization of Self Forcing, which involves ODE regression and few-step distillation with DMD~\cite{yin2024one, yin2024improved} \textit{before} Self Forcing. We find our approach compares favorably to CausVid. We study this experimentally; please see~\cref{subsec:self-forcing} for details. 
+
+\input{figs/self-forcing}
+
+
+\subsection{Stage 4: Self Forcing}
+\label{subsec:self-forcing}
+We apply Self Forcing~\cite{huang2025selfforcingbridgingtraintest} to improve long generations. The original Self Forcing method (see~\cref{subsec:sf_overview} for an overview) requires the context length of the student model to be equal to that of the teacher. We extend the teacher's context to be longer than the student's, allowing the student to benefit from a more powerful teacher. This requires using a sliding-window context when generating the student's video. However, naively applying Self Forcing when using this sliding window leads to excessive memory usage, as shown in~\cref{fig:self_forcing}. We fix this problem with an efficient implementation termed \textit{\oursf}. Our method first produces an initial video and caches intermediate noisy frames with gradient computation disabled. We then recompute the final video from these intermediate states in an additional step with backpropagation enabled. This process saves redundant memory that would otherwise accumulate when doing backpropagation through sliding-window video generation.
+
+The core issue with naively applying Self Forcing in the sliding-window setting is that each generation step produces a new window of context frames, and backpropagation requires retaining all of these windows in memory simultaneously. For a student context length $L_s$ and a total generation length of $L_t$ steps, the sliding window produces overlapping windows (e.g., frames $1{:}L_s$, then $2{:}L_s{+}1$, then $3{:}L_s{+}2$), each sharing all but one frame with its predecessor. This results in a memory cost of $O(L_t \cdot L_s)$. Our method eliminates this redundancy by decoupling the autoregressive rollout from backpropagation.
+
+Specifically, in \oursf, we first perform the autoregressive rollout to obtain the sequence of clean estimates $\hat{\mathbf{x}}_0^{1:N}$ and the corresponding noisy transition states $\mathbf{x}_{\sigma}^{1:N}$, stopping all gradient propagation during this phase. We then recompute the generator's outputs in a single parallelized forward pass. This pattern of using recomputation to save memory is analogous to Gradient Checkpointing~\cite{chen2016trainingdeepnetssublinear,griewank2000revolve}, where we manually create a checkpoint for $\hat{\mathbf{x}}_0^{1:N}$ and $\mathbf{x}_{\sigma}^{1:N}$ during the autoregressive rollout. To strictly reproduce the inference-time conditioning where noisy frames attend to clean history, we double the input sequence length by concatenating the clean frames $\hat{\mathbf{x}}_0^{1:N}$ and the noisy frames $\mathbf{x}_{\sigma'}^{1:N}$. We then apply a custom ``Teacher Forcing'' attention mask that enforces causal, sliding-window dependencies: it forces each noisy frame $\mathbf{x}_{\sigma}^i$ to attend exclusively to the preceding clean frames within its context window of size $L_s$, i.e., $\hat{\mathbf{x}}_0^{i-L_s:i-1}$. A pseudocode visualization of this procedure, which highlights the differences between \oursf and naive Self Forcing, is shown in~\cref{alg:self_forcing_algorithms}.
+
+This formulation effectively converts the sequential rolling cache operation into a single parallel operation, reducing the memory footprint to $O(L_t)$. Due to our memory savings, we find that backpropagating through the recomputed KV representations (line 29 of~\cref{alg:self_forcing_algorithms}), though not part of the original Self Forcing algorithm, is now feasible and can improve generations (see~\cref{sec:experiments} for results).
+
+
+
+
+
+
+
+\input{figs/algorithms/sf_comparison}
+
+

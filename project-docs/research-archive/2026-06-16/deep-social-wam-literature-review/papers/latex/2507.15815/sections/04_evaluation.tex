@@ -1,0 +1,360 @@
+
+\section{Experiments}\label{sec:experiments}
+% \seth{This section is under construction. I know this section flows pretty poorly, but I need to add the remaining results before reordering them.}
+
+We conduct experiments to answer the following questions: \textit{(i)} How do our design choices for the LLM Economist improve the utility optimization for the planner and workers? \textit{(ii)} Can the LLM Economist design potentially beneficial tax policies to improve social welfare? \textit{(iii)} Can we use the LLM Economist to discover meaningful emergent behaviors under specific configurations, such as the democratic voting?
+Before presenting results for each question, we first detail our experimental setup as follows:
+
+\paragraph{Simulacra Setup.}\label{sec:sim_setup}
+All experiments use \texttt{meta-llama/Llama-3.1-8B-Instruct} queried at temperature 0.7 hosted on a single H100.  
+Unless noted otherwise, we simulate a population of $N=100$ workers for a horizon of $T=3\,000$ total steps, partitioned into tax years of length $K=128$; this choice was found in pilot runs to give workers sufficient time to adapt without incurring unnecessary compute.  
+Skills $s^{i}$ are drawn once per run from the Generalized-Beta distribution calibrated to the 2023 American Community Survey Public-Use Microdata Sample~\citep{acs2023pums}, and are held fixed thereafter.  
+The action space for workers is $\mathcal{A}=[0,100]$ weekly labor hours (40 being the default); and the planner searches seven marginal brackets.  
+Government expenditures are rebated lump-sum each year so that the budget balances exactly.  
+In the bounded scenario, the dissatisfaction penalty $\psi$ appearing in Eq.~\eqref{eq:isoelastic} is chosen by LLMs so that a single-bracket misalignment reduces annual isoelastic utility by one half.
+
+\paragraph{Evaluation.} We compare our LLM tax planner with two baselines --- \textit{(i)} \textbf{Saez}: the marginal schedule obtained by plugging regression-based elasticity into the Saez formula once at $t=0$; and \textit{(ii)} \textbf{U.S.~Fed}: the statutory 2024 federal rates. 
+For both fixed and dynamic tax planners, we simulate their effects using LLM workers running for one tax year and report the social welfare after convergence.
+
+% \subsection{Basic components}
+% \subsubsection{In-Context Reinforcement Learning}\label{subsub:icrl}  % might move this to the tax planning optimization section since these are full experiments
+\subsection{Planner's Social Welfare Optimization}\label{subsub:icrl}  % might move this to the tax planning optimization section since these are full experiments
+
+% Ablation over in-context learning with respect to key features
+The planner–worker interaction in the LLM Economist is a two-level RL game: the planner searches the space of tax schedules, workers adapt their labor choices, and convergence of the joint trajectory corresponds to a Stackelberg equilibrium.  
+Two design choices govern the stability and quality of that equilibrium.  
+First, a \emph{time–scale separation} must be enforced: the tax year must be long enough for workers to finish adapting before the planner proposes a new schedule.  
+Second, the language prompts that drive the planner must balance \emph{exploration} of novel schedules with \emph{exploitation} of those that already yield high social welfare.
+The ablations below quantify how each choice influences convergence and final welfare.
+
+\paragraph{Tax-year length.}
+Table \ref{tab:steps_per_year} explores how the planner’s action cadence, parameterized by the tax-year length \(K\), influences social welfare solutions.
+Very short tax years ($K\!=\!5$ or $10$) leave the workforce too little time to adapt and stall below 65\% of the Stackelberg optimal \(\texttt{SWF}^{*}\).  
+Performance improves monotonically up to \(K\!=\!128\), after which longer horizons yield no additional gain, a plateau that mirrors the behavioral dynamics in Figure~\ref{fig:utility_convergence}.
+
+% Tax year length
+% effect on utility convergence
+Figure \ref{fig:utility_convergence} visualizes why a tax year of $K=128$ steps is sufficient. 
+The mean first difference of utility, $\partial_t u_i$, starts above $2{,}000$ units immediately after the planner changes the brackets, reflecting large welfare gains from re-optimizing labor. 
+The derivative falls to statistical noise within 120 steps and remains centered at zero thereafter, indicating that workers have fully adjusted. 
+Shorter tax years truncate this equilibration phase, while longer ones yield no measurable benefit, consistent with the plateau in Table~\ref{tab:steps_per_year}.
+
+
+% effect on tax convergence
+
+% W & w/o exploit prompts
+% W & w/o explore prompts
+
+\paragraph{Exploration versus exploitation prompts.}
+Table~\ref{tab:explore_exploit_impact} isolates the two prompt sentences that steer the planner toward broad search (\emph{exploration}) and subsequent policy stabilization (\emph{exploitation}).  
+When both cues are present the planner reaches 84.9\% of \(\texttt{SWF}^{*}\).  
+Removing the exploration sentence lowers welfare by 7.0 points, whereas omitting exploitation lowers it by 21.9 points, underscoring that locking in a high-performing schedule once discovered is more valuable than continued random search after welfare plateaus.
+
+\begin{figure*}[t]
+  \centering
+  % ---------------- Tax-year ablation -----------------------------------
+  \begin{subfigure}[t]{0.47\linewidth}
+    \centering
+    \caption{\textbf{Tax-year length}}
+    \vskip 0.4em
+    \scriptsize
+    \begin{tabular}{@{}ccc@{}}
+      \toprule
+      Steps\,/\,yr & Total steps & \%$\texttt{SWF}^{*}$ \\
+      \midrule
+       8  &   310 & 62.3 \\
+      16  &   600 & 64.9 \\
+      64  & 2\,000 & 84.9 \\
+     128  & 6\,000 & \textbf{90.0} \\
+     256  & 6\,000 & 90.0 \\
+      \bottomrule
+    \end{tabular}
+    \label{tab:steps_per_year}
+  \end{subfigure}\hfill
+  % ---------------- Prompt ablation ------------------------------------
+  \begin{subfigure}[t]{0.47\linewidth}
+    \centering
+    \caption{\textbf{Prompt design}}
+    \vskip 0.4em
+    \scriptsize
+    \begin{tabular}{@{}lccc@{}}
+      \toprule
+      Variant & Expl.+Expl. & No Explore & No Exploit \\
+      \midrule
+      \%$\texttt{SWF}^{*}$ & \textbf{84.9} & 77.9 & 63.0 \\
+      \bottomrule
+    \end{tabular}
+    \label{tab:explore_exploit_impact}
+  \end{subfigure}
+  \caption{\textbf{Ablation studies for in-context RL.}  
+           Left: social welfare saturates once the tax year exceeds 128
+           steps, with \(K=128\) capturing 90\,\% of the optimum.
+           Right: removing either exploration or exploitation guidance in
+           the planner prompt lowers welfare, with the exploitation cue
+           being most critical.}
+  \label{fig:icrl_ablation}
+\end{figure*}
+
+
+
+
+% \subsubsection{Multiple Worker Utility Optimization}\label{subsub:worker}
+\subsection{Workers' Utility Optimization}\label{subsub:worker}
+
+In this section, we present evidence to show that the design of LLM Economists enables effective multi-worker utility optimization. Specifically, we initialize the skills of workers with realistic data distribution --- a Generalized-Beta-of-the-Second-Kind distribution fitted to the 2023 ACS microdata.  
+Figure~\ref{fig:gb2_hist} confirms that the fitted GB2 curve (red) matches the empirical U.S.\ income density (green histogram) over four orders of magnitude, providing a reliable starting point for the worker population's skill when working 40 hours per week.
+
+% The simulation begins by sampling latent skills from the Generalized-Beta-of-the-Second-Kind distribution fitted to the 2023 ACS microdata.  
+% Figure~\ref{fig:gb2_hist} confirms that the fitted GB2 curve (red) matches the empirical U.S.\ income density (green histogram) over four orders of magnitude, providing a realistic starting point for the worker population's skill when working 40 hours per week.
+
+\paragraph{Distributional dynamics.}
+With skills fixed, labor choices and rebates determine the evolution of pre-tax and post-tax income, which are visualized in Figure~\ref{fig:pretax_dynamics} and~\ref{fig:posttax_dynamics}.  
+Figure~\ref{fig:pretax_dynamics} shows that the pre-tax distribution remains stationary, as expected, while Figure~\ref{fig:posttax_dynamics} reveals substantial redistribution
+across brackets once the planner’s policy takes effect.
+
+\begin{figure*}[t]
+  \centering
+  % ---------- first row of four subfigures (one row total) -------------
+  \begin{subfigure}[t]{0.48\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/plotGB2.png}
+      \caption{\textbf{GB2 Income fit.}}
+      \label{fig:gb2_hist}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/QQplot.png}
+      \caption{\textbf{GB2 Q--Q check.}}
+      \label{fig:gb2_qq}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/pretax_income_distribution_over_time.png}
+      \caption{\textbf{Pre-tax income.}}
+      \label{fig:pretax_dynamics}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/income_distribution_over_time.png}
+      \caption{\textbf{Post-tax income.}}
+      \label{fig:posttax_dynamics}
+  \end{subfigure}
+  \caption{\textbf{Income modeling and redistribution dynamics.}
+  Figures (a)–(b) validate the GB2 prior used to sample latent skills:
+  the histogram and Q–Q plot show an excellent fit to ACS 2023 data.
+  Figures (c)–(d) track bracket shares over 6\,000 steps: pre-tax shares
+  remain stable, whereas the learned policy shifts roughly 15\,\% of
+  workers into lower brackets and then stabilizes, demonstrating the
+  planner’s progressivity.}
+  \label{fig:four_panel_income}
+\end{figure*}
+
+
+
+
+Taken together, Figures~\ref{fig:gb2_hist}–\ref{fig:posttax_dynamics} demonstrate that \textit{(i)} the initial skill prior matches U.S.\ data, \textit{(ii)} the chosen labor–consumption utility leads to stable pre-tax incomes, and \textit{(iii)} the learned tax mechanism reallocates post-tax income toward lower brackets while preserving aggregate labor supply, which is evidence that the worker layer is optimizing utilities coherently under the planner’s incentives.
+
+
+% show that the agents do actually follow the utility correctly
+% chain of thought analysis regarding decisions
+\textbf{Example chain of thought for bounded utility satisfaction:}
+\begin{tcolorbox}[colback=gray!10,colframe=black,sharp corners,boxrule=1pt,
+                  width=\columnwidth,left=0pt,right=0pt]
+\small
+\textbf{Entrepreneur (income $\approx\$180\text{k}$) chain of thought:}\\[2pt]
+My income falls in the 32\% bracket, so I keep $68\%$ of the next dollar
+($\ge 65\%$ target).  Quick tally gives an effective rate of about $22\%$
+($<25\%$ threshold).  Government spending still feels inefficient, but the
+tax burden itself is acceptable.\\[4pt]
+\textbf{Verdict:} \textit{SATISFIED}
+\end{tcolorbox}
+
+
+% show boundedly rational optimization and persona effect
+% \begin{figure*}[t]
+%   \centering
+%   \begin{subfigure}[t]{0.43\linewidth}
+%       \centering
+%       \includegraphics[width=\linewidth]{fig/smoothed_utility_dynamics.png}
+%       \caption{\textbf{Bounded vs.\ isoelastic utility over a tax year.}  During the first tax year (solid curves) an exmaple bounded worker starts far below the isoelastic utility, indicating initial dissatisfaction with the schedule; by the late phase of learning (dashed) the bounded curve approaches the isoelastic, showing that the planner’s updated policy has brought the bounded agent close to full satisfaction.}
+%       \label{fig:util_dynamics}
+%     \end{subfigure}\hfill
+%   \begin{subfigure}[t]{0.54\linewidth}
+%       \centering
+%       \includegraphics[width=\linewidth]{fig/personas.png}
+%       \caption{\textbf{Persona-specific satisfaction.} Average binary satisfaction as a function of labor for three personas under a fixed tax schedule. Teachers tolerate a wider labor range, entrepreneurs are sensitive above 50 hours, and engineers peak at moderate workloads, illustrating heterogeneity in tax-policy preferences.}
+%       \label{fig:persona_satis}
+%   \end{subfigure}
+%   \caption{\textbf{Alignment of utility and satisfaction with tax policy.} Figure~\ref{fig:util_dynamics} shows that the bounded–utility gap visible early in learning closes once the planner adopts a more progressive schedule, bringing bounded agents’ welfare nearly in line with isoelastic agents. Figure~\ref{fig:persona_satis} demonstrates that satisfaction is strongly mediated by persona, underscoring the importance of modeling heterogeneous preferences.}
+%   \label{fig:utility_persona_combo}
+% \end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  % ---------- bounded vs isoelastic ------------------------------------
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{fig/smoothed_utility_dynamics.png}
+    \caption{\textbf{Early vs.\ late utility.}  A bounded worker (black) closes much of the gap to the isoelastic benchmark (red) once the planner adopts a more progressive schedule.}
+    \label{fig:util_dynamics}
+  \end{subfigure}\hfill
+  % ---------- utility derivative ---------------------------------------
+  \begin{subfigure}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{fig/utility_convergence.png}
+    \caption{\textbf{Utility derivative.}  Mean $\partial_t u_i$ for $N{=}100$ workers under $K{=}128$.  The derivative falls to noise within 120 steps, signaling convergence.}
+    \label{fig:utility_convergence}
+  \end{subfigure}
+  % ---------- persona satisfaction -------------------------------------
+  \begin{subfigure}[t]{0.7\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{fig/personas.png}
+    \caption{\textbf{Persona satisfaction.}  Teachers remain satisfied across a wide labor range, entrepreneurs are tax-sensitive above 50 h / week, and engineers peak at moderate hours.}
+    \label{fig:persona_satis}
+  \end{subfigure}\hfill
+  \caption{\textbf{Worker-level adaptation to tax policy.}
+  Figure \ref{fig:util_dynamics} shows that the planner’s updates lift bounded-utility workers nearly to the isoelastic frontier.  Figure \ref{fig:persona_satis} highlights heterogeneity: satisfaction depends on persona-specific labor norms.  Figure \ref{fig:utility_convergence} confirms that a 128-step tax year gives workers enough time to reach equilibrium, justifying the time-scale separation used throughout the study.}
+  \label{fig:worker_alignment}
+\end{figure*}
+
+\paragraph{Bounded Utility Optimization.} Figure \ref{fig:worker_alignment} highlights two complementary aspects of worker‐level adaptation. Figure~\ref{fig:util_dynamics} traces a representative bounded‐utility agent across the first and the last tax year. Initially (solid curves) the worker’s utility is roughly 30k below the isoelastic component, reflecting dissatisfaction with the planner’s unrefined schedule. As the planner iteratively updates rates, the bounded trajectory (black dashed) rises and almost meets the isoelastic trajectory (red dashed), indicating that the final policy restores virtually the entire dissatisfaction penalty. Figure (b) turns to cross-sectional heterogeneity: under a fixed schedule teachers remain satisfied over a broad labor band, entrepreneurs lose satisfaction beyond 50 hours because higher effort triggers higher marginal rates, and engineers peak at moderate workloads. Together the two figures show that the LLM Economist not only considers person-based satisfaction in optimizing an agent's utility but also tailors utility consistently across persona groups.
+
+% show boundedly rational optimization in multi-agent case converges quickly after early large deviations by tracking social welfare and multi-agent utility distribution over time
+% figure: utility_convergence
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=0.6\linewidth]{fig/utility_convergence.png}
+%     \caption{\textbf{Utility convergence during the tax year.}
+%     The plot reports the mean first derivative of utility, $\partial_t u_i$, across all
+%     $N=100$ workers (black line) together with a 95\,\% confidence band (gray
+%     shading) for the setting $K=128$.  The large positive derivatives observed in
+%     the first ten steps indicate rapid utility gains as workers adjust to the
+%     newly announced tax schedule.  By step~120 the derivative has mean zero and
+%     lies well within the confidence band, signifying that utility has
+%     equilibrated and further worker updates would yield negligible additional
+%     adaptation. Results are smoothed over 16 timesteps; hence, starting at step 16.}
+%     \label{fig:utility_convergence}
+% \end{figure}
+
+
+% \subsection{LLM Economist}
+% \subsection{Tax-Planning Optimization}\label{subsec:taxopt}
+\subsection{Tax Policy Evaluation}\label{subsec:taxopt}
+
+We test the hypothesis that an \emph{in‑context} LLM tax planner—operating with no explicit gradient information—can learn marginal rate schedules that capture the bulk of first‑order optimal‑tax gains. And more largely, we test the overall ability of LLMs to design mechanisms for positive societal adjustment.  Concretely, we ask: \emph{How close can the \textsc{LLM Economist} come to the welfare benchmark set by a theory‑driven Saez schedule, and how much improvement does it deliver over prevailing baselines?} 
+
+To answer this, we evaluate the planner in two canonical settings.  
+\emph{Bounded-utility} workers use the seven statutory U.S.\ brackets;
+\emph{isoelastic} workers face a simplified three-bracket system ($\,$0–\$90k, \$90–\$160k, \$160k–\$1m$)$ commonly analyzed in optimal-tax theory.  In each case we compare the LLM Economist’s terminal schedule with \textit{(i)} the statutory schedule and \textit{(ii)} a Saez schedule obtained from local perturbations.
+
+\vspace{0.5em}
+\noindent\textbf{Seven-bracket bounded case.}  
+For the statutory brackets we cannot estimate a single elasticity; instead we perturb the tax policy along a grid and keep the welfare-maximizing grid point.  Results are
+shown in Figure \ref{fig:rates_7}.  The grid search improves social welfare (SWF) by 10\% over the LLM Economist but both schedules dwarf the U.S.\ baseline: +93\% for the LLM policy and +114\% for the perturbed Saez.  The planner flattens the first four brackets and softens the top bracket by 5 pp; Saez instead raises the \$192k–\$244k rate, extracting extra revenue at the cost of higher labor distortion.
+
+\begin{figure*}[t]
+  \centering
+  % \begin{subfigure}[t]{0.39\linewidth}
+  %     \centering
+  %     \includegraphics[width=\linewidth]{fig/rates_three_plot.png}
+  %     \caption{\textbf{Three-bracket isoelastic scenario.}}
+  %     \label{fig:rates_3}
+  % \end{subfigure}\hfill
+  % 60 39 for single line
+  \begin{subfigure}[t]{0.9\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/rates_plot.png}
+      \caption{\textbf{Seven-bracket bounded scenario.}}
+      \label{fig:rates_7}\hfill
+  \end{subfigure}
+  \begin{subfigure}[t]{0.7\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/rates_three_plot.png}
+      \caption{\textbf{Three-bracket isoelastic scenario.}}
+      \label{fig:rates_3}
+  \end{subfigure}
+  \caption{\textbf{Social welfare (left axis) and marginal tax rates (right axis) under alternative schedules.}  
+  In both scenarios the LLM Economist (green) approaches the welfare of an analytically tuned Saez schedule (blue) and far exceeds the relevant baseline (orange for statutory U.S.\ rates in the seven-bracket case, grey not shown in the three-bracket case).  Qualitatively, the LLM policy flattens middle brackets and softens the top rate, whereas the Saez solution (perturbed from the LLM Economist) concentrates revenue extraction in a steeper peak bracket.}
+  \label{fig:tax_schedule_comparison}
+\end{figure*}
+
+
+\vspace{0.5em}
+\noindent\textbf{Three-bracket isoelastic case.}  
+Since isoelastic utility is purely rational, Saez can be solved analytically (given a good starting point, the LLM Economist solution). So we follow the Saez regression recipe: estimate elasticity from the perturbation and solve the log linear system per bracket.  Figure \ref{fig:rates_3} summarizes.  The Saez-regression schedule now outperforms the LLM Economist, reflecting the Stackelberg equilibria at the Saez solution; the LLM schedule remains within the same qualitative shape but sets uniformly lower rates, preserving more labor supply at the expense of redistribution.
+
+\paragraph{Interpretation.}
+Across both scenarios the in-context planner lands within 10–35\% of the Saez optimum—remarkable given that it receives no explicit gradient information.  In the bounded setting, heterogeneous welfare weights push the planner toward flatter mid-brackets and a softer top rate, favoring broad gains; in the isoelastic setting, the Saez formula is theoretically exact (and starts from the LLM Economist solution before further optimizing) and therefore retains an edge.  These results show that language-based optimization can approach first-order-optimal tax design even in high-dimension heterogeneous environments where analytic formulas are unavailable.
+
+
+
+\subsection{Voting Simulacra} % 
+
+Having shown in Section~\ref{subsec:taxopt} that an LLM‑based planner can
+approach first‑order optimal taxes in \emph{static} environments, we now
+turn to the \emph{dynamic} political layer introduced in
+Section~\ref{sec:sim_setup}: every tax year, agents elect a new planner
+by majority rule, each candidate publishing a chain‑of‑thought (CoT) and
+a concrete tax schedule before the vote.  
+Our goal is to test whether language agents reproduce classic political‑economy
+phenomena—e.g.\ majority exploitation, leader turnover, and welfare
+cycling—when preferences are heterogeneous and the planner’s policy
+feeds back into future elections.
+
+% voting scenario with larger number of agents showing cyclical behavior
+% the idea is to show how personas in the population breakdown leads to emergent phenomena in leaders and policy, we see cyclical behavior and then tyranny of two groups over the third in a three group case
+% ------------------------ Voting simulacra figure ----------------------
+\begin{figure*}[t]
+  \centering
+  % 59 4
+  \begin{subfigure}[t]{0.9\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/tyranny_of_masses.png}
+      \caption{\textbf{Three-persona “tyranny.”}}
+      \label{fig:tyranny}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.7\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{fig/leader_heatbar_and_swf.png}
+      \caption{\textbf{100-worker democracy.}}
+      \label{fig:democracy}
+  \end{subfigure}
+  \caption{Democratic dynamics under two population settings.}
+  \label{fig:democratic_results}
+\end{figure*}
+
+\textbf{Example candidate platform:}
+\begin{tcolorbox}[colback=gray!10,colframe=black,sharp corners,boxrule=1pt,
+                  width=\columnwidth,left=0pt,right=0pt]
+\small
+\textit{Chain of thought: If I promise lower middle-bracket rates and a larger R\&D rebate, founders will back me and teachers won't oppose a modest hike at the very top.  Platform: flatten the \$47k–\$160k bracket to 18\%, cut the startup payroll tax credit to every filer, and fund it with a 2-pp increase above \$1\,M.  This keeps my reinvestment margin high while sounding fair to the median voter.}
+\end{tcolorbox}
+
+% We report two runs that bracket the spectrum of electorate
+% sizes studied in the paper:
+% (i) a \textbf{three‑persona society} that exposes textbook “tyranny of
+% the masses,” and
+% (ii) a \textbf{100‑worker democracy} in which leadership changes almost
+% every year, causing welfare to spike under good policies and drift under
+% poor ones (Figures~\ref{fig:tyranny}–\ref{fig:democracy}).  
+% Together they demonstrate that the \textsc{LLM Economist}, coupled with
+% minimal voting rules, can end‑to‑end generate both pathological and
+% beneficial political dynamics—offering a sandbox for mechanism‑design
+% interventions in future work.
+
+Figure~\ref{fig:democratic_results} contrasts two election-driven runs.
+Figure~\ref{fig:tyranny} shows a three-agent bounded society in which two
+workers repeatedly install each other as planner, keeping their own
+utilities around \$8\,000 while the minority worker hovers ${\sim}25\%$
+lower—a textbook “tyranny of the masses’’ outcome produced end-to-end by
+language agents.  In the 100-agent three-bracket experiment
+(Figure~\ref{fig:democracy}) leadership swaps almost every tax year.  Each
+new planner resets the tax schedule, causing social welfare to spike when
+an exceptionally good policy appears and to drift when a poor policy
+prevails.  The electoral exploration can outperform static optimal
+taxation when preferences are heterogeneous.  Together the two cases
+demonstrate that the \emph{LLM Economist} also captures realistic political
+feedback—ranging from majority exploitation to welfare-enhancing turnover, without any hard-coded voting rules.
+
+
+

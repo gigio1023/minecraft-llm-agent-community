@@ -1,0 +1,67 @@
+\vspace*{-.8ex}
+\section{Learning Latent Dynamics}
+\label{sec:dynamics}
+\vspace*{-.8ex}
+
+\input{figures/video/figure}
+\input{figures/bars/figure}
+\input{figures/value-small/figure}
+
+Learning behaviors in imagination requires a world model that generalizes well. We focus on latent dynamics models that predict forward in a compact latent space, facilitating long-term predictions and allowing the agent to imagine thousands of trajectories in parallel. Several objectives for learning representations for control have been proposed \citep{watter2015e2c,jaderberg2016unreal,oord2018cpc,eslami2018gqn}. We review three approaches for learning representations to use with Dreamer: reward prediction, image reconstruction, and contrastive estimation.
+
+\paragraph{Reward prediction}
+
+Latent imagination requires a representation model $\p(s_t|s_{t-1},a_{t-1},o_t)$, transition model $\q(s_t|s_{t-1},a_{t-1},)$, and reward model $\q(r_t|s_t)$, as described in \cref{sec:overview}. In principle, this could be achieved by simply learning to predict future rewards given actions and past observations \citep{oh2017vpn,gelada2019deepmdp,schrittwieser2019muzero}. With a large and diverse dataset, such representations should be sufficient for solving a control task. However, with a finite dataset and especially when rewards are sparse, learning about observations that correlate with rewards is likely to improve the world model \citep{jaderberg2016unreal,gregor2019beliefstate}.
+
+\pagebreak
+
+\paragraph{Reconstruction}
+
+We first describe the world model used by PlaNet \citep{hafner2018planet} that learns latent dynamics by reconstructing images as shown in \cref{fig:dynamics}. The world model consists of the following components, where the observation model is only used to provide a learning signal,
+\begin{gather}
+\begin{aligned}
+\makebox[12em][l]{Representation model:} && &\pr[p_\theta](s_t|s_{t-1},a_{t-1},o_t) \\
+\makebox[12em][l]{Observation model:} && &\pr[q_\theta](o_t|s_t) \\
+\makebox[12em][l]{Reward model:} && &\pr[q_\theta](r_t|s_t) \\
+\makebox[12em][l]{Transition model:} && &\pr[q_\theta](s_t|s_{t-1},a_{t-1}).
+\label{eq:generative_model}
+\end{aligned}
+\end{gather}%
+The components are optimized jointly to increase the variational lower bound \citep[ELBO;][]{jordan1999viintro} or more generally the variational information bottleneck \citep[VIB;][]{tishby2000ib,alemi2016vib}. As derived in \cref{sec:derivations}, the bound includes reconstruction terms for observations and rewards and a KL regularizer. The expectation is taken under the dataset and representation model,
+\begin{equation}
+\begin{aligned}
+&\mathcal{J}_{\mathrm{REC}}
+  \defined\E[\bigg]{p}{\sum_t\Big(\mathcal{J}_{\mathrm{O}}^t+\mathcal{J}_{\mathrm{R}}^t+\mathcal{J}_{\mathrm{D}}^t\Big)}+\text{const} \qquad
+\mathcal{J}_{\mathrm{O}}^t
+  \defined\ \ln\q(o_t|s_t) \\
+&\mathcal{J}_{\mathrm{R}}^t
+  \defined\ln\q(r_t|s_t) \qquad
+\mathcal{J}_{\mathrm{D}}^t
+  \defined\ -\beta\KL{\p(s_t|s_{t-1},a_{t-1},o_t)}{\q(s_t|s_{t-1},a_{t-1})}.
+\label{eq:generative_objective}
+\end{aligned}
+\end{equation}%
+
+We implement the transition model as a recurrent state space model \citep[RSSM;][]{hafner2018planet}, the representation model by combining the RSSM with a convolutional neural network \citep[CNN;][]{lecun1989cnn} applied to the image observation, the observation model as a transposed CNN, and the reward model as a dense network. The combined parameter vector $\theta$ is updated by stochastic backpropagation \citep{kingma2013vae,rezende2014vae}. \Cref{fig:video} shows video predictions of this model. We refer to \cref{sec:hparams} and \citet{hafner2018planet} model details.
+
+\paragraph{Contrastive estimation}
+
+Predicting pixels can require high model capacity. We can also encourage mutual information between model states and observations by instead predicting the states from the images \citep{guo2018actioncpc}. This replaces the observation model with a state model,
+\begin{gather}
+\begin{aligned}
+\makebox[12em][l]{State model:} && &\pr[q_\theta](s_t|o_t).
+\label{eq:contrastive_model}
+\end{aligned}
+\end{gather}%
+While the reconstruction objective used the fact that the observation marginal is a constant, we now face the state marginal. As shown in \cref{sec:derivations}, this can be estimated via noise contrastive estimation \citep[NCE;][]{gutmann2010nce,oord2018cpc} by averaging the state model over observations $o'$ of the current sequence batch. Intuitively, $\q(s_t|o_t)$ makes the state predictable from the current image while $\ln\sum_{o'}\q(s_t|o')$ keeps it diverse to prevent collapse,
+\begin{gather}
+\begin{aligned}
+\mathcal{J}_{\mathrm{NCE}}
+\defined\ \E[\bigg]{}{\sum_t\Big(\mathcal{J}_{\mathrm{S}}^t+\mathcal{J}_{\mathrm{R}}^t+\mathcal{J}_{\mathrm{D}}^t\Big)}\quad
+\mathcal{J}_{\mathrm{S}}^t
+\defined\ &\ln\q(s_t|o_t)
+-\ln\bigg(\sum_{o'}\q(s_t|o')\bigg).
+\label{eq:contrastive_objective}
+\end{aligned}\raisetag{1.52\baselineskip}
+\end{gather}%
+We implement the state model as a CNN and again optimize the bound with respect to the combined parameter vector $\theta$ using stochastic backpropagation. While avoiding pixel prediction, the amount of information this bound can extract efficiently is limited \citep{mcallester2018ncelimit}. We empirically compare reward, reconstruction, and contrastive objectives in our experiments in \cref{fig:repr-small}.

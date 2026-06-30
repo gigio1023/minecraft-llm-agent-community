@@ -1,0 +1,52 @@
+\section{Agent Learning with Large-scale Pre-training}
+\input{figs/algo_figure}
+\label{sec:method}
+
+One of the grand challenges of embodied AI is to build a single agent that can complete a wide range of open-world tasks.
+The \minedojo framework aims to facilitate new techniques towards this goal by providing an open-ended task suite (Sec. \ref{sec:benchmark}) and large-scale internet knowledge base (Sec. \ref{sec:dataset}). 
+Here we take an initial step towards this goal by developing a proof of concept that demonstrates how a single language-prompted agent can be trained in \minedojo to complete several complex Minecraft tasks.
+To this end, we propose a novel agent learning algorithm that takes advantage of the massive YouTube data offered by \minedojo. We note that this is only one of the numerous possible ways to use \minedojo's internet database --- the Wiki and Reddit corpus also hold great potential to drive new algorithm discoveries for the community in future works. 
+
+
+In this paper, we consider a multi-task reinforcement learning (RL) setting, where an agent is tasked with completing a collection of \minedojo tasks specified by language instructions (Sec. \ref{sec:benchmark}). 
+Solving these tasks often requires the agent to interact with the Minecraft world in a prolonged fashion. Agents developed in popular RL benchmarks~\cite{tassa2018deepmind,zhu2020robosuite} often rely on meticulously crafted dense and task-specific reward functions to guide random explorations. However, these rewards are hard or even infeasible to define for our diverse and open-ended tasks in \minedojo.
+To address this challenge, our key insight is to learn \textbf{a dense, language-conditioned reward function from in-the-wild YouTube videos and their transcripts}. Therefore, we introduce \textbf{\mineclip}, a contrastive video-language model that learns to correlate video snippets and natural language descriptions (Fig.~\ref{fig:algo_figure}). \mineclip is multi-task by design, as it is trained on open-vocabulary and diverse English transcripts. 
+
+During RL training, \mineclip provides a high-quality reward signal \textit{without} any domain adaptation techniques, despite the domain gap between noisy YouTube videos and clean simulator-rendered frames. 
+\mineclip eliminates the need to manually engineer reward functions for each and every \minedojo task.
+For Creative tasks that lack a simple success criterion (Sec.~\ref{sec:benchmark-creative}), \mineclip also serves the dual purpose of an \textbf{automatic evaluation metric} that agrees well with human judgement \Rebuttal{on a subset of tasks we investigate} (Sec.~\ref{sec:method-rl}, Table~\ref{table:eval-metric-quality}).  
+Because the learned reward model incurs a non-trivial computational overhead, we introduce several techniques to significantly improve RL training efficiency, making \mineclip a practical module for open-ended agent learning in Minecraft (Sec. \ref{sec:method-rl}).
+
+\input{tables/core-experiments}
+
+\subsection{Pre-Training \mineclip on Large-scale Videos}
+\label{sec:method-mineclip-pretraining}
+
+Formally, the learned reward function can be defined as $\Phi_\mathcal{R}: (G, V) \rightarrow \mathbb{R}$ that maps a language goal $G$ and a video snippet $V$ to a scalar reward. An ideal $\Phi_\mathcal{R}$ should return a high reward if the behavior depicted in the video faithfully follows the language description, and a low reward otherwise. This can be achieved by optimizing the InfoNCE objective \cite{oord2018representation, DBLP:conf/cvpr/He0WXG20, DBLP:conf/icml/ChenK0H20}, which learns to correlate positive video and text pairs \cite{sun2019learning, DBLP:conf/nips/AlayracRSARFSDZ20, DBLP:conf/cvpr/MiechASLSZ20, akbari2021vatt, xu2021videoclip}. 
+
+Similar to the image-text CLIP model \cite{radford2021clip}, \mineclip is composed of a separate text encoder $\phi_G$ that embeds a language goal and a video encoder $\phi_V$ that embeds a moving window of 16 consecutive frames with $160 \times 256$ resolution (Fig.~\ref{fig:algo_figure}). Our neural architecture has a similar design as CLIP4Clip \cite{luo2021clip4clip}, where $\phi_G$ reuses OpenAI CLIP's pretrained text encoder, and $\phi_V$ is factorized into a frame-wise image encoder $\phi_I$ and a temporal aggregator $\phi_a$ that summarizes the sequence of 16 image features into a single video embedding. Unlike CLIP4Clip, we insert two extra layers of residual CLIP Adapter \cite{gao2021clipadapter} after the aggregator $\phi_a$ to produce a better video feature, and finetune \textit{only} the last two layers of the pretrained $\phi_I$ and $\phi_G$.
+
+From the \minedojo YouTube database, we follow the procedure in VideoCLIP~\cite{xu2021videoclip} to sample 640K pairs of 16-second video snippets and time-aligned English transcripts, after applying a keyword filter. 
+We train two \mineclip variants with different types of aggregator $\phi_a$: (1) \mineclipavg does simple average pooling, which is fast but agnostic to the temporal ordering; (2) \mineclipattn encodes the sequence by two transformer layers, which is relatively slower but captures more temporal information, and thus produces a better reward signal in general. 
+Details of data preprocessing, architecture, and hyperparameters are listed in the Appendix (Sec.~\ref{supp:sec:mineclip}). 
+
+\subsection{RL with \mineclip Reward}
+\label{sec:method-rl}
+
+We train a language-conditioned policy network that takes as input raw pixels and predicts discrete control. The policy is trained with PPO~\cite{schulman2017proximal} on the \mineclip rewards.
+In each episode, the agent is prompted with a language goal and takes a sequence of actions to fulfill this goal. When calculating the \mineclip rewards, we concatenate the agent's latest 16 egocentric RGB frames in a temporal window to form a video snippet. \mineclip handles all task prompts \textit{zero-shot} without any further finetuning. In our experiments (Sec. \ref{sec:experiments}), we show that \mineclip provides effective dense rewards out of the box, despite the domain shift between in-the-wild YouTube frames and simulator frames. Besides regular video data augmentation, we do not employ any special domain adaptation methods during pre-training. Our finding is consistent with CLIP's strong zero-shot performances on robustness benchmarks in object recognition \cite{radford2021clip}. 
+
+Compared to hard-coded reward functions in popular benchmarks~\cite{zhu2020robosuite,tassa2018deepmind,fan2021secant}, the \mineclip model has 150M parameters and is thus much more expensive to query. We make several design choices to greatly accelerate RL training with \mineclip in the loop:  
+
+\begin{enumerate}[leftmargin=3em]
+    \item The language goal $G$ is fixed for a specific task, so the \textbf{text features $\phi_G$ can be precomputed} to avoid invoking the text encoder repeatedly. 
+    \item Our agent's \textbf{RGB encoder reuses the pre-trained weights of $\phi_I$} from \mineclip. We do not finetune $\phi_I$ during RL training, which saves computation and endows the agent with good visual representations from the beginning. 
+    \item \mineclip's video encoder $\phi_V$ is factorized into an image encoder $\phi_I$ and a light-weight aggregator $\phi_a$.  This design choice enables \textbf{efficient image feature caching}. Consider two overlapping video sequences of 8 frames, \texttt{V[0:8]} and \texttt{V[1:9]}.
+    We can cache the image features of the 7 overlapping frames \texttt{V[1]} to \texttt{V[7]} to maximize compute savings.
+    If $\phi_V$ is a monolithic model like S3D \cite{xie2018rethinking} in VideoCLIP \cite{xu2021videoclip}, then the video features from every sliding window must be recomputed, which would incur a much higher cost per time step.
+    \item We leverage \textbf{Self-Imitation Learning} \cite{oh2018self} to store the trajectories with high \mineclip reward values in a buffer, and alternate between PPO and self-imitation gradient steps. It further improves sample efficiency as shown in the Appendix (Fig.~\ref{supp:fig:ablation_si}). 
+\end{enumerate}
+
+
+
+

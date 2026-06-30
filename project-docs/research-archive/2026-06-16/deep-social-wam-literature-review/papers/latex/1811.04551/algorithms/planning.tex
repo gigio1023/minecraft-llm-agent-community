@@ -1,0 +1,40 @@
+\begin{algorithm}[h!]
+\SetEndCharOfAlgoLine{}
+\SetKwComment{Comment}{// }{}
+\SetKwInOut{Input}{Input}
+\Input{
+\begin{tabular}[t]{l @{\hspace{.5em}} l}
+$H$ & Planning horizon distance \\
+$I$ & Optimization iterations \\
+$J$ & Candidates per iteration \\
+$K$ & Number of top candidates to fit \\
+\end{tabular}%
+\begin{tabular}[t]{l @{\hspace{.5em}} l}
+$\q(s_t|o_{\leq t},a_{<t})$ & Current state belief \\
+$\p(s_t|s_{t-1},a_{t-1})$ & Transition model \\
+$\p(r_t|s_t)$ & Reward model \\
+\end{tabular}%
+}
+\BlankLine
+Initialize factorized belief over action sequences $\q(a_{t:t+H})\leftarrow\Normal(0,\I)$. \;
+\For{optimization iteration $i=1..I$}{
+  \Comment{Evaluate $J$ action sequences from the current belief.}
+  \For{candidate action sequence $j=1..J$}{
+      $a^{(j)}_{t:t+H}\sim\q(a_{t:t+H})$ \;
+      $s^{(j)}_{t:t+H+1}\sim
+        \q(s_t|o_{1:t},a_{1:t-1})
+        \prod_{\tau=t+1}^{t+H+1}\p(s_\tau|s_{\tau-1},a^{(j)}_{\tau-1})$ \;
+      $R^{(j)}=\sum_{\tau=t+1}^{t+H+1}\E{}{\p(r_\tau|s^{(j)}_\tau)}$ \;
+  }
+  \BlankLine
+  \Comment{Re-fit belief to the $K$ best action sequences.}
+  $\mathcal{K}\leftarrow\mathrm{argsort}(\{R^{(j)}\}_{j=1}^J)_{1:K}$ \;
+  $\mu_{t:t+H}=\frac{1}{K}\sum_{k\in\mathcal{K}} a_{t:t+H}^{(k)}, \quad
+  \sigma_{t:t+H}=\frac{1}{K-1}\sum_{k\in\mathcal{K}}|a_{t:t+H}^{(k)}-\mu_{t:t+H}|$. \;
+  $\q(a_{t:t+H})\leftarrow\Normal(\mu_{t:t+H},\sigma_{t:t+H}^2\I)$ \;
+}
+\Return{first action mean $\mu_t$.}
+\BlankLine
+\caption{Latent planning with CEM}
+\label{alg:planner}
+\end{algorithm}

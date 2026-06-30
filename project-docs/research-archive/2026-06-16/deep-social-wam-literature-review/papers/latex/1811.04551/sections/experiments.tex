@@ -1,0 +1,28 @@
+\section{Experiments}
+\label{sec:control}
+
+\input{figures/score_model/figure}
+
+\input{figures/score_agent/figure}
+
+We evaluate \method on six continuous control tasks from pixels. We explore multiple design axes of the agent: the stochastic and deterministic paths in the dynamics model, iterative planning, and online experience collection. We refer to the appendix for hyper parameters (\cref{sec:hparams}) and additional experiments (\cref{sec:exp_overshooting,sec:exp_activation,sec:exp_multi}). Besides the action repeat, we use the same hyper parameters for all tasks. Within less than one hundredth the episodes, \method outperforms A3C \citep{mnih2016a3c} and achieves similar performance to the top model-free algorithm D4PG \citep{barth2018d4pg}. The training time of 10 to 20 hours (depending on the task) on a single Nvidia V100 GPU compares favorably to that of A3C and D4PG. Our implementation uses TensorFlow Probability \citep{dillon2017tfd}. Please visit \,\url{https://danijar.com/planet}\, for access to the code and videos of the trained agent.
+
+For our evaluation, we consider six image-based continuous control tasks of the DeepMind control suite \citep{tassa2018dmcontrol}, shown in \Cref{fig:domains}. These environments provide qualitatively different challenges. The cartpole swingup task requires a long planning horizon and to memorize the cart when it is out of view, reacher has a sparse reward given when the hand and goal area overlap, finger spinning includes contact dynamics between the finger and the object, cheetah exhibits larger state and action spaces, the cup task only has a sparse reward for when the ball is caught, and the walker is challenging because the robot first has to stand up and then walk, resulting in collisions with the ground that are difficult to predict. In all tasks, the only observations are third-person camera images of size $64\times 64\times 3$ pixels.
+
+\paragraph{Comparison to model-free methods}
+
+\cref{fig:score_model} compares the performance of \method to the model-free algorithms reported by \citet{tassa2018dmcontrol}. Within 100 episodes, \method outperforms the policy-gradient method A3C trained from proprioceptive states for 100,000 episodes, on all tasks. After 500 episodes, it achieves performance similar to D4PG, trained from images for 100,000 episodes, except for the finger task. \method surpasses the final performance of D4PG with a relative improvement of $26\%$ on the cheetah running task. We refer to \cref{tab:control} for numerical results, which also includes the performance of CEM planning with the true dynamics of the simulator.
+
+\paragraph{Model designs}
+
+\cref{fig:score_model} additionally compares design choices of the dynamics model. We train \method using our recurrent state-space model (RSSM), as well as versions with purely deterministic GRU \citep{cho2014gru}, and purely stochastic state-space model (SSM). We observe the importance of both stochastic and deterministic elements in the transition function on all tasks. The deterministic part allows the model to remember information over many time steps. The stochastic component is even more important -- the agent does not learn without it. This could be because the tasks are stochastic from the agent's perspective due to partial observability of the initial states. The noise might also add a safety margin to the planning objective that results in more robust action sequences.
+
+\paragraph{Agent designs}
+
+\cref{fig:score_agent} compares \method, a version collecting episodes under random actions rather than by planning, and a version that at each environment step selects the best action out of $1000$ sequences rather than iteratively refining plans via CEM. We observe that online data collection helps for all tasks and is necessary for the cartpole, finger, and walker tasks. Iterative search for action sequences using CEM improves performance on all tasks.
+
+\paragraph{One agent all tasks}
+
+\cref{fig:score_multi} in the appendix shows the performance of a single agent trained on all six tasks. The agent is not told which task it is facing; it needs to infer this from the image observations. We pad the action spaces with unused elements to make them compatible and adapt \cref{alg:agent} to collect one episode of each task every $C$ update steps. We use the same hyper parameters as for the main experiments above. The agent solves all tasks while learning slower compared to individually trained agents. This indicates that the model can learn to predict multiple domains, regardless of the conceptually different visuals.
+
+\input{tables/control}

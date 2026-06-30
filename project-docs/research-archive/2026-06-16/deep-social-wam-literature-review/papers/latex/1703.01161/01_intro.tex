@@ -1,0 +1,25 @@
+\seckiny
+\section{Introduction}
+\seckiny
+
+Deep reinforcement learning has recently enjoyed successes in many domains~\cite{mnih-dqn-2015,schulman2015trust,levine2015endtoend,mnih2016asynchronous,lillicrap2015continuous}. 
+%
+Nevertheless, long-term credit assignment remains a major challenge for these methods, especially in environments with sparse reward signals, such as the infamous Montezuma's Revenge ATARI game. 
+It is symptomatic that the standard approach on the ATARI benchmark suite~\cite{bellemare-ale} is to use an action-repeat heuristic, where each action translates into several (usually $4$) consecutive actions in the environment. 
+Yet another dimension of complexity is seen in non-Markovian environments that require memory -- these are particularly challenging, since the agent has to learn which parts of experience to store for later, using only a sparse reward signal. 
+
+
+%%
+The framework we propose takes inspiration from feudal reinforcement learning (FRL) introduced by \citet{dayan1993feudal}, where levels of hierarchy within an agent communicate via explicit goals. 
+Some key insights from FRL are that goals can be generated in a top-down fashion, and that goal setting can be decoupled from  goal achievement; a level in the hierarchy communicates to the level below it what must be achieved, but does not specify \emph{how} to do so.  Making higher levels reason at a lower temporal resolution naturally structures the agents behaviour into temporally extended sub-policies.  
+
+The architecture explored in this work is a fully-differentiable neural network with two levels of hierarchy (though there are obvious generalisations to deeper hierarchies).
+The top level, the “Manager”, sets goals at a lower temporal resolution in a latent state-space that is itself \textit{learnt} by the Manager.
+The lower level, the “Worker”, operates at a higher temporal resolution and produces primitive actions, conditioned on the goals it receives from the Manager. The Worker is motivated to follow the goals by an intrinsic reward.
+However, significantly, no gradients are propagated between Worker and Manager; the Manager receives its learning signal from the environment alone. In other words, the Manager learns to select latent goals that maximise extrinsic reward.
+
+%
+The key contributions of our proposal are: (1) A consistent, end-to-end differentiable model that embodies and generalizes the principles of FRL. (2) A novel, approximate \textit{transition policy gradient} update for training the Manager, which exploits the semantic meaning of the goals it produces. (3) The use of goals that are directional rather than absolute in nature. (4) A novel RNN design for the Manager -- a dilated LSTM -- which extends the longevity of the recurrent state memories and allows gradients to flow through large hops in time, enabling effective back-propagation through hundreds of steps.
+%
+
+Our ablative analysis (Section \ref{subsec:ablative}) confirms that transitional policy gradient and directional goals are crucial for best performance. Our experiments on a selection of ATARI games (including the infamous Montezuma's revenge) and on several memory tasks in the 3D DeepMind Lab environment~\cite{beattie2016labyrinth} show that FuN significantly improves long-term credit assignment and memorisation. 

@@ -1,0 +1,837 @@
+\documentclass{article}
+
+\usepackage{iclr2022_conference,times}
+
+\usepackage{amsmath}
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage[pdftex]{graphicx} 
+
+\usepackage{cleveref}
+\usepackage{xcolor}
+\usepackage{array,multirow}
+\usepackage{wrapfig}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage[export]{adjustbox}
+\usepackage{bm} % bold math
+\usepackage{caption}
+\usepackage{subcaption}
+\iclrfinalcopy
+
+\definecolor{lightgrey}{rgb}{0.43,0.43,0.43}
+\definecolor{crimson}{rgb}{0.86,0.08,0.24}
+\hypersetup{
+  colorlinks,
+  citecolor=lightgrey,
+  linkcolor=crimson,
+  urlcolor=lightgrey}
+
+\newcommand{\modelnamelong}{Slot Attention for Video\xspace}
+\newcommand{\modelname}{SAVi\xspace}
+\newcommand{\lossfun}[1]{\mathcal{L}_\mathit{#1}}
+
+\DeclareMathOperator*{\softmax}{softmax}
+\DeclareMathOperator{\GRU}{GRU}
+\DeclareMathOperator{\Transformer}{Transformer}
+
+\title{Conditional Object-Centric Learning\\from Video}
+
+% Footnote without footnote mark.
+\newcommand\blfootnote[1]{%
+  \begingroup
+  \renewcommand\thefootnote{}\footnote{#1}%
+  \addtocounter{footnote}{-1}%
+  \endgroup
+}
+
+\author{Thomas Kipf$^{\,*\dagger}$, Gamaleldin F.~Elsayed$^*$, Aravindh Mahendran$^*$, Austin Stone$^*$,\\\textbf{Sara Sabour, Georg Heigold, Rico Jonschkowski, Alexey Dosovitskiy \& Klaus Greff}\\
+Google Research}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Object-centric representations are a promising path toward more systematic generalization by providing flexible abstractions upon which compositional world models can be built. Recent work on simple 2D and 3D datasets has shown that models with object-centric inductive biases can learn to segment and represent meaningful objects from the statistical structure of the data alone without the need for any supervision. However, such fully-unsupervised methods still fail to scale to diverse realistic data, despite the use of increasingly complex inductive biases such as priors for the size of objects or the 3D geometry of the scene. In this paper, we instead take a weakly-supervised approach and focus on how 1) using the temporal dynamics of video data in the form of optical flow and 2) conditioning the model on simple object location cues can be used to enable segmenting and tracking objects in significantly more realistic synthetic data. We introduce a sequential extension to Slot Attention which we train to predict optical flow for realistic looking synthetic scenes and show that conditioning the initial state of this model on a small set of hints, such as center of mass of objects in the first frame, is sufficient to significantly improve instance segmentation. These benefits generalize beyond the training distribution to novel objects, novel backgrounds, and to longer video sequences. We also find that such initial-state-conditioning can be used during inference as a flexible interface to query the model for specific objects or parts of objects, which could pave the way for a range of weakly-supervised approaches and allow more effective interaction with trained models.
+
+Project page: \href{https://slot-attention-video.github.io/}{\small\texttt{https://slot-attention-video.github.io/}}
+
+
+\end{abstract}
+
+\section{Introduction}
+\blfootnote{\kern-1.7em$^*$Equal contribution. $^\dagger$Correspondence to: \href{mailto:tkipf@google.com}{\texttt{tkipf@google.com}}}%
+\looseness=-1Humans understand the world in terms of separate \emph{objects}~\citep{kahneman1992reviewing,spelke2007core}, which serve as compositional building blocks that can be processed independently and recombined. % in numerous ways.
+Such a compositional model of the world forms the foundation for high-level cognitive abilities such as language, causal reasoning, mathematics, planning, etc. and is crucial for generalizing in predictable and systematic ways. 
+Object-centric representations have the potential to greatly improve sample efficiency, robustness, generalization to new tasks, and interpretability of machine learning algorithms~\citep{greff2020binding}.
+In this work, we focus on the aspect of modeling motion of objects from video, because of its synergistic relationship with object-centric representations:
+On the one hand, objects support learning an efficient dynamics model by factorizing the scene into approximately independent parts with only sparse interactions.
+Conversely, motion provides a powerful cue for which inputs should be grouped together, and is thus an important tool for learning about objects.
+
+\looseness=-1Unsupervised multi-object representation learning has recently made significant progress both on images (e.g.~\citealp{burgess2019monet,greff2019multi,lin2020space,locatello2020object}) and on video (e.g.~\citealp{veerapaneni2020entity,weis2020unmasking,jiang2019scalable}).
+By incorporating object-centric inductive biases, these methods learn to segment and represent objects from the statistical structure of the data alone without the need for supervision.
+Despite promising results these methods are currently limited by two important problems:
+Firstly, they are restricted to toy data like moving 2D sprites or very simple 3D scenes and generally fail at more realistic data with complex textures \citep{greff2019multi,harley2021track,clevrtex2021karazija}.
+And secondly, it is not entirely clear how to interface with these models both during training and inference. 
+The notion of an object is ambiguous and task-dependent, and the segmentation learned by these models does not necessarily align with the tasks of interest.
+The model might, for example, over-segment a desired object into distinct parts, or alternatively fail to segment into the desired parts. 
+Ideally, we would like to be able to provide the model with hints as to the desired level of granularity during training, and flexibly query the model during inference to request that the model detects and tracks a particular object or a part thereof. 
+
+In this paper we introduce a sequential extension of Slot Attention~\citep{locatello2020object} that we call \emph{\modelnamelong} (\modelname) to tackle the problem of unsupervised / weakly-supervised multi-object segmentation and tracking in video data.
+We demonstrate that 1) using optical flow prediction as a self-supervised objective and 2) providing a small set of abstract hints such as the center of mass position for objects as conditional inputs in the first frame suffices to direct the decomposition process in complex video scenes without otherwise requiring any priors on the size of objects or on the information content of their representations.
+We show successful segmentation and tracking for synthetic video data with significantly higher realism and visual complexity than the datasets used in prior work on unsupervised object representation learning.
+These results are robust with respect to noise on both the optical flow signal and the conditioning, and that they generalize almost perfectly to longer sequences, novel objects, and novel backgrounds.
+
+
+\section{Slot Attention for Video (SAVi)}
+\looseness=-1We introduce a sequential extension of the Slot Attention \citep{locatello2020object} architecture to video data, which we call \modelname.
+Inspired by predictor-corrector methods for integration of ordinary differential equations, \modelname performs two steps for each observed video frame: a prediction and a correction step.
+The correction step uses Slot Attention to update (or \textit{correct}) the set of slot representations based on slot-normalized cross-attention with the inputs.
+The prediction step uses self-attention among the slots to allow for modeling of temporal dynamics and object interactions. The output of the predictor is then used to initialize the corrector at the next time step, thus allowing the model to consistently track objects over time.
+Importantly, both of these steps are permutation equivariant and thus are able to preserve slot symmetry. See Figure~\ref{fig:savi_overview} for a schematic overview of the \modelname architecture.
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=\textwidth]{figures/savi_overview.pdf}
+    \caption{Slot Attention for Video (SAVi) architecture overview. The SAVi Processor is recurrently applied to a sequence of input video frames. SAVi maintains a set $\mathcal{S}_t = [\bm{s}^1_t, \dots, \bm{s}_t^K]$ of $K$ latent slot representations at each time step $t$. Slots can be \textit{conditionally} initialized based on cues such as center of mass coordinates of objects and subsequently learn to track and represent a particular object. SAVi is trained to predict optical flow or to reconstruct input frames.}
+    \label{fig:savi_overview}
+    \vspace{-0.5em}
+\end{figure}
+
+\textbf{Encoder}\quad
+For each time-step $t \in \{1 \dots T\}$ the corresponding video frame $\bm{x}_t$ is first passed through a small convolutional neural network (CNN) encoder (here, a stack of five convolutional layers with ReLUs), where we concatenate a linear positional encoding at the second-to-last layer.
+The resulting grid of visual features is flattened into a set of vectors $\bm{h}_t = f_\text{enc}(\bm{x}_t) \in \mathbb{R}^{N\times D_{\text{enc}}}$, where $N$ is the size of the flattened grid (i.e., width*height) and $D_{\text{enc}}$ is the dimensionality of the CNN feature maps. Afterwards, each vector is independently passed through a multi-layer perceptron (MLP).
+
+\textbf{Slot Initialization}\quad
+\modelname maintains $K$ slots, each of which can represent a part of the input such as objects or parts thereof.
+We denote the set of slot representations at time $t$ as $\mathcal{S}_t = [\bm{s}^1_t, \dots, \bm{s}_t^K] \in \mathbb{R}^{K\times D}$, where we use the calligraphic font to indicate that any operation on these sets is equivariant (or invariant) w.r.t. permutation of their elements.
+In other words, the ordering of the slots carries no information and they can be freely permuted (in a consistent manner across all time steps) without changing the model output.
+%
+We consider two types of initializers: conditional and unconditional.
+In the conditional case, we encode the conditional input either via a simple MLP (in the case of bounding boxes or center of mass coordinates) or via a CNN (in the case of segmentation masks). For slots for which there is no conditioning information available (e.g. if $K$ is larger than the number of objects), we set the conditional input to a fixed value (e.g., `$-1$' for bounding box coordinates).
+The encoded conditional input forms the initial slot representation for \modelname. 
+In the unconditional case, we either randomly initialize slots by sampling from a Gaussian distribution independently for each video (both at training and at test time), or by learning a set of initial slot vectors.
+
+
+\textbf{Corrector}\quad
+The task of the corrector is to update the slot representations based on the visual features from the encoder. 
+In \modelname this is done using the iterative attention mechanism introduced in Slot Attention~\citep{locatello2020object}. Different from a regular cross-attention mechanism (e.g.~\citealp{vaswani2017attention}) which is normalized over the inputs, Slot Attention encourages decomposition of the input into multiple slots via softmax-normalization over the output (i.e.~the slots), which makes it an appealing choice for our video decomposition architecture. When using a single iteration of Slot Attention, the corrector update takes the following form:
+\begin{equation}
+  \mathcal{U}_t = \frac{1}{\mathcal{Z}_t}\sum_{n=1}^{N} \mathcal{A}_{t,n} \odot v(\bm{h}_{t,n}) \in \mathbb{R}^{K\times D}, \quad \mathcal{A}_t = \softmax_K \left( \frac{1}{\sqrt{D}} k(\bm{h}_t) \cdot q(\mathcal{S}_{t})^T \right) \in \mathbb{R}^{N\times K},  
+\end{equation}
+where $\mathcal{Z}_t = \sum_{n=1}^{N} \mathcal{A}_{t,n}$ and $\odot$ denotes the Hadamard product. $k$, $q$, $v$ are learned linear projections that map to a common dimension $D$. We apply LayerNorm \citep{ba2016layer} before each projection.
+The slot representations are then individually updated using Gated Recurrent Units~\citep{cho2014learning} as $\bm{\hat{s}}^k_t = \GRU(\bm{u}^k_t, \bm{s}^k_{t})$. Alternatively, the attention step (followed by the GRU update) can be iterated multiple times with shared parameters per frame of the input video. For added expressiveness, we apply an MLP with residual connection $\bm{\hat{s}}^k_t \leftarrow \bm{\hat{s}}^k_t + \mathrm{MLP}(\mathrm{LN}(\bm{\hat{s}}^k_t))$ and LayerNorm ($\mathrm{LN}$) after the GRU when using multiple Slot Attention iterations, following~\citet{locatello2020object}.
+ 
+
+\textbf{Predictor}\quad
+\looseness=-1The predictor takes the role of a transition function to model temporal dynamics, including interactions between slots. 
+To preserve permutation equivariance, we use a Transformer encoder~\citep{vaswani2017attention}.
+It allows for modeling of independent object dynamics as well as information exchange between slots via self-attention, while being more memory efficient than GNN-based models such as the Interaction Network~\citep{battaglia2016interaction}. Slots are updated as follows:
+\begin{equation}
+  \mathcal{S}_{t+1} = \mathrm{LN}\bigl( \mathrm{MLP}\bigl(\mathcal{\tilde{S}}_{t}\bigr) + \mathcal{\tilde{S}}_{t})\,,\quad \mathcal{\tilde{S}}_{t} = \mathrm{LN}\bigl( \mathrm{MultiHeadSelfAttn}\bigl(\mathcal{\hat{S}}_t\bigr) + \mathcal{\hat{S}}_t\bigr)\,.
+\end{equation}
+For $\mathrm{MultiHeadSelfAttn}$ we use the default multi-head dot-product attention mechanism from~\citet{vaswani2017attention}. We apply LayerNorm ($\mathrm{LN}$) after each residual connection.
+
+\textbf{Decoder}\quad
+The network output should be permutation equivariant (for per-slot outputs) or invariant (for global outputs) with respect to the slots.
+Slots can be read out either after application of the corrector or after the predictor (transition model).
+We decode slot representations after application of the corrector using a slot-wise Spatial Broadcast Decoder~\citep{watters2019spatial} to produce per-slot RGB predictions of the optical flow (or reconstructed frame) and an alpha mask.
+The alpha mask is normalized across slots via a softmax and used to perform a weighted sum over the slot-wise RGB reconstruction to arrive at a combined reconstructed frame:
+\begin{equation}
+  \bm{y_t} = \sum_{k=1}^K \bm{m}^k_t \odot \bm{y}^k_t,
+  \qquad
+  \bm{m}_t = \softmax_K \bigl( \bm{\hat{m}}^k_t\bigr),
+  \qquad
+  \bm{\hat{m}}^k_t, \bm{y}^k_t = f_\text{dec} \bigl(\bm{\hat{s}}^k_t\bigr).
+\end{equation}
+
+\textbf{Training}\quad
+Our sole prediction target is optical flow for each individual video frame, which we represent as RGB images using the default conversion in the literature~\citep{sun2018pwc}. Alternatively, our framework also supports prediction of other image-shaped targets, such as reconstruction of the original input frame.
+We minimize the pixel-wise squared reconstruction error (averaged over the batch), summed over both the temporal and spatial dimensions:
+\begin{equation}
+\lossfun{\mathrm{rec}} = \sum_{t=1}^T \lVert\bm{y}_{t} - \bm{y}^\text{true}_{t}\rVert^2. 
+\end{equation}
+
+\section{Related Work}
+\looseness=-1\textbf{Object-centric representation learning}\quad
+There is a rich literature on learning object representations from static scenes~\citep{greff2016tagger,eslami2016attend,greff2017neural,greff2019multi,burgess2019monet,engelcke2019genesis,crawford2019spatially,lin2020space,locatello2020object,du2021comet} or videos~\citep{van2018relational,kosiorek2018sequential,stelzner2019faster,kipf2019contrastive,crawford2020exploiting,creswell2021unsupervised} without explicit supervision. 
+PSGNet~\citep{bear2020learning} learns to decompose static images or individual frames from a video into hierarchical scene graphs using motion information estimated from neighboring video frames.
+Most closely related to our work are sequential object-centric models for videos and dynamic environments, such as OP3~\citep{veerapaneni2020entity}, R-SQAIR~\citep{stanic2019r}, ViMON~\citep{weis2020unmasking}, and SCALOR~\citep{jiang2019scalable}, which learn an internal motion model for each object. SIMONe~\citep{kabra2021simone} auto-encodes an entire video in parallel and learns temporally-abstracted representations of objects.
+OP3~\citep{veerapaneni2020entity} uses the same decoder as \modelname and a related dynamics model, but a less efficient inference process compared to Slot Attention.
+ 
+In an attempt to bridge the gap to visually richer and more realistic environments, recent works in object-centric representation learning have explored integration of inductive biases related to 3D scene geometry, both for static scenes~\citep{chen2020object,stelzner2021decomposing} and for videos~\citep{du2020unsupervised,henderson2020unsupervised,harley2021track}. This is largely orthogonal to our approach of utilizing conditioning and optical flow. A recent related method, FlowCaps~\citep{sabour2020unsupervised}, similarly proposed to use optical flow in a multi-object model. FlowCaps uses capsules~\citep{sabour2017dynamic,hinton2018matrix} instead of a slot-based representation and assumes specialization of individual capsules to objects or parts of a certain appearance, making it unsuitable for environments that contain a large variety of object types. Using a slot-based, exchangeable representation of objects allows \modelname to represent a diverse range of objects and generalize to novel objects at test time. 
+
+We discuss further recent related works on attention-based architectures operating on sets of latent variables~\citep{santoro2018relational,goyal2021neural,goyal2021factorizing,goyal2019recurrent,jaegle2021perceiver,jaegle2021perceiverio}, object-centric models for dynamic visual reasoning~\citep{yi2019clevrer,ding2021attention,bar2021compositional}, and supervised attention-based object-centric models~\citep{fuchs2019end,carion2020detr,kamath2021mdetr,meinhardt2021trackformer} in Appendix~\ref{app:related_work}.
+
+\looseness=-1\textbf{Video object segmentation and tracking}\quad
+The conditional tasks we consider in our work are closely related to the computer vision task of semi-supervised video object segmentation (VOS), where segmentation masks are provided for the first video frame during evaluation. Different from the typical setting, which is addressed by supervised learning on fully annotated videos or related datasets (e.g.~\citealp{caelles2017one,luiten2018premvos}), we consider the problem where models do not have access to any supervised information beyond the conditioning information on the first frame (e.g. a bounding box for each object).
+Several recent works have explored pre-training using self-supervision~\citep{li2019joint,jabri2020space,caron2021emerging} or image classification~\citep{zhang2020transductive} for the semi-supervised VOS task. These models rely on having access to segmentation masks in the first frame at evaluation time.  We demonstrate that multi-object segmentation and tracking can emerge even when segmentation labels are absent at both training and test time. 
+
+There is a rich literature on using motion cues to segment objects in the computer vision community. These methods use motion information at test time to, for example, cluster trajectories in order to segment independently moving objects~\citep{faktor2014video} or estimate multiple fundamental matrices between two views~\citep{isack2012energy}, to name a few.
+Closest to our work is a contemporary method~\citep{yang2021self} that trains a Slot Attention model on isolated optical flow data for foreground-background segmentation of a single object, independently for individual video frames and without using visual observations. Our method, on the other hand, supports multi-object environments and only relies on motion information as a training signal but otherwise operates directly on textured visual information, which allows it to segment static scenes at test time where optical flow is unavailable and consistently represent and track multiple objects throughout a video.
+
+\section{Experiments}
+\label{sec:experiments}
+We investigate 1) how \modelname compares to existing unsupervised video decomposition methods, 2) how various forms of hints (e.g., bounding boxes) can facilitate scene decomposition, and 3) how \modelname generalizes to unseen objects, backgrounds, and longer videos at test time.
+
+\begin{figure}[t]
+    \vspace{-1.1em}
+    \centering
+    \begin{subfigure}[b]{0.33\textwidth}
+    \centering
+    \subfloat{\raisebox{0.18in}{\rotatebox[origin=t]{90}{\small{CATER}}}}\hspace{0.05em}
+    \includegraphics[width=0.28\linewidth,frame=0.8pt]{figures/cater_0.png}
+    \includegraphics[width=0.28\linewidth,frame=0.8pt]{figures/cater_1.png}
+    \includegraphics[width=0.28\linewidth,frame=0.8pt]{figures/cater_2.png}\\
+    \subfloat{\raisebox{0.15in}{\rotatebox[origin=t]{90}{\small{MOVi}}}}\hspace{0.05em}
+    \includegraphics[width=0.28\linewidth,frame=0.8pt]{figures/movi_1.png}
+    \includegraphics[width=0.28\linewidth,frame=0.8pt]{figures/movi_2.png}
+    \includegraphics[width=0.28\linewidth,frame=0.8pt]{figures/movi_3.png}    
+    \end{subfigure}
+    ~
+    \begin{subfigure}[b]{0.64\textwidth}
+    \centering
+    \subfloat{\raisebox{0.45in}{\rotatebox[origin=t]{90}{\small{MOVi++}}}}\hspace{0.05em}
+    \includegraphics[width=0.3\linewidth,frame=0.8pt]{figures/movi++_1.jpg}
+    \includegraphics[width=0.3\linewidth,frame=0.8pt]{figures/movi++_2.jpg}
+    \includegraphics[width=0.3\linewidth,frame=0.8pt]{figures/movi++_3.jpg}
+    \end{subfigure}
+    \caption{Frame samples from the multi-object video datasets used in our experiments. MOVi++ uses real-world backgrounds and 3D scanned objects, which is a significant step up in visual complexity compared to datasets used in prior work on unsupervised/weakly-supervised object-centric learning.}
+    \label{fig:dataset_samples}
+\end{figure}
+
+\textbf{Metrics}\quad
+We report two metrics to measure the quality of video decomposition, object segmentation, and tracking: Adjusted Rand Index (ARI) and mean Intersection over Union (mIoU). ARI is a clustering similarity metric which we use to measure how well predicted segmentation masks match ground-truth masks in a permutation-invariant fashion, which makes it suitable for unsupervised methods. Like in prior work~\citep{greff2019multi,locatello2020object,kabra2021simone}, we only measure ARI based on foreground objects, which we refer to as FG-ARI. For video data, one cluster in the computation of ARI corresponds to the segmentation of a single object for the entire video, requiring temporal consistency without object identity switches to perform well on this metric.
+
+\textbf{Training setup}\quad
+During training, we split each video into consecutive sub-sequences of 6 frames each, where we provide the conditioning signal for the first frame. We train for 100k steps (200k for fully unsupervised video decomposition) with a batch size of 64 using Adam~\citep{kingma2014adam} with a base learning rate of $2\cdot10^{-4}$. We use a total of 11 slots in \modelname. For our experiments on fully unsupervised video decomposition we use 2 iterations of Slot Attention per frame and a single iteration otherwise. Further architecture details and hyperparameters are provided in the appendix. On 8x V100 GPUs with 16GB memory each, training \modelname with bounding box conditioning takes approx.~12hrs for videos with $64\times64$ resolution and 30hrs for videos with $128\times128$ resolution.
+
+\subsection{Unsupervised video decomposition}
+We first evaluate \modelname in the unconditional setting and with a standard RGB reconstruction objective on the CATER~\citep{girdhar2019cater} dataset\footnote{We use a variant of CATER with segmentation masks (for evaluation), introduced by~\citet{kabra2021simone}.}. Dataset examples are shown in Figure~\ref{fig:dataset_samples}.
+Results of \modelname and four unsupervised object representation learning baselines (taken from \citet{kabra2021simone}) are summarized in Table~\ref{table:ari_object_discovery}.
+The two image-based methods (Slot Attention~\citep{locatello2020object} and MONet~\citep{burgess2019monet}) are independently applied to each frame, and thus lack a built-in notion of temporal consistency which is reflected in their poor FG-ARI scores. 
+Unsurprisingly, the two video-based baselines, S-IODINE~\citep{greff2019multi} and SIMONe~\citep{kabra2021simone}, perform better.
+The (unconditional) \modelname model outperforms these baselines, demonstrating the adequacy of our architecture for the task of unsupervised object representation learning, albeit only for the case of simple synthetic data. For qualitative results, see Figure~\ref{fig:cater_unsupervised_segmentation} and Appendix~\ref{app:qualitative_results}.
+
+\subsection{More realistic datasets}
+To test \modelname on more realistic data, we use two video datasets (see \Cref{fig:dataset_samples}) introduced in Kubric~\citep{kubric2021}, created by simulating rigid body dynamics of up to ten 3D objects rendered in various scenes via raytracing using Blender~\citep{blender2021}.
+We refer to these as Multi-Object Video (MOVi) datasets.
+The first dataset, MOVi, uses the same simple 3D shapes as the CATER dataset (both inspired by the CLEVR benchmark~\citep{johnson2017clevr}), but introduces more complex rigid-body physical dynamics with frequent collisions and occlusions.
+The second dataset, MOVi++ significantly increases the visual complexity compared to datasets used in prior work and uses approx.~380 high resolution HDR photos as backgrounds and a set of 1028 3D scanned everyday objects~\citep{gso2020}, such as shoes, toys, or household equipment.
+Each dataset contains 9000 training videos and 1000 validation videos with 24 frames at 12 fps each and, unless otherwise mentioned, a resolution of $64\times64$ pixels for MOVi and $128\times128$ pixels for MOVi++.
+
+Due to its high visual complexity the MOVi++ dataset is a significantly more challenging testcase for unsupervised and weakly-supervised instance segmentation. 
+In fact, while SCALOR~\citep{jiang2019scalable} (using the reference implementation) was able to achieve $81.2\pm0.4\%$ FG-ARI on MOVi, it only resulted in $22.7\pm0.9\%$ FG-ARI on MOVi++.
+The SIMONe model also only achieved around $33\%$ FG-ARI (with one outlier as high as $46\%$), using our own re-implementation (which approximately reproduces the above results on CATER).
+We observed that both models, as well as \modelname, converged to a degenerate solution where slots primarily represent fixed regions of the image (often a rectangular patch or a stripe), instead of tracking individual objects.
+
+\begin{table}[t]
+\centering
+\caption{Segmentation results. Mean $\pm$ standard error (5 seeds). All values in $\%$.}
+\begin{subtable}{0.266\linewidth}
+\caption{Unsupervised.}
+\vspace{-0.8em}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lc} \\
+\toprule
+ & CATER \\
+\cmidrule(l{2pt}r{2pt}){2-2}
+\textbf{Model}& \textbf{FG-ARI}$\uparrow$\\
+\midrule
+Slot Attention& $7.3\scriptstyle{\color{lightgrey}\,\pm\,0.3}$ \\
+MONet& $41.2\scriptstyle{\color{lightgrey}\,\pm\,0.5}$ \\
+\midrule
+S-IODINE& $66.8\scriptstyle{\color{lightgrey}\,\pm\,1.5}$ \\
+SIMONe& $\mathbf{91.8}\scriptstyle{\color{lightgrey}\,\pm\,1.6}$ \\
+\modelname (uncond.) &  $\mathbf{92.8} \scriptstyle{\color{lightgrey}\,\pm\,0.8}$ \\
+\midrule
+\modelname + Segm. &  $97.9 \scriptstyle{\color{lightgrey}\,\pm\,0.4}$ \\
+\bottomrule
+\end{tabular}
+\label{table:ari_object_discovery}
+}
+\end{subtable}
+\begin{subtable}{0.715\linewidth}
+\caption{Conditional with optical flow supervision.}
+\label{table:seg-results}
+\vspace{-0.8em}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lcccc} \\%  cc}
+\toprule
+ & \multicolumn{2}{c}{MOVi} & \multicolumn{2}{c}{MOVi++} \\
+\cmidrule(l{2pt}r{2pt}){2-3}\cmidrule(l{2pt}r{2pt}){4-5}
+\textbf{Model} (+ Conditioning)& \textbf{FG-ARI}$\uparrow$ & \textbf{mIoU}$\uparrow$  & \textbf{FG-ARI}$\uparrow$ & \textbf{mIoU}$\uparrow$ \\
+\midrule
+Segmentation Propagation &  $61.5 \scriptstyle{\color{lightgrey}\,\pm\,0.6}$ & $ 49.8 \scriptstyle{\color{lightgrey}\,\pm\,0.4}$ & $ 37.8 \scriptstyle{\color{lightgrey}\,\pm\,0.5}$ & $33.3 \scriptstyle{\color{lightgrey}\,\pm\,0.2}$ \\
+\modelname + Segmentation &   $\mathbf{93.7} \scriptstyle{\color{lightgrey}\,\pm\,0.2}$ &	$\mathbf{72.0} \scriptstyle{\color{lightgrey}\,\pm\,0.3}$&  $70.4 \scriptstyle{\color{lightgrey}\,\pm\,2.0}$ &  $43.0 \scriptstyle{\color{lightgrey}\,\pm\,0.6}$ \\
+\modelname + Bounding Box &   $\mathbf{93.7} \scriptstyle{\color{lightgrey}\,\pm\,0.0}$ &	$\mathbf{71.2} \scriptstyle{\color{lightgrey}\,\pm\,0.6}$&  $\mathbf{77.4} \scriptstyle{\color{lightgrey}\,\pm\,0.5}$ &  $\mathbf{45.9} \scriptstyle{\color{lightgrey}\,\pm\,1.2}$ \\
+\modelname + Center of Mass &   $\mathbf{93.8} \scriptstyle{\color{lightgrey}\,\pm\,0.1}$ &	$\mathbf{72.1} \scriptstyle{\color{lightgrey}\,\pm\,0.2}$& $\mathbf{78.3} \scriptstyle{\color{lightgrey}\,\pm\,0.6}$ & $43.5 \scriptstyle{\color{lightgrey}\,\pm\,2.9}$
+\\
+\midrule
+CRW~\citep{jabri2020space}& -- & $42.4$ & -- & $50.9$ \\
+T-VOS~\citep{zhang2020transductive}& -- & $50.4$ & -- & $46.4$ \\
+\modelname (ResNet) + Bounding Box& -- & -- & $82.8 \scriptstyle{\color{lightgrey}\,\pm\,0.4}$ & $50.7\scriptstyle{\color{lightgrey}\,\pm\,0.2}$ \\
+\midrule
+Flow k-Means + Center of Mass &  $30.2$ & $5.8$ & $32.6$ & $9.3$ \\
+\bottomrule
+\end{tabular}
+}
+\end{subtable}
+\label{table:main_quantitative_results}
+\end{table}
+\begin{figure}[t]
+\centering
+\begin{subfigure}[b]{0.69\textwidth}
+\includegraphics[width=0.308\textwidth]{figures/savi_ablation_movi.pdf}
+\includegraphics[width=0.665\textwidth]{figures/savi_ablation_movi++.pdf}
+\caption{Supervision ablation on MOVi \& MOVi++.}
+\label{fig:supervision_ablation}
+\end{subfigure}
+~
+\begin{subfigure}[b]{0.25\textwidth}
+\centering
+\includegraphics[width=0.99\linewidth]{figures/noise_movi++.pdf}
+\caption{Robustness to noise.}
+\label{fig:noise_com}
+\end{subfigure}
+\caption{(\textbf{a}) Supervision ablations for a SAVi model trained with bounding boxes as conditional input. (\textbf{b}) Robustness analysis with Gaussian noise added to the conditioning signal. In both figures, we evaluate on the first six frames and report mean $\pm$ standard error across 5 seeds.}
+\label{fig:ablations}
+\vspace{-3mm}
+\end{figure}
+
+
+\subsection{Conditional video decomposition}
+To tackle these more realistic videos we 1) change the training objective from predicting RGB image to optical flow and 2) condition the latent slots of the SAVi model on \textit{hints} about objects in the first frame of the video, such as their segmentation mask.
+We showcase typical qualitative results for \modelname in \Cref{fig:qualitative}, and on especially challenging cases with heavy occlusion or complex textures in Figures~\ref{fig:qualitative_challenge} and~\ref{fig:qualitative_failure_case}.
+In all cases, \modelname was trained on six consecutive frames, but we show results for full (24 frame) sequences at test time.
+Using detailed segmentation information for the first frame is common practice in video object segmentation, where models such as T-VOS~\citep{zhang2020transductive} or CRW~\citep{jabri2020space} \textit{propagate} the initial masks through the remainder of the video sequence. 
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.4335\textwidth]{figures/movi_long.pdf}\,
+    \includegraphics[width=0.5562\textwidth]{figures/movi++_long.pdf}%
+    \caption{Representative qualitative results of \modelname conditioned on bounding box annotations in the first video frame. We visualize predicted (\textit{Pred.}) segmentations and optical flow predictions together with their respective ground-truth values (\textit{G.T.}) for both MOVi (\textit{left}) and MOVi++ (\textit{right}). We visualize the soft segmentation masks provided by the decoder of \modelname. Each mask is multiplied with a color that identifies the particular slot it represents.}
+    \label{fig:qualitative}
+\end{figure}
+\begin{figure}[t!]
+    \centering
+    \begin{subfigure}[b]{0.425\textwidth}
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/movi++_challenge_1.pdf}\,
+    \includegraphics[width=0.465\textwidth,trim=1.4cm 0 0 0,clip]{figures/movi++_challenge_2.pdf}%
+    \caption{Successfully handled challenging examples.}
+    \label{fig:qualitative_challenge}
+    \end{subfigure}
+    \,\,
+    \begin{subfigure}[b]{0.28\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/movi++_failure.pdf}%
+    \caption{Failure case.}
+    \label{fig:qualitative_failure_case}
+    \end{subfigure}
+    \,\,
+    \begin{subfigure}[b]{0.214\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/cater_unsupervised.pdf}
+    \caption{Unsupervised.}
+    \label{fig:cater_unsupervised_segmentation}
+    \end{subfigure}
+    \caption{(\textbf{a}) SAVi successfully handles examples with complex texture (\textit{left}) and occlusion with object of similar appearance (\textit{right}). (\textbf{b}) In a heavily occluded example \modelname can lose track of objects and swap object identities. (\textbf{c}) Unsupervised segmentation on CATER with RGB reconstruction.}
+    \vspace{-1em}
+\end{figure}
+
+\paragraph{Quantitative Evaluation}
+On the MOVi and MOVi++ datasets T-VOS achieves $50.4\%$ and $46.4\%$ mIoU respectively, whereas CRW achieves $42.4\%$ and $50.9\%$ mIoU (see \Cref{table:seg-results}).
+\modelname learns to produce temporally consistent masks that are significantly better on MOVi ($72.0\%$ mIoU) and slightly worse than T-VOS and CRW on MOVi++ ($43.0\%$ mIoU) when trained to predict flow and with segmentation masks as conditioning signal in the first frame.
+However, we hold that this comparison is not entirely fair, since both CRW and T-VOS use a more expressive ResNet~\citep{he2016deep} backbone and operate on higher-resolution frames (480p). For T-VOS, this backbone is pre-trained on ImageNet~\citep{deng2009imagenet}, whereas for CRW we re-train it on MOVi/MOVi++.
+For a fairer comparison, we adapt T-VOS~\citep{zhang2020transductive} to our setting by using the same CNN encoder architecture at the same resolution as in SAVi and trained using the same supervision signal (i.e.~optical flow of moving objects). 
+While this adapted baseline (\textit{Segmentation Propagation} in \Cref{table:seg-results}) performs similar to T-VOS on MOVi, there is a significant drop in performance on MOVi++. We verify that SAVi can similarly benefit from using a stronger ResNet backbone on MOVi++ (\textit{SAVi (ResNet)} in \Cref{table:seg-results}), which closes the gap to the CRW~\citep{jabri2020space} baseline.
+
+\paragraph{Conditioning Ablations}
+Surprisingly, we find that even simple hints about objects in the first video frame such as bounding boxes, or even just a point in the center of a bounding box (termed as \textit{center of mass}), suffice for the model to establish correspondence between hint and visual input, and to retain the same quality in object segmentation and tracking.
+Conditioning on such simple signals is not possible with segmentation propagation models~\citep{zhang2020transductive,jabri2020space} as they require accurate segmentation masks as input.
+To study whether an even weaker conditioning signal suffices, we add noise --- sampled from a Gaussian distribution $\mathcal{N}(0, \sigma)$ --- to the center-of-mass coordinates provided to the model in the first frame, both during training and testing.
+We find that \modelname remains robust to noise scales $\sigma$ up to $\sim$20$\%$ of the average object size (\Cref{fig:noise_com}), after which point mIoU starts to decay (and faster than FG-ARI), indicating that \modelname starts to lose correspondence between the conditioning signal and the objects in the scene. 
+Full ablation of the conditioning signal leads to a significant drop in performance (\Cref{fig:ablations}), which demonstrates that conditional hints are indeed important to SAVi, though even very rough hints suffice.
+
+\paragraph{Optical flow ablations}
+Using ground-truth optical flow as a training target --- especially in the absence of camera motion --- is a form of weak supervision that won't be available for real data.
+To investigate its benefits and importance, we first apply k-means clustering to the optical flow signal (enriched with pixel position information) where we use the center of mass coordinates of objects to initialize the cluster centers.
+The results (see \Cref{table:seg-results}) show that simply clustering the optical flow signal itself is insufficient for accurate segmentation.
+Next, we perform the following ablations on a SAVi model with bounding boxes as conditional input, summarized in \Cref{fig:ablations}: 1) instead of using ground-truth optical flow provided by the simulator/renderer, we use approximate optical flow obtained from a recent unsupervised flow estimation model~\citep{stone2021smurf} (\textit{estimated flow}); 2) we replace optical flow with RGB pixel values as training targets, i.e.~using a reconstruction target (\textit{w/o flow}); 3) we train SAVi without conditioning by initializing slots using fixed parameters that are learned during training (\textit{unconditional}). 
+We find, that estimated flow confers virtually the same benefits as ground truth-flow, and that flow is unnecessary for the simpler MOVi dataset.
+For MOVi++, on the other hand, it is crucial for learning an accurate decomposition of the scene, and without access to optical flow (true or estimated) \modelname fails to learn meaningful object segmentations.
+
+\subsection{Test time generalization}\label{sec:generalization}
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}[b]{0.7\textwidth}
+        \includegraphics[width=0.5\textwidth]{figures/movi_full_seq_fg_ari.pdf}\,\,
+        \includegraphics[width=0.482\textwidth]{figures/movi_full_seq_miou.pdf}
+        \caption{Per-frame evaluation scores on MOVi.}
+    \label{fig:long_sequence_generalization}
+    \end{subfigure}
+    \quad
+    \begin{subfigure}[b]{0.24\textwidth}
+    \includegraphics[width=\textwidth]{figures/savi_generalization_movi++.pdf}%
+    \vspace{0.1em}
+    \caption{OOD generalization.}
+    \label{fig:genearlization_obj_bg}
+    \end{subfigure}
+    \caption{(\textbf{a}) Per-frame segmentation quality. Grey area highlights the number of frames used during training. (\textbf{b}) Video decomposition results on out-of-distribution evaluation splits with new objects and/or new backgrounds (6 frames). Mean $\pm$ standard error for 5 seeds.}
+\end{figure}
+\textbf{Longer sequences}\quad
+For memory efficiency, we train \modelname on subsequences with a total of 6 frames, i.e.~shorter than the full video length. We find, however, that even without any additional data augmentation or regularization, \modelname generalizes well to longer sequences at test time, far beyond the setting used in training. We find that segmentation quality measured in terms of FG-ARI remains largely stable, and surprisingly even increases for unconditional models (Figure \ref{fig:long_sequence_generalization}). Part of the increase can be explained by objects leaving the field of view later in the video (see examples in the appendix), but models nonetheless appear to benefit from additional time steps to reliably break symmetry and bind objects to slots. The opposite effect can be observed for segmentation propagation models: performance typically decays over time as errors accumulate.
+
+\textbf{New objects and backgrounds}\quad
+We find that \modelname generalizes surprisingly well to settings with previously unseen objects and with new backgrounds at test time: there is no significant difference in both FG-ARI and mIoU metrics when evaluating \modelname with bounding box conditioning on evaluation sets of MOVi++ with entirely new objects or backgrounds. On an evaluation set where we provide both new backrounds and new objects at the same time, there is a drop of less than 2\% (absolute), see Figure~\ref{fig:genearlization_obj_bg}. Remarkably, a \modelname model trained on MOVi++ also transfers well to MOVi at test time.
+
+\begin{figure}[t!]
+    \centering    
+    \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width=0.104\textwidth]{figures/conditioning_legend.pdf}
+    \includegraphics[width=0.104\textwidth]{figures/movi++_parts_whole_boxes.pdf}\quad
+    \includegraphics[width=0.755\textwidth,trim=0 0 23.5cm 0,clip]{figures/movi++_parts_whole_attn.pdf}
+    \end{subfigure}\,
+    \caption{Emergent part-whole segmentation by querying the model at test time in different ways: The model attends to either both \textit{green fist} with a single slot or to each individual fist with a separate slot, depending on the granularity of the conditioning signal. We visualize \modelname's attention masks.
+    }
+    \label{fig:part-whole-segmentation}
+    \vspace{-1em}
+\end{figure}
+\paragraph{Part-whole segmentation}
+Our dataset is annotated only at the level of whole objects, yet we find anecdotal evidence that by conditioning at the level of parts during inference the model can in fact successfully segment and track the corresponding parts.
+Consider, for example the two \textit{green fists} in \Cref{fig:part-whole-segmentation} which in the dataset are treated as a single composite object.
+When conditioned with a single bounding box encompassing both fists (\textit{Whole}), or on two bounding boxes (\textit{Parts}), \modelname either segments and tracks either the composite object or the individual parts (see appendix for an additional example).
+This finding is remarkable for two reasons: 
+Firstly, it shows that the model can (at least to some degree) generalize to different levels of granularity.
+This kind of generalization is very useful, since the notion of an object is generally task-dependent and the correct level of granularity might not be known at training time.
+Secondly, this experiments demonstrates a powerful means for interfacing with the model:
+rather than producing a single fixed decomposition, \modelname has learned to adapt its segmentation and processing of the video based on the conditioning signal.
+We believe that this way of learning a part-whole hierarchy only implicitly and segmenting different levels on demand is ultimately more flexible and tractable than trying to explicitly represent the entire hierarchy at once.
+%In this example we used conditioning to communicate the desired level of object granularity at test time, but we hypothesize that it could also serve as an interface for other tasks such as visual search or directing attention. See \Cref{app:quantitative_reslts} for preliminary experiments about using conditioning to select and track only a subset of objects.
+
+\subsection{Limitations}
+\label{sec:discussion}
+There are still several obstacles that have to be overcome for successful application of our framework to the full visual and dynamic complexity of the real world. First, our training set up assumes the availability of optical flow information at training time, which may not be available in real-world videos. Our experiments, however, have demonstrated that estimated optical flow from an unsupervised model such as SMURF~\citep{stone2021smurf} can be sufficient to train \modelname. Secondly, the environments considered in our work, despite taking a large step towards realism compared to prior works, are limited by containing solely rigid objects with simple physics and, in terms of the MOVi datasets, solely moving objects. In this case, optical flow, even in the presence of camera movement, can be interpreted as an indirect supervision signal for foreground-background (but not per-object) segmentation. Furthermore, training solely with optical flow presents a challenge for static objects.
+%
+Nonetheless, we find evidence that SAVi can reliably decompose videos in a constrained real-world environment: we provide qualitative results demonstrating scene decomposition and long-term tracking in a robotic grasping environment~\citep{cabi2020scaling} in Appendix~\ref{app:qualitative_results}. Most real-world video data, however, is still of significantly higher complexity than the environments considered here and reliably bridging this gap is an open problem.
+
+
+\section{Conclusion}
+\label{sec:conclusion}
+\looseness=-1We have looked at the problem of learning object representations and physical dynamics from video.
+We introduced \modelname, an object-centric architecture that uses attention over a latent set of slots to discover, represent and temporally track individual entities in the input, and we have shown that video in general and flow prediction in particular are helpful for identifying and tracking objects.
+We demonstrated that providing the model with simple and possibly unreliable position information about the objects in the first frame is sufficient to steer learning towards the right level of granularity to successfully decompose complex videos and simultaneously track and segment multiple objects.
+More importantly, we show that the level of granularity can potentially be controlled at inference time, allowing a trained model to track either parts of objects or entire objects depending on the given initialization.
+%
+Since our model achieves very reasonable segmentation and tracking performance, this is evidence that object-centric representation learning is not primarily limited by model capacity. 
+This way of conditioning the initialization of slot representations with location information also potentially opens the door for a wide range of semi-supervised approaches.
+
+
+\subsection*{Ethics Statement}
+Our analysis, which is focused on multi-object video data with physically simulated common household objects, has no immediate impact on general society. As with any model that performs dynamic scene understanding, applications with potential negative societal impact such as in the area of surveillance, derived from future research in this area, cannot be fully excluded. We anticipate that future work will take steps to close the gap between the types of environments considered in this work, and videos of diverse scenes taken in the real world, which will likely enable applications in various societally relevant domains such as robotics and general video understanding. 
+
+\subsection*{Acknowledgements}
+We would like to thank Mike Mozer and Daniel Keysers for general advice and feedback on the paper, and David Fleet, Dirk Weissenborn, Jakob Uszkoreit, Marvin Ritter, Andreas Steiner, and Etienne Pot for helpful discussions. We are further grateful to Rishabh Kabra for sharing the CATER (with masks) dataset and to Yi Yang, Misha Denil, Yusuf Aytar, and Claudio Fantacci for helping us get started with the Sketchy dataset.
+
+\bibliographystyle{iclr2022_conference}
+\bibliography{references}
+
+\newpage
+\appendix
+\section{Appendix}
+
+\setcounter{figure}{0} \renewcommand{\thefigure}{A.\arabic{figure}}
+\setcounter{table}{0} \renewcommand{\thetable}{A.\arabic{table}}
+
+In Section~\ref{app:related_work}, we discuss additional related work. In Sections~\ref{app:real_world_robotics}--\ref{app:quantitative_reslts}, we show additional qualitative and quantitative results. Section~\ref{app:ablations} further contains results for an ablation study on SAVi. Lastly, in Sections~\ref{app:datasets}--\ref{app:metrics}, we report additional details on datasets, model architecture, and training setup (hyperparameters, baselines, metrics).
+
+
+\subsection{Additional related work}
+\label{app:related_work}
+\paragraph{Attention-based networks for sets of latent variables}
+\modelname shares close connections with other attention-based modular neural networks. Relational Recurrent Networks~\citep{santoro2018relational} and the RIM model~\citep{goyal2019recurrent} use related attention mechanisms to map from inputs to slots and from slots to slots, the latter of which (RIM) uses specialized neural network parameters for each slot. Follow-up works~\citep{goyal2021factorizing,goyal2021neural} introduce additional sparsity and factorization constraints on the dynamics model, which is orthogonal to our contributions of conditional learning and dynamics modeling using optical flow. The Perceiver~\citep{jaegle2021perceiver} uses an architecture similar to Slot Attention~\citep{locatello2020object}, i.e.~using a set of latent vectors which are (recurrently) updated by attending on a set of input feature vectors, for classification tasks. The Perceiver IO~\citep{jaegle2021perceiverio} model extends this architecture by adding an attention-based decoder component to interface with a variety of structured prediction tasks. SAVi similarly maps inputs onto a latent set of slot vectors using an attention mechanism, but differs in the decoder architecture and in its sequential nature: different from Perceiver IO, SAVi processes a sequence of inputs (e.g.~video frames) of arbitrary length, encoding and decoding a single input (or output) element per time step while maintaining a latent set of slot variables that is carried forward in time.
+
+
+\paragraph{Supervised slot-based models for visual tracking}
+Slot-based architectures have also been explored in the context of fully supervised multi-object tracking and segmentation with models such as MOHART~\citep{fuchs2019end}, TrackFormer~\citep{meinhardt2021trackformer}, and TubeR~\citep{zhao2021tuber}. In the image domain,  GPV-I~\citep{gupta2021towards} and MDETR~\citep{kamath2021mdetr,carion2020detr} explore conditioning supervised slot-based models on auxiliary information, in a form which requires combinatorial matching during training. \modelname learns to track and segment multiple objects without being directly supervised to do so, using only weak forms of supervision for the first frame of the video. Slot conditioning allows us to avoid matching and to consistently identify and track individual objects by their specified query.
+
+
+\paragraph{Dynamic visual reasoning and action graphs}
+Object-centric models for dynamic scenes have found success in other relational tasks in vision, such as supervised visual reasoning~\citep{yi2019clevrer,chen2021grounding,ding2021attention,ding2021dynamic}, activity/action recognition~\citep{jain2016structural,girdhar2019video,herzig2019spatio}, and compositional video synthesis with action graphs~\citep{bar2021compositional}. Many of these approaches use pre-trained~\citep{chen2021grounding} and sometimes frozen~\citep{yi2019clevrer,ding2021attention} object detection backbones. Combining these methods with an end-to-end video object discovery architecture such as SAVi using self-supervised learning objectives is an interesting direction for future work.
+
+\subsection{Real-world robotics task}
+\label{app:real_world_robotics}
+To evaluate whether SAVi can decompose real-world video data in a limited domain, we train and qualitatively evaluate an unsupervised SAVi model with RGB reconstruction on the Sketchy dataset~\citep{cabi2020scaling}. The Sketchy dataset contains videos of a real-world robotic grasper interacting with various objects.
+
+We use the human demonstration sequences as part of the ``$\mathrm{rgb30\_\_all}$'' subset of the Sketchy dataset~\citep{cabi2020scaling}, resulting in a total of 2930 training videos of 201 frames each. In Figure~\ref{fig:unsupervised_sketchy_appendix} and in the supplementary videos (see supplementary material), we show qualitative results on unseen validation data.
+
+Our qualitative results in Figure~\ref{fig:unsupervised_sketchy_appendix} demonstrate that SAVi can decompose these real-world scenes into meaningful object components and consistently represent and track individual scene components over long time horizons, far beyond what is observed during training. SAVi is trained with a per-slot MLP predictor model (with a single hidden layer of 256 hidden units, a skip connection, and Layer Normalization) for 1M steps with otherwise the same architecture as the unsupervised SAVi model used for CATER described in the main paper.
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/sketchy_unsupervised_appendix.pdf}%
+\caption{Fully-unsupervised video decomposition on Sketchy~\citep{cabi2020scaling}, a real-world robotic grasping dataset, with a SAVi model trained using 11 object slots. In addition to the predicted segmentation of the scene (\textit{Pred.}), we visualize reconstructions of individual slots (multiplied with their respective predicted soft segmentation mask). We assign all three discovered background slots (slots 2, 3, and 8) the color black to ease interpretation. Additional videos are provided in the supplementary material.}
+\label{fig:unsupervised_sketchy_appendix}
+\end{figure}
+
+
+\subsection{Additional qualitative results}
+\label{app:qualitative_results}
+
+
+\paragraph{Part-whole segmentation} In Figure~\ref{fig:katr_part_whole_laptop} we show another example of steerable part-whole segmentation based on the granularity of the hint provided for the first frame. In this example, the laptop in the foreground of the scene is either annotated with a single bounding box that covers the full object (which is the granularity of annotation originally provided in the dataset), or we re-annotate this object as two separate instances, where one bounding box covers the screen of the laptop and the other bounding box covers the base incl.~the keyboard. Despite never having seen a separate "screen" object in the dataset, the model can reliably identify, segment, and track each individual part, as can be seen both by the predicted decoder segmentation masks and the corrector attention masks. Alternatively, if the conditional input covers the full object, the model tracks and segments the entire laptop using a single slot, here shown in green.
+
+We further observe that the corrector attention masks much more sharply outline the object compared to the decoder segmentation masks, but have artifacts for large objects which is likely due to the limited receptive field of the encoder CNN used in our work (for reasons of simplicity). Both this gap in sharpness and the artifacts seen in the corrector masks for large objects can likely be addressed in future work by using more powerful encoder and decoder architectures. 
+\begin{figure}[htp]
+    \centering
+    \begin{subfigure}[b]{0.12\textwidth}
+    \includegraphics[width=\linewidth]{figures/movi++_parts_whole_boxes_laptop.pdf}
+    \caption{Inputs.}
+    \end{subfigure}\quad
+    \begin{subfigure}[b]{0.4\textwidth}
+    \includegraphics[width=\linewidth,trim=0 0 63cm 0,clip]{figures/movi++_parts_whole_laptop.pdf}
+    \caption{Decoder segmentation masks.}
+    \end{subfigure}\quad
+    \begin{subfigure}[b]{0.402\textwidth}
+    \includegraphics[width=\linewidth,trim=0 0 78.6cm 0,clip]{figures/movi++_parts_whole_laptop_attn.pdf}
+    \caption{Corrector attention masks.}
+    \end{subfigure}\quad
+\caption{An example of query-dependent part vs.~whole segmentation. (a) shows the input bounding boxes provided as conditioning signal. (b) and (c) show the per-slot segmentations obtained for each of the two conditioning cases in terms of the decoder segmentation masks and corrector attention masks, respectively.}
+\label{fig:katr_part_whole_laptop}
+\end{figure}
+
+
+\paragraph{Unsupervised video decomposition}
+In Figure~\ref{fig:unsupervised_cater_appendix} we show qualitative results for fully-unsupervised video decomposition with SAVi on the CATER dataset (on unseen validation data). Since SAVi is trained with a RGB reconstruction loss in this setting, we can visualize reconstructions of individual objects over multiple time steps in the video.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/cater_unsupervised_appendix.pdf}%
+\caption{Fully-unsupervised video decomposition on CATER with a SAVi model trained using 11 object slots. In addition to the predicted segmentation of the scene (\textit{Pred.}), we visualize reconstructions of individual slots (multiplied with their respective predicted soft segmentation mask).}
+\label{fig:unsupervised_cater_appendix}
+\end{figure}
+
+\paragraph{Extrapolation to long sequences}
+In Figures~\ref{fig:qualitative_klevr}--\ref{fig:qualitative_katr} we show several representative examples of applying \modelname with bounding box conditioning on full-length MOVi and MOVi++ videos of 24 frames, after being trained on sequences of only 6 frames.
+
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/movi_appendix_1.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi_appendix_2.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi_appendix_3.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi_appendix_4.pdf}%
+\caption{Qualitative extrapolation results for a SAVi model with bounding box conditioning trained on sequences of 6 frames on MOVi.}
+\label{fig:qualitative_klevr}
+\end{figure}
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/movi++_appendix_1.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi++_appendix_2.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi++_appendix_3.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi++_appendix_4.pdf}%
+\caption{Qualitative extrapolation results for a SAVi model with bounding box conditioning trained on sequences of 6 frames on MOVi++.}
+\label{fig:qualitative_katr}
+\end{figure}
+
+\paragraph{Moving camera}
+In Figure~\ref{fig:moving_camera_results} we show qualitative results for SAVi (with bounding box conditioning) on a more challenging variant of the MOVi++ dataset with (linear) camera movement, where optical flow encodes both object movement and movement of the background relative to the camera. This effectively leads to colored background in the optical flow images, and weakens the usefulness of optical flow for foreground-background segmentation.
+Nonetheless, \modelname with bounding box conditioning achieves approx. $65.5\pm0.5\%$ FG-ARI on this modified dataset, and we find that it is still able to segment and track objects, although at a lower fidelity than in MOVi++.
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/moving_camera_appendix_1.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/moving_camera_appendix_2.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/moving_camera_appendix_3.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/moving_camera_appendix_4.pdf}%
+\caption{Qualitative results for a SAVi model with bounding box conditioning trained on a varaint of MOVi++ with a moving camera.}
+\label{fig:moving_camera_results}
+\end{figure}
+
+\paragraph{Baselines: Segmentation Propagation}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/movi_appendix_tvos_0.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi++_appendix_tvos_0.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi++_appendix_tvos_1.pdf}\\[.5em]
+\caption{Qualitative results for the Segmentation Propagation baseline with segmentation conditioning on the MOVi (top example) and on the MOVi++ (bottom two examples) datasets.}
+\label{fig:qualitative_katr_tvos}
+\end{figure}
+In Figure~\ref{fig:qualitative_katr_tvos} we show qualitative results for the Segmentation Propagation baseline on a couple of sequences each in the MOVi and MOVi++ datasets. In these image grids, `Pred.' corresponds to the soft segmentation masks before $\mathrm{argmax}$ similar to the illustrations for \modelname above. We also show `Pred.~Argmax' which corresponds to the hard segmentation masks post $\mathrm{argmax}$. The last row in each image grid corresponds to optical flow predicted from a single image. This is expected to be poor since flow prediction from a single image is a highly ambiguous task. We find that the Segmentation Propagation baseline struggles to retain small objects. These often disappear or become part of a bigger object. The soft masks also suggest that the model is struggling to keep the background separate from objects. 9 continuous reference frames were used for label propagation in Segmentation Propagation. See Section~\ref{sec:appendix:baseline:tvos} for more details.
+
+
+\paragraph{Baselines: SCALOR}
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/movi_scalor_1.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi_scalor_2.pdf}%
+\caption{Qualitative results for a SCALOR model trained on sequences of 6 frames on MOVi.}
+\label{fig:qualitative_klevr_scalor}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/movi++_scalor_1.pdf}\\[.5em]
+    \includegraphics[width=0.92\textwidth]{figures/movi++_scalor_2.pdf}%
+\caption{Qualitative results for a SCALOR model trained on sequences of 6 frames on MOVi++.}
+\label{fig:qualitative_katr_scalor}
+\end{figure}
+Figures~\ref{fig:qualitative_klevr_scalor} and~\ref{fig:qualitative_katr_scalor} show qualitative results for the SCALOR baseline on examples from the MOVi and MOVi++ datasets. Often, when small objects in MOVi get close to each other, SCALOR merges them as one object. On MOVi++, SCALOR struggles with object boundaries and often picks up background texture as extra objects.
+
+\subsection{Additional quantitative results}
+\label{app:quantitative_reslts}
+\paragraph{Transfer to static scenes}
+A key advantage of \modelname over methods that segment objects using optical flow as input, is that \modelname can be applied to static images where optical flow is not available. We demonstrate generalization to static images by evaluating `\modelname + Bounding box' models on the first frame of all videos in the validation set. To this end, we repeat the first frame twice to form a ``boring'' video to test whether the model can accurately segment and ``track'' objects even in the absence of motion. In this setting, our model achieves a FG-ARI score of $88.7 \pm 0.2$ on the MOVi++ dataset, i.e. it accurately segments the static scene.
+
+\paragraph{Tracking subsets of objects} We investigate interfacing with \modelname to track a subset of the objects present in the first frame. We achieve this by conditioning slots using bounding boxes/segmentation masks for some of the objects and ignoring the bounding boxes/segmentation masks for the remaining objects. We found it beneficial, for these experiments, to initialize unconditioned slots with random vectors, so that they are free to model any remaining objects. We also found it beneficial to expose the model to this scenario at training time. We encoded whether a slot received conditional input or not using a binary indicator which we appended to the initial slot value.
+\begin{wrapfigure}[28]{r}{0.5\textwidth}
+    \vspace{-0.5em}
+    \centering
+    \includegraphics[width=1\linewidth,frame=0pt]{figures/movi_conditional_unsupervised_all.pdf}
+    \caption{Subset selection experiments: We select a subset of objects at train and test time and measure tracking mIoU on the MOVi dataset (first 6 frames only). Five seeds were used for each of these box-whisker plots.}
+    \label{fig:subsel}
+\end{wrapfigure}
+\Cref{fig:subsel} reports mIoU across various experimental conditions. The top two plots study \modelname under bounding box conditioning and the bottom two plots study \modelname under segmentation mask conditioning.
+
+\textit{Varying subset sizes for evaluation:} For the right two plots in \Cref{fig:subsel}, we train \modelname with up to 6 objects and evaluate with varying subset sizes. We observe that, selecting and tracking subsets of objects is indeed possible, but the introduction of randomly initialized slots comes at a price: with more objects without a conditioning signal, therefore needing to be explained by randomly initialized slots, the model's ability to connect the provided hints to the correct objects decays, as can be observed by a decrease in the mIoU score.
+
+\textit{Varying subset sizes for training:} In the left two plots in \Cref{fig:subsel}, we train \modelname with various subsets of size $s \in \lbrace 1, 3, 6, 10\rbrace$ and evaluate on 3 objects at test time. By training on subsets of objects, we are able to ablate between an unsupervised and a fully conditioned setting. As seen in the plots, when `maximum training objects' is 1, that is 10 randomly initialized slots and 1 conditioned slot are used, the model is not able to establish a correspondence between the conditioning hint and the corresponding object in the scene. In other words, it treats the conditioning hint similar to the randomly initialized slots. On the other hand, providing conditioning for all objects at training time, that is `maximum training objects' is 10, leads to poor generalization to subsets at test time since the model was not exposed to unconditioned objects during training. Conditioning on up to 6 objects presents a reasonable trade off between these two extremes. Providing explicit supervision on the alignment of the hint and the corresponding object in the input (which we do not provide) is likely necessary for stabilizing this setup when only few hints are provided. Alternatively, smarter initialization strategies for unconditioned slots can likely improve this setup, which we leave for future work.
+
+\paragraph{Generalization to unseen objects and backgrounds} 
+To test for generlization capabilities, we evaluate a SAVi model with bounding box conditioning, which was trained on MOVi++, on the following evaluation splits (see Table~\ref{table:generalization}):
+\begin{itemize}
+    \item \textbf{Unseen objects}: This split only contains novel objects (approx.~100) not seen during training, which are also not part of the default evaluation split. Remarkably, SAVi generalizes without a decrease in FG-ARI or mIoU scores on this split.
+    \item \textbf{Unseen objects}: This split only contains novel backgrounds (approx.~40) not seen during training, but otherwise contains solely known objects. Generalization is comparable as to the default evaluation set.
+    \item \textbf{Unseen objects \& backgrounds}: When evaluating with both novel objects and backgrounds, there is only a slight decrease in FG-ARI and mIoU scores, i.e.~the model still generalizes well.
+    \item \textbf{MOVi}: A model trained on MOVi++ also generalizes well to MOVi, here at a resolution of $128\times 128$ to be in line with the training setup on MOVi++.
+\end{itemize}
+
+\begin{table*}[htp]
+\centering
+\caption{Generalization results for a SAVi + Bounding Box model trained on MOVi++. Evaluation on first 6 video frames. Mean and standard error (10 seeds). All values in $\%$.}
+\vspace{-1em}
+\begin{tabular}{lcc} \\%  cc}
+\toprule
+\textbf{Evaluation split} & \textbf{FG-ARI}$\uparrow$ & \textbf{mIoU}$\uparrow$ \\
+\midrule
+MOVi++: Default &   $82.0 \scriptstyle{\,\pm\,0.1}$ &  $54.3 \scriptstyle{\,\pm\,0.3}$ \\
+MOVi++: Unseen objects &   $82.0 \scriptstyle{\,\pm\,0.1}$ &	$54.4 \scriptstyle{\,\pm\,0.3}$ \\
+MOVi++: Unseen backgrounds &   $82.2 \scriptstyle{\,\pm\,0.1}$ &	$54.0 \scriptstyle{\,\pm\,0.3}$ \\
+MOVi++: Unseen objects \& backgrounds &   $80.4 \scriptstyle{\,\pm\,0.1}$ &	$52.6 \scriptstyle{\,\pm\,0.3}$ \\
+MOVi (trained on MOVi++) & $83.7 \scriptstyle{\,\pm\,0.2}$ & $53.7 \scriptstyle{\,\pm\,0.6}$ \\
+\bottomrule
+\end{tabular}
+\label{table:generalization}
+\end{table*}
+
+
+\paragraph{Unconditional video decomposition on MOVi / MOVi++}
+
+In Table~\ref{table:movi_unconditional} we report results on unconditional video decomposition on the MOVi and MOVi++ datasets. For SIMONe, we use our own reimplementation for which we approximately reproduced the CATER results reported by~\citet{kabra2021simone}. For SCALOR~\citep{jiang2019scalable}, we use the implementation provided by the authors. Further baseline details are provided in Section~\ref{app:baselines}.
+
+\begin{table*}[htp]
+\centering
+\caption{Unconditional video decomposition on MOVi / MOVi++.}
+\vspace{-1em}
+\begin{tabular}{lcc} \\%  cc}
+\toprule
+ & MOVi & MOVi++ \\
+\cmidrule(l{2pt}r{2pt}){2-2}\cmidrule(l{2pt}r{2pt}){3-3}
+\textbf{Model}& \textbf{FG-ARI}$\uparrow$ &  \textbf{FG-ARI}$\uparrow$\\
+\midrule
+SCALOR & $81.2\scriptstyle{\,\pm\,0.2}$ & $22.7\scriptstyle{\,\pm\,0.9}$ \\
+SIMONe & $74.8 \scriptstyle{\,\pm\,4.2}$ &  $32.7 \scriptstyle{\,\pm\,2.3}$\\
+\modelname (uncond.) &  $78.2 \scriptstyle{\,\pm\,0.7}$ &  $47.6 \scriptstyle{\,\pm\,0.2}$ \\
+\bottomrule
+\end{tabular}
+\label{table:movi_unconditional}
+\end{table*}
+
+\paragraph{Architecture ablations}
+\label{app:ablations}
+In this section, we report results on several architecture ablations on SAVi. 
+In all cases, we evaluate on MOVi++ and condition SAVi on bounding box information in the first frame of the video. Results are reported in Table~\ref{table:ablations}. We consider the following ablations:
+\begin{itemize}
+    \item \textbf{No predictor}: Instead of a Transformer-based~\citep{vaswani2017attention} predictor, we use the identity function. Modeling the dynamics of the objects is thus entirely offloaded to the corrector, which does not model interactions. We find that this can marginally increase FG-ARI scores, likely because the self-attention mechanism in the default model variant can have a regularizing effect. It, however, negatively affects the model's ability to learn the correspondence between provided hints and objects in the video, as indicated by the drop in mIoU scores, likely due to its inability to exchange information between learned slot representations in the absence of the Transformer-based predictor.
+    \item \textbf{MLP predictor}: In this setup, we replace the predictor with an MLP with residual connection and LayerNorm~\citep{ba2016layer}, applied independently on each slot with shared parameters. It has the same structure and number of parameters as the MLP in the Transformer block used in our default predictor. Similar to the \textit{no predictor} ablation, this variant does not model interactions between slots. The effect on performance is comparable to the \textit{no predictor} ablation.
+    \item \textbf{Inverted corrector attention}: By default, we use Slot Attention~\citep{locatello2020object} as our corrector. The attention matrix in Slot Attention is softmax-normalized over the slots, which creates competition between slots so that two slots are discouraged to attend to the same object or part (unless their representations are identical). In this ablation, we normalize the attention matrix instead over the visual input features, as done in e.g.~RIM~\citep{goyal2019recurrent}. We observe a sharp drop in the model's ability to learn the correspondence between hints and objects, as indicated by the low mIoU score in this setting.
+\end{itemize}
+\begin{table*}[htp]
+\centering
+\caption{SAVi ablations and model variants on MOVi++ with bounding box conditioning. Evaluation on first 6 video frames. Mean and standard error (10 seeds). All values in $\%$.}
+\vspace{-1em}
+\begin{tabular}{lcc} \\
+\toprule
+\textbf{Model variant} & \textbf{FG-ARI}$\uparrow$ & \textbf{mIoU}$\uparrow$ \\
+\midrule
+SAVi (default) &   $82.0 \scriptstyle{\,\pm\,0.1}$ &  $54.3 \scriptstyle{\,\pm\,0.3}$ \\
+No predictor &   $83.0 \scriptstyle{\,\pm\,0.2}$ & $44.7 \scriptstyle{\,\pm\,3.4}$ \\
+MLP predictor &   $82.8 \scriptstyle{\,\pm\,0.2}$ & $49.5 \scriptstyle{\,\pm\,2.2}$ \\
+Inverted corrector attention &   $78.3 \scriptstyle{\,\pm\,0.4}$ & $11.4 \scriptstyle{\,\pm\,0.4}$ \\
+\bottomrule
+\end{tabular}
+\label{table:ablations}
+\end{table*}
+
+\begin{table*}[b]
+\centering
+\caption{SAVi on MOVi with bounding box conditioning vs.~unconditional SAVi with bounding boxes provided as supervision during the first fame via a matching-based loss.  Evaluation on first 6 video frames. Mean and standard error (10 seeds). All values in $\%$.}
+\vspace{-1em}
+\begin{tabular}{lc} \\
+\toprule
+\textbf{Model variant} & \textbf{FG-ARI}$\uparrow$ \\
+\midrule
+Conditional SAVi (default) &   $92.9 \scriptstyle{\,\pm\,0.1}$ \\
+SAVi + Learned init.~+ Matching loss &   $83.0 \scriptstyle{\,\pm\,0.2}$ \\
+SAVi + Gaussian init.~+ Matching loss &   $82.3 \scriptstyle{\,\pm\,0.7}$ \\
+\bottomrule
+\end{tabular}
+\label{table:matching}
+\end{table*}
+\paragraph{Comparison to semi-supervised training with matching}
+While our approach of conditioning the model on a set of hints, such as bounding boxes, in the first frame can be seen as a form of semi-supervised learning, SAVi is still solely trained with an unsupervised flow prediction (or reconstruction) objective. Instead of providing bounding boxes as conditional input to initialize the slots of SAVi, an interesting variant is to instead initialize slots in an unconditioned way and provide the bounding boxes instead as supervision signal in the form of a matching-based loss during training. This variant receives the same information as our conditional setup, but now requires matching to associate slots to bounding box labels. We train the model in the same way as the supervised set prediction set up of Slot Attention using Hungarian matching and a Huber loss as described by \citet{locatello2020object} with labels provided only during the first frame of the video. Additionally we still decode optical flow predictions at every time step using the same loss as in our default model. We found that this setup requires more than a single iteration of Slot Attention to converge to a sensible decomposition in the first frame where we apply matching. Results are summarized in Table~\ref{table:matching}. We find that using matching as training signal results in significantly worse FG-ARI segmentation score at evaluation time compared to using conditioning both at training and at test time.
+
+\paragraph{Semantic property readout}
+To evaluate to what degree slots of the SAVi model capture information about objects beyond their location and velocity, we train a simple readout probe in the form of an MLP that is tasked to predict object properties given a learned slot representation in SAVi. For these experiments, we train SAVi with bounding box conditioning on MOVi and jointly train an MLP readout head to predict object properties from each slot representation in the first frame. We do not propagate the gradients from the readout head through the rest of the model, i.e. the SAVi model does not receive any supervision information about object properties. The MLP readout head has a single hidden layer with 256 units and a ReLU activation. It is tasked to predict classification logits for (i) the object color out of 8 possible colors, (ii) the object shape out of 3 possible shapes, and (iii) the object material out of 2 possible materials. For each of the three classification targets we train with a cross-entropy loss using all videos of the MOVi training set. For evaluation, we measure average accuracy where each classification target (color, shape, material) is considered separately and the result is averaged over videos and classification targets. 
+
+In this setting, the readout probe achieves an accuracy of $54.6 \scriptstyle{\,\pm\,1.5}$ (10 seeds, mean and standard error) on the MOVi evaluation set which is far above chance level, indicating that semantic information about objects is still to some degree retained in the slots even though our training objective (optical flow) is insensitive to color and material appearance. When training with RGB frame reconstruction instead, we can achieve a significantly higher score of $85.7 \scriptstyle{\,\pm\,0.7}$, suggesting that one could likely combine the benefits of frame reconstruction and flow prediction by training a model to jointly predict both targets, which is a promising direction for future work.
+
+\subsection{Dataset details}
+\label{app:datasets}
+The Kubric~\citep{kubric2021} dataset generation pipeline is publicly available under an Apache 2.0 license. MOVi++ contains approx.~380 publicly available CC-0 licensed HDR backgrounds from \url{https://hdrihaven.com/}. The data does not contain personally identifiable information or offensive content.
+
+The original CATER~\citep{girdhar2019cater} dataset (without segmentation mask annotations) is publicly available under an Apache 2.0 license. The variant with segmentation masks was provided by the authors of SIMONe~\citep{kabra2021simone}.
+
+\subsection{Architecture details and hyperparameters}
+\label{app:architecture}
+All modules use shared parameters across time steps, except for the initializer, which is only applied at the first time step.
+
+
+\paragraph{Encoder}
+Our encoder architecture is inspired by the one used in Slot Attention~\citep{locatello2020object}. We summarize the architecture in Table~\ref{table:architecture_cnn_enc}. We use the same linear position embedding as in Slot Attention, i.e.~a four-dimensional vector per spatial position encoding the coordinate along the four cardinal directions, normalized to $[-1, 1]$. We project it to the same size as the feature maps of the CNN encoder using a learnable linear transformation. The projected position embedding is then added to the feature maps. For the modified \textit{SAVi (ResNet)} model on MOVi++, we replace the convolutional backbone (the first 4 convolutional layers) with a ResNet-34~\citep{he2016deep} backbone. We use a modified ResNet root block without strides (i.e. $1\times1$ stride), resulting in $16\times16$ feature maps after the backbone. We further use group normalization~\citep{wu2018group} throughout the ResNet backbone.
+\begin{table*}[htp!]
+\centering
+\caption{SAVi encoder architecture for MOVi and CATER with $64\times64$ input resolution. For MOVi++ with $128\times128$ input resolution, we use a larger input stride of 2 and 64 channels (numbers in parentheses).}
+\begin{tabular}{ccccc}
+\toprule
+Layer & Stride & \#Channels & Activation \\
+\midrule 
+Conv $5\times 5$ & $1\times 1$ ($2\times 2$) & $32$ ($64$) & ReLU\\
+Conv  $5\times 5$ & $1\times 1$ & $32$ ($64$) & ReLU\\
+Conv $5\times 5$ & $1\times 1$ & $32$ ($64$) & ReLU\\
+Conv  $5\times 5$ & $1\times 1$ & $32$ ($64$) & --\\
+Position Embedding & -- & $32$ ($64$) & --\\
+Layer Norm & -- & -- & --  \\ 
+Conv $1\times 1$ & $1\times 1$ & 64 & ReLU \\ 
+Conv $1\times 1$ & $1\times 1$ & 64 & -- \\ 
+\bottomrule
+\end{tabular}
+\label{table:architecture_cnn_enc}
+\end{table*}
+
+
+\paragraph{Corrector}
+For the Slot Attention~\citep{locatello2020object} corrector, we only use a single iteration of the attention mechanism in all experiments on MOVi and MOVi++, and two iterations on CATER experiments.  The query/key/value projection size is $D=128$. Before each projection, we apply Layer Norm~\citep{ba2016layer}. The attention update is followed by a GRU~\citep{cho2014learning} that operates on the slot feature size of $128$ (unless otherwise mentioned). \citet{locatello2020object} further describe placing an optional feedforward layer after the GRU, which we only use when using more than a single iteration of Slot Attention: this MLP has a single hidden layer of size $256$.
+
+\paragraph{Predictor}
+We use the default multi-head dot-product attention mechanism ($\mathrm{MultiHeadSelfAttn}$) from~\citet{vaswani2017attention} as part of our predictor, for which we use a query/key/value projection size of $128$ and a total of $4$ attention heads. For the MLP, we use a single hidden layer with $256$ hidden units and ReLU activation. On CATER, we use the identity function as predictor, as objects do not interact in this dataset.
+
+\paragraph{Decoder}
+We use the same decoder architecture as in Slot Attention~\citep{locatello2020object}, for which we specify the details in Table~\ref{table:architecture_cnn_dec}. Each slot representation is first spatially broadcasted to an $8\times8$ grid (i.e., the same vector is repeated at each spatial location) and then augmented with position embeddings which are computed in the same way as in the encoder. We use a small CNN to arrive at representations with the same resolution as the input frame. Finally, the output of this CNN is processed by two projection heads in the form of $1\times1$ convolutions, (1) to read out the segmentation mask logits and (2) to read out the per-slot predicted optical flow (or reconstructed RGB image). The segmentation mask logits are normalized using a softmax (across slots) and then used to recombine the per-slot predictions into a single image. The decoder uses shared parameters across slots and time steps. Note that the ground-truth optical flow is computed w.r.t.~the previous frame, using an additional simulated frame before the first time step (which is only used for computation of ground-truth optical flow and later discarded).
+\begin{table*}[htp!]
+\centering
+\caption{SAVi decoder architecture for MOVi and CATER with $64\times64$ resolution. For MOVi++ with $128\times128$ resolution, we use a larger output stride of 2 (numbers in parentheses).}
+% \vspace{2mm}
+\begin{tabular}{ccccc}
+\toprule
+Layer & Stride & \#Channels & Activation \\
+\midrule 
+Spatial Broadcast $8\times 8$ & -- & $128$ & --\\
+Position Embedding & -- & $128$ & --\\
+ConvTranspose $5\times 5$ & $2\times 2$ & $64$ & ReLU\\
+ConvTranspose  $5\times 5$ & $2\times 2$ & $64$ & ReLU\\
+ConvTranspose $5\times 5$ & $2\times 2$ & $64$ & ReLU\\
+ConvTranspose  $5\times 5$ & $1\times 1$ ($2\times 2$) & $64$ & --\\
+\bottomrule
+\end{tabular}
+\label{table:architecture_cnn_dec}
+\end{table*}
+
+
+\paragraph{Initializer}
+To encode bounding boxes and center of mass coordinates we pass the coordinate vector for each bounding box or center of mass location through an MLP with a single hidden layer of $256$ hidden units, a ReLU activation and an output size of $128$. The MLP is applied with shared parameters on each bounding box (or center of mass location) independently. Bounding boxes are represented as $[y_{\text{min}}, x_{\text{min}}, y_{\text{max}},x_{\text{max}}]$ coordinates and center of mass locations are represented as $[y, x]$. Any unconditioned slot is provided with $[-1, -1, -,1 -1]$ bounding box coordinates ($[-1, -1]$ for center of mass conditioning).
+
+When conditioning on segmentation masks, we use a CNN encoder applied independently on the binary segmentation mask for each conditioned foreground object. For each unconditioned slot, we provide an empty mask filled with zeros as input to the CNN. The architecture is summarized in Table~\ref{table:architecture_cnn_initializer}.
+
+\begin{table*}[htp!]
+\centering
+\caption{SAVi initializer architecture for segmentation mask conditioning signals. We use the same architecture for all datasets. After the initial convolutional backbone, we perform a spatial average, followed by Layer Norm~\citep{ba2016layer} and a small MLP, to arrive at the initial slot representations.}
+\begin{tabular}{ccccc}
+\toprule
+Layer & Stride & \#Channels & Activation \\
+\midrule 
+Conv $5\times 5$ & $2\times 2$ & $32$ & ReLU\\
+Conv  $5\times 5$ & $2\times 2$ & $32$& ReLU\\
+Conv $5\times 5$ & $2\times 2$ & $32$ & ReLU\\
+Conv  $5\times 5$ & $1\times 1$ & $32$ & --\\
+Position Embedding & -- & $32$ & --\\
+Layer Norm & -- & -- & --  \\ 
+Conv $1\times 1$ & $1\times 1$ & 64 & ReLU \\ 
+Conv $1\times 1$ & $1\times 1$ & 64 & -- \\ 
+Spatial Average & -- & -- & --  \\ 
+Layer Norm & -- & -- & --  \\ 
+Dense & --& 256 & ReLU \\ 
+Dense & -- & 128 & -- \\ 
+\bottomrule
+\end{tabular}
+\label{table:architecture_cnn_initializer}
+\end{table*}
+
+
+\paragraph{Other hyperparameters}
+As described in the main paper, we train for 100k steps with a batch size of 64 using the Adam optimizer~\citep{kingma2014adam} with a learning rate of $2\cdot10^{-4}$ and gradient clipping with a maximum norm of 0.05. Like in previous work~\citep{locatello2020object}, we use learning rate warmup and learning rate decay. We linearly warm up the learning rate for 2.5k steps and we use cosine annealing~\citep{loshchilov2016sgdr} to decay the learning rate to 0 throughout the course of training. Like prior work~\citep{locatello2020object}, we use a total of 11 slots in \modelname for our scenes which contain a maximum number of 10 objects. In the conditional setup, all unconditioned slots share the same initialization and hence effectively behave as one single slot, irrespective of their number. Our chosen hyperparamters are close to the ones used in prior work and we did not perform an extensive search. We chose learning rate and gradient clipping norm based on performance measured on a separately generated instance of the MOVi++ dataset. We found that training with a substantially longer schedule (e.g.~1M steps) can still significantly improve results for SAVi, but we opted for shorter schedules to allow for easier and faster reproduction of our experiments. We only train the modified \textit{SAVi (ResNet)} model on MOVi++ with a longer schedule of 1M steps, which we found to be especially beneficial for this significantly larger model.
+
+\paragraph{Training software and hardware}
+We implement both SAVi and the T-VOS baseline in JAX~\citep{jax2018github} using the Flax~\citep{flax2020github} neural network library. We train our models on TPU v3 hardware. We report training time on GPU hardware in Section~\ref{sec:experiments}.
+
+\subsection{Baseline details}
+\label{app:baselines}
+\paragraph{SCALOR}
+This baseline~\citep{jiang2019scalable} patches the image into a $d\times d$ grid and uses a discovery network to propose objects in each grid cell. Then based on a threshold $\tau$ on the overlap of the proposed object with the propagated objects from the previous frames, the model rejects or accepts the proposals. The image is reconstructed with a combination of discovered objects and a background decoder with an encoding bottleneck dimension of $D_{\text{bg-en}}$. It is also important to have a correct mean and variance of the scale and ratio for the proposed objects. We performed a hyper-parameter search over the mentioned parameters along with the priors and annealing schedules for discovery and for the proposal rejection. We found the foreground-background splitting behavior to be especially sensitive to hyper-parameters, frequently resulting in the reconstruction of the entire image including all (or some) foreground objects with the background decoder, as opposed to the desired case where the background decoder only reconstructs the background of the scene. We also found that changing SCALOR's prior annealing schedule made the model highly unstable. We performed validation on held out $1/10$th of the training dataset, choosing the variants with best log likelihood and visual quality. All the hyper-parameters for the reported results are similar to the original SCALOR, except we use a $4\times 4$ grid, a rejection threshold of $0.2$, glimpse size of $32$, scale mean and variance $0.2$ and $0.1$, object height-width ratio mean and variance $1.0$ and $0.5$, and for MOVi we decrease the background encoding dimension from the default $10$ to $2$. We use the official implementation provided by the authors, \citet{jiang2019scalable}.
+
+\paragraph{SIMONe}
+SIMONe~\citep{kabra2021simone} is a probabilistic video model which encodes frames using CNNs followed by a transformer~\citep{vaswani2017attention} encoder. It subsequently produces per-frame embeddings and per-object embeddings by pooling latent representations over (per-frame) transformer tokens and over time, respectively. Each pixel (for each time step and for each object embedding) is decoded independently using an MLP, conditioned on both time and object embedding (sampled from a learned posterior). The model is trained using a reconstruction loss in pixel space (in the form of a mixture model likelihood) and a regularization loss on the latent variables. SIMONe encodes all frames in a video in parallel, i.e. it differs from all other considered video baselines in that it is not auto-regressive and thus cannot generalize beyond the (fixed) clip length provided during training. We re-implement the SIMONe model in JAX (as there is no public implementation by the authors at the time of writing) with several simplifications: 1) we sample latent variables only once per latent variable and time step instead of re-sampling for every generated pixel, 2) we always decode all frames during training instead of sampling random sub-sets of frames, 3) we only train for 200k steps as we found that performance did not significantly improve with a longer schedule. We verified that our re-implementation reaches comparable performance to the numbers reported by~\citet{kabra2021simone} on CATER. We otherwise utilize the same hyperparameters as reported by~\citet{kabra2021simone} for CATER in all our experiments, and we re-size all video frames to $64\times64$ before providing them to the model.
+
+
+\paragraph{Contrastive Random Walk (CRW)}\label{sec:appendix:baseline:crw}
+CRW~\citep{jabri2020space} is a self-supervised technique that induces a contrastive loss between embeddings of patches in neighboring frames. These embeddings are effective for downstream tracking via label propagation. We used the open source implementation provided by the authors to train their model on our datasets, MOVi and MOVi++; and evaluated tracking performance using the Davis 2017 benchmark utilities~\citep{caelles2019the,ponttuset2017the} on the validation sets of MOVi and MOVi++ respectively. We resized all images to $256 \times 256$ for training and to $480 \times 480$ for evaluation. This matches the setup that CRW was originally trained and tested on (Kinetics at $256\times 256$ and Davis at 480p). Label propagation is more accurate at high resolution. We tuned and set the following parameters for MOVi++: Edge-dropout rate 0.05, training temperature 0.01, evaluation temperature 0.05, frame sampling gap 1, number of training epochs 250 with a learning rate drop at 200 epochs. And for MOVi: Edge-dropout rate 0.05, training temperature 0.03, evaluation temperature 0.01, frame sampling gap 2, number of training epochs 40 with a learning rate drop at 30 epochs. Early stopping was necessary for MOVi as training longer hurt downstream performance. We used video clips consisting of 6 frames to train these models. All other hyper-parameters and the architecture, a ResNet-18~\citep{he2016deep} encoder, were kept at their default values.
+
+\paragraph{Transductive VOS}\label{sec:appendix:baseline:tvos}
+Transductive VOS (T-VOS)~\citep{zhang2020transductive} propagates segmentation labels from the first frame into future frames, thus tracking objects and segmenting them. It correlates per-pixel features of a target frame with those of a history of previous frames, called reference. Softmax-normalized correlation weights are used to compute a convex combination of previous frame labels. This constitutes the prediction for each pixel in the target frame. Such predictions in turn get incorporated into the reference for subsequent label propagation. A simple motion prior is used to focus on neighboring regions when propagating labels. T-VOS uses references frames to capture the past video context. For T-VOS, we use the official implementation by the authors, using an ImageNet pre-trained ResNet-50~\citep{he2016deep} backbone excluding the last stage for better results. We upsample MOVi/MOVi++ frames to 480p resolution, as we found that T-VOS with a ResNet-50 backbone produces inferior results when applied on frames at the original resolution. Metrics were computed at the original resolution of the two datasets. We select the optimal T-VOS temperature hyperparameter ($\tau=1$ for MOVi and $\tau=1.3$ for MOVi++) based on evaluation performance.
+
+\paragraph{Segmentation Propagation}\label{sec:appendix:baseline:seg_prop}
+For a more direct comparison to SAVi, we apply T-VOS~\citep{zhang2020transductive} on a backbone that is pre-trained using the same data and optical flow supervision as SAVi. For this experiment, we use a simplified re-implementation of T-VOS in JAX, for which we use a maximum of 9 reference frames of the immediate past. We do not make use of the sparse sampling method from~\citep{zhang2020transductive}. This is similar to the ``9 frames'' column in Table 2 as reported by \citet{zhang2020transductive}, but in addition also uses their motion prior. We trained a self-supervised CNN backbone, in domain, using MOVi/MOVi++ frames. The self-supervision proxy task was that of single image optical flow prediction, inspired by prior work on predicting optical flow from static images~\citep{mahendran2018cross,walker2015dense}. This proxy task requires guessing object motion based on appearance, which in turn requires modeling the objects present in the scene.
+
+In more detail, we regressed optical flow using a fully convolutional network~\citep{long2015fully} using the exact same loss function as \modelname. The image backbone was also identical to \modelname except for an extra $5\times 5$ convolution layer to project features into 128 dimensions. This matches the dimensionality of slot vectors in \modelname making this a fairer comparison.
+
+To pre-train the visual backbone, we use a batch size of 64 and we train for 100k steps using the Adam optimizer~\citep{kingma2014adam} with a learning rate of $2\times 10^{-5}$. We use linear position embeddings in the same way as \modelname, adding them right before a $1\times 1$ convolution layer which regresses 3-dimensional RGB encoded optical flow. For evaluation of T-VOS, we use their motion prior with $\sigma_1 = 2.3, \sigma_2 = 4.6$, and a temperature of $50$ for MOVi and $200$ for MOVi++. We use $L2$-normalized per-pixel embeddings in order to make T-VOS less sensitive to temperature.
+
+\subsection{Metric details}
+\label{app:metrics}
+For both FG-ARI and mIoU, we skip the first frame during evaluation as we provide conditional information (e.g., bounding boxes) for it in most cases. 
+
+
+\paragraph{FG-ARI}
+For our experiments on CATER (unsupervised video decomposition) we follow prior work~\citep{kabra2021simone} and report FG-ARI for all frames.
+
+\paragraph{Segmentation mIoU}
+This metric assumes a strict alignment between ground truth and predictions. That is, if the first segment tracks a ball then the first slot should track the same ball. No matching is used. Unlike ARI, this metric is sensitive to slots tracking the object they were conditioned with. In frames were an object is missing, either due to occlusion or because it has left the scene, $\mathrm{mIoU} = 1.0$ if the object is missing in the prediction as well, otherwise $\mathrm{mIoU} = 0.0$. Thus even a single predicted pixel in such frames is penalized heavily. This setting corresponds to the Jaccard-Mean metric used in the DAVIS-2017 object tracking challenge~\citep{caelles2019the,ponttuset2017the}.
+
+\end{document}

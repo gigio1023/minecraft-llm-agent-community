@@ -1,0 +1,51 @@
+\input{figs/solaris-engine}
+\section{\solarisengine: A Framework for Multiplayer Gameplay at Scale}
+\label{sec:system}
+\input{tables/systems-comparison}
+
+
+
+
+
+We describe our core system, \solarisengine, built from the ground up for capturing pre-programmed multiplayer Minecraft gameplay and large-scale data collection. Several frameworks exist for controlling agents in Minecraft, including Malmo~\cite{johnson2016malmo}, MineRL~\cite{guss2019minerllargescaledatasetminecraft}, Minedojo~\cite{fan2022minedojo}, and Mineflayer~\cite{mineflayer2025}. While these tools offer various capabilities (see~\cref{tab:mc_systems_comparison}), we found they could not be adapted to generate coherent, cooperative multiplayer gameplay. Our system enables us to collect millions of frames through a primitive skills library, a multiplayer communication layer, and a modular, extensible episode system. Looking ahead, we envision this foundation serving other purposes, such as collecting data for Vision-Language-Action models or testing large-scale collaboration among AI agents.
+
+\input{figs/dataset-plots}
+
+
+\subsection{Enabling cooperative multiplayer gameplay} Existing frameworks like Malmo~\cite{johnson2016malmo}, MineRL~\cite{guss2019minerllargescaledatasetminecraft}, and Minedojo~\cite{fan2022minedojo} use low-level action spaces, where, without RL training, agents can only take random actions. Data from these agents would be too simple and chaotic for world modeling, a problem that gets worse with multiple agents. Though agents could be trained using RL to learn meaningful action policies, the visual data collected from such agents would be geared toward collecting rewards and would not necessarily be diverse, realistic, and human-like.
+
+Data for training video world models, on the other hand, demands realistic gameplay. We use Mineflayer, a JavaScript Minecraft client library that the community has used for building game bots. Notably, in Voyager~\cite{wang2023voyager}, it is also used as a high-level API for programming agents, albeit in a single-player setting. Mineflayer provides primitives like \textit{pathfinding}, \textit{block placement}, and \textit{combat} that are composable, letting us generate quality gameplay through programming alone.
+
+However, Mineflayer was not designed for multiplayer coordination. To address Mineflayer's lack of multiplayer support, we built a communication layer enabling bot coordination to mimic collaborative human gameplay. We introduced high-level primitives such as building, scaffolding, tool use, and navigation. These primitives, shown in~\cref{fig:solaris-engine}, when combined with the communication layer, form an episode where two bots achieve a predefined goal. We created a library of these episode types covering core Minecraft interaction aspects. For a full list, please refer to~\cref{subsec:appendix_episode_types}.
+
+Although our episode library is written in high-level code using predefined primitives, the system translates these into low-level actions as if they were collected from a human player, making our dataset compatible with VPT \cite{baker2022videopretrainingvptlearning}. See ~\cref{subsec:appendix_action_space} for the description of all supported actions and the relation to VPT.
+
+
+\subsection{Extracting and aligning visuals with actions}
+
+Mineflayer has another significant limitation: it lacks rendering capabilities. To record visuals, we pair each controller bot with a "camera bot" running the official Minecraft Java client in headless mode with GPU-accelerated rendering. A custom server-side plugin synchronizes the camera bot to mirror the controller's state and actions, even including animations, in real time. Although implemented as separate processes, they form a single logical player (see~\cref{fig:solaris-engine}), with actions and graphical observations aligned via timestamps in a post-processing step. While we currently run with two, the system architecture can theoretically accommodate any number of concurrent players.
+
+\subsection{Robust and Scalable Docker System}
+We implement the controller bots, camera bots, and Minecraft server as Docker containers, orchestrated through Docker Compose to run in isolated units. A suite of Python scripts manages these units, launching multiple Compose workers in parallel to enable scalable data collection. The bots operate in a loop, sampling and executing episodes from our library. The bots teleport to a random location at the start of an episode to diversify terrain.
+
+Minecraft's complexity and stochasticity mean that episodes inevitably encounter errors or get stuck. To handle this, we built a safety mechanism that detects episode failures during execution, notifies all components, and aborts the current episode across all bots. The system then proceeds to a new episode with a fresh state, ensuring continuous data collection without manual intervention.
+
+
+
+
+
+
+
+
+
+
+
+
+\input{figs/dataset-demo}
+
+\subsection{Multiplayer Training Dataset}
+
+Using our framework, we collect a large-scale multiplayer training dataset. The dataset episodes, shown in~\cref{fig:dataset-demo}, cover core aspects of the game: building, combat, movement, and mining. Our bots build houses, walls, towers, and bridges, fight mobs or each other, chase each other and navigate together, dig to find valuable ores, mine their way underground towards each other, or mine blocks on the ground. We collect our episodes in an even split between ``Superflat'' and ``Normal'' Minecraft world types. To the best of our knowledge, our dataset is the first action-annotated multiplayer Minecraft dataset suitable for machine learning applications.
+
+The gameplay features diverse times of day, biomes, in-game tool use, and weather conditions. Our action annotations span a wide range of Minecraft environment actions: WASD movement, jumping, sprinting, sneaking, camera changes, and interactive actions such as digging, placing, attacking, and item switching (see ~\cref{subsec:appendix_action_space} for the full action space). We collect a total of $6.32$ M frames per player. We show important dataset statistics in~\cref{fig:dataset-plots}.
+

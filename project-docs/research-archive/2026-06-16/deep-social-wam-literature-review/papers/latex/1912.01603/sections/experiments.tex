@@ -1,0 +1,33 @@
+\section{Experiments}
+\label{sec:experiments}
+
+\input{figures/repr-small/figure}
+
+We experimentally evaluate Dreamer on a variety of control tasks. We designed the experiments to compare Dreamer to current best methods in the literature, and to evaluate its ability to solve tasks with long horizons, continuous actions, discrete actions, and early termination. We further compare the orthogonal choice of learning objective for the world model. The source code for all our experiments and videos of Dreamer are available at \mbox{\url{https://danijar.com/dreamer}}.
+
+\paragraph{Control tasks}
+
+We evaluate Dreamer on 20 visual control tasks of the DeepMind Control Suite \cite{tassa2018dmcontrol}, illustrated in \cref{fig:tasks}. These tasks pose a variety of challenges, including sparse rewards, contact dynamics, and 3D scenes. We selected the tasks on which \citet{tassa2018dmcontrol} report non-zero performance from image inputs. Agent observations are images of shape $64\times64\times3$, actions range from $1$ to $12$ dimensions, rewards range from $0$ to $1$, episodes last for $1000$ steps and have randomized initial states. We use a fixed action repeat of $R=2$ across tasks. We further evaluate the applicability of Dreamer to discrete actions and early termination on a subset of Atari games \citep{bellemare2013ale} and DeepMind Lab levels \citep{beattie2016dmlab} as detailed in \cref{sec:discrete}.
+
+\paragraph{Implementation}
+
+Our implementation uses TensorFlow Probability \citep{dillon2017tfd}. We use a single Nvidia V100 GPU and 10 CPU cores for each training run. The training time for our Dreamer implementation is about $3$ hours per $10^6$ environment steps on the control suite, compared to $11$ hours for online planning using PlaNet, and the $24$ hours used by D4PG to reach similar performance. We use the same hyper parameters across all continuous tasks, and similarly across all discrete tasks, detailed in \cref{sec:hparams}. The world models are learned via reconstruction unless specified.
+
+\paragraph{Baseline methods}
+
+The highest reported performance on the continuous tasks is achieved by D4PG \citep{barth2018d4pg}, an improved variant of DDPG \citep{lillicrap2015ddpg} that uses distributed collection, distributional Q-learning, multi-step returns, and prioritized replay. We include the scores for D4PG with pixel inputs and A3C \citep{mnih2016a3c} with state inputs from \citet{tassa2018dmcontrol}. PlaNet \citep{hafner2018planet} learns the same world model as Dreamer and selects actions via online planning without an action model and drastically improves over D4PG and A3C in data efficiency. We re-run PlaNet with $R=2$ for a unified experimental setup. For Atari, we show the final performance of SimPLe \citep{kaiser2019simple}, DQN \citep{mnih2015dqn} and Rainbow \citep{hessel2018rainbow} reported by \citet{castro2018dopamine}, and for DeepMind Lab that of IMPALA \citep{espeholt2018impala} as a guideline.
+
+\vspace*{5ex}
+\pagebreak
+
+\paragraph{Performance}
+
+To evaluate the performance of Dreamer, we compare it to state-of-the-art reinforcement learning agents. The results are summarized in \cref{fig:bars}. With an average score of $823$ across tasks after $5\times10^6$ environment steps, Dreamer exceeds the performance of the strong model-free D4PG agent that achieves an average of $786$ within $10^8$ environment steps. At the same time, Dreamer inherits the data-efficiency of PlaNet, confirming that the learned world model can help to generalize from small amounts of experience. The empirical success of Dreamer shows that learning behaviors by latent imagination with world models can outperform top methods based on experience replay.
+
+\paragraph{Long horizons}
+
+To investigate its ability to learn long-horizon behaviors, we compare Dreamer to alternatives for deriving behaviors from the world model at various horizon lengths. For this, we learn an action model to maximize imagined rewards without a value model and compare to online planning using PlaNet. \Cref{fig:horizon} shows the final performance for different imagination horizons, confirming that the value model makes Dreamer more robust to the horizon and performs well even for short horizons. Performance curves for all 19 tasks with horizon of 20 are shown in \cref{sec:value-all}, where Dreamer outperforms the alternatives on 16 of 20 tasks, with 4 ties.
+
+\paragraph{Representation learning}
+
+Dreamer can be used with any differentiable dynamics model that predicts future rewards given actions and past observations. Since the representation learning objective is orthogonal to our algorithm, we compare three natural choices described in \cref{sec:dynamics}: pixel reconstruction, contrastive estimation, and pure reward prediction. \Cref{fig:repr-small} shows clear differences in task performance for different representation learning approaches, with pixel reconstruction outperforming contrastive estimation on most tasks. This suggests that future improvements in representation learning are likely to translate to higher task performance with Dreamer. Reward prediction alone was not sufficient in our experiments. Further ablations are included in the appendix of the paper.

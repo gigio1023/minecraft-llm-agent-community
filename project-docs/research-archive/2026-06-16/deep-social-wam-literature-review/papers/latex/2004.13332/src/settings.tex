@@ -1,0 +1,129 @@
+\section{Training Hyperparameters and Experiment Settings}
+\label{sec:hyperparameters}
+
+\begin{table}[ht!]
+    \begin{small}
+        \begin{center}
+            \begin{tabular}[c]{lll}
+                Parameter & & Value \\
+                \hline
+                \hline
+
+                Training algorithm & & \textit{ppo} \\
+                Number of parallel environment replicas & & 60 \\
+                Sampling horizon (steps per replica) & $\samplinghorizon$ & 200 \\
+                SGD minibatch size & & 3000 \\
+                SGD sequence length & & 50 \\
+                Policy updates per horizon (agent) & & 16 \\
+                Policy updates per horizon (planner) & & 4 \\
+
+                CPUs & & 15 \\
+                GPUs & & 2 \\
+
+
+                \hline
+
+                Learning rate (agent) & & 0.0003 \\
+                Learning rate (planner) & & 0.0001 \\
+                Entropy regularization coefficient (agent) & & 0.025 \\
+                Entropy regularization coefficient (planner) & & 0.1 \\
+                Gamma & $\df$ & 0.998 \\
+                GAE lambda & & 0.98 \\
+                Gradient clipping & & 10 \\
+                Value function loss coefficient & & 0.05 \\
+
+                \hline
+
+                Number of convolutional layers & & 2 \\
+                Number of fully-connected layers & & 2 \\
+                Fully-connected layer dimension (agent) & & 128 \\
+                Fully-connected layer dimension (planner) & & 256 \\
+                LSTM cell size (agent) & & 128 \\
+                LSTM cell size (planner) & & 256 \\
+                All agents share weights & & True \\
+                Value/Policy networks share weights & & False \\
+
+                \hline
+
+                Planner gets spatial info & & True \\
+                Agents get full spatial observation & & False \\
+                Agent spatial observation box half-width & & 5 \\
+
+                \hline
+
+                Phase \textit{one} training duration & & 50M steps \\
+                Phase \textit{two} training duration & & 400M steps \\
+                Phase \textit{two} initial max $\mtaxrate$ & & 10\% \\
+                Phase \textit{two} tax annealing duration & & 54M steps \\
+
+
+            \end{tabular}
+        \end{center}
+        \caption{Training hyperparameters.}
+        \label{tab:training_settings_ai}
+    \end{small}
+\end{table}
+For each experiment, experience collection was parallelized over 60 replicas of the environment.
+Each training iteration involved collecting $\samplinghorizon$ steps from each replica (using the latest policy parameters), followed by a round of parameter updates using the collected samples.
+With a sampling horizon of 200 timesteps and 60 environment replicas, a total of 12000 timesteps were sampled per training iteration.
+Since each ``agent'' experiences its transition per timestep, this is actually a total of 60000 transitions: 48000 for the 4 agents and 12000 for the planner.
+When doing policy updates, we divided each such set of transitions into minibatches of size 3000 and perform one gradient update per minibatch.
+Therefore, each training iteration involved 16 updates to the agent parameters and 4 to the planner parameters.
+We use PPO to accomodate multiple updates per training iteration.
+
+Tables \ref{tab:training_settings_ai} and \ref{tab:env_settings_ai} provide details regarding the training hyperparameters and environment settings, respectively, used in our AI experiments.
+\begin{table}[ht!]
+    \begin{small}
+        \begin{center}
+            \begin{tabular}[c]{lll}
+                Parameter & & Value \\
+                \hline
+                \hline
+
+                Number of agents & $N$ & 4 \\
+                Episode length & $\eplen$ & 1000 \\
+                World height & & 25 \\
+                World width & & 25 \\
+                Resource respawn probability & & 0.01 \\
+                Max resource health & & 1 \\
+                Skill distribution & & \textit{pareto} \\
+                Starting agent coin & $\money_{i, 0} $ & 0 \\
+
+
+
+                \hline
+
+                Iso-elastic utility exponent & $\eta$ & 0.23 \\
+                Move labor & & 0.21 \\
+                Gather labor & & 0.21 \\
+                Trade labor & & 0.05 \\
+                Build labor & & 2.1 \\
+
+                \hline
+
+                Minimum build payout & & 10 \\
+                Build payment max skill multiplier & & 3 \\
+                House lifetime & & $\inf$ \\
+
+                \hline
+
+                Max bid/ask price & & 10 \\
+                Max bid/ask order duration & & 50 \\
+                Max number of open orders per resource & & 5 \\
+
+                \hline
+
+                Tax period duration & $\taxperiodlen$ & 100 \\
+                Min bracket rate & & 0\% \\
+                Max bracket rate & & 100\% \\
+                Rate discretization (AI Economist) & & 5\% \\
+                Bracket cutoffs & $\{\bracketcutoff_0, \ldots, \bracketcutoff_B\}$ & \textit{us-federal} \\
+                social welfare weights (Saez formula) & $g_i$ & \textit{inverse-income} \\
+
+                \end{tabular}
+        \end{center}
+        \caption{Environment settings.}
+        \label{tab:env_settings_ai}
+    \end{small}
+\end{table}
+

@@ -1,0 +1,676 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2020_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_kotation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\definecolor{lightgrey}{rgb}{0.43,0.43,0.43}
+\definecolor{crimson}{rgb}{0.86,0.08,0.24}
+\hypersetup{
+  colorlinks,
+  citecolor=lightgrey,
+  linkcolor=crimson,
+  urlcolor=crimson}
+
+\usepackage{wrapfig}
+
+\title{Contrastive Learning of Structured \\ World Models}
+
+\author{Thomas Kipf \\
+University of Amsterdam \\
+\texttt{t.n.kipf@uva.nl} \\
+\And
+Elise van der Pol \\
+University of Amsterdam \\
+UvA-Bosch Delta Lab \\
+\texttt{e.e.vanderpol@uva.nl} \\
+\And
+Max Welling \\
+University of Amsterdam \\
+CIFAR\\
+\texttt{m.welling@uva.nl} \\
+}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+A structured understanding of our world in terms of objects, relations, and hierarchies is an important component of human cognition. Learning such a structured world model from raw sensory data remains a challenge. As a step towards this goal, we introduce Contrastively-trained Structured World Models (C-SWMs). C-SWMs utilize a contrastive approach for representation learning in environments with compositional structure. We structure each state embedding as a set of object representations and their relations, modeled by a graph neural network. This allows objects to be discovered from raw pixel observations without direct supervision as part of the learning process. We evaluate C-SWMs on compositional environments involving multiple interacting objects that can be manipulated independently by an agent, simple Atari games, and a multi-object physics simulation. Our experiments demonstrate that C-SWMs can overcome limitations of models based on pixel reconstruction and outperform typical representatives of this model class in highly structured environments, while learning interpretable object-based representations.
+\end{abstract}
+
+
+\section{Introduction}
+Compositional reasoning in terms of objects, relations, and actions is a central ability in human cognition \citep{spelke2007core}. This ability serves as a core motivation behind a range of recent works that aim at enriching machine learning models with the ability to disentangle scenes into objects, their properties, and relations between them  \citep{chang2016compositional,battaglia2016interaction,watters2017visual,van2018relational,kipf2018neural,sun2018actor,sun2019relational,xu2019unsupervised}. These structured neural models greatly facilitate predicting physical dynamics and the consequences of actions, and provide a strong inductive bias for generalization to novel environment situations, allowing models to answer counterfactual questions such as ``\textit{What would happen if I pushed this block instead of pulling it?}''.
+
+Arriving at a structured description of the world in terms of objects and relations in the first place, however, is a challenging problem. While most methods in this area require some form of human annotation for the extraction of objects or relations, several recent works study the problem of object discovery from visual data in a completely unsupervised or self-supervised manner \citep{eslami2016attend,greff2017neural,nash2017multi,van2018relational,kosiorek2018sequential,janner2018reasoning,xu2019unsupervised,burgess2019monet,greff2019multi,engelcke2019genesis}. These methods follow a \textit{generative} approach, i.e., they learn to discover object-based representations by performing visual predictions or reconstruction and by optimizing an objective in pixel space. Placing a loss in pixel space requires carefully trading off structural constraints on latent variables vs.~accuracy of pixel-based reconstruction. Typical failure modes include ignoring visually small, but relevant features for predicting the future, such as a bullet in an Atari game \citep{kaiser2019model}, or wasting model capacity on visually rich, but otherwise potentially irrelevant features, such as static backgrounds.
+
+To avoid such failure modes, we propose to adopt a \textit{discriminative} approach using contrastive learning, which scores real against fake experiences in the form of state-action-state triples from an experience buffer \citep{lin1992self}, in a similar fashion as typical graph embedding approaches score true facts in the form of entity-relation-entity triples against corrupted triples or fake facts.
+
+We introduce Contrastively-trained Structured World Models (C-SWMs), a class of models for learning abstract state representations from observations in an environment. C-SWMs learn a set of abstract state variables, one for each object in a particular observation. Environment transitions are modeled using a graph neural network \citep{scarselli2009graph,li2015gated,kipf2016semi,gilmer2017neural,battaglia2018relational} that operates on latent abstract representations.
+
+This paper further introduces a novel object-level contrastive loss for unsupervised learning of object-based representations. We arrive at this formulation by adapting methods for learning translational graph embeddings \citep{bordes2013translating,wang2014knowledge} to our use case. By establishing a connection between contrastive learning of state abstractions \citep{franccois2018combined,thomas2018disentangling} and relational graph embeddings \citep{nickel2016review}, we hope to provide inspiration and guidance for future model improvements in both fields.
+
+In a set of experiments, where we use a novel ranking-based evaluation strategy, we demonstrate that C-SWMs learn interpretable object-level state abstractions, accurately learn to predict state transitions many steps into the future, demonstrate combinatorial generalization to novel environment configurations and learn to identify objects from scenes without supervision.
+
+\section{Structured World Models}
+Our goal is to learn an object-oriented abstraction of a particular observation or environment state. In addition, we would like to learn an action-conditioned transition model of the environment that takes object representations and their relations and interactions into account.
+
+We start by introducing the general framework for contrastive learning of state abstractions and transition models \emph{without} object factorization in Sections \ref{sec:representations}--\ref{sec:learning}, and in the following describe a variant that utilizes object-factorized state representations, which we term a Structured World Model.
+
+\subsection{State Abstraction}\label{sec:representations}
+We consider an \emph{off-policy} setting, where we operate solely on a buffer of offline experience, e.g., obtained from an exploration policy. Formally, this \emph{experience buffer} $\mathcal{B}=\{(s_t, a_t, s_{t+1})\}_{t=1}^T$ contains $T$ tuples of states $s_t\in\mathcal{S}$, actions $a_t\in\mathcal{A}$, and follow-up states $s_{t+1}\in\mathcal{S}$, which are reached after taking action $a_t$. We do not consider rewards as part of our framework for simplicity.
+
+Our goal is to learn abstract or \textit{latent} representations $z_t\in\mathcal{Z}$ of environment states $s_t\in\mathcal{S}$ that discard any information which is not necessary to predict the abstract representation of the follow-up state $z_{t+1}\in\mathcal{Z}$ after taking action $a_t$. Formally, we have an \emph{encoder} $E: \mathcal{S}\rightarrow \mathcal{Z}$ which maps observed states to abstract state representations and a \emph{transition model} $T: \mathcal{Z}\times\mathcal{A}\rightarrow \mathcal{Z}$ operating solely on abstract state representations.
+
+\subsection{Contrastive Learning}\label{sec:learning}
+Our starting point is the graph embedding method TransE \citep{bordes2013translating}: TransE embeds facts from a knowledge base $\mathcal{K}=\{(e_t, r_t, o_{t})\}_{t=1}^T$, which consists of entity-relation-entity triples $(e_t, r_t, o_t)$, where $e_t$ is the subject entity (analogous to the source state $s_t$ in our case), $r_t$ is the relation (analogous to the action $a_t$ in our experience buffer), and $o_t$ is the object entity (analogous to the target state $s_{t+1}$).
+
+TransE defines the energy of a triple $(e_t, r_t, o_t)$ as $H = d(F(e_t) + G(r_t), F(o_t))$, where $F$ (and $G$) are embedding functions that map discrete entities (and relations) to $\mathbb{R}^D$, where $D$ is the dimensionality of the embedding space, and $d(\cdot,\cdot)$ denotes the squared Euclidean distance. Training is carried out with an energy-based hinge loss \citep{lecun2006tutorial}, with negative samples obtained by replacing the entities in a fact with random entities from the knowledge base.
+
+We can port TransE to our setting with only minor modifications. As the \emph{effect} of an action is in general not independent of the source state, we replace $G(r_t)$ with $T(z_t, a_t)$, i.e., with the transition function, conditioned on both the action and the (embedded) source state via $z_t = E(s_t)$. The overall energy of a state-action-state triple then can be defined as follows: $H = d(z_t + T(z_t, a_t), z_{t+1})$.
+
+This additive form of the transition model provides a strong inductive bias for modeling effects of actions in the environment as translations in the abstract state space. Alternatively, one could model effects as linear transformations or rotations in the abstract state space, which motivates the use of a graph embedding method such as RESCAL \citep{nickel2011three}, CompleX \citep{trouillon2016complex}, or HolE \citep{nickel2016holographic}.
+
+With the aforementioned modifications, we arrive at the following energy-based hinge loss:
+\begin{align}
+\mathcal{L} =\,\, &d(z_t + T(z_t, a_t), z_{t+1}) + \max(0, \gamma - d(\tilde{z}_t, z_{t+1}))\, ,
+\end{align}
+defined for a single $(s_t, a_t, s_{t+1})$ with a corrupted abstract state $\tilde{z}_t = E(\tilde{s}_t)$. $\tilde{s}_t$ is sampled at random from the experience buffer. The margin $\gamma$ is a hyperparameter for which we found $\gamma=1$ to be a good choice. Unlike  \citet{bordes2013translating}, we place the hinge only on the negative term instead of on the full loss and we do not constrain the norm of the abstract states $z_t$, which we found to work better in our context (see Appendix \ref{sec:hinge-loss}). The overall loss is to be understood as an expectation of the above over samples from the experience buffer $\mathcal{B}$.
+
+\subsection{Object-oriented State Factorization} \label{sec:factorization}
+Our goal is to take into account the compositional nature of visual scenes, and hence we would like to learn a relational and object-oriented model of the environment that operates on a factored abstract state space $\mathcal{Z}=\mathcal{Z}_1\times\ldots\times\mathcal{Z}_K$, where $K$ is the number of available object slots. We further assume an object-factorized action space $\mathcal{A}=\mathcal{A}_1\times\ldots\times\mathcal{A}_K$. This factorization ensures that each object is independently represented and it allows for efficient sharing of model parameters across objects in the transition model. This serves as a strong inductive bias for better generalization to novel scenes and facilitates learning and object discovery. The overall C-SWM model architecture using object-factorized representations is shown in Figure \ref{fig:model}.
+
+\begin{figure}[htp!]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/model.pdf}
+  \caption{The C-SWM model is composed of the following components: 1) a CNN-based object extractor, 2) an MLP-based object encoder, 3) a GNN-based relational transition model, and 4) an object-factorized contrastive loss. Colored blocks denote abstract states for a particular object. \label{fig:model}}
+\end{figure}
+
+\paragraph{Encoder and Object Extractor}
+We split the encoder into two separate modules: 1) a CNN-based object extractor $E_{\text{ext}}$, and 2) an MLP-based object encoder $E_{\text{enc}}$. The object extractor module is a CNN operating directly on image-based observations from the environment with $K$ feature maps in its last layer. Each feature map $m^k_t = [E_{\text{ext}}(s_t)]_k$ can be interpreted as an object mask corresponding to one particular object slot, where $[\ldots]_k$ denotes selection of the $k$-th feature map. For simplicity, we only assign a single feature map per object slot which sufficed for the experiments considered in this work (see Appendix \ref{sec:feature-maps}). To allow for encoding of more complex object features (other than, e.g., position/velocity), the object extractor can be adapted to produce multiple feature maps per object slot. After the object extractor module, we flatten each feature map $m^k_t$ (object mask) and feed it into the object encoder $E_{\text{enc}}$. The object encoder shares weights across objects and returns an abstract state representation: $z_t^k = E_{\text{enc}}(m_t^k)$ with $z_t^k\in\mathcal{Z}_k$. We set $\mathcal{Z}_k = \mathbb{R}^D$ in the following, where $D$ is a hyperparameter.
+
+\paragraph{Relational Transition Model}
+We implement the transition model as a graph neural network \citep{scarselli2009graph,li2015gated,kipf2016semi,battaglia2016interaction,gilmer2017neural,battaglia2018relational}, which allows us to model pairwise interactions between object states while being invariant to the order in which objects are represented. After the encoder stage, we have an abstract state description $z_t^k\in\mathcal{Z}_k$ and an action $a_t^k\in\mathcal{A}_k$ for every object in the scene. We represent actions as one-hot vectors (or a vector of zeros if no action is applied to a particular object), but note that other choices are possible, e.g., for continuous action spaces. The transition function then takes as input the tuple of object representations $z_t = (z_t^1, \ldots, z_t^K)$ and actions $a_t = (a_t^1, \ldots, a_t^K)$ at a particular time step:
+\begin{align}
+\Delta z_t = T(z_t, a_t) = \mathrm{GNN}(\{(z^k_t, a^k_t)\}_{k=1}^K)\, .
+\end{align}
+$T(z_t, a_t)$ is implemented as a graph neural network (GNN) that takes $z^k_t$ as input node features. The model predicts updates $\Delta z_t=(\Delta z_t^1,\ldots,\Delta z_t^K)$. The object representations for the next time step are obtained via $z_{t+1} = (z^1_t + \Delta z^1_{t}, \ldots, z^K_t + \Delta z^K_{t})$. The GNN consists of node update functions $f_{\text{node}}$ and edge update functions $f_{\text{edge}}$ with shared parameters across all nodes and edges. These functions are implemented as MLPs and we choose the following form of message passing updates:
+\begin{align}
+e_t^{(i,j)} &= f_{\text{edge}}([z_t^i,z_t^j]) \\
+\Delta z^j_t &= f_{\text{node}}([z_t^j,a_t^j,\textstyle\sum_{i\neq j} e_t^{(i, j)}]) \, ,
+\end{align}
+where $e_t^{(i,j)}$ is an intermediate representation of the edge or interaction between nodes $i$ and $j$. This corresponds to a single round of node-to-edge and edge-to-node message passing. Alternatively, one could apply multiple rounds of message passing, but we did not find this to be necessary for the experiments considered in this work. Note that this update rule corresponds to message passing on a fully-connected scene graph, which is $\mathcal{O}(K^2)$. This can be reduced to linear complexity by reducing connectivity to nearest neighbors in the abstract state space, which we leave for future work. We denote the output of the transition function for the $k$-th object as $\Delta z^k_t = T^k(z_t, a_t)$ in the following.
+
+\paragraph{Multi-object Contrastive Loss}
+We only need to change the energy function to take the factorization of the abstract state space into account, which yields the following energy $H$ for positive triples and $\tilde{H}$ for negative samples:
+\begin{align}
+H = \frac{1}{K}\sum_{k=1}^K d(z_t^k + T^k(z_t, a_t), z_{t+1}^k)\, , \quad
+\tilde{H} = \frac{1}{K}\sum_{k=1}^K d(\tilde{z}_{t}^k, z_{t+1}^k)\, ,
+\end{align}
+where $\tilde{z}_{t}^k$ is the $k$-th object representation of the negative state sample $\tilde{z}_{t} = E(\tilde{s}_{t})$. The overall contrastive loss for a single state-action-state sample from the experience buffer then takes the form:
+\begin{align}
+\label{eq:multi-obj-loss}
+\mathcal{L} = H + \max(0, \gamma - \tilde{H})\, .
+\end{align}
+
+
+\section{Related Work}
+For coverage of related work in the area of object discovery with autoencoder-based models, we refer the reader to the Introduction section. We further discuss related work on relational graph embeddings in Section \ref{sec:learning}.
+
+\paragraph{Structured Models of Environments}
+Recent work on modeling structured environments such as interacting multi-object or multi-agent systems has made great strides in improving predictive accuracy by explicitly taking into account the structured nature of such systems \citep{sukhbaatar2016learning,chang2016compositional,battaglia2016interaction,watters2017visual,hoshen2017vain,wang2018nervenet,van2018relational,kipf2018neural,sanchez2018graph,xu2019unsupervised}. These methods generally make use of some form of graph neural network, where node update functions model the dynamics of individual objects, parts or agents and edge update functions model their interactions and relations. Several recent works succeed in learning such structured models directly from pixels \citep{watters2017visual,van2018relational,xu2019unsupervised,watters2019cobra}, but in contrast to our work rely on pixel-based loss functions. The latest example in this line of research is the COBRA model \citep{watters2019cobra}, which learns an action-conditioned transition policy on object representations obtained from an unsupervised object discovery model \citep{burgess2019monet}. Unlike C-SWM, COBRA does not model interactions between object slots and relies on a pixel-based loss for training. Our object encoder, however, is more limited and utilizing an iterative object encoding process such as in MONet \citep{burgess2019monet} would be interesting for future work.
+
+\paragraph{Contrastive Learning}
+Contrastive learning methods are widely used in the field of graph representation learning \citep{bordes2013translating,perozzi2014deepwalk,grover2016node2vec,bordes2013translating,schlichtkrull2018modeling,velivckovic2018deep}, and for learning word representations \citep{mnih2012fast,mikolov2013efficient}. The main idea is to construct pairs of related data examples (positive examples, e.g., connected by an edge in a graph or co-occuring words in a sentence) and pairs of unrelated or corrupted data examples (negative examples), and use a loss function that scores positive and negative pairs in a different way. Most energy-based losses \citep{lecun2006tutorial} are suitable for this task. Recent works \citep{oord2018representation,hjelm2018learning,henaff2019data,sun2019contrastive,anand2019unsupervised} connect objectives of this kind to the principle of learning representations by maximizing mutual information between data and learned representations, and successfully apply these methods to image, speech, and video data.
+
+\paragraph{State Representation Learning} State representation learning in environments similar to ours is often approached by models based on autoencoders \citep{corneil2018efficient, watter2015embed, ha2018world, hafner2018learning, laversanne2018curiosity} or via adversarial learning \citep{kurutach2018learning, wang2019learning}. Some recent methods learn state representations without requiring a decoder back into pixel space. Examples include the selectivity objective in \citet{thomas2018disentangling}, the contrastive objective in \citet{franccois2018combined}, the mutual information objective in \citet{anand2019unsupervised}, the distribution matching objective in \citet{gelada2019deepmdp} or using causality-based losses and physical priors in latent space \citep{jonschkowski2015learning,ehrhardt2018unsupervised}. Most notably, \citet{ehrhardt2018unsupervised} propose a method to learn an object detection module and a physics module jointly from raw video data without pixel-based losses. This approach, however, can only track a single object at a time and requires careful balancing of multiple loss functions.
+
+\section{Experiments}
+Our goal of this experimental section is to verify whether C-SWMs can 1) learn to discover object representations from environment interactions without supervision, 2) learn an accurate transition model in latent space, and 3) generalize to novel, unseen scenes. Our implementation is available under \url{https://github.com/tkipf/c-swm}.
+
+\subsection{Environments}
+We evaluate C-SWMs on two novel grid world environments (2D shapes and 3D blocks) involving multiple interacting objects that can be manipulated independently by an agent, two Atari 2600 games (Atari Pong and Space Invaders), and a multi-object physics simulation (3-body physics). See Figure \ref{fig:environments} for example observations.
+
+For all environments, we use a random policy to collect experience for both training and evaluation. Observations are provided as $50\times50\times3$ color images for the grid world environments and as $50\times50\times6$ tensors (two concatenated consecutive frames) for the Atari and 3-body physics environments. Additional details on environments and dataset creation can be found in Appendix \ref{sec:datasets}.
+
+
+\begin{figure}[htp!]
+\centering
+  \begin{subfigure}[b]{0.24\textwidth}
+  \centering
+  \includegraphics[trim={0 0 9cm 0},clip,width=\linewidth]{figures/environments.pdf}
+  \caption{2D Shapes\label{fig:environments_a}}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[b]{0.26\textwidth}
+  \centering
+  \includegraphics[trim={8cm 0 0 0},clip,width=\linewidth]{figures/environments.pdf}
+  \caption{3D Blocks\label{fig:environments_b}}
+  \end{subfigure}
+  ~
+    \begin{subfigure}[b]{0.14\textwidth}
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[trim={0 0.1cm 0 0},clip,width=0.8\linewidth]{figures/pong.png}
+  \caption{Atari\\Pong\label{fig:environments_c}}
+  \end{subfigure}
+  ~
+    \begin{subfigure}[b]{0.14\textwidth}
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[trim={0 0.1cm 0 0},clip,width=0.8\linewidth]{figures/spaceinvaders.png}
+  \caption{Space\\Invaders\label{fig:environments_d}}
+  \end{subfigure}
+  ~
+    \begin{subfigure}[b]{0.14\textwidth}
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.67\linewidth]{figures/physics_sim.png}\\[0.18em]
+  \caption{3-Body\\Physics\label{fig:environments_e}}
+  \end{subfigure}
+  \caption{Example observations from block pushing environments (a--b), Atari 2600 games (c--d) and a 3-body gravitational physics simulation (e). In the grid worlds (a--b), each block can be independently moved into the four cardinal directions unless the target position is occupied by another block or outside of the scene. Best viewed in color.\label{fig:environments}}
+\end{figure}
+
+\subsection{Evaluation Metrics}
+In order to evaluate model performance directly in latent space, we make use of ranking metrics, which are commonly used for the evaluation of link prediction models, as in, e.g., \citet{bordes2013translating}. This allows us to assess the quality of learned representations directly without relying on auxiliary metrics such as pixel-based reconstruction losses, or performance in downstream tasks such as planning.
+
+Given an observation encoded by the model and an action, we use the model to predict the representation of the next state, reached after taking the action in the environment. This predicted state representation is then compared to the encoded true observation after taking the action in the environment and a set of reference states (observations encoded by the model) obtained from the experience buffer. We measure and report both Hits at Rank 1 (H@1) and Mean Reciprocal Rank (MRR). Additional details on these evaluation metrics can be found in Appendix \ref{sec:metrics}.
+
+\subsection{Baselines}
+\paragraph{Autoencoder-based World Models} The predominant method for state representation learning is based on autoencoders, and often on the VAE \citep{kingma2013auto,rezende2014stochastic} model in particular. This World Model baseline is inspired by \citet{ha2018world} and uses either a deterministic autoencoder (AE) or a VAE to learn state representations. Finally, an MLP is used to predict the next state after taking an action.
+
+\paragraph{Physics As Inverse Graphics (PAIG)} This model by \citet{jaques2019physics} is based on an encoder-decoder architecture and trained with pixel-based reconstruction losses, but uses a differentiable physics engine in the latent space that operates on explicit position and velocity representations for each object. Thus, this model is only applicable to the 3-body physics environment.
+
+\subsection{Training and Evaluation Setting}
+We train C-SWMs on an experience buffer obtained by running a random policy on the respective environment. We choose 1000 episodes with 100 environment steps each for the grid world environments, 1000 episodes with 10 steps each for the Atari environments and 5000 episodes with 10 steps each for the 3-body physics environment.
+
+For evaluation, we populate a separate experience buffer with 10 environment steps per episode and a total of 10.000 episodes for the grid world environments, 100 episodes for the Atari environments and 1000 episodes for the physics environment. For the Atari environments, we minimize train/test overlap by `warm-starting' experience collection in these environments with random actions before we start populating the experience buffer (see Appendix \ref{sec:datasets}), and we ensure that not a single full test set episode coincides exactly with an episode from the training set. The state spaces of the grid world environments are large (approx.~6.4M unique states) and hence train/test coincidence of a full 10-step episode is unlikely. Overlap is similarly unlikely for the physics environment which has a continuous state space. Hence, performing well on these tasks will require some form of generalization to new environment configurations or an unseen sequence of states and actions.
+
+All models are trained for 100 epochs (200 for Atari games) using the Adam \citep{kingma2014adam} optimizer with a learning rate of $5\cdot 10^{-4}$ and a batch size of 1024 (512 for baselines with decoders due to higher memory demands, and 100 for PAIG as suggested by the authors). Model architecture details are provided in Appendix \ref{sec:architecture}.
+
+\subsection{Qualitative Results}
+
+We present qualitative results for the grid world environments in Figure \ref{fig:grid_world} and for the 3-body physics environment in Figure \ref{fig:physics}. All results are obtained on hold-out test data. Further qualitative results (incl.~on Atari games) can be found in Appendix \ref{sec:additional_results}.
+
+In the grid world environments, we can observe that C-SWM reliably discovers object-specific filters for a particular scene, without direct supervision. Further, each object is represented by two coordinates which correspond (up to a random linear transformation) to the true object position in the scene. Although we choose a two-dimensional latent representation per object for easier visualization, we find that results remain unchanged if we increase the dimensionality of the latent representation. The edges in this learned abstract transition graph correspond to the effect of a particular action applied to the object. The structure of the learned latent representation accurately captures the underlying grid structure of the environment. We further find that the transition model, which only has access to latent representations, correctly captures whether an action has an effect or not, e.g., if a neighboring position is blocked by another object.
+
+Similarly, we find that the model can learn object-specific encoders in the 3-body physics environment and can learn object-specific latent representations that track location and velocity of a particular object, while learning an accurate latent transition model that generalizes well to unseen environment instances.
+
+\begin{figure*}[t]
+\centering
+  \begin{subfigure}[b]{0.47\textwidth}
+  \centering
+    \includegraphics[width=0.9\linewidth]{figures/object_masks.png}
+    \caption{Discovered object masks in a scene from the 3D cubes (top) and 2D shapes (bottom) environments.}
+  \end{subfigure}
+  \quad
+  \begin{subfigure}[b]{0.47\textwidth}
+  \centering
+    \includegraphics[width=\linewidth]{figures/latent_grid_graphs_col.png}
+    \caption{
+  Learned abstract state transition graph of the yellow cube (left) and the green square (right), while keeping all other object positions fixed at test time.}
+  \end{subfigure}
+  \caption{Discovered object masks (left) and direct visualization of the 2D abstract state spaces and transition graphs for a single object (right) in the block pushing environments. Nodes denote state embeddings obtained from a test set experience buffer with random actions and edges are predicted transitions. The learned abstract state graph clearly captures the underlying grid structure of the environment both in terms of object-specific latent states and in terms of predicted transitions, but is randomly rotated and/or mirrored. The model further correctly captures that certain actions do not have an effect if a neighboring position is blocked by another object (shown as colored spheres), even though the transition model does not have access to visual inputs. \label{fig:grid_world}}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+  \begin{subfigure}[b]{0.59\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/physics_trajectory.pdf}
+    \caption{Observations from 3-body gravitational physics simulation (bottom) and learned abstract state transition graph for a single object slot (top).}
+  \end{subfigure}
+  \quad
+  \begin{subfigure}[b]{0.35\textwidth}
+    \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=0.65\linewidth]{figures/balls_3.pdf}
+    \centering
+    \caption{Abstract state transition graph from 50 test episodes for single object slot.}
+  \end{subfigure}
+  \caption{Qualitative results for 3-body physics environment for a single representative test set episode (left) and for a dataset of 50 test episodes (right). The model learns to smoothly embed object trajectories, with the circular motion represented in the latent space (projected from four to two dimensions via PCA). In the abstract state transition graph, orange nodes denote starting states for a particular episode, green links correspond to ground truth transitions and violet links correspond to transitions predicted by the model. One trajectory (in the center) strongly deviates from typical trajectories seen during training, and the model struggles to predict the correct transition.\label{fig:physics}}
+\end{figure*}
+
+\subsection{Quantitative Results}
+We set up quantitative experiments for evaluating the quality of both object discovery and the quality of the learned transition model. We compare against autoencoder baselines and model variants that do not represent the environment in an object-factorized manner, do not use a GNN, or do not make use of contrastive learning. Performing well under this evaluation setting requires some degree of (combinatorial) generalization to unseen environment instances.
+
+We report ranking scores (in \%) in latent space, after encoding source and target observations, and taking steps in the latent space using the learned model. Reported results are mean and standard error of scores over 4 runs on hold-out environment instances. Results are summarized in Table \ref{tab:results_node}.
+
+\begin{table}[ht]
+\centering
+\caption{\label{tab:results_node}Ranking results for multi-step prediction in latent space. Highest (mean) scores in \textbf{bold}.}
+
+\begin{adjustbox}{center,width=0.9\linewidth}
+\begin{tabular}{lllcccccc}
+\toprule
+  & & & \multicolumn{2}{c}{1 Step} & \multicolumn{2}{c}{5 Steps} & \multicolumn{2}{c}{10 Steps} \\ \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+&&Model & H@1 & MRR & H@1 & MRR & H@1 & MRR      \\ \midrule
+\multicolumn{2}{c}{\parbox[t]{2mm}{\multirow{6}{*}{\rotatebox[origin=c]{90}{2D SHAPES}}}} &\bf C-SWM& {\bf100}{\color{lightgrey}\tiny$\pm$0.0} &  {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} \\
+&&-- latent GNN & 99.9{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & 97.4{\color{lightgrey}\tiny$\pm$0.1} & 98.4{\color{lightgrey}\tiny$\pm$0.0} & 89.7{\color{lightgrey}\tiny$\pm$0.3} & 93.1{\color{lightgrey}\tiny$\pm$0.2} \\
+&&-- factored states & 54.5{\color{lightgrey}\tiny$\pm$18.1} & 65.0{\color{lightgrey}\tiny$\pm$15.9} & 34.4{\color{lightgrey}\tiny$\pm$16.0}  & 47.4{\color{lightgrey}\tiny$\pm$16.0} & 24.1{\color{lightgrey}\tiny$\pm$11.2} & 37.0{\color{lightgrey}\tiny$\pm$12.1} \\
+&&-- contrastive loss & 49.9{\color{lightgrey}\tiny$\pm$0.9} & 55.2{\color{lightgrey}\tiny$\pm$0.9} & 6.5{\color{lightgrey}\tiny$\pm$0.5} & 9.3{\color{lightgrey}\tiny$\pm$0.7} & 1.4{\color{lightgrey}\tiny$\pm$0.1} & 2.6{\color{lightgrey}\tiny$\pm$0.2}
+
+\\
+&&World Model (AE) & 98.7{\color{lightgrey}\tiny$\pm$0.5}  & 99.2{\color{lightgrey}\tiny$\pm$0.3} & 36.1{\color{lightgrey}\tiny$\pm$8.1}  & 44.1{\color{lightgrey}\tiny$\pm$8.1} & 6.5{\color{lightgrey}\tiny$\pm$2.6}  & 10.5{\color{lightgrey}\tiny$\pm$3.6}\\
+&&World Model (VAE) & 94.2{\color{lightgrey}\tiny$\pm$1.0}  & 96.4{\color{lightgrey}\tiny$\pm$0.6} & 14.1{\color{lightgrey}\tiny$\pm$1.1}  & 21.4{\color{lightgrey}\tiny$\pm$1.4} & 1.4{\color{lightgrey}\tiny$\pm$0.2}  & 3.5{\color{lightgrey}\tiny$\pm$0.4}\\
+\midrule
+\multicolumn{2}{c}{\parbox[t]{2mm}{\multirow{6}{*}{\rotatebox[origin=c]{90}{3D BLOCKS}}}} &\bf C-SWM& {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} & {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} \\
+&&-- latent GNN & {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} & 99.9{\color{lightgrey}\tiny$\pm$0.0} & 96.3{\color{lightgrey}\tiny$\pm$0.4} & 97.7{\color{lightgrey}\tiny$\pm$0.3} & 86.0{\color{lightgrey}\tiny$\pm$1.8} & 90.2{\color{lightgrey}\tiny$\pm$1.5}\\
+&&-- factored states & 74.2{\color{lightgrey}\tiny$\pm$9.3} & 82.5{\color{lightgrey}\tiny$\pm$8.3} & 48.7{\color{lightgrey}\tiny$\pm$12.9} & 62.6{\color{lightgrey}\tiny$\pm$13.0} & 65.8{\color{lightgrey}\tiny$\pm$14.0} & 49.6{\color{lightgrey}\tiny$\pm$11.0} \\
+&&-- contrastive loss & 48.9{\color{lightgrey}\tiny$\pm$16.8} & 52.5{\color{lightgrey}\tiny$\pm$17.8} & 12.2{\color{lightgrey}\tiny$\pm$5.8} & 16.3{\color{lightgrey}\tiny$\pm$7.1} & 3.1{\color{lightgrey}\tiny$\pm$1.9} & 5.3{\color{lightgrey}\tiny$\pm$2.8}\\
+&&World Model (AE) & 93.5{\color{lightgrey}\tiny$\pm$0.8}  & 95.6{\color{lightgrey}\tiny$\pm$0.6} & 26.7{\color{lightgrey}\tiny$\pm$0.7}  & 35.6{\color{lightgrey}\tiny$\pm$0.8} & 4.0{\color{lightgrey}\tiny$\pm$0.2}  & 7.6{\color{lightgrey}\tiny$\pm$0.3}\\
+&&World Model (VAE) & 90.9{\color{lightgrey}\tiny$\pm$0.7}  & 94.2{\color{lightgrey}\tiny$\pm$0.6} & 31.3{\color{lightgrey}\tiny$\pm$2.3}  & 41.8{\color{lightgrey}\tiny$\pm$2.3} & 7.2{\color{lightgrey}\tiny$\pm$0.9}  & 12.9{\color{lightgrey}\tiny$\pm$1.3}\\
+\midrule
+\parbox[t]{0.1mm}{\multirow{5}{*}{\rotatebox[origin=c]{90}{ATARI}}} & \parbox[t]{2mm}{\multirow{5}{*}{\rotatebox[origin=c]{90}{PONG}}}&{\bf C-SWM} ($K=5$)& 20.5{\color{lightgrey}\tiny$\pm$3.5}  & 41.8{\color{lightgrey}\tiny$\pm$2.9} & 9.5{\color{lightgrey}\tiny$\pm$2.2}  & 22.2{\color{lightgrey}\tiny$\pm$3.3} & 5.3{\color{lightgrey}\tiny$\pm$1.6}  & 15.8{\color{lightgrey}\tiny$\pm$2.8}\\
+&&{\bf C-SWM} ($K=3$)& 34.8{\color{lightgrey}\tiny$\pm$5.3}  & 54.3{\color{lightgrey}\tiny$\pm$5.2} & 12.8{\color{lightgrey}\tiny$\pm$3.4}  & 28.1{\color{lightgrey}\tiny$\pm$4.2} & 9.5{\color{lightgrey}\tiny$\pm$1.7}  & 21.1{\color{lightgrey}\tiny$\pm$2.8}\\
+&&{\bf C-SWM} ($K=1$)& {\bf36.5}{\color{lightgrey}\tiny$\pm$5.6}  & {\bf56.2}{\color{lightgrey}\tiny$\pm$6.2} & {\bf18.3}{\color{lightgrey}\tiny$\pm$1.9}  & {\bf35.7}{\color{lightgrey}\tiny$\pm$2.3} & {\bf11.5}{\color{lightgrey}\tiny$\pm$1.0}  & {\bf26.0}{\color{lightgrey}\tiny$\pm$1.2}\\
+&&World Model (AE) & 23.8{\color{lightgrey}\tiny$\pm$3.3}  & 44.7{\color{lightgrey}\tiny$\pm$2.4} & 1.7{\color{lightgrey}\tiny$\pm$0.5}  & 8.0{\color{lightgrey}\tiny$\pm$0.5} & 1.2{\color{lightgrey}\tiny$\pm$0.8}  & 5.3{\color{lightgrey}\tiny$\pm$0.8}\\
+&&World Model (VAE) & 1.0{\color{lightgrey}\tiny$\pm$0.0}  & 5.1{\color{lightgrey}\tiny$\pm$0.1} & 1.0{\color{lightgrey}\tiny$\pm$0.0}  & 5.2{\color{lightgrey}\tiny$\pm$0.0} & 1.0{\color{lightgrey}\tiny$\pm$0.0}  & 5.2{\color{lightgrey}\tiny$\pm$0.0} \\
+\midrule
+\parbox[t]{0.1mm}{\multirow{5}{*}{\rotatebox[origin=c]{90}{SPACE}}} & \parbox[t]{2mm}{\multirow{5}{*}{\rotatebox[origin=c]{90}{INVADERS}}}&{\bf C-SWM} ($K=5$)& {\bf 48.5}{\color{lightgrey}\tiny$\pm$7.0}  & {\bf 66.1}{\color{lightgrey}\tiny$\pm$6.6} & {\bf 16.8}{\color{lightgrey}\tiny$\pm$2.7}  & {\bf 35.7}{\color{lightgrey}\tiny$\pm$3.7} & {\bf 11.8}{\color{lightgrey}\tiny$\pm$3.0}  & {\bf 26.0}{\color{lightgrey}\tiny$\pm$4.1}\\
+&&{\bf C-SWM} ($K=3$)& 46.2{\color{lightgrey}\tiny$\pm$13.0}  & 62.3{\color{lightgrey}\tiny$\pm$11.5} & 10.8{\color{lightgrey}\tiny$\pm$3.7}  & 28.5{\color{lightgrey}\tiny$\pm$5.8} & 6.0{\color{lightgrey}\tiny$\pm$0.4}  & 20.9{\color{lightgrey}\tiny$\pm$0.9}\\
+&&{\bf C-SWM} ($K=1$)& 31.5{\color{lightgrey}\tiny$\pm$13.1}  & 48.6{\color{lightgrey}\tiny$\pm$11.8} & 10.0{\color{lightgrey}\tiny$\pm$2.3}  & 23.9{\color{lightgrey}\tiny$\pm$3.6} & 6.0{\color{lightgrey}\tiny$\pm$1.7}  & 19.8{\color{lightgrey}\tiny$\pm$3.3}\\
+&&World Model (AE) & 40.2{\color{lightgrey}\tiny$\pm$3.6}  & 59.6{\color{lightgrey}\tiny$\pm$3.5} & 5.2{\color{lightgrey}\tiny$\pm$1.1}  & 14.1{\color{lightgrey}\tiny$\pm$2.0} & 3.8{\color{lightgrey}\tiny$\pm$0.8}  & 10.4{\color{lightgrey}\tiny$\pm$1.3}\\
+&&World Model (VAE) & 1.0{\color{lightgrey}\tiny$\pm$0.0}  & 5.3{\color{lightgrey}\tiny$\pm$0.1} & 0.8{\color{lightgrey}\tiny$\pm$0.2}  & 5.2{\color{lightgrey}\tiny$\pm$0.0} & 1.0{\color{lightgrey}\tiny$\pm$0.0}  & 5.2{\color{lightgrey}\tiny$\pm$0.0}\\
+\midrule
+\parbox[t]{0.1mm}{\multirow{4}{*}{\rotatebox[origin=c]{90}{3-BODY}}} & \parbox[t]{2mm}{\multirow{4}{*}{\rotatebox[origin=c]{90}{PHYSICS}}} & \bf C-SWM & {\bf 100}{\color{lightgrey}\tiny$\pm$0.0}  & {\bf 100}{\color{lightgrey}\tiny$\pm$0.0} &  97.2{\color{lightgrey}\tiny$\pm$0.9}  & 98.5{\color{lightgrey}\tiny$\pm$0.5} & {\bf 75.5}{\color{lightgrey}\tiny$\pm$4.7}  & {\bf 85.2}{\color{lightgrey}\tiny$\pm$3.1}\\
+&&World Model (AE) & {\bf 100}{\color{lightgrey}\tiny$\pm$0.0}  & {\bf 100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf 97.7}{\color{lightgrey}\tiny$\pm$0.3}  & {\bf 98.8}{\color{lightgrey}\tiny$\pm$0.2} & 67.9{\color{lightgrey}\tiny$\pm$2.4}  & 78.4{\color{lightgrey}\tiny$\pm$1.8}\\
+&&World Model (VAE) & {\bf 100}{\color{lightgrey}\tiny$\pm$0.0}  & {\bf 100}{\color{lightgrey}\tiny$\pm$0.0} & 83.1{\color{lightgrey}\tiny$\pm$2.5}  & 90.3{\color{lightgrey}\tiny$\pm$1.6} & 23.6{\color{lightgrey}\tiny$\pm$4.2}  & 37.5{\color{lightgrey}\tiny$\pm$4.8}\\
+&& Physics WM (PAIG) & 89.2{\color{lightgrey}\tiny$\pm$3.5}  & 90.7{\color{lightgrey}\tiny$\pm$3.4} & 57.7{\color{lightgrey}\tiny$\pm$12.0}  & 63.1{\color{lightgrey}\tiny$\pm$11.1} & 25.1{\color{lightgrey}\tiny$\pm$13.0}  & 33.1{\color{lightgrey}\tiny$\pm$13.4}\\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+We find that baselines that make use of reconstruction losses in pixel space (incl.~the C-SWM model variant without contrastive loss) typically generalize less well to unseen scenes and learn a latent space configuration that makes it difficult for the transition model to learn the correct transition function. See Appendix \ref{sec:object-representations} for a visual analysis of such latent state transition graphs. This effect appears to be even stronger when using a VAE-based World Model, where the prior puts further constraints on the latent representations. C-SWM recovers this structure well, see Figure \ref{fig:grid_world}.
+
+On the grid-world environments (2D shapes and 3D blocks), C-SWM models latent transitions almost perfectly, which requires taking interactions between latent representations of objects into account. Removing the interaction component, i.e., replacing the latent GNN with an object-wise MLP, makes the model insensitive to pairwise interactions and hence the ability to predict future states deteriorates. Similarly, if we remove the state factorization, the model has difficulties generalizing to unseen environment configurations. We further explore variants of the grid-world environments in Appendix \ref{sec:grid-variants}, where 1) certain actions have no effect, and 2) one object moves randomly and independent of agent actions, to test the robustness of our approach.
+
+For the Atari 2600 experiments, we find that results can have a high variance, and that the task is more difficult, as both the World Model baseline and C-SWM struggle to make perfect long-term predictions. While for Space Invaders, a large number of object slots ($K=5$) appears to be beneficial, C-SWM achieves best results with only a single object slot in Atari Pong. This suggests that one should determine the optimal value of $K$ based on performance on a validation set if it is not known a-priori. Using an iterative object encoding mechanism, such as in MONet \citep{burgess2019monet}, would enable the model to assign `empty' slots which could improve robustness w.r.t.~the choice of $K$, which we leave for future work.
+
+We find that both C-SWMs and the autoencoder-based World Model baseline excel at short-term predictions in the 3-body physics environment, with C-SWM having a slight edge in the 10 step prediction setting. Under our evaluation setting, the PAIG baseline \citep{jaques2019physics} underperforms using the hyperparameter setting recommended by the authors. Note that we do not tune hyperparameters of C-SWM separately for this task and use the same settings as in other environments.
+
+\subsection{Limitations}
+\paragraph{Instance Disambiguation}
+In our experiments, we chose a simple feed-forward CNN architecture for the object extractor module. This type of architecture cannot disambiguate multiple instances of the same object present in one scene and relies on distinct visual features or labels (e.g., \textit{the green square}) for object extraction. To better handle scenes which contain potentially multiple copies of the same object (e.g., in the Atari Space Invaders game), one would require some form of iterative disambiguation procedure to break symmetries and dynamically bind individual objects to slots or \textit{object files} \citep{KahnemanTreisman84,kahneman1992reviewing}, such as in the style of dynamic routing \citep{sabour2017dynamic}, iterative inference \citep{greff2019multi,engelcke2019genesis} or sequential masking \citep{burgess2019monet,kipf2019compile}.
+
+\paragraph{Stochasticity \& Markov Assumption}
+Our formulation of C-SWMs does not take into account stochasticity in environment transitions or observations, and hence is limited to fully deterministic worlds. A probabilistic extension of C-SWMs is an interesting avenue for future work.
+For simplicity, we make the Markov assumption: state and action contain all the information necessary to predict the next state. This allows us to look at single state-action-state triples in isolation. To go beyond this limitation, one would require some form of memory mechanism, such as an RNN as part of the model architecture, which we leave for future work.
+
+\section{Conclusions}
+Structured world models offer compelling advantages over pure connectionist methods, by enabling stronger inductive biases for generalization, without necessarily constraining the generality of the model: for example, the contrastively trained model on the 3-body physics environment is free to store identical representations in each object slot and ignore pairwise interactions, i.e., an unstructured world model still exists as a special case. Experimentally, we find that C-SWMs make effective use of this additional structure, likely because it allows for a transition model of significantly lower complexity, and learn object-oriented models that generalize better to unseen situations.
+
+We are excited about the prospect of using C-SWMs for model-based planning and reinforcement learning in future work, where object-oriented representations will likely allow for more accurate counterfactual reasoning about effects of actions and novel interactions in the environment. We further hope to inspire future work to think beyond autoencoder-based approaches for object-based, structured representation learning, and to address some of the limitations outlined in this paper.
+
+\section*{Acknowledgements}
+We would like to thank Marco Federici and Adam Kosiorek
+for helpful discussions. We would further like to thank the anonymous reviewers for valuable feedback. T.K.~acknowledges funding by SAP SE.
+
+
+\bibliography{references}
+\bibliographystyle{iclr2020_conference}
+
+\newpage
+\appendix
+
+\section{Additional Results and Discussion}
+\label{sec:additional_results}
+\subsection{Object-specific Representations}
+\label{sec:object-representations}
+We visualize abstract state transition graphs separated by object slot for the 3D cubes environment in Figure \ref{fig:object_graphs_cubes}. Discovered object representations in the 2D shapes dataset (not shown) are qualitatively very similar. We apply the same visualization technique to the model variant without contrastive loss, which is instead trained with a decoder model and a loss in pixel space. See Figure \ref{fig:object_graphs_decoder} for this baseline and note that the regular structure in the latent space is lost, which makes it difficult for the transition model to learn transitions which generalize to unseen environment instances.
+
+
+Qualitative results for the 3-body physics dataset are summarized in Figures \ref{fig:object_graphs_physics} and \ref{fig:object_graphs_physics2} for two different random seeds.
+
+\begin{figure*}[htp]
+\centering
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/cubes_1.png}
+    \caption{Object slot 1.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/cubes_2.png}
+    \caption{Object slot 2.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/cubes_3.png}
+    \caption{Object slot 3.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/cubes_4.png}
+    \caption{Object slot 4.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/cubes_5.png}
+    \caption{Object slot 5.}
+  \end{subfigure}
+  \caption{Abstract state transition graphs per object slot for a trained C-SWM model on the 3D cubes environment (with all objects allowed to be moved, i.e., none are fixed in place). Edge color denotes action type. The abstract state graph is nearly identical for each object, which illustrates that the model successfully represents objects in the same manner despite their visual differences.\label{fig:object_graphs_cubes}}
+\end{figure*}
+
+
+\begin{figure*}[htp]
+\centering
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.1cm},clip,width=\linewidth]{figures/cubes_dec_1.png}
+    \caption{Object slot 1.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.1cm},clip,width=\linewidth]{figures/cubes_dec_2.png}
+    \caption{Object slot 2.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.1cm},clip,width=\linewidth]{figures/cubes_dec_3.png}
+    \caption{Object slot 3.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.1cm},clip,width=\linewidth]{figures/cubes_dec_4.png}
+    \caption{Object slot 4.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.1cm},clip,width=\linewidth]{figures/cubes_dec_5.png}
+    \caption{Object slot 5.}
+  \end{subfigure}
+  \caption{Abstract state transition graphs per object slot for a trained SWM model \textit{without contrastive loss}, using instead a loss in pixel space, on the 3D cubes environment. Edge color denotes action type.\label{fig:object_graphs_decoder}}
+\end{figure*}
+
+\begin{figure*}[htp]
+\centering
+  \begin{subfigure}[b]{0.38\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_filters.pdf}
+    \caption{Discovered object-specific filters.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_1.pdf}
+    \caption{Object slot 1.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_2.pdf}
+    \caption{Object slot 2.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_3.pdf}
+    \caption{Object slot 3.}
+  \end{subfigure}
+  \caption{Object filters (left) and abstract state transition graphs per object slot (right) for a trained C-SWM model on unseen test instances of the 3-body physics environment (seed 1).\label{fig:object_graphs_physics}}
+\end{figure*}
+
+\begin{figure*}[htp]
+\centering
+  \begin{subfigure}[b]{0.38\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_alt_filters.pdf}
+    \caption{Discovered object-specific filters.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_alt_1.pdf}
+    \caption{Object slot 1.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_alt_2.pdf}
+    \caption{Object slot 2.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/balls_alt_3.pdf}
+    \caption{Object slot 3.}
+  \end{subfigure}
+  \caption{Object filters (left) and abstract state transition graphs per object slot (right) for a trained C-SWM model on unseen test instances of the 3-body physics environment (seed 2).\label{fig:object_graphs_physics2}}
+\end{figure*}
+
+For the Atari 2600 environments, we generally found latent object representations to be less interpretable. We attribute this to the fact that a) objects have different roles and are in general not exchangeable (in contrast to the block pushing grid world environments and the 3-body physics environment), b) actions affect only one object directly, but many other objects indirectly in two consecutive frames, and c) due to multiple objects in one scene sharing the same visual features. See Figure \ref{fig:object_graphs_pong} for an example of learned representations in Atari Pong and Figure \ref{fig:object_graphs_spaceinvaders} for an example in Space Invaders.
+
+\begin{figure*}[htp]
+\centering
+  \begin{subfigure}[b]{0.38\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/pong_filters.pdf}
+    \caption{Discovered object-specific filters.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/pong_1.pdf}
+    \caption{Object slot 1.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/pong_2.pdf}
+    \caption{Object slot 2.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/pong_3.pdf}
+    \caption{Object slot 3.}
+  \end{subfigure}
+  \caption{Object filters (left) and abstract state transition graphs per object slot (right) for a trained C-SWM model with $K=3$ object slots on unseen test instances of the Atari Pong environment.\label{fig:object_graphs_pong}}
+\end{figure*}
+
+\begin{figure*}[htp!]
+\centering
+  \begin{subfigure}[b]{0.38\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/spaceinvaders_filters.pdf}
+    \caption{Discovered object-specific filters.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/spaceinvaders_1.pdf}
+    \caption{Object slot 1.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/spaceinvaders_2.pdf}
+    \caption{Object slot 2.}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.18\textwidth}
+  \centering
+    \includegraphics[trim={0 0.3cm 0 0.37cm},clip,width=\linewidth]{figures/spaceinvaders_3.pdf}
+    \caption{Object slot 3.}
+  \end{subfigure}
+  \caption{Object filters (left) and abstract state transition graphs per object slot (right) for a trained C-SWM model with $K=3$ object slots on unseen test instances of the Space Invaders environment.\label{fig:object_graphs_spaceinvaders}}
+\end{figure*}
+
+\begin{figure}[htp]
+\centering
+\includegraphics[width=\linewidth]{figures/shapes_comparison.pdf}
+  \caption{Qualitative model comparison in pixel space on a hold-out test instance of the 2D shapes environment. We train a separate decoder model for 100 epochs on both the C-SWM and the World Model baseline using all training environment instances to obtain pixel-based reconstructions for multiple prediction steps into the future. \label{fig:pixel_comparison}}
+\end{figure}
+
+\subsection{Model Comparison in Pixel Space}
+To supplement our model comparison in latent space using ranking metrics, we here show a direct comparison in pixel space at the example of the 2D shapes environment. This requires training a separate decoder model for C-SWM. For fairness of this comparison, we use the same protocol to train a separate decoder for the World Model (AE) baseline (discarding the one obtained from the original end-to-end auto-encoding training procedure). This decoder has the same architecture as in the other baseline models and is trained for 100 epochs.
+
+\begin{wrapfigure}{r}{0.45\textwidth}
+\vspace{-1em}
+\centering
+\includegraphics[trim={0 0.3cm 0 0.33cm},clip,width=\linewidth]{figures/mse_plot.pdf}
+\caption{Quantitative model comparison in pixel space on a hold-out test set of the 2D shapes environment. The plot shows mean squared reconstruction error (MSE) in pixel space for multiple transition model prediction steps into the future (lower is better), averaged over 4 runs. Shaded area denotes standard error. \label{fig:mse_plot}}
+\vspace{-2em}
+\end{wrapfigure}
+
+For a qualitative comparison, see Figure \ref{fig:pixel_comparison}. The C-SWM model, as expected from our ranking analysis in latent space, performs almost perfectly at this task. Although the World Model (AE) baseline makes clear mistakes which compound over time, it nonetheless often gets several object positions correct after many time steps. The ranking loss in latent space captures this behaviour well, and, for example, assigns an almost perfect score for 1-step prediction to the World Model (AE) baseline. The typically used mean-squared error (MSE) in pixel space (see Figure \ref{fig:mse_plot}), however, differs by \textit{several orders of magnitude} between the two models and does not capture any of the nuanced differences in qualitative predictive behavior. We hence strongly encourage researchers in this area to consider ranking-based evaluations directly in latent space in addition to, or as a replacement for comparisons in pixel space.
+
+
+
+
+\subsection{Hinge Loss}
+\label{sec:hinge-loss}
+In Table \ref{tab:results_hinge}, we summarize results of a comparison between our multi-object contrastive loss from Eq.~\ref{eq:multi-obj-loss}, denoted by \textit{C-SWM (original)}, and a \textit{full-hinge} (or \textit{triplet}) loss that places the hinge over both the positive and the negative energy term, i.e., $\mathcal{L} = \max(0,\gamma + H - \tilde{H})$. The latter loss is similar to the loss employed in \citet{bordes2013translating}, but without imposing a norm constraint on the embeddings $z_t$. Reported results are mean and standard error over 4 runs on hold-out environment instances.
+
+\begin{table}[htp!]
+\centering
+\caption{\label{tab:results_hinge}Comparison of hinge loss variants on 2D shapes environment. Numbers denote ranking scores (in \%) for multi-step prediction in latent space. Highest (mean) scores in \textbf{bold}.}
+\begin{tabular}{lcccccc}
+\toprule
+   & \multicolumn{2}{c}{1 Step} & \multicolumn{2}{c}{5 Steps} & \multicolumn{2}{c}{10 Steps} \\ \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Model & H@1 & MRR & H@1 & MRR & H@1 & MRR      \\ \midrule
+\bf C-SWM (original)& {\bf100}{\color{lightgrey}\tiny$\pm$0.0} &  {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} & {\bf99.9}{\color{lightgrey}\tiny$\pm$0.0} & {\bf100}{\color{lightgrey}\tiny$\pm$0.0} \\
+with full hinge ($\gamma=1$) & 95.9{\color{lightgrey}\tiny$\pm$1.0} & 97.8{\color{lightgrey}\tiny$\pm$0.6} & 40.4{\color{lightgrey}\tiny$\pm$5.9}  & 54.4{\color{lightgrey}\tiny$\pm$5.8} & 12.6{\color{lightgrey}\tiny$\pm$4.0}  & 21.8{\color{lightgrey}\tiny$\pm$5.9} \\
+with full hinge ($\gamma=5$) & 97.7{\color{lightgrey}\tiny$\pm$0.9}  & 98.8{\color{lightgrey}\tiny$\pm$0.5} & 52.0{\color{lightgrey}\tiny$\pm$2.5}  & 65.7{\color{lightgrey}\tiny$\pm$2.6} & 15.8{\color{lightgrey}\tiny$\pm$2.9}  & 26.8{\color{lightgrey}\tiny$\pm$3.5} \\
+with full hinge ($\gamma=10$) & 97.0{\color{lightgrey}\tiny$\pm$0.4}  & 98.5{\color{lightgrey}\tiny$\pm$0.2} & 49.5{\color{lightgrey}\tiny$\pm$1.5}  & 63.3{\color{lightgrey}\tiny$\pm$1.4} & 18.7{\color{lightgrey}\tiny$\pm$1.2}  & 30.3{\color{lightgrey}\tiny$\pm$1.4} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We find that placing the hinge only on the negative energy term significantly improves results, likely because the full hinge loss can be minimized by simply increasing the norms of the embeddings $z_t$, as outlined in \citet{bordes2013translating}. This could be addressed by introducing additional constraints, such as by forcing the embeddings $z_t$ to lie on the unit-hypersphere, as done in TransE \citep{bordes2013translating}, which we do not consider in this work as most of the environment dynamics in our experiments obey a flat Euclidean geometry (e.g., translation on a grid).
+
+
+\subsection{Multiple Feature Maps per Object Slot}
+\label{sec:feature-maps}
+We experimented with assigning multiple feature maps per object slot to investigate whether this can improve performance on the Space Invaders environment (as an example of one of the more complex environments considered in this work). All other model settings are left unchanged. Results are summarized in Table \ref{tab:results_feaure_maps}. The original model variant with one feature map per object slot (using a total of $K=5$ slots) is denoted by \textit{C-SWM (original)}. Reported results are mean and standard error over 4 runs on hold-out environment instances.
+
+\begin{table}[htp!]
+\centering
+\caption{\label{tab:results_feaure_maps}Comparison of model variants with multiple feature maps per object on the Space Invaders environment. Numbers denote ranking scores (in \%) for multi-step prediction in latent space.}
+\begin{tabular}{lcccccc}
+\toprule
+   & \multicolumn{2}{c}{1 Step} & \multicolumn{2}{c}{5 Steps} & \multicolumn{2}{c}{10 Steps} \\ \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Model & H@1 & MRR & H@1 & MRR & H@1 & MRR      \\ \midrule
+{\bf C-SWM (original)}& {48.5}{\color{lightgrey}\tiny$\pm$7.0}  & { 66.1}{\color{lightgrey}\tiny$\pm$6.6} & {16.8}{\color{lightgrey}\tiny$\pm$2.7}  & { 35.7}{\color{lightgrey}\tiny$\pm$3.7} & {11.8}{\color{lightgrey}\tiny$\pm$3.0}  & { 26.0}{\color{lightgrey}\tiny$\pm$4.1} \\
+with 2 feature maps & 48.2{\color{lightgrey}\tiny$\pm$7.1}  & 65.7{\color{lightgrey}\tiny$\pm$6.8} & 12.8{\color{lightgrey}\tiny$\pm$3.0}  & 27.7{\color{lightgrey}\tiny$\pm$3.2} & 8.2{\color{lightgrey}\tiny$\pm$2.9}  & 21.2{\color{lightgrey}\tiny$\pm$3.4} \\
+with 5 feature maps & 52.5{\color{lightgrey}\tiny$\pm$3.4}  & 71.0{\color{lightgrey}\tiny$\pm$2.6} & 18.2{\color{lightgrey}\tiny$\pm$4.3}  & 36.3{\color{lightgrey}\tiny$\pm$4.6} & 11.8{\color{lightgrey}\tiny$\pm$2.5}  & 25.0{\color{lightgrey}\tiny$\pm$3.4} \\
+with 10 feature maps & 50.0{\color{lightgrey}\tiny$\pm$0.9}  & 68.6{\color{lightgrey}\tiny$\pm$1.0} & 15.8{\color{lightgrey}\tiny$\pm$1.4}  & 32.4{\color{lightgrey}\tiny$\pm$2.3} & 9.0{\color{lightgrey}\tiny$\pm$1.4}  & 22.7{\color{lightgrey}\tiny$\pm$2.3} \\
+\bottomrule
+\end{tabular}
+\end{table}
+We find that there is no clear advantage in using multiple feature maps per object slot for the Space Invaders environment, but this might nonetheless prove useful for environments of more complex nature.
+
+\subsection{Grid-World Environment Variants}
+\label{sec:grid-variants}
+To further evaluate the robustness of our approach, we experimented with two variants of the 2D shapes grid-world environment with five objects.
+%
+In the first variant, termed \textit{no-op action}, we include an additional `no-op' action for each object that has no effect. This mirrors the setting present in many Atari 2600 benchmark environments that have an explicit no-op action.
+%
+In the second variant, termed \textit{random object}, we assign a special property to one out of the five objects: a random action is applied to this object at every turn, i.e., the agent only has control over the other four objects and in every environment step, a total of two objects receive an action (one by the agent, which only affects one out of the first four objects, and one random action on the last object). This is to test how the model behaves in the presence of other agents that act randomly. As our model is fully deterministic, it is to be expected that adding a source of randomness in the environment will pose a challenge.
+
+We report results in Table \ref{tab:results_env_variants}. Reported numbers are mean and standard error over 4 runs on hold-out environment instances. We find that adding a no-op action has little effect on our model, but adding a randomly moving object reduces predictive performance. Performance in the latter case could potentially be improved by explicitly modeling stochasticity in the environment.
+
+\begin{table}[htp!]
+\centering
+\caption{\label{tab:results_env_variants}Comparison of C-SWM on variants of the 2D shapes environment. Numbers denote ranking scores (in \%) for multi-step prediction in latent space.}
+\begin{tabular}{lcccccc}
+\toprule
+   & \multicolumn{2}{c}{1 Step} & \multicolumn{2}{c}{5 Steps} & \multicolumn{2}{c}{10 Steps} \\ \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Model & H@1 & MRR & H@1 & MRR & H@1 & MRR      \\ \midrule
+{\bf C-SWM (original env.)}& 100{\color{lightgrey}\tiny$\pm$0.0}  & 100{\color{lightgrey}\tiny$\pm$0.0} & 100{\color{lightgrey}\tiny$\pm$0.0}  & 100{\color{lightgrey}\tiny$\pm$0.0} & 99.9{\color{lightgrey}\tiny$\pm$0.0}  & 100{\color{lightgrey}\tiny$\pm$0.0} \\
++ no-op action & 100{\color{lightgrey}\tiny$\pm$0.0}  & 100{\color{lightgrey}\tiny$\pm$0.0} & 100{\color{lightgrey}\tiny$\pm$0.0}  & 100{\color{lightgrey}\tiny$\pm$0.0} & 99.9{\color{lightgrey}\tiny$\pm$0.0}  & 99.9{\color{lightgrey}\tiny$\pm$0.0} \\
++ random object & 98.4{\color{lightgrey}\tiny$\pm$0.1}  & 99.2{\color{lightgrey}\tiny$\pm$0.0} & 95.9{\color{lightgrey}\tiny$\pm$0.2}  & 97.6{\color{lightgrey}\tiny$\pm$0.1} & 90.4{\color{lightgrey}\tiny$\pm$0.3}  & 93.7{\color{lightgrey}\tiny$\pm$0.2} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Stability}
+The discovered object representations and identifications can vary between runs. While we found that this process is very stable for the simple grid world environments where actions only affect a single object, we found that results can be initialization-dependent on the Atari environments, where actions can have effects across all objects, and the 3-body physics simulation (see Figures \ref{fig:object_graphs_physics} and \ref{fig:object_graphs_physics2}), which does not have any actions. In some cases, the discovered representation can be less suitable for forward prediction in time or for generalization to novel scenes, which explains the variance in some of our results on these datasets.
+
+
+\subsection{Training Time}
+We found that the overall training time of the C-SWM model was comparable to that of the World Model baseline. Both C-SWM and the World Model baseline trained for approx.~1 hour wall-clock time on the 2D shapes dataset, approx.~2 hours on the 3D cubes dataset, and approx.~30min on the 3-body physics environment using a single NVIDIA GTX1080Ti GPU. The Atari Pong and Space Invaders models trained for typically less than 20 minutes. A notable exception is the PAIG baseline model \citep{jaques2019physics} which trained for approx.~6 hours on a NVIDIA TitanX Pascal GPU using the recommended settings by the authors of the paper.
+
+\section{Datasets}
+\label{sec:datasets}
+\subsection{Grid Worlds}
+To generate an experience buffer for training, we initialize the environment with random object placements and uniformly sample an object and an object-specific action at every time step.
+
+We provide state observations as $50\times 50\times 3$ tensors with RGB color channels, normalized to $[0, 1]$. Actions are provided as a 4-dim one-hot vector (if an action is applied) or a vector of zeros per object slot in the environment. The action one-hot vector encodes the directional movement action applied to a particular object, or is represented as a vector of zeros if no action is applied to a particular object. Note that only a single object receives an action per time step. For the Atari environments, we provide a copy of the one-hot encoded action vector to every object slot, and for the 3-body physics environment, which has no actions, we do not provide an action vector.
+
+\paragraph{2D Shapes}
+This environment is a $5\times 5$ grid world with 5 different objects placed at random positions. Each location can only be occupied by at maximum one object. Each object is represented by a unique shape/color combination, occupying $10\times 10$ pixels on the overall $50 \times 50$ pixel grid. At each time step, one object can be selected and moved by one position along the four cardinal directions. See Figure \ref{fig:environments_a} for an example. The action has no effect if the target location in a particular direction is occupied by another object or outside of the $5\times 5$ grid. Thus, a learned transition model needs to take pairwise interactions between object properties (i.e., their locations) into account, as it would otherwise be unable to predict the effect of an action correctly.
+
+\paragraph{3D Blocks}
+To investigate to what degree our model is robust to partial occlusion and perspective changes, we implement a simple block pushing environment using Matplotlib \citep{hunter2007matplotlib} as a rendering tool. The underlying environment dynamics are the same as in the 2D Shapes dataset, and we only change the rendering component to make for a visually more challenging task that involves a different perspective and partial occlusions. See Figure \ref{fig:environments_b} for an example.
+
+\subsection{Atari 2600 Games}
+\paragraph{Atari Pong} We make use of the Arcade Learning Environment \citep{bellemare2013arcade} to create a small environment based on the Atari 2600 game Pong which is restricted to the first interaction between the ball and the player-controlled paddle, i.e., we discard the first couple of frames from the experience buffer where the opponent behaves completely independent of any player action. Specifically, we discard the first 58 (random) environment interactions. We use the {\sc PongDeterministic-v4} variant of the environment in OpenAI Gym \citep{brockman2016openai}. We use a random policy and populate an experience buffer with 10 environment interactions per episode, i.e., $T=10$. An observation consists of two consecutive frames, cropped (to exclude the score) and resized to $50\times50$ pixels each. See Figure \ref{fig:environments_c} for an example.
+
+\paragraph{Space Invaders} This environment is based on the Atari 2600 game Space Invaders, using the {\sc SpaceInvadersDeterministic-v4} variant of the environment in OpenAI Gym \citep{brockman2016openai}, and processed / restricted in a similar manner as the Pong environment. We discard the first 50 (random) environment interactions for each episode and only begin populating the experience buffer thereafter. See Figure \ref{fig:environments_d} for an example observation.
+
+\subsection{3-Body Physics} The 3-body physics simulation environment is an interacting system that evolves according to classical gravitational dynamics. Different from the other environments considered here, there are no actions. This environment is adapted from \citet{jaques2019physics} using their publicly available implementation\footnote{\url{https://github.com/seuqaj114/paig}}, where we set the step size ($\mathrm{dt}$) to $2.0$ and the initial maximum $x$ and $y$ velocities to $0.5$. We concatenate two consecutive frames of $50\times50$ pixels each to provide the model with (implicit) velocity information.  See Figure \ref{fig:physics} for an example observation sequence.
+
+
+\section{Evaluation Metrics}
+\label{sec:metrics}
+
+\subsection{Hits at Rank k (H@k)} This score is 1 for a particular example if the predicted state representation is in the k-nearest neighbor set around the encoded true observation, where we define the neighborhood of a node to include the node itself. Otherwise this score is 0. In other words, this score measures whether the rank of the predicted state representation is smaller than or equal to k, when ranking all reference state representations by distance to the true state representation. We report the average of this score over a particular evaluation dataset.
+
+\subsection{Mean Reciprocal Rank (MRR)}
+This score is defined as the average inverse rank, i.e., $\mathrm{MRR}=\frac{1}{N}\sum_{n=1}^N \frac{1}{\mathrm{rank}_n}$, where $\mathrm{rank}_n$ is the rank of the $n$-th sample.
+
+\section{Architecture and Hyperparameters}
+\label{sec:architecture}
+
+\subsection{Object Extractor}
+For the 3D cubes environment, the object extractor is a 4-layer CNN with $3\times 3$ filters, zero-padding, and $16$ feature maps per layer, with the exception of the last layer, which has $K=5$ feature maps, i.e., one per object slot. After each layer, we apply BatchNorm \citep{ioffe2015batch} and a $\mathrm{ReLU}(x)=\max(0,x)$ activation function. For the 2D shapes environment, we choose a simpler CNN architecture with only a single convolutional layer with $10\times 10$ filters and a stride of $10$, followed by BatchNorm and a ReLU activation or LeakyReLU \citep{xu2015empirical} for the Atari 2600 and physics environments. This layer has $16$ feature maps and is followed by a channel-wise linear transformation (i.e., a $1\times1$ convolution), with 5 feature maps as output. For both models, we choose a sigmoid activation function after the last layer to obtain object masks with values in $(0, 1)$. We use the same two-layer architecture for the Atari 2600 environments and the 3-body physics environment, but with $9\times9$ filters (and zero-padding) in the first layer, and $5\times5$ filters with a stride of 5 in the second layer.
+
+\subsection{Object Encoder}
+After reshaping/flattening the output of the object extractor, we obtain a vector representation per object (2500-dim for the 3D cubes environment, 25-dim for the 2D shapes environment, and 1000-dim for Atari 2600 and physics environments). The object encoder is an MLP with two hidden layers of 512 units and each, followed by ReLU activation functions. We further use LayerNorm \citep{ba2016layer} before the activation function of the second hidden layer.  The output of the final output layer is 2-dimensional (4-dimensional for Atari 2600 and physics environments), reflecting the ground truth object state, i.e., the object coordinates in 2D (although this is not provided to the model), and velocity (if applicable).
+
+\subsection{Transition Model}
+Both the node and the edge model in the GNN-based transition model are MLPs with the same architecture / number of hidden units as the object encoder model, i.e., two hidden layers of 512 units each, LayerNorm and ReLU activations.
+
+\subsection{Loss function}
+The margin in the hinge loss is chosen as $\gamma=1$. We further multiply the squared Euclidean distance $d(x,y)$ in the loss function with a factor of $0.5/\sigma^2$ with $\sigma=0.5$ to control the spread of the embeddings. We use the same setting in all experiments.
+
+\subsection{Baselines}
+\paragraph{World Model Baseline}
+
+The World Model baseline is trained in two stages: First, we train an auto-encoder or a VAE with a 32-dim latent space, where the encoder is a CNN with the same architecture as the object extractor used in the C-SWM model, followed by an MLP with the same architecture as the object encoder module in C-SWM on the flattened representation of the output of the encoder CNN. The decoder exactly mirrors this architecture where we replace convolutional layers with deconvolutional layers. We verified that this architecture can successfully build representations of single frames.
+
+
+\begin{wrapfigure}{r}{0.4\textwidth}
+\centering
+  \begin{subfigure}[b]{0.16\textwidth}
+  \centering
+    \includegraphics[width=0.7\linewidth]{figures/recon_cubes.png}
+    \caption{3D Cubes}
+  \end{subfigure}
+  ~
+  \begin{subfigure}[b]{0.16\textwidth}
+  \centering
+    \includegraphics[width=0.7\linewidth]{figures/recon_shapes.png}
+    \caption{2D Shapes}
+  \end{subfigure}
+  \caption{Reconstructions from the latent code of a trained VAE-based World Model baseline.\label{fig:world_model_reconstructions}}
+  \vspace{-1em}
+\end{wrapfigure}
+Example reconstructions from the latent code are shown in Figure \ref{fig:world_model_reconstructions}. We experimented both with mean squared error and binary cross entropy (using the continuous channel values in [0, 1] as targets) as reconstruction loss in the (V)AE models, both of which are typical choices in most practical implementations. We generally found binary cross entropy to be more stable to optimize and to produce better results, which is why we opted for this loss in all the baselines using decoders considered in the experimental section.
+
+
+In the second stage, we freeze the model parameters of the auto-encoder and train a transition model with mean-squared error on the latent representations. For the VAE model, we use the predicted mean values of the latent representations. This transition model takes the form of an MLP with the same architecture and number of hidden units as the node model in C-SWM. We experimented both with a translational transition model (i.e., the transition model only predicts the latent state difference, instead of the full next state) and direct prediction of the next state. We generally found that the translational transition model performed better and used it throughout all the reported results.
+
+The World Model baselines are trained with a smaller batch size of 512, which slightly improved performance and simplified memory management.
+
+\paragraph{Ablations}
+We perform the following ablations: 1) we replace the latent GNN with an MLP (per object, i.e., we remove the edge update function) to investigate whether a structured transition model is necessary, 2) we remove the state factorization and embed the full scene into a single latent variable of higher dimensionality (original dimensionality $\times$ number of original object slots) with an MLP as transition model, and 3) we replace the contrastive loss with a pixel-based reconstruction loss on both the current state and the predicted next state (we add a decoder that mirrors the architecture of the encoder).
+
+\paragraph{Physics-as-Inverse-Graphics (PAIG)}
+For this baseline, we train the PAIG model from \citet{jaques2019physics} with the code provided by the authors\footnote{\url{https://github.com/seuqaj114/paig}} on our dataset with the standard settings recommended by the authors for this particular task, namely: model=PhysicsNet, epochs=500, batch\_size=100, base\_lr=1e-3, autoencoder\_loss=5.0, anneal\_lr=true, color=true, and cell\_type=gravity\_ode\_cell. We use the same input size as in C-SWM, i.e., frames are of shape $50\times50\times3$. We further set input\_steps=2, pred\_steps=10 and extrap\_steps=0 to match our setting of predicting for a total of 10 frames while conditioning on a pair of 2 initial frames to obtain initial position and velocity information. We train this model with four different random seeds. For evaluation, we extract learned position representations for all frames of the test set and further run the latent physics prediction module (conditioned on the first two initial frames) to obtain model predictions. We further augment position representations with velocity information by taking the difference between two consecutive position representations and concatenating this representation with the 2-dim position representation, which we found to slightly improve results. In total, we obtain a 12-dim (4-dim $\times$ 3 objects) representation for each time step, i.e., the same as C-SWM. From this, we obtain ranking metrics. We found that one of the training runs (seed=2) collapsed all latent representations to a single point. We exclude this run in the results reported in Table \ref{tab:results_node}, i.e., we report average and standard error over the three other runs only.
+
+
+\end{document}

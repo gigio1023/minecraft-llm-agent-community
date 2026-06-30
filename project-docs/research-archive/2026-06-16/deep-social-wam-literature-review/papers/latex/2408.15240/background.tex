@@ -1,0 +1,28 @@
+
+An autoregressive language model generates an output sequence $\rvy = (y_1, y_2, \ldots, y_T)$ given a input context $\rvx$ (e.g., math problem) by predicting tokens one at a time, based on the previously generated tokens. Assuming that the language model is parameterized by $\theta$, the conditional probability distribution of generating a sequence $\rvy$ given context $\rvx$ is
+\begin{align}
+    p_{\theta}(\rvy \mid \rvx) = \prod_{t=1}^T p_{\theta}(y_t \mid \rvx, y_{<t})
+\end{align}
+with the convention $y_{<1} = \emptyset$ and $\rvy_{<t} = (y_1, y_2, \ldots, y_{t-1})$. For ease of notation, we define $p_\theta(y_t \mid \rvx) := p_\theta(y_t \mid \rvy_{<t}, \rvx)$. For a vocabulary size $M$, the probability of predicting the $t$-th token $y_t$, $p_\theta(y_t \mid \rvx)$, is determined using a softmax with temperature $\gamma$ on logit scores $z$ of all the tokens: $
+p_\theta(y_t \mid \rvx) = \frac{\exp(z_t/\gamma)}{\sum_{i=1}^M \exp(z_i/\gamma)}, \quad \textrm{where}\ z_t = \mathrm{logit}_\theta(y_t \mid  \rvx, \rvy_{<t})$.
+Higher values of temperature $\gamma$ introduce more randomness, while setting temperature $\tau=0$ makes the output deterministic, which corresponds to greedy decoding.
+% 0 value makes the output more deterministic by favoring the most probable words.
+
+\textbf{Next-token prediction} is the typical approach for pre-training and fine-tuning LLMs. In particular, supervised fine-tuning~(\textbf{SFT}) minimizes the cross-entropy loss between the model's predicted next token and the actual target token in a given sequence. Given a dataset $\gD = \{(x, y)\}$ of input context $\rvx$ and target response $\rvy$, the SFT loss is given by:
+\begin{equation}
+\gL_{\text{SFT}}(\theta, \gD) = -\mathbb{E}_{(\rvx, \rvy) \sim \gD} \left[ \sum_{t=1}^{|\rvy|} \log p_{\theta}(y_t \mid \rvx, \rvy_{<t}) \right].\label{eq:sft}
+\end{equation}
+\textbf{Best-of-N} is a widely-used approach to improve the reasoning performance of LLMs~\citep{cobbe2021training, lightman2023let}. Specifically, given a test problem, we sample N candidate solutions from a generator LLM. These candidates are then scored using a learned verifier or reward model, and the highest-scoring solution is selected as the final answer. A better verifier increases the chance of selecting the correct solution, improving test accuracy.
+
+
+\textbf{Discriminative Verifiers}. The prevalent approach of training verifiers for reasoning domains is to fine-tune an LLM as a classifier on a dataset of correct and incorrect solutions generated from a fixed LLM, using the binary cross-entropy loss. To do so, these verifiers directly assign a numerical score $r_\theta(\rvx, \rvy) \in [0, 1]$ to estimate the probability that a solution $\rvy$ is correct for a problem $\rvx$. As such, these verifiers do not utilize the text generation the capabilities of LLMs. Given a reward-modeling~(RM) dataset $\gD_{RM} = \gD_{\text{incorrect}} \union \gD_{\text{correct}}$, we train discriminative RMs as follows:
+\begin{align}
+\gL(\theta, \gD_{RM}) =& -\mathbb{E}_{(\rvx, \rvy^+) \sim \gD_{\text{correct}}} \left[ \log r_\theta(\rvx, \rvy^+)\right] -\mathbb{E}_{(\rvx, \rvy^-) \sim \gD_{\text{incorrect}}} \left[\log (1 - r_\theta(\rvx, \rvy^-)) \right],\nonumber\\
+\quad \text{where} \quad &r_\theta(\rvx, \rvy) = \text{sigmoid}(z_{cls}), \quad \text{and} \quad z_{cls}=\mathrm{logit}_\theta(cls \mid \rvy, \rvx)\label{eq:disc}
+\end{align}
+where $\rvy^+$ are correct and $\rvy^-$  are incorrect solutions, and
+% = \{(\rvx, \rvy^+)\}$ is a subset of $\gD_{RM}$ comprised of problems with their correct solutions $\rvy^+$, and 
+%$c$ is the binary correctness label, that is $c = 1$ if $\rvy$ is correct for problem $\rvx$, otherwise $c = 0$, and  
+$cls$ corresponds to a special vocabulary token. In this work, we always use a balanced data mixture between correct~($\gD_{\text{correct}}$) and incorrect~($\gD_{\text{incorrect}}$) problem-solution pairs.
+
+\textbf{LLM-as-a-Judge} does not finetune a verifier from a pretrained LLM, but simply prompts the LLM to perform the task of verification or self-critique~\citep{zheng2024judging, bai2022constitutional}. LLM-judge sometimes uses reference-guided grading, where the LLM is given a reference solution to compare to.

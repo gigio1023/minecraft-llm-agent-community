@@ -1,0 +1,177 @@
+\section{LLM as a Judge}
+\label{sec:llm-as-a-judge}
+While our initial evaluations using MT-bench and Chatbot Arena rely on human ratings, collecting human preferences can be costly and laborious~\cite{selfinstruct,alpaca,ouyang2022training,bai2022training,diao2023lmflow}. To overcome this, we aim to develop a more scalable and automated approach. Given that most questions in MT-bench and Chatbot Arena are open-ended without reference answers, devising a rule-based program to assess the outputs is extremely challenging.
+Traditional evaluation metrics based on the similarity between outputs and reference answers (e.g., ROUGE~\cite{lin2004rouge}, BLEU~\cite{papineni2002bleu}) are also ineffective for these questions.
+
+As LLMs continue to improve, they show potential in replacing human annotators in many tasks~\cite{gilardi2023chatgpt,huang2023chatgpt}. Specifically, we are interested in whether LLMs can effectively evaluate the responses of chat assistants and match human preferences. Next, we discuss the use and limitations of LLM-as-a-judge.
+
+\subsection{Types of LLM-as-a-Judge}
+We propose 3 LLM-as-a-judge variations. They can be implemented independently or in combination:
+\begin{itemize}
+\item \textbf{Pairwise comparison}. An LLM judge is presented with a question and two answers, and tasked to determine which one is better or declare a tie. The prompt used is given in \Cref{fig:default-prompt-pair} (Appendix).
+\item \textbf{Single answer grading}.
+Alternatively, an LLM judge is asked to directly assign a score to a single answer. The prompt used for this scenario is in \Cref{fig:default-prompt-single} (Appendix).
+\item \textbf{Reference-guided grading}.
+In certain cases, it may be beneficial to provide a reference solution if applicable. An example prompt we use for grading math problems is in \Cref{fig:default-prompt-math} (Appendix).
+\end{itemize}
+
+These methods have different pros and cons. For example, the pairwise comparison may lack scalability when the number of players increases, given that the number of possible pairs grows quadratically; single answer grading may be unable to discern subtle differences between specific pairs, and its results may become unstable, as absolute scores are likely to fluctuate more than relative pairwise results if the judge model changes.
+
+\subsection{Advantages of LLM-as-a-Judge}
+LLM-as-a-judge offers two key benefits: \textit{scalability} and \textit{explainability}. It reduces the need for human involvement, enabling scalable benchmarks and fast iterations. Additionally, LLM judges provide not only scores but also explanations, making their outputs interpretable, as shown in \Cref{fig:intro-figure}.
+
+\subsection{Limitations of LLM-as-a-Judge}
+\label{subsec:llmlimit}
+
+We identify certain biases and limitations of LLM judges. However, we will also present solutions later and show the agreement between LLM judges and humans is high despite these limitations.
+
+\textbf{Position bias} is when an LLM exhibits a propensity to favor certain positions over others. This bias is not unique to our context and has been seen in human decision-making~\cite {blunch1984position, raghubir2006center} and other ML domains~\cite{ko2020look, wang2018position}. 
+
+\Cref{fig:position-bias-example} (Appendix) shows an example of position bias. 
+GPT-4 is tasked to evaluate two responses from GPT-3.5 and Vicuna-13B to an open-ended question. When GPT-3.5's answer is positioned first, GPT-4 considers GPT-3.5's answer more detailed and superior. However, upon switching the positions of the two responses, GPT-4's judgement flips, favoring Vicuna's answer.
+
+To analyze the position bias, we construct two similar answers to each first-turn question in MT-bench by calling GPT-3.5 twice with a temperature of 0.7.
+We then try three LLMs with two different prompts:
+``default'' is our default prompt in \Cref{fig:default-prompt-pair} (Appendix).
+``rename'' renames the assistants in our default prompt to see whether the bias is on positions or names.
+As in \Cref{tab:position_bias_prompt}, we found all of them exhibit strong position bias. Most LLM judges favor the first position. Claude-v1 also shows a name bias which makes it favors "Assistant A", as illustrated by the "rename" prompt. The position bias can be very significant. Only GPT-4 outputs consistent results in more than 60\% of cases.
+
+Note that this test is challenging because the answers are very similar and occasionally indistinguishable even to humans. We will show that position bias is less prominent in some cases in \Cref{subsec:additional-position-bias}.
+As for the origin of this bias, we suspect that it could be rooted in the training data or inherent to the left-to-right architecture of causal transformers, but leave a deeper study as future work.
+
+
+\begin{table}[t]
+\centering
+\footnotesize
+\vspace{-1em}
+\caption{Position bias of different LLM judges. Consistency is the percentage of cases where a judge gives consistent results when swapping the order of two assistants. ``Biased toward first'' is the percentage of cases when a judge favors the first answer. ``Error'' indicates wrong output formats. The two largest numbers in each column are in bold.}
+\label{tab:position_bias_prompt}
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Judge & Prompt  & Consistency & Biased toward first & Biased toward second & Error \\
+\midrule
+\multirow{3}{*}{Claude-v1} & default & 23.8\% & \textbf{75.0\%} & 0.0\% & 1.2\% \\
+ & rename & 56.2\% & 11.2\% & \textbf{28.7\%} & \textbf{3.8\%} \\
+\midrule
+\multirow{3}{*}{GPT-3.5} & default & 46.2\% & \textbf{50.0\%} & 1.2\% & 2.5\% \\
+ & rename & 51.2\% & 38.8\% & 6.2\% & \textbf{3.8\%} \\
+\midrule
+\multirow{3}{*}{GPT-4} & default & \textbf{65.0\%} & 30.0\% & 5.0\% & 0.0\% \\
+ & rename & \textbf{66.2\%} & 28.7\% & 5.0\% & 0.0\% \\
+\bottomrule
+\end{tabular}
+\vspace{-1.5em}
+\end{table}
+
+\begin{table}[t]
+\footnotesize
+\centering
+\vspace{-0.5em}
+\begin{minipage}{0.45\textwidth}
+\caption{Failure rate under ``repetitive list'' attack for different LLM judges on 23 answers.} %
+\label{tab:success_rate_verbose_attack}
+\begin{tabular}{llll}
+\toprule
+Judge          & Claude-v1 & GPT-3.5  & GPT-4 \\
+\midrule
+Failure rate   & 91.3\%    & 91.3\%   & 8.7\% \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\hfill
+\begin{minipage}{0.5\textwidth}
+\footnotesize
+\centering
+\caption{Judge failure rate on 10 math questions with different prompts. We test LLaMA-13B vs. Vicuna-13B and swap positions. A failure means when GPT-4 says an incorrect answer is correct.}
+\label{tab:failure_rate_math}
+\begin{tabular}{llll}
+\toprule
+          & Default & CoT  & Reference  \\
+\midrule
+Failure rate   & 14/20    & 6/20   & 3/20 \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\vspace{-0.5em}
+\end{table}
+
+\textbf{Verbosity bias} is when an LLM judge favors longer, verbose responses, even if they are not as clear, high-quality, or accurate as shorter alternatives.
+
+To examine this bias, we design a ``repetitive list'' attack with model answers from MT-bench.
+We first select 23 model answers from MT-bench that contain a numbered list.
+We then make them unnecessarily verbose by asking GPT-4 to rephrase the list without adding any new information and insert the rephrased new list to the beginning of the original list.
+For example, if the original response contains 5 items, then the new response will contain 10 items but the first 5 items are rephrased from the original 5 items. An example is shown in \Cref{fig:verbosity-bias-example} (Appendix). We define the attack is successful if an LLM judge thinks the new response is better than the old response. \Cref{tab:success_rate_verbose_attack} shows the failure rate of LLM judges under this attack, demonstrating that all LLMs may be prone to verbosity bias though GPT-4 defends significantly better than others. As a calibration, we find LLM judges are able to correctly judge identical answers (i.e., they always return a tie for two identical answers) but cannot pass the more advanced ``repetitive list'' attack.
+
+
+
+
+\textbf{Self-enhancement bias.}
+We adopt the term ``self-enhancement bias'' from social cognition literature~\cite{brown1986evaluations} to describe the effect that LLM judges may favor the answers generated by themselves.
+
+We examine this effect statistically. \Cref{fig:mt_bench_win_rate}(b) shows the win rate (w/o tie) of six models under different LLM judges and humans.
+Compared to humans, we do observe that some judges favor certain models. For example, GPT-4 favors itself with a 10\% higher win rate; Claude-v1 favors itself with a 25\% higher win rate. However, they also favor other models and GPT-3.5 does not favor itself.
+Due to limited data and small differences, our study cannot determine whether the models exhibit a self-enhancement bias.
+Conducting a controlled study is challenging because we cannot easily rephrase a response to fit the style of another model without changing the quality.
+
+
+\textbf{Limited capability in grading math and reasoning questions.}
+LLMs are known to have limited math and reasoning capability~\cite{cobbe2021training}, which results in its failure of grading such questions because they do not know the correct answers.
+However, what is more intriguing is that it also shows limitations in grading basic math problems which it is capable of solving.
+For instance, in Figure~\ref{fig:math-grading} (Appendix), we present an example of an elementary math question in which GPT-4 makes an incorrect judgment.
+It's worth noting that although GPT-4 can solve the problem (when asked separately), it was misled by the provided answers, ultimately resulting in incorrect judgment.
+This pattern can also be seen in a reasoning question example in Figure~\ref{fig:reasoning-grading} (Appendix).
+Both GPT-3.5 and Claude-v1 show a similar weakness.
+In \Cref{subsubsec:chain-of-through-judge}, we will introduce a reference-guided method to mitigate such issues.
+
+\subsection{Addressing limitations}
+\label{sec:addressing_limitations}
+We present a few methods to address position bias and the limited grading ability for math questions.
+
+
+\textbf{Swapping positions.}
+The position bias can be addressed by simple solutions.
+A conservative approach is to call a judge twice by swapping the order of two answers and only declare a win when an answer is preferred in both orders. If the results are inconsistent after swapping, we can call it a tie.
+Another more aggressive approach is to assign positions randomly, which can be effective at a large scale with the correct expectations. In the following experiments, we use the conservative one.
+
+
+\textbf{Few-shot judge.}
+We assess whether few-shot examples can improve consistency in the position bias benchmark. We select three good judgment examples using MT-bench-like questions, GPT-3.5 and Vicuna for generating answers, and GPT-4 for generating judgments. 
+The examples cover three cases: A is better, B is better, and tie.
+As shown in \Cref{tab:few_shot_judge_consistency} (Appendix), the few-shot judge can significantly increase the consistency of GPT-4 from 65.0\% to 77.5\%.
+However, high consistency may not imply high accuracy and we are not sure whether the few-shot examples will introduce new biases. Besides, the longer prompts make API calls $4 \times$ more expensive. We use the zero-shot prompt by default in our following experiments but leave an additional study in \Cref{subsec:additional-few-shot-judge}.
+
+\textbf{Chain-of-thought and reference-guided judge.}
+\label{subsubsec:chain-of-through-judge}
+In \Cref{subsec:llmlimit}, we have shown LLM's limited capability in grading math and reasoning questions.
+We propose two simple methods to mitigate this issue: chain-of-thought judge and reference-guided judge.
+Chain-of-thought is a widely used technique to improve LLM's reasoning capability~\cite{wei2022chain}.
+We propose a similar technique to prompt an LLM judge to begin with answering the question independently and then start grading.
+Detailed prompt in Figure~\ref{fig:cot-prompt-math} (Appendix).
+However, even with the CoT prompt, we find that in many cases LLM makes exactly the same mistake as the given answers in its problem-solving process (See example in Figure~\ref{fig:cot-failure} (Appendix), suggesting that LLM judge may still be misled by the context.
+Hence, we propose a reference-guided method, in which we first generate LLM judge's answer independently, and then display it as a reference answer in the judge prompt.
+In Table~\ref{tab:failure_rate_math}, we see a significant improvement in failure rate  (from 70\% to 15\%) over the default prompt.
+
+\textbf{Fine-tuning a judge model.}
+\label{subsubsec:fine-tuning-judge}
+We try fine-tuning a Vicuna-13B on arena data to act as a judge and show some promising preliminary results in \Cref{sec:vicuna-judge}.
+
+\subsection{Multi-turn judge}
+In MT-bench, every question involves two turns to evaluate conversational abilities. 
+Therefore, when comparing two assistants, it becomes necessary to present a total of two questions and four responses, complicating the prompt design.
+We explore two possible designs, (1) breaking the two turns into two prompts or (2) displaying complete conversations in a single prompt.
+Our finding is the former one can cause the LLM judge struggling to locate the assistant's previous response precisely.
+We illustrate a case in Figure~\ref{fig:mt-sep} (Appendix) where GPT-4 makes an inaccurate judgment due to a faulty reference.
+This suggests the necessity of displaying a complete conversation to enable the LLM judge to better grasp the context. 
+We then consider the alternative design that presents two full conversations in a single prompt in which we ask the LLM judge to focus on the second question (Figure~\ref{fig:multiturn-prompt-pair} (Appendix)).
+This approach has been found to significantly alleviate the aforementioned referencing issue. %
+
+
+
+
+
+
+
+
+
+
+

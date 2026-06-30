@@ -1,0 +1,132 @@
+\subsection{Baseline Methods}
+\label{sect:baselines}
+We now show empirically that the AI Economist can outperform baseline tax policies.
+In particular, we will compare the following tax models:
+\begin{itemize}
+ \item free-market (no taxes),
+ \item US federal single-filer 2018 tax schedule,
+ \item Saez tax formula (adapted for a multi-period setting), and
+ \item the AI Economist planner. %
+\end{itemize}
+
+The specific tax rates set by these models are depicted in Figure \ref{fig:tax_rates_ai}.
+See the related work (Section \ref{sec:relatedwork}) for a broader discussion on the various tax frameworks proposed in the optimal tax literature, including linear tax models and analytical approaches to dynamic taxation in sequential economies.\footnote{We have also conducted experiments with linear planner models $\tax(\st) = \brcka{\V{\weight}, \st_{nonspatial}}$, but found they significantly underperform compared to all non-trivial tax models mentioned above.
+Furthermore, we found that pure income redistribution leads to close-to-perfect equality, but very low productivity levels, and as a result, significantly worse social metrics.
+As such, we do not include results for these models.}
+
+All tax models set tax rates for a bracketed tax schedule, and use the same income brackets, following the 2018 US federal income tax schedule and scaling so that USD 1000 corresponds to 1 Coin:
+\eq{
+ \V{\bracketcutoff} &= [0, 9700, 39475, 84200, 160725, 204100, 510300, \infty] \quad\textrm{(USD)} \\
+ &= [0, 9.7, 39.475, 84.2, 160.725, 204.100, 510.3, \infty] \quad\textrm{(Coin)}.
+}
+
+\paragraph{US Federal Income Tax Rates (Single-filer, 2018).}
+The bracket tax rates are given by:
+\eq{
+ \V{\mtaxrate} = [0.1, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37].
+}
+
+\paragraph{Saez Tax Formula (single-period).}
+A prominent analytical treatment of optimal taxation is given by
+\cite{saez_using_2001}, who proposes a closed-form solution for optimal tax rates in a single-period economy.
+
+Let $\pdf$ and $\cdf$ denote the probability density and cumulative density function on income, respectively.
+The Saez framework assumes the planner can observe the population's distribution over incomes $\income\sim\pdf(\income)$.
+Here, $\income$ and the associated density functions refer to \textit{pre-tax} income within a single tax period.
+
+\cite{saez_using_2001} works with the linear-weighted family of social welfare functions (Eq~\ref{eq:inv_income_weighted_utility}), and defines the {\em social marginal welfare weights} as
+\begin{align}\socialmarginalwelfareweight_i = \frac{d\socialwelfare}{d\utility_i}\frac{d\utility_i}{d\money_i} = \socialwelfareweight_i \frac{d\utility_i}{d\money_i}.
+\end{align}
+
+Weight $\socialmarginalwelfareweight_i$ represents the change in social welfare due to a change in agent $i$'s endowment.\footnote{In the optimal tax theory literature the derivative of utility is taken with regard to an agent's consumption, which reflects its available money after taxes and redistribution. Endowment plays the same role as consumption in our model.}
+The weights $\socialwelfareweight_i$, and implied social marginal welfare weights, $\socialmarginalwelfareweight_i$, parameterize the planner's objective, and encode a social choice, for example emphasizing agents with low wealth over agents with high wealth.
+\if 0
+For example, it is typical for
+the social marginal welfare weights  to be non-negative and decreasing in pre-tax income $\income_i$, since utility functions are assumed to be concave.
+
+\fi
+In instantiating Saez's framework, %
+one available choice is to treat these social marginal welfare weights as the primitives in the model.
+We do this, and  set the social marginal welfare  weights for the purpose of applying Saez's framework to be $\socialmarginalwelfareweight_i = \frac{1}{\income_i}$, also normalizing weights so that  $\sum_{i\in\mathcal{I}}\socialmarginalwelfareweight_i = 1$ (see also Section \ref{sect:socialwelfarefunctions}).
+This  framework  does not explicitly optimize for the product of
+equality and productivity. However, we  find empirically that optimizing with this choice for the social marginal welfare
+weights tends to improve the product of equality and productivity.
+
+\if 0
+Saez considers agents that optimize a utility function $\utility(\consumption_i, \income_i)$ that is increasing in consumption $\consumption$ and decreasing in pre-tax income $\income$. Here, consumption $\consumption$ is equivalent to the income after tax and subsidies, denoted $\money$, as used in our work. This is analogous to the utility function used in our work, $\utility_i(\money_i, \labor_i)$, which is increasing with post-tax income $\money$ and decreasing with $\labor$ (and thus pre-tax income $\income$).\fi
+
+
+
+
+To define the Saez framework, let $\alpha(\income)$ denote the {\em marginal average income at income $\income$, normalized by the fraction of incomes above $\income$}, i.e.,
+\begin{align}
+\alpha(\income) &= \frac{\income \cdot \pdf(\income)}{1-\cdf(\income)}.
+\end{align}
+Let $G(\income)$ denote the {\em normalized, reverse cumulative Pareto weight over incomes above a threshold $\income$}, i.e.,
+\begin{align}
+ G(\income) = \frac{1}{P(\income'\geq \income)} \int_{\income'=\income}^{\infty} p(\income') g(\income') \mathrm{d}\income'.
+\end{align}
+ where $g(\income)$ is the normalized social marginal welfare weight of an agent earning income $\income$.
+In this way, $G(\income)$ represents how much the social welfare function weights the income  above  threshold $\income$.
+Let {\em elasticity} $\elas(\income)$ denote the {\em average sensitivity of an agent's income
+to changes in the tax rate}, defined as
+\begin{align}
+ \elas(\income) = \frac{\mathrm{d}\income / \income }{\mathrm{d}(1-\mtaxrate(\income)) / (1-\mtaxrate(\income))}.
+\end{align}
+
+\cite{saez_using_2001} shows that the optimal marginal tax-rate at pre-tax income $z$
+is
+\eq{
+ \mtaxrate(\income) &= \frac{1-G(\income)}{1-G(\income) + \alpha(\income) \elas(\income)} \label{eq:saezformula}.
+}
+
+The salient property of this formula is that it does not depend on the agent's utility function, but rather depends  on the population's income distribution, $\pdf(\income)$, this  defining $\alpha(\income)$ and $G(\income)$, and the tax elasticity of income, $\elas(\income)$. Both of these quantities are, at least in principle, measurable.
+In practice, a  challenge in applying the Saez formula is in estimating the tax elasticity of income, which is highly non-trivial in real-world economies. See \cite{gruber2002elasticity} for an extensive review of empirical approaches for the Saez framework.
+
+The resulting tax schedule depends sharply on the shape of the income distribution. A log-normal-like income distribution, for example, leads to regressive taxes, with lower marginal rates at higher incomes, while a Pareto-like distribution leads to progressive taxes,  with higher marginal rates at higher incomes (see~\cite{mankiw_optimal_2009}).
+
+
+\paragraph{Saez Tax Formula (multi-period).}
+In our experiments, we apply the Saez formula to the multi-period setting by estimating the tax elasticity of income at the start of each tax period, and then appealing to Eq~\ref{eq:saezformula}. For this, we make use of a buffer $D = \brckcur{\brck{\income_{i_\alpha}, \mtaxrate_{i_\alpha}}}_{\alpha}$, which is a set of pairs of observed incomes and tax rates
+in a window of previous tax periods, where the index $\alpha$ refers to a datapoint coming from agent $i_\alpha$.
+
+Following \cite{gruber2002elasticity}, we assume constant tax elasticity $\tilde{e}$, with
+\eq{\label{eq:elasticitysimpleformula}
+\income_t = \income^0 \cdot (1-\mtaxrate_t)^{\tilde{e}}.
+}
+Hence, we can write:
+\eq{\label{eq:elasticitysimpleformula_for_ols}
+\log (\income_t) = \tilde{e} \cdot \log (1-\mtaxrate_t) + \log ( \income^0),
+}
+where $\income^0$ is the income that would result from zero taxes. Given the buffer $D$
+collected from multiple rollouts, we estimate $\tilde{e}$ using ordinary least-squares regression on Eq~\ref{eq:elasticitysimpleformula_for_ols}.
+\if 0
+and estimate the elasticity at the start of period $t$ as
+\eq{
+e &= \frac{1-\mtaxrate_t}{\income_t}\frac{d\income_t}{d(1-\mtaxrate_t)}
+= \frac{d\log \income_t}{d\log(1 - \mtaxrate_t) }.
+}
+This allows us to write:
+
+\fi
+In particular, we make use of the 30,000 most recent incomes and tax rates observed during rollout episodes, and find that this leads to stable estimates for the average elasticity $\tilde{e}$.
+
+
+
+\paragraph{AI Economist.}
+For the AI Economist, we make use of a deep neural network to set the marginal tax rate in each bracket, denoted
+\eq{
+ \mtaxrate \sim \plannerpolicy(\ob^\text{world}_{p, t}, \ob^\text{agent}_{p, t}, \ob^\text{market}_{p, t}, \ob^\text{tax}_{p, t}, \hidden_{p, t-1}; \pweight).
+}
+
+
+This shares the same general organization as the agents' policy model (Section \ref{sec:agent_utility}).
+Indeed, the planner and agent policy networks use the same basic network architecture (Figure \ref{fig:neural_network_policies}).
+However, the information in the planner observations differs from that in agents in some important ways.
+For instance, the planner observes the full spatial state of the world in $\ob^\text{world}_{p, t}$, and the planner observes all agents' public states in $\ob^\text{agent}_{p, t}$ but does not observe any of their private states, observing endowments but not skills.
+Section \ref{sec:details_of_environment} of the Appendix offers a detailed explanation of the different observations available to the agents and the planner.
+
+
+
+
+

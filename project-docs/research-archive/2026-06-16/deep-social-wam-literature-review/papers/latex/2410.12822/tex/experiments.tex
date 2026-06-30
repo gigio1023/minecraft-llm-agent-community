@@ -1,0 +1,842 @@
+\vspace{-1mm}
+\section{Experiments}
+We evaluate AVID in two different domains with different pretrained base models. Details about the datasets are provided in Appendix~\ref{sec:dataset_details} and details about the pretrained models are in Appendix~\ref{sec:model_details}. As the focus of our work is on training lightweight adapters with limited compute, we compare adapter models with limited parameters under a computational budget.
+%
+Code to reproduce our experiments is available at \url{https://github.com/microsoft/causica/tree/main/research_experiments/avid}.
+
+\vspace{-2mm}
+\paragraph{Procgen} The pretrained model is a pixel-space image-to-video diffusion model~\citep{ho2022video} trained on videos sampled from 15 out of the 16 procedurally generated games of Procgen~\citep{cobbe2020leveraging}, excluding the 16th game Coinrun.
+%
+The adaptation approaches are trained using an action-labelled dataset sampled from Coinrun.
+%
+At each timestep, the discrete action is one of 15 possible keypad inputs, and the models are trained on sequences of 10 frames.
+%
+Each adaptation approach is limited to 3 days of training on a single A100 GPU.
+%
+We test three dataset sizes, \textit{Coinrun100k/500k/2.5M}, evaluate the models on a held-out test set of initial frames and actions.
+
+\vspace{-2mm}
+\paragraph{RT1 + DynamiCrafter} In this benchmark, the pretrained model is DynamiCrafter~\citep{xing2023dynamicrafter} which is currently one of the best performing  image-to-video models in the VBench image-to-video leaderboard~\citep{huang2024vbench}. DynamiCrafter is a latent image-to-video diffusion model that uses the autoencoder from Stable Diffusion~\citep{rombach2022high} and a 1.4B parameter 3D UNet trained on web-scale video data. As DynamiCrafter is a latent diffusion model, we assume that we can run inference on the encoder and decoder as described in Section~\ref{sec:avid}.
+%
+For the action-labelled dataset we use the RT1 dataset~\citep{brohan2022rt} which consists of real-world robotics videos. The action at each step is a 7 dimensional continuous vector corresponding to the movement and rotation of the end effector and opening or closing of the gripper. The models are trained on trajectories of 16 frames. Each adaptation approach is limited to 7 days of training on $4\times$ A100 GPUs, and is evaluated using a held-out test set of ground truth trajectories.
+
+\subsection{Baselines}
+\label{sec:baselines}
+We compare AVID with several baselines, both with and without access to the parameters of the pretrained model. Further details, including hyperparameter tuning, are in Appendix~\ref{app:baselines}.
+
+\textbf{Full access to pretrained model parameters:}
+\begin{itemize}[leftmargin=*, topsep=0pt]
+\setlength\itemsep{0.3mm}
+    \item \textit{Action-Conditioned Finetuning} -- tunes all of the parameters of the pretrained model on the action-conditioned dataset. To add action-conditioning, we first compute an action embedding according to Section~\ref{sec:avid}. For Procgen and RT1, we concatenate and add the action embeddings with the time step embeddings respectively. 
+    \item \textit{Language-Conditioned Finetuning} -- finetunes the pretrained model using a language description of each video. The language is embedded using CLIP~\citep{radford2021learning} and conditioned upon using cross-attention following~\cite{xing2023dynamicrafter}.
+    \item \textit{ControlNet} \citep{zhang2023adding} -- freezes the parameters of the pretrained model  and makes a \textit{trainable copy}  of its UNet encoder. The trainable part of the model is conditioned on a new signal, and connected to the decoder in the original model via convolutions which are initialised to zero. In our work, we use ControlNet to add action-conditioning. 
+    \item \textit{ControlNet Small} -- ControlNet still has a large number of trainable parameters. ControlNet Small freezes the pretrained model in the same way as ControlNet, but reduces the number of trainable parameters to a similar amount to AVID by decreasing the number of channels in the layers of the UNet encoder. A learned projection at each layer projects the activations of the smaller model to match the number of channels in the pretrained base model.
+\end{itemize}
+\textbf{No access to pretrained model parameters\ \ } For a fair comparison to AVID, we evaluate the following approaches which either do not leverage the pretrained model or, like AVID, assume access to only noise predictions from the pretrained model:
+\begin{itemize}[leftmargin=*, topsep=0pt]
+    \setlength\itemsep{0.3mm}
+    \item \textit{Action-Conditioned Diffusion} -- We train an action-conditioned diffusion model $\boldsymbol{\epsilon}_{\theta}(\mathbf{x}_i, \mathbf{a}, i, x_0)$  from scratch, with the same number of parameters and same UNet architecture as AVID.
+    \item \textit{Classifier Guidance} \citep{dhariwal2021diffusion} -- We train a classifier $f_{\phi}(\mathbf{a} | \mathbf{x}_i)$ on noisy images $\mathbf{x}_i$ to predict actions. With weighting $w$, the classifier is used to steer the diffusion sampling process towards samples consistent with the actions. The final noise prediction becomes: 
+    \begin{align*}
+        \bar{\boldsymbol{\epsilon}}_{\textnormal{final}}(\mathbf{x}_i, \mathbf{a}, i, x_0) = \boldsymbol{\epsilon}_{\textnormal{pre}}(\mathbf{x}_i, i, x_0) - \sqrt{1 - \bar{\alpha}_t} \; w \nabla_{\mathbf{x}_i} \log f_\phi(\mathbf{a} \vert \mathbf{x}_i).
+    \end{align*}
+
+    \item \textit{Product of Experts} -- Inspired by \citet{yang2024probabilistic}, we add action conditioning to a pretrained video diffusion model by adding its score to an action-conditioned model.
+    %by constructing the product distribution: $p_{\textnormal{product}}(\mathbf{x} | \mathbf{a}, x_0) \propto p_{\textnormal{pre}}(\mathbf{x} | x_0) p_{\textnormal{adapt}}(\mathbf{x} | \mathbf{a}, x_0)$. 
+    %
+    We train a small video diffusion model on action conditioned data $\boldsymbol{\epsilon}_{\textnormal{adapt}}(\mathbf{x}_i, \mathbf{a}, i, x_0)$, and compute the final denoising prediction as a weighted sum of predictions from the pretrained and action-conditioned models:
+    \begin{align*}
+    \bar{\boldsymbol{\epsilon}}_{\textnormal{final}}(\mathbf{x}_i, \mathbf{a}, i, x_0) = \lambda_{p}\boldsymbol{\epsilon}_{\textnormal{adapt}}(\mathbf{x}_i, \mathbf{a}, i, x_0) + (1-\lambda_{p}) \boldsymbol{\epsilon}_{\textnormal{pre}}(\mathbf{x}_i, i, x_0),
+    \end{align*}
+    where $\lambda_{p}$ controls the strength of the pretrained prior  during video generation.
+    \item \textit{Action Classifier-Free Guidance} \citep{ho2022classifier} -- We train a small action-conditioned diffusion model $\boldsymbol{\epsilon}_{\textnormal{adapt}}(\mathbf{x}_i, \mathbf{a}, i, x_0)$  while randomly removing the action conditioning ($\mathbf{a} = \varnothing$) during training with probability $p=0.2$. 
+    %
+    We then compute the final denoising prediction as:
+    \begin{align*}
+        \bar{\boldsymbol{\epsilon}}_{\textnormal{final}}(\mathbf{x}_i, \mathbf{a}, i, x_0) = \boldsymbol{\epsilon}_{\textnormal{pre}}(\mathbf{x}_i, i, x_0) + \lambda_{a} \left(\boldsymbol{\epsilon}_{\textnormal{adapt}}(\mathbf{x}_i, \mathbf{a}, i, x_0) - \boldsymbol{\epsilon}_{\textnormal{adapt}}(\mathbf{x}_i, \mathbf{a} = \varnothing, i, x_0)\right).
+    \end{align*}
+    Note that unlike standard classifier-free guidance this approach combines predictions from two separate models, $\boldsymbol{\epsilon}_{\textnormal{pre}}$ and $\boldsymbol{\epsilon}_{\textnormal{adapt}} $, which are trained on different data.
+\end{itemize}
+
+\subsection{Evaluation}
+For evaluation, we use a set of 1024 held-out test videos and their corresponding action sequences. We generate 1024 synthetic videos by conditioning the models on each initial frame and action sequence, and compare the generated videos against the ground truth using the following metrics: 
+\begin{itemize}[leftmargin=*, topsep=0pt]
+    \setlength\itemsep{0.3mm}
+    \item \textit{Action Error Ratio} -- To assess the consistency between the videos and the action sequences, we train a model to predict actions from real videos. The Action Error Ratio is the ratio of errors obtained by using this model on generated videos, divided by the error obtained on real videos. More details are in Appendix~\ref{sec:metric_details}.
+    \item \textit{FVD}~\citep{unterthiner2019fvd} -- measures the similarity between feature distributions of generated and real video sequences in the I3D network~\citep{carreira2017quo}, accounting for both spatial quality and temporal coherence. 
+   \item \textit{FID}~\citep{heusel2017gans} -- compares the feature distributions of all real and generated images in the Inception-v3 network~\citep{szegedy2015going}, measuring the quality and variety of the images. 
+    \item \textit{SSIM}~\citep{wang2004image} -- compares each ground truth and generated image, focusing on luminance, contrast, and structural information. 
+    \item \textit{PSNR}~\citep{hore2010image} -- is computed using the mean squared error between each ground truth and generated video, and thus computes the distance between the videos in pixel-space.
+    \item \textit{LPIPS}~\citep{zhang2018unreasonable} -- compares the similarity between the features representations of each ground truth and predicted image using the VGG network~\citep{simonyan2014very}. 
+\end{itemize}
+We bold results within 2\% of the best performance in each model size category. We also compute normalized metrics by normalizing each value between 0 and 1. Details are in Appendix~\ref{app:normalization}.
+%
+
+
+% In summary, Action Error Ratio evaluates the consistency of the videos with the action sequence, FVD compares the distribution of videos, and FID compares the distribution of frames. SSIM, PSNR, and LPIPS each make framewise comparisons between each ground truth and generated frame.
+
+\begin{figure}[t!]
+    \centering
+    % Row 1
+    \begin{minipage}{0.055\textwidth} % Column for rotated method name
+        \centering
+        \raisebox{0.3\textwidth}{\rotatebox{90}{\textbf{\tiny Ground Truth}}} % Rotating and vertically centering method name
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/real_videos/3-70-real_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/real_videos/3-70-real_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/real_videos/3-70-real_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/real_videos/3-70-real_frames/frame_9.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/real_videos/3-70-real_frames/frame_12.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/real_videos/3-70-real_frames/frame_15.png}
+    \end{minipage}%
+    \vspace{0.01cm} % Space between rows
+   \begin{minipage}{0.055\textwidth} % Column for rotated method name
+        \centering
+        \raisebox{0.3\textwidth}{\rotatebox{90}{\textbf{\tiny AVID 145M}}} % Rotating and vertically centering method name
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/avid_145M/3-70-samples_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/avid_145M/3-70-samples_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/avid_145M/3-70-samples_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/avid_145M/3-70-samples_frames/frame_9.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/avid_145M/3-70-samples_frames/frame_12.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/avid_145M/3-70-samples_frames/frame_15.png}
+    \end{minipage}%
+    \vspace{0.01cm} % Space between rows
+    \begin{minipage}{0.055\textwidth} % Column for rotated method name
+        \centering
+        \raisebox{0.1\textwidth}{\rotatebox{90}{\textbf{\tiny \shortstack{Action Cond.\\Diffusion 145M }}}}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/act_cond_diffusion_145M/3-70-samples_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/act_cond_diffusion_145M/3-70-samples_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/act_cond_diffusion_145M/3-70-samples_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/act_cond_diffusion_145M/3-70-samples_frames/frame_9.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/act_cond_diffusion_145M/3-70-samples_frames/frame_12.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/rt1/edited_frames/3-70_act_cond_145M_final_frame.png}
+    \end{minipage}%
+    \vspace{0.01mm}
+    \begin{minipage}{0.055\textwidth} % Column for rotated method name
+       \centering
+        \raisebox{0.1\textwidth}{\rotatebox{90}{\textbf{\tiny \shortstack{AVID 145M\\Latent Mask}}}}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/rt1_avid_145M/3-70-mask_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/rt1_avid_145M/3-70-mask_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/rt1_avid_145M/3-70-mask_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/rt1_avid_145M/3-70-mask_frames/frame_9.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/rt1_avid_145M/3-70-mask_frames/frame_12.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/rt1_avid_145M/3-70-mask_frames/frame_15.png}
+    \end{minipage}%
+    \caption{ Top three rows: Examples of videos generated for RT1 (extended in Figure~\ref{fig:qual_extended}, Appendix~\ref{app:qualitative}). Bottom row: Mask generated in downsampled latent space by AVID. White indicates the mask is set to 1 and black indicates the mask is set to 0.\label{fig:rt1_qual}}
+\end{figure}
+%
+\begin{figure}[t!]
+    \begin{minipage}{0.06\textwidth} % Column for rotated method name
+        \centering
+        \raisebox{0.3\textwidth}{\rotatebox{90}{\textbf{\tiny Ground Truth}}} % Rotating and vertically centering method name
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_2.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_5.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_8.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/real_videos/3-424_frames/frame_9.png}
+    \end{minipage}%
+    \vspace{0.01cm}
+    %
+    \begin{minipage}{0.06\textwidth} % Column for rotated method name
+        \centering
+        \raisebox{0.3\textwidth}{\rotatebox{90}{\textbf{\tiny AVID 71M}}} % Rotating and vertically centering method name
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_2.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_5.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_8.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/avid_71M/3-424_frames/frame_9.png}
+    \end{minipage}%
+    \vspace{0.01cm}
+    %
+    \begin{minipage}{0.06\textwidth} % Column for rotated method name
+        \centering
+        \raisebox{0.1\textwidth}{\rotatebox{90}{\textbf{\tiny \shortstack{Action Cond.\\Diffusion 71M }}}}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_0.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_2.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_3.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_5.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_6.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_8.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/coinrun/act_cond_diffusion_71M/3-424_frames/frame_9.png}
+    \end{minipage}%
+    \vspace{0.2mm}
+      %
+    \begin{minipage}{0.06\textwidth} % Column for rotated method name
+        \centering
+         \raisebox{0.1\textwidth}{\rotatebox{90}{\textbf{\tiny \shortstack{AVID 71M \\ Mask}}}}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_1.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_1.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_2.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_4.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_5.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_7.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}{0.125\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/masking/coinrun_avid_71M/3-424_frames/frame_8.png}
+    \end{minipage}%
+    \caption{Top three rows: Examples of videos generated for Coinrun 500k (extended in Figure~\ref{fig:procgen_qualitative_extended}, Appendix~\ref{app:qualitative}). Bottom row: Mask generated by AVID where white indicates
+the mask is set to 1 and black indicates the mask is set to 0.\label{fig:procgen_qualitative}}
+\end{figure}
+\subsection{Results}
+\textbf{Qualitative Results\ \ }
+Examples of generated videos are in Figures~\ref{fig:rt1_qual} and~\ref{fig:procgen_qualitative}, with further examples in Appendix~\ref{app:qualitative}. We observe for both RT1 and Coinrun that the action-conditioned diffusion model trained from scratch fails to maintain consistency with the original conditioning image: objects in the initial image disappear in later frames in the video. In contrast, the videos generated by AVID are consistent throughout. In both AVID and action-conditioned diffusion, we observe that the motion in the generated videos is accurate compared to the ground truth motion. The pretrained base models do not generate accurate videos for either domain (Appendix~\ref{app:qualitative}). The masks generated by AVID are visualised in Figures~\ref{fig:rt1_qual} and~\ref{fig:procgen_qualitative}. The lighter parts of the mask show that the pretrained models predictions are predominantly used by AVID for maintaining background textures. The mask is reduced nearer to 0 around the robot arm in RT1 and the character in Coinrun, showing that the adapter outputs are predominantly used for action-relevant parts of the video. In Appendix~\ref{app:different_actions} we show that AVID can be used to generate predictions for different actions given the same initial frame.
+
+
+
+
+
+
+
+\textbf{Quantitative  Results\ \ } To evaluate overall performance, in Figures~\ref{fig:rt1_perf} and~\ref{fig:coinrun500_perf} we plot the normalized performance averaged across all evaluation metrics. 
+%
+AVID obtains similar or slightly better overall performance compared to ControlNet/ControlNet Small on both Coinrun500k and RT1. Note that unlike ControlNet variants,  AVID does not require access to the weights of the original pretrained model.
+%
+For RT1, we observe that training an action-conditioned diffusion model performs slightly worse than AVID at the largest model size. For Coinrun500k, AVID significantly outperforms action-conditioned diffusion at the larger model size. As the number of trainable parameters is reduced, the performance of action-conditioned diffusion declines much more quickly than AVID in both domains, and therefore AVID is considerably stronger at smaller model sizes.
+%
+In Figure~\ref{fig:coinrun_perf} we plot the overall performance of these three approaches against the  Coinrun dataset size. A similar trend is observed for all approaches as dataset size is modified.
+
+\begin{figure}[t!]
+    \centering
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/rt1_performance.png}
+        \caption{}
+        \label{fig:rt1_perf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/coinrun500k_performance.png}
+        \caption{}
+        \label{fig:coinrun500_perf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/coinrun_performance.png}
+        \caption{}
+        \label{fig:coinrun_perf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/mask_levels.png}
+        \caption{}
+        \label{fig:mask_levels}
+    \end{subfigure}
+    \caption{(a) RT1 averaged normalized performance versus parameter count. (b) Coinrun500k averaged normalized performance versus parameter count. (c) Coinrun averaged normalized performance versus dataset size. Details on metric normalization are in Appendix~\ref{app:normalization}. (d) Average mask ($m$) values of AVID throughout diffusion process.}
+    \label{fig:mainfig}
+\end{figure}
+
+
+\begin{table}[t!]
+\tiny
+\centering
+\begin{tabular}{|l|l|>{\centering\arraybackslash}p{1.1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|}
+\hline
+\rowcolor[HTML]{2A5B93} &
+\textbf{\textcolor{white}{Method}} &
+ \textbf{\textcolor{white}{Action Err. Ratio $\downarrow$}} &
+  \textbf{\textcolor{white}{FVD $\downarrow$}} &
+  \textbf{\textcolor{white}{FID $\downarrow$}} &
+  \textbf{\textcolor{white}{SSIM $\uparrow$}} &
+  \textbf{\textcolor{white}{LPIPS $\downarrow$}} &
+  \textbf{\textcolor{white}{PSNR $\uparrow$}} 
+  \\ \hline
+\multirow{5}{*}{\rotatebox{90}{\textbf{Medium}}} &
+  AVID (Ours) (22M) &
+ \textbf{1.257} &
+ \textbf{28.5} &
+ \textbf{8.07} &
+ \textbf{0.666} & 
+ \textbf{0.192} &
+ \textbf{22.4}
+ \\ 
+  &   Action-Conditioned Diffusion (22M) &
+ 1.500 &
+ 41.6 & 
+ 8.95 & 
+ 0.562 &
+ 0.284 &
+ 18.7 
+ \\ 
+ &
+  Product of Experts (22M) &
+1.601 &
+101.8 &
+9.96 &
+0.584 &
+0.281 &
+19.1
+ \\ 
+ &
+  Action Classifier-Free Guidance (22M) &
+1.966 &
+191.1 &
+13.09 & 
+0.454 &
+0.3495 &
+17.5 \\  
+ &
+  ControlNet-Small (22M) \shadecell &
+ 1.465 \shadecell &
+ 34.7 \shadecell & 
+ 8.49 \shadecell & 
+ 0.652 \shadecell &
+ 0.205 \shadecell &
+ 21.9  \shadecell
+ \\ \hline
+\multirow{5}{*}{\rotatebox{90}{\textbf{Large}}} &
+  AVID (Ours) (71M) &
+\textbf{1.154} &
+23.1 &
+7.33 & 
+0.713 &
+0.161 &
+23.8
+\\ 
+  &  Action-Conditioned Diffusion (71M) &
+1.216 &
+31.3 &
+7.78 & 
+0.648 & 
+0.220 & 
+20.9 
+  \\ 
+ &
+  Product of Experts (71M) &
+  1.247 &
+ 84.8 &
+ 9.07 &
+ 0.651 &
+ 0.229 &
+ 21.0 \\ 
+ &
+  Action Classifier-Free Guidance (71M) &
+  2.079 &
+  188.7 &
+  13.05 &
+  0.463 &
+  0.341 &
+  17.7 \\ 
+ &
+  ControlNet (71M) \shadecell &
+  1.418 \shadecell &
+  \textbf{18.5} \shadecell &
+  \textbf{7.16} \shadecell &
+\textbf{0.758} \shadecell &
+\textbf{0.128} \shadecell &
+\textbf{25.5}  \shadecell
+ \\ \hline
+\multirow{4}{*}{\rotatebox{90}{\textbf{Full}}} &
+  Pretrained Base Model (97M) &
+ 3.855 &
+ 204.0 &
+ 13.03 &
+ 0.451 &
+0.352 & 
+17.3 
+ \\ 
+ &
+  Classifier Guidance &
+  4.070 &
+  192.9 &
+  12.68 &
+  0.450 &
+  0.351 &
+  17.4 \\ 
+ &
+  Action-Conditioned Finetuning (97M) \shadecell &
+\textbf{1.227} \shadecell &
+\textbf{14.1} \shadecell &
+\textbf{6.52} \shadecell &
+\textbf{0.761} \shadecell & 
+\textbf{0.120} \shadecell &
+\textbf{25.8} \shadecell
+ \\ \hline
+\end{tabular}
+\caption{Results for Coinrun 500k dataset. Methods trained for 3 days on a single A100. Shading indicates method requires access to the model parameters. Brackets indicate trainable parameters.}
+\label{tab:results_coinrun500k}
+\end{table}
+
+
+\begin{table}[t!]
+\tiny
+\centering
+\begin{tabular}{|l|l|>{\centering\arraybackslash}p{1.1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|}
+\hline
+\rowcolor[HTML]{2A5B93} &
+\textbf{\textcolor{white}{Method}} &
+ \textbf{\textcolor{white}{Action Err. Ratio $\downarrow$}} &
+  \textbf{\textcolor{white}{FVD $\downarrow$}} &
+  \textbf{\textcolor{white}{FID $\downarrow$}} &
+  \textbf{\textcolor{white}{SSIM $\uparrow$}} &
+  \textbf{\textcolor{white}{LPIPS $\downarrow$}} &
+  \textbf{\textcolor{white}{PSNR $\uparrow$}} 
+  \\ \hline
+\multirow{5}{*}{\rotatebox{90}{\textbf{Small}}} &
+  AVID (Ours) (11M) &
+  2.572 &
+  54.0 &
+  4.344 &
+  \textbf{0.811} &
+  \textbf{0.166} & 
+ \textbf{24.5} \\ 
+  & Action-Conditioned Diffusion (11M) &
+  \textbf{2.238} &
+  80.4 &
+  5.329 &
+  0.767 &
+  0.226 & 
+  22.9 \\ 
+ &
+  Product of Experts (11M) &
+  2.859 &
+  89.9 &
+  5.276 &
+  0.790 &
+  0.201 & 
+  23.6 \\ 
+ &
+  Action Classifier-Free Guidance (11M) &
+  3.503 &
+  104.8 &
+  4.858 &
+  0.737 &
+  0.217 & 
+  22.2 \\ 
+ &
+ ControlNet-Small (10M) \shadecell  &
+  2.640 \shadecell &
+  \textbf{38.6} \shadecell &
+  \textbf{3.730} \shadecell &
+  \textbf{0.811} \shadecell &
+  \textbf{0.169} \shadecell & 
+  23.4 \shadecell \\  \hline
+\multirow{5}{*}{\rotatebox{90}{\textbf{Medium}}} &
+  AVID (Ours) (34M) &
+  1.907  &
+  38.7 &
+  3.645 &
+  \textbf{0.831} &
+  \textbf{0.150} &
+  \textbf{25.0} \\ 
+  &   Action-Conditioned Diffusion (34M) &
+ \textbf{1.737}  &
+  36.7 &
+  4.038 &
+  0.813 &
+  0.172 &
+  24.3  \\ 
+ &
+  Product of Experts (34M) &
+  2.421
+ &
+  61.7
+ &
+  4.533
+ &
+  0.813
+ &
+  0.175
+ &
+  24.4
+ \\ 
+ &
+  Action Classifier-Free Guidance (34M) &
+ 3.129 &
+ 71.4 &
+ 4.690 &
+ 0.748 &
+ 0.205 &
+22.6 \\  
+ &
+  ControlNet-Small (38M) \shadecell &
+  2.227 \shadecell &
+  \textbf{35.0} \shadecell &
+  \textbf{3.539} \shadecell &
+  \textbf{0.821} \shadecell &
+  0.162 \shadecell &
+  24.0 \shadecell \\ \hline
+\multirow{5}{*}{\rotatebox{90}{\textbf{Large}}} &
+  AVID (Ours) (145M) &
+  1.609 &
+  39.3 &
+  \textbf{3.436} &
+  \textbf{0.842} &
+  \textbf{0.142} &
+  \textbf{25.3} \\ 
+  & 
+  Action-Conditioned Diffusion (145M) &
+  \textbf{1.384} &
+  \textbf{24.9} &
+  3.504 &
+  0.817 &
+  0.153 &
+  24.6 \\ 
+ &
+  Product of Experts (145M) &
+  1.947 &
+  47.0 &
+  4.026 &
+  0.819 &
+  0.160 &
+  24.8 \\ 
+ &
+  Action Classifier-Free Guidance (145M) &
+  3.188 &
+  79.3 &
+  4.775 &
+  0.748 &
+  0.205 &
+  22.8 \\ 
+ &
+  ControlNet-Small (170M) \shadecell &
+  1.779 \shadecell &
+  30.0 \shadecell &
+  \textbf{3.375} \shadecell &
+  \textbf{0.832} \shadecell &
+  0.153 \shadecell &
+  24.4 \shadecell \\ \hline
+\multirow{5}{*}{\rotatebox{90}{\textbf{Full}}} &
+  Pretrained Base Model (1.4B) &
+   4.183 &
+  237.6 &
+  5.432 &
+  0.712 &
+  0.228 &
+  20.6 \\ 
+ &
+  Classifier Guidance &
+  4.182 &
+  213.1 &
+  6.005 &
+  0.683 &
+  0.250 &
+  19.8 \\ 
+ &
+  ControlNet (654M)  \shadecell &
+  1.708 \shadecell &
+  27.1 \shadecell &
+  3.248 \shadecell &
+  0.836 \shadecell &
+  0.148 \shadecell &
+  24.5 \shadecell  \\ 
+ &
+  Action-Conditioned Finetuning (1.4B) \shadecell &
+   \textbf{1.297} \shadecell &
+  \textbf{24.2} \shadecell &
+  \textbf{2.965} \shadecell &
+  \textbf{0.852} \shadecell &
+  \textbf{0.134} \shadecell &
+ \textbf{25.6} \shadecell \\ 
+ & \shadecell Language-Conditioned Finetuning (1.4B) &
+3.859 \shadecell&
+33.7 \shadecell&
+ 3.511 \shadecell&
+0.812 \shadecell & 
+0.177 \shadecell
+ &
+ 22.1 \shadecell\\ \hline
+\end{tabular}
+\caption{Quantitative results for RT1 dataset. Methods trained for 7 days on $4 \times$ A100. Shading indicates method requires access to the model parameters. Brackets indicate trainable parameters.}
+\label{tab:rt1_main_results}
+\end{table}
+
+
+In Figure~\ref{fig:mask_levels} we plot the average mask value at each step of the diffusion process. On RT1 AVID has a higher mask value, and therefore uses the pretrained model more heavily than on Coinrun. This is likely because the backgrounds in RT1 are mostly static and DynamiCrafter is a strong model. We see that the mask values are lower at diffusion steps where the noise level is high. This indicates that the adapter model is more responsible for generating low-frequency information, such as the positions of objects, which is defined early in the reverse process. Towards the end of the reverse process, where fine details are generated~\citep{ho2020denoising}, the pretrained model is relied on more.
+
+The values for every evaluation metric are reported in Tables~\ref{tab:results_coinrun500k} and~\ref{tab:rt1_main_results}. For Coinrun500k, AVID performs the best for every evaluation metric at the smaller 22M model size.
+%
+For the larger model size of 71M, AVID performs the second best for most metrics to ControlNet, but obtains the best performance for Action Error Ratio.
+%
+In RT1, AVID is the strongest in the metrics that make framewise comparisons (SSIM/LPIPS/PSNR) across all model sizes. 
+%
+In our setting, where the goal is to generate accurate videos according to the input action sequence, these metrics are more suitable than comparing the overall distribution of images and videos (i.e. FID and FVD)~\citep{zhu2024irasim}. ControlNet Small generally obtains the best performance for FVD and FID, while Action-Conditioned Diffusion is consistently the best for Action Error Ratio.
+%
+Poor performance was obtained for Classifier Guidance and Action Classifier-Free Guidance across both domains. 
+%
+For standard implementations of  classifier(-free) guidance, the unconditional model is trained on the trained on data from the target domain. In contrast, in our setting the pretrained models are not trained on data from Coinrun or RT1 which may explain the lackluster performance of these methods.
+%
+Product of Experts also performed poorly (PoE). However, for PSNR and SSIM, PoE did slightly outperform both of the models from which it is composed.
+
+Across both domains, finetuning the pretrained model with action conditioning is the strongest baseline. However, like the ControlNet variants, this requires access to the weights of the pretrained model which we assume we do not have access to. In comparison, finetuning with language instead of action conditioning results in poor performance in all metrics except FID and FVD, demonstrating that fine-grained action conditioning is necessary to generate accurate synthetic videos.
+
+\textbf{AVID Ablations\ \ } We evaluate the following two ablations of AVID: \textit{No Mask} (NM): The output adapter does not output a mask. Instead, the outputs of the pretrained model and adapter are directly added: $ \epsilon_{\textnormal{final}} = \epsilon_{\textnormal{pre}}  + \epsilon_{\textnormal{adapt}}  $. \textit{No Conditioning} (NC): The adapter is no longer conditioned on  the output of the pretrained model, $\epsilon_{\textnormal{pre}}$. Results for the ablations are in Table~\ref{tab:ablation_short}. For NM, performance across most metrics is worse for RT1, but similar for Coinrun500k. For NC, the performance on most metrics gets significantly worse for both Coinrun500k and RT1. Thus, conditioning on the outputs of the pretrained model is the most crucial component of our approach. 
+
+\begin{table}[h!]
+\tiny
+\centering
+\begin{tabular}{|l|l|>{\centering\arraybackslash}p{1.1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|>{\centering\arraybackslash}p{1cm}|}
+\hline
+\rowcolor[HTML]{2A5B93} &
+\textbf{\textcolor{white}{Method}} &
+ \textbf{\textcolor{white}{Action Err. Ratio $\downarrow$}} &
+  \textbf{\textcolor{white}{FVD $\downarrow$}} &
+  \textbf{\textcolor{white}{FID $\downarrow$}} &
+  \textbf{\textcolor{white}{SSIM $\uparrow$}} &
+  \textbf{\textcolor{white}{LPIPS $\downarrow$}} &
+  \textbf{\textcolor{white}{PSNR $\uparrow$}} 
+  \\ \hline
+  \multirow{3}{*}{\rotatebox{90}{\makecell{\textbf{Coinrun}\\\textbf{500k}\\\textbf{Large}}}}
+ &
+  AVID (Ours) (71M)  &
+  \textbf{1.154} &
+23.1 &
+7.33 & 
+\textbf{0.713} &
+\textbf{0.161} &
+\textbf{23.8} \\ 
+  & No Mask (71M) &
+  \textbf{1.136} &
+  \textbf{22.2} & 
+  \textbf{7.15} & 
+  \textbf{0.721} &
+  \textbf{0.158} &
+  \textbf{24.0}
+  \\ 
+  & No Conditioning (71M) &
+   \textbf{1.141} &
+  27.8 &
+  8.02 &
+  0.682 & 
+  0.189 &
+  22.3 \\ \hline
+ \multirow{3}{*}{\rotatebox{90}{\makecell{\textbf{RT1}\\\textbf{Large}}}}
+ &
+  AVID (Ours) (145M) &
+  \textbf{1.609} &
+  39.3 &
+  \textbf{3.436} &
+  \textbf{0.842} &
+  \textbf{0.142} &
+  \textbf{25.3} \\ 
+ &
+  No Mask (145M) &
+  1.769 &
+  44.1 &
+  3.533 &
+  \textbf{0.836} &
+  0.146 &
+  \textbf{25.3} \\ 
+  & No Conditioning (145M) &
+  1.775 &
+  \textbf{36.2} &
+  3.550 & 
+  \textbf{0.827} &
+  0.149 &
+  25.0 
+ \\ \hline
+\end{tabular}
+\caption{Results for AVID ablations (extended in Table~\ref{tab:avid_abl_full}, Appendix~\ref{sec:avid_abl_full}).}
+\label{tab:ablation_short}
+\end{table}

@@ -1,0 +1,559 @@
+\section{Data Mixture Details}
+\label{sec:app:data_mix}
+
+We list our used data mixture in \cref{tab:data_mix}. The mixture mostly follows \citep{octo_2023}, with a few additional datasets.
+
+\begin{table}[th]
+    \centering
+       \begin{tabular}{lr}
+        \toprule
+        \multicolumn{2}{c}{\textbf{\name{} Training Dataset Mixture}}\\
+        \midrule
+        Fractal~\citep{brohan2022rt} & 12.7\% \\
+        Kuka~\citep{kalashnikov2018qt} & 12.7\% \\
+        Bridge\citep{ebert2021bridge, walke2023bridgedata} & 13.3\% \\
+        Taco Play~\citep{rosetebeas2022latent,mees2023grounding} & 3.0\% \\
+        Jaco Play~\citep{dass2023jacoplay} & 0.4\% \\
+        Berkeley Cable Routing~\citep{luo2023multistage} & 0.2\% \\
+        Roboturk~\citep{DBLP:journals/corr/abs-1811-02790} & 2.3\% \\
+        Viola~\citep{zhu2023viola} & 0.9\% \\
+        Berkeley Autolab UR5~\citep{BerkeleyUR5Website} & 1.2\% \\
+        Toto~\citep{zhou2023train} & 2.0\% \\
+        Language Table~\citep{lynch2023interactive} & 4.4\% \\
+        Stanford Hydra Dataset~\citep{belkhale2023hydra}  & 4.4\% \\
+        Austin Buds Dataset~\citep{zhu2022bottom}  & 0.2\% \\
+        NYU Franka Play Dataset~\citep{cui2022play}  & 0.8\% \\
+        Furniture Bench Dataset~\citep{heo2023furniturebench}  & 2.4\% \\
+        UCSD Kitchen Dataset~\citep{ucsd_kitchens}  & <0.1\% \\
+        Austin Sailor Dataset~\citep{nasiriany2022sailor}  & 2.2\% \\
+        Austin Sirius Dataset~\citep{liu2022robot}  & 1.7\% \\
+        DLR EDAN Shared Control~\citep{quere_shared_2020}  & <0.1\% \\
+        IAMLab CMU Pickup Insert~\citep{saxena2023multiresolution}  & 0.9\% \\
+        UTAustin Mutex~\citep{shah2023mutex} & 2.2\% \\
+        Berkeley Fanuc Manipulation~\citep{fanuc_manipulation2023} & 0.7\% \\
+        CMU Stretch~\citep{mendonca2023structured} & 0.2\% \\
+        BC-Z~\citep{jang2022bc} & 7.5\% \\
+        FMB Dataset~\citep{luo2024fmb}  & 7.1\% \\
+        DobbE~\citep{shafiullah2023dobbe}  & 1.4\% \\
+        DROID~\citep{khazatsky2024droid}  & 10.0\%\footnote{We remove DROID for the last third of training due to slow learning progress (see \cref{sec:data_mix}) and re-distribute its mixture weights across all other datasets.} \\
+                \bottomrule
+        \end{tabular}%
+        \caption{\name{} training data mixture using datasets from the Open X-Embodiment dataset~\citep{open_x_embodiment_rt_x_2023}, following \citep{octo_2023} with a few additions.}
+        \label{tab:data_mix}
+\end{table}
+
+
+\section{Evaluation Tasks and Detailed Results}
+\label{sec:app:detailed_setups}
+
+In this section, we provide more details on the BridgeData~V2 WidowX and Google robot evaluations discussed in \cref{sec:zero_shot_exp}, as well as the Franka-Tabletop and Franka-DROID fine-tuning evaluations discussed in \cref{sec:finetuning_exp}.
+
+\subsection{BridgeData~V2 WidowX Evaluation Details}
+\label{sec:app:bridge_evaluation}
+
+Here we focus specifically on BridgeData~V2 evaluations discussed in \cref{sec:zero_shot_exp}.
+
+\subsubsection{BridgeData~V2 Evaluation Tasks}
+\label{sec:app:bridge_evaluation_tasks}
+
+As described in \cref{sec:zero_shot_exp}, we evaluate each generalist robot manipulation policy on 17 tasks with 10 trials each. In this section, we provide details on the task categories and individual tasks.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.65\linewidth]{figures/bridge_tasks_vertical.pdf}
+    \caption{\textbf{BridgeData~V2 WidowX robot evaluation tasks.} We evaluate every generalist robot policy on 4 types out-of-distribution (OOD) generalization tasks: \textbf{visual}, \textbf{motion}, \textbf{physical}, and \textbf{semantic} (as defined in \cref{sec:zero_shot_exp}). Every pair of images shows the start state and an example end state after the robot completes the task. We also rigorously assess \textbf{language grounding} in the 3 tasks shown in the bottom 3 rows, by changing the prompt while fixing the initial state and testing whether the policy can approach the correct target object.}
+    \label{fig:app:bridge_tasks}
+\end{figure}
+
+In total, we evaluate on 5 visual generalization tasks, 2 motion generalization tasks, 3 physical generalization tasks, 4 semantic generalization tasks, and 3 language grounding tasks. Note that all tasks we evaluate on introduce some form of distribution shift since we are unable to procure the exact objects used in the original dataset (other distribution shifts naturally arise as we reproduce a real-world test environment originally constructed at a different location; see \cref{sec:app:compare_to_orig_bridge} for a detailed discussion on such distribution shifts). All 17 tasks are depicted in \cref{fig:app:bridge_tasks}. Each rollout is marked as a failure (0) or success (1). In some more difficult tasks, we record partial successes (0.5); we describe the conditions for partial credit in the task descriptions below.
+
+
+Below we describe each of the 17 tasks, in the order shown in \cref{fig:app:bridge_tasks}:
+\begin{enumerate}
+    \item \textbf{Put Eggplant into Pot (Easy Version)}: The robot's goal is to pick up the eggplant and drop it into the pot. This is a \textbf{visual generalization} task because we use a handcrafted paper pot that has a different appearance than the pot used in the original BridgeData~V2 training dataset (since we are unable to procure the original pot). Unlike all 16 other tasks, for this particular task we initialize the robot's end-effector directly above the eggplant before rolling out the policy; hence, we call this the ``Easy Version'' of the ``Put Eggplant into Pot'' task.
+    \item \textbf{Put Eggplant into Pot}: This is the same task as described above, except that the robot's end-effector is not initialized directly above the eggplant. Instead, we initialize it in a position that is fixed across all rollouts, which means that the robot must horizontally reach for the eggplant first before manipulating it. (Note: The same applies to all other tasks described below.) This is a \textbf{visual generalization} task for the same reason as above.
+    \item \textbf{Put Cup from Counter into Sink}: The robot's goal is to pick up the pink cup from either the kitchen countertop or drying rack and place it into the sink on the right. This is a \textbf{visual generalization} task because we use a pink cup rather than a blue cup (a blue cup is used in the original BridgeData~V2 dataset, but we find that none of the methods we evaluate is able to manipulate it reliably -- most likely because the color of the cup blends in with the color of the sink).
+    \item \textbf{Put Eggplant into Pot (w/ Clutter)}: This is the same task as the ``Put Eggplant into Pot'' task, except that it is more difficult due to the presence of several distractor objects. It is a \textbf{visual generalization} task for the same reason discussed in the normal ``Put Eggplant into Pot'' task, and even more so given unseen distractors in the scene. \emph{Partial credit (0.5 out of 1) is rewarded when the robot moves towards the correct target object.}
+    \item \textbf{Put Yellow Corn on Pink Plate}: The robot's goal is to pick up the yellow corn and place it on the pink plate. This is a \textbf{visual generalization} task due to the presence of unseen distractor objects in the scene, such as a green dinosaur on the countertop in the back section of the sink. \emph{Partial credit (0.5 out of 1) is rewarded when the robot moves towards the correct target object.}
+    \item \textbf{Lift Eggplant}: The robot's goal is to grasp and lift the eggplant into the air. This is a \textbf{motion generalization} task because the eggplant is initialized in unseen positions and/or orientations, and the robot is forced to move beyond its training distribution of positions and/or orientations and often perform long-range reaching in order to complete the task. (Note: Long-range reaching is not demonstrated in this environment in the original BridgeData~V2 demonstrations; see \cref{sec:app:compare_to_orig_bridge} for details.) We find that this task, though seemingly simple, is deceptively challenging for many policies. \emph{Partial credit (0.5 out of 1) is rewarded when the robot makes contact with the eggplant.}
+    \item \textbf{Put Carrot on Plate (w/ Height Change)}: The robot's goal is to pick up the carrot and place it on the yellow plate. This is a \textbf{motion generalization} task because the plate is elevated from its usual position at the bottom of the sink, and the robot must adjust its trajectory to correctly place the carrot on the elevated platform (without knocking down the plate in the process). \emph{Partial credit (0.5 out of 1) is rewarded when the robot grasps the carrot and touches the plate with it.}
+    \item \textbf{Put Carrot on Plate}: This is the same task as above, except that the plate is at its normal position (at the bottom of the sink or drying rack). We consider this a \textbf{physical generalization} task because the carrot has a different size and shape than the one used in the original BridgeData~V2 dataset, which is shorter and narrower. (Note that the previous version of this task listed above would also technically be a physical generalization task since it involves the same carrot, but we list it under the ``motion generalization'' category since that is the focus there.)
+    \item \textbf{Flip Pot Upright}: The robot's goal is to manipulate the pot such that it is oriented upright in the sink at the end of the episode. This is a \textbf{physical generalization} task because this pot has a different size and shape than the one used in the original BridgeData~V2 training demonstrations (the pot we use is wider and shorter).
+    \item \textbf{Lift AAA Battery}: The robot's goal is simply to grasp the AAA battery and lift it up into the air. This is considered a \textbf{physical generalization} task because the battery is much smaller and thinner than target objects seen in the BridgeData~V2 training demonstrations in this environment; see \cref{sec:app:compare_to_orig_bridge} for details. (Note that this target object does not exist in the original BridgeData~V2 demonstrations in this environment, so this is also an instance of ``semantic generalization'', but we classify it solely as ``physical generalization'' since that is the main focus here).
+    \item \textbf{Move Skull into Drying Rack}: The robot's goal is to grasp the skull windup toy and drop it into the yellow drying rack in the left part of the sink. This is a \textbf{semantic generalization} task since the skull is an unseen target object (does not appear in the BridgeData~V2 training demonstrations).
+    \item \textbf{Lift White Tape}: The robot's goal is to grasp and lift the white roll of tape into the air. This is a \textbf{semantic generalization} task since the white tape roll is an unseen target object (does not appear in the BridgeData~V2 training demonstrations). (Note that this task may also be considered as ``physical generalization'' because of its shape being different than the objects seen in the training demonstrations in this environment; most policies struggle to grasp objects with this ring structure, and they often move the robot's end-effector directly into the center region.)
+    \item \textbf{Take Purple Grapes out of Pot}: The robot's goal is to grasp the purple grapes lying inside the steel pot and remove it from the pot (by lifting it out and/or dropping it anywhere outside the pot). This is a \textbf{semantic generalization} task because it is an unseen language instruction; the robot has never seen this task in the original BridgeData~V2 training dataset.
+    \item \textbf{Stack Blue Cup on Pink Cup}: The robot's goal is to grasp the blue cup and place it securely on top of the pink cup. This is a \textbf{semantic generalization} task because it is an unseen language instruction; the robot has never seen this task in this environment in the original BridgeData~V2 training dataset. \emph{Partial credit (0.5 out of 1) is rewarded when the robot grasps the blue cup and touches the pink cup with the blue cup.}
+    \item \textbf{Put \{Eggplant, Red Bottle\} into Pot}: This is a \textbf{language grounding} task. The robot's goal is to put the specified target object into the pot. Both the eggplant and red bottle are present in the scene. We conduct paired evaluations: for the same initial state, we prompt the policy to target the eggplant in one episode, and then the red bottle in the next episode. We test each method 5 times with the eggplant and 5 times with the red bottle, using the same set of 5 initial states for both target objects. \emph{Partial credit (0.5 out of 1) is rewarded when the robot moves towards the correct target object.}
+    \item \textbf{Lift \{Cheese, Red Chili Pepper\}}: This is a \textbf{language grounding} task. The robot's goal is to grasp and lift the specified target object. We conduct paired evaluations as described in the task above. \emph{Partial credit (0.5 out of 1) is rewarded when the robot moves towards the correct target object.}
+    \item \textbf{Put \{Blue Cup, Pink Cup\} on Plate}: This is a \textbf{language grounding} task. The robot's goal is to grasp the specified target object and place it onto the plate. We conduct paired evaluations as described in other language grounding tasks. \emph{Partial credit (0.5 out of 1) is rewarded when the robot moves towards the correct target object.}
+\end{enumerate}
+
+
+\subsubsection{Comparing Evaluation Tasks to Original BridgeData~V2 Training Data}
+\label{sec:app:compare_to_orig_bridge}
+
+We conduct our evaluations in a sink environment used in the original BridgeData~V2 dataset \citep{walke2023bridgedata}. We reproduce the environment to match the original environment in the BridgeData~V2 dataset with rough approximations for the robot's location relative to the sink, as well as the camera's placement relative to the scene. Given the lack of precise measurements of these positions in the original dataset, we are unable to reproduce the \emph{exact} environment setup, and natural distribution shifts arise due to slightly different robot, sink, and camera placements. In addition, since we evaluate robot policies in a different location than where the training demonstrations were collected from, other natural distribution shifts arise. For example, the lighting conditions and background (\eg visible areas behind the sink) are inevitably different than what was seen in the training dataset. Furthermore, we are unable to procure the exact set of objects used in the original BridgeData~V2 dataset, so there are distribution shifts between the objects used at train time and those used at test time.
+
+Despite all these challenges, we find that certain generalist policies, such as \name{} and RT-2-X, can still generalize and perform various tasks fairly reliably ``out-of-the-box''. Other generalist policies, such as RT-1-X and Octo, can also complete some tasks, though they struggle when tested with more difficult generalization tasks in our BridgeData~V2 evaluation suite.
+
+The original BridgeData~V2 dataset includes demonstrations of the following seven tasks in this specific sink environment: ``Flip Pot Upright'', ``Put Carrot on Plate'', ``Put Cup from Counter (or Drying Rack) into Sink'', ``Put Eggplant into Pot'', ``Put Knife on Cutting Board'', ``Put Spoon in Pot'', and ``Turn Lever Vertical to Front''. See \cref{fig:app:original_bridge_tasks} for samples images of all these tasks from the original dataset. Note that all training demonstrations collected in this environment are initialized such that the robot's end-effector is positioned directly above the target object in the beginning of the episode. (However, this is not the case across all environments in the BridgeData~V2 dataset; in some other environments, the robot is initialized farther away from the target object, so it must horizontally reach for the object first before manipulating it.)
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{figures/original_bridge_tasks.pdf}
+    \caption{\textbf{Original BridgeData~V2 sink environment tasks.} Images from sample demonstrations in the sink environment from the original BridgeData~V2 dataset reveal that all demonstrations in this environment were initialized such that the robot's end-effector was positioned immediately above the target object. Note that these initial states are different from the initial states we use in our BridgeData~V2 evaluation tasks shown in \cref{fig:app:bridge_tasks}. In our evaluations, we always initialize the robot's end-effector to a fixed location above the sink, rather than positioning it directly above the target object (except for one task: ``Put Eggplant into Pot (Easy Version)'').}
+    \label{fig:app:original_bridge_tasks}
+\end{figure}
+
+In our BridgeData~V2 evaluation suite, only one task -- ``Put Eggplant into Pot (Easy Version'') -- is initialized with the robot's end-effector hovering directly over the target object; in all 16 other tasks, the end-effector is initialized at a fixed location above the sink such that the robot must horizontally reach towards the object. This initial condition, in combination with the distribution shifts we introduce in the various types of OOD generalization in our evaluation suite, challenges the generalist policies and requires a high degree of robustness in order to complete the tasks successfully. Hence, the success rates for policies like RT-1-X and Octo are lower than what is reported in prior works. However, we find that other policies such as RT-2-X and \name{} still achieve relatively strong performance despite all these distribution shifts and challenges.
+
+
+\subsubsection{Detailed BridgeData~V2 Evaluation Results}
+\label{sec:app:detailed_bridge_eval_results}
+
+See \cref{app:tab:bridge_results_detailed} for the full BridgeData~V2 WidowX evaluation results. The number of successes for each method, out of 10 trials, is listed for each of 17 tasks. \name{} achieves strongest performance in the majority of the tasks and has the highest aggregate success rate among the generalist policies. RT-2-X also shows good performance, outperforming RT-1-X and Octo, though it does not perform as well as \name{}. RT-1-X and Octo generally experience difficulty in these generalization tasks.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Detailed BridgeData~V2 WidowX evaluation results.} We report performance on the full evaluation suite of 17 tasks (discussed in \cref{sec:zero_shot_exp}), including visual/motion/physical/semantic generalization tasks and language grounding tasks. Note that \emph{partial success} (score of 0.5) is possible for some tasks; see \cref{sec:app:bridge_evaluation_tasks} for details. We find that \name{} performs best in most tasks and achieves highest performance overall, followed by RT-2-X. On the other hand, RT-1-X and Octo struggle in the evaluations, only getting 0--2 successes in several tasks. See \cref{fig:app:bridge_tasks} for illustrations of all tasks.}
+\label{app:tab:bridge_results_detailed}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Category & Task & \# Trials & \makecell{RT-1-X\\\# Successes} & \makecell{Octo\\\# Successes} & \makecell{RT-2-X\\\# Successes} & \makecell{\name{}~(ours)\\\# Successes} \\
+\midrule
+Visual gen & Put Eggplant into Pot (Easy Version) & 10 & 1 & 5 & 7 & \textbf{10} \\
+Visual gen & Put Eggplant into Pot & 10 & 0 & 1 & 5 & \textbf{10} \\
+Visual gen & Put Cup from Counter into Sink & 10 & 1 & 1 & 0 & \textbf{7} \\
+Visual gen & Put Eggplant into Pot (w/ Clutter) & 10 & 1 & 3.5 & 6 & \textbf{7.5} \\
+Visual gen & Put Yellow Corn on Pink Plate & 10 & 1 & 4 & 8 & \textbf{9} \\
+Motion gen & Lift Eggplant & 10 & 3 & 0.5 & 6.5 & \textbf{7.5} \\
+Motion gen & Put Carrot on Plate (w/ Height Change) & 10 & 2 & 1 & \textbf{4.5} & \textbf{4.5} \\
+Physical gen & Put Carrot on Plate & 10 & 1 & 0 & 1 & \textbf{8} \\
+Physical gen & Flip Pot Upright & 10 & 2 & 6 & 5 & \textbf{8} \\
+Physical gen & Lift AAA Battery & 10 & 0 & 0 & 2 & \textbf{7} \\
+Semantic gen & Move Skull into Drying Rack & 10 & 1 & 0 & \textbf{5} & \textbf{5} \\
+Semantic gen & Lift White Tape & 10 & \textbf{3} & 0 & 0 & 1 \\
+Semantic gen & Take Purple Grapes out of Pot & 10 & \textbf{6} & 0 & 5 & 4 \\
+Semantic gen & Stack Blue Cup on Pink Cup & 10 & 0.5 & 0 & \textbf{5.5} & 4.5 \\
+Language grounding & Put \{Eggplant, Red Bottle\} into Pot & 10 & 2.5 & 4 & \textbf{8.5} & 7.5 \\
+Language grounding & Lift \{Cheese, Red Chili Pepper\} & 10 & 1.5 & 2.5 & 8.5 & \textbf{10} \\
+Language grounding & Put \{Blue Cup, Pink Cup\} on Plate & 10 & 5 & 5.5 & 8.5 & \textbf{9.5} \\
+\midrule
+&& Mean Success Rate & \cellcolor{lightlightgray}18.5$\pm$2.7\% & \cellcolor{lightlightgray}20.0$\pm$2.6\% & \cellcolor{lightlightgray}50.6$\pm$3.5\% & \cellcolor{lightlightgray}\textbf{70.6$\pm$3.2\%} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+Additionally, in \cref{app:tab:detailed_quantized_inference_results}, we provide the full evaluation results for the quantized inference experiments that were summarized in \cref{tab:quantized_results}. For these evaluations, we test policies on 8 representative BridgeData V2 tasks spanning all task categories in the full evaluation suite.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Full quantized inference results.} Here we present the detailed version of the results shown in \cref{tab:quantized_results}.}
+\label{app:tab:detailed_quantized_inference_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+Category & Task & \# Trials & \makecell{bfloat16\\\# Successes} & \makecell{int8\\\# Successes} & \makecell{int4\\\# Successes} \\
+\midrule
+Visual gen & Put Eggplant into Pot (Easy Version) & 10 & \textbf{9} & 7 & \textbf{9} \\
+Visual gen & Put Eggplant into Pot & 10 & \textbf{7} & \textbf{7} & \textbf{7} \\
+Visual gen & Put Cup from Counter into Sink & 10 & 5 & 3 & \textbf{7} \\
+Motion gen & Lift Eggplant & 10 & 6 & 4 & \textbf{7.5} \\
+Physical gen & Put Carrot on Plate & 10 & 6 & 5 & \textbf{7} \\
+Physical gen & Lift AAA Battery & 10 & \textbf{7} & 5 & 3 \\
+Semantic gen & Take Purple Grapes out of Pot & 10 & 8 & 8 & \textbf{9} \\
+Language grounding & Put \{Eggplant, Red Bottle\} into Pot & 10 & \textbf{9} & 7.5 & 8 \\
+\midrule
+&& Mean Success Rate & \cellcolor{lightlightgray}\textbf{71.3 $\pm$ 4.8\%} & \cellcolor{lightlightgray}58.1 $\pm$ 5.1\% & \cellcolor{lightlightgray}\textbf{71.9 $\pm$ 4.7\%} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Google Robot Evaluation Details}
+\label{sec:app:rt1_robot_evaluation}
+
+In this section, we provide more details on the Google robot evaluations introduced in \cref{sec:zero_shot_exp}.
+
+\subsubsection{Google Robot Evaluation Tasks}
+\label{sec:app:rt1_robot_evaluation_tasks}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figures/rt1_robot_tasks.jpeg}
+    \caption{\textbf{Google robot evaluation tasks.} We evaluate every generalist robot policy on in-distribution tasks and out-of-distribution (OOD) generalization tasks. OOD tasks involve unseen backgrounds, target objects, instructions/object relations, and semantic concepts (e.g., photos from the Internet that do not appear in robot action data).}
+    \label{fig:app:rt1_robot_tasks}
+\end{figure}
+
+On the Google robot, we evaluate each generalist robot policy on 12 tasks with 5 rollouts each, for a total of 60 rollouts. The first five tasks test on in-distribution conditions, and the last seven tasks test on more difficult out-of-distribution (OOD) conditions. All tasks are depicted in \cref{fig:app:rt1_robot_tasks}. Each rollout is marked as a failure (0) or success (1).
+
+We describe the 12 tasks below:
+\begin{enumerate}
+    \item \textbf{Pick Coke Can} (in-distribution): The robot is positioned in front of a platform with a can of Coke on top of it. The robot's goal is to grasp and lift the Coke can.
+    \item \textbf{Move Apple near Green Can} (in-distribution): The robot is positioned in front of a platform with an apple and a green soda can on top of it. The robot's goal is to grasp the apple and move it next to the green can.
+    \item \textbf{Move Blue Chip Bag near Apple} (in-distribution): The robot is positioned in front of a platform with a blue bag of chips and an apple on top of it. The robot's goal is to grasp the blue bag of chips and move it close to the apple.
+    \item \textbf{Place Coke Can Upright} (in-distribution): The robot is positioned in front of a platform with a can of Coke on top of it, and the can is oriented horizontally on its side. The robot's goal is to grasp the Coke can and orient it to be in a vertical position.
+    \item \textbf{Open Middle Drawer} (in-distribution): The robot is positioned in front of a set of three drawers. The robot's goal is to grasp the middle drawer handle and pull the drawer open.
+    \item \textbf{Move Orange near Brown Chip Bag} (OOD): The robot is positioned in front of a platform with a brown bag of chips and an orange on top of it. A tablecloth with blue sky and white cloud patterns covers the platform underneath the objects. The robot's goal is to grasp the orange and bring it next to the bag of chips. This task is OOD because the orange is an unseen object relative to the training dataset, and the tablecloth is an unseen background.\footnote{See Appendix of \citet{rt22023arxiv} for a detailed list of OOD conditions in Google robot evaluations.}
+    \item \textbf{Pick Pepsi Can} (OOD): The robot is positioned in front of a platform with a can of Pepsi on top of it. A tablecloth with bright yellow/brown patterns covers the platform underneath the can. The robot's goal is to grasp and lift the can. This task is OOD because the Pepsi can is an unseen object, and the tablecloth is an unseen background.
+    \item \textbf{Pick Banana} (OOD): The robot is positioned in front of a platform with an apple, a can of Coke, and a banana. The robot's goal is to grasp and lift the banana. This task is OOD because the banana is an unseen target object.
+    \item \textbf{Pick Green Cup} (OOD): The robot is positioned in front of a platform with a banana, a can of Pepsi, and a green cup. The robot's goal is to grasp and lift the green cup. This task is OOD because all objects in the scene are unseen in the training data.
+    \item \textbf{Place Apple on Plate} (OOD): The robot is positioned in front of a platform with a plate and an apple. The robot's goal is to grasp the apple and move it onto the plate. This task is OOD because it is a novel instruction describing an unseen object relation: training demonstrations only cover moving the apple \emph{near} the plate, rather than placing it \emph{on top of} the plate.
+    \item \textbf{Place Banana in Pan} (OOD): The robot is positioned in front of a platform with a pan and a banana. The robot's goal is to grasp the banana and move it into the pan. This task is OOD because the banana is an unseen target object, and it is a novel instruction describing an unseen object relation, as explained in the previous task.
+    \item \textbf{Move Coke Can to Taylor Swift} (OOD): The robot is positioned in front of a platform with a can of Coke and photos of three different celebrities, including Taylor Swift. The robot's goal is to grasp the can and move it to the photo of Taylor Swift. This task is OOD because the photos of the celebrities are unseen in the robot interaction data.
+\end{enumerate}
+
+
+
+\subsubsection{Detailed Google Robot Evaluation Results}
+\label{sec:app:detailed_rt1_robot_results}
+
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Detailed Google robot evaluation results.} We report full evaluation results for Google robot evaluations discussed in \cref{sec:zero_shot_exp}. Each generalist policy is evaluated with 60 rollouts across 12 tasks, covering both in-distribution and out-of-distribution (OOD) testing conditions. In the bottom row, we report mean success rate $\pm$ StdErr for each policy. OpenVLA and RT-2-X both significantly outperform RT-1-X and Octo overall (we bold the mean success rate for both due to overlapping error bars). See \cref{fig:app:rt1_robot_tasks} for illustrations of all tasks.}
+\label{app:tab:rt1_robot_results_detailed}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+Category & Task & \# Trials & \makecell{RT-1-X\\\# Successes} & \makecell{Octo\\\# Successes} & \makecell{RT-2-X\\\# Successes} & \makecell{\name{}~(ours)\\\# Successes} \\
+\midrule
+In-distribution & Pick Coke Can & 5 & \textbf{5} & 1 & \textbf{5} & \textbf{5} \\
+In-distribution & Move Apple near Green Can & 5 & 3 & 3 & 3 & \textbf{5} \\
+In-distribution & Move Blue Chip Bag near Apple & 5 & 0 & 3 & 4 & \textbf{5} \\
+In-distribution & Place Coke Can Upright & 5 & 0 & 0 & \textbf{4} & \textbf{4} \\
+In-distribution & Open Middle Drawer & 5 & 0 & \textbf{4} & 2 & 3 \\
+OOD & Move Orange near Brown Chip Bag & 5 & 1 & 2 & \textbf{5} & \textbf{5} \\
+OOD & Pick Pepsi Can & 5 & 3 & 0 & \textbf{5} & 4 \\
+OOD & Pick Banana & 5 & \textbf{5} & 3 & \textbf{5} & \textbf{5} \\
+OOD & Pick Green Cup & 5 & 1 & 0 & \textbf{5} & \textbf{5} \\
+OOD & Place Apple on Plate & 5 & 0 & 0 & \textbf{4} & \textbf{4} \\
+OOD & Place Banana in Pan & 5 & 0 & 0 & 2 & \textbf{4} \\
+OOD & Move Coke Can near Taylor Swift & 5 & 2 & 0 & \textbf{3} & 2 \\
+\midrule
+&& Mean Success Rate & \cellcolor{lightlightgray}33.3$\pm$6.1\% & \cellcolor{lightlightgray}26.7$\pm$5.8\% & \cellcolor{lightlightgray}\textbf{78.3$\pm$5.4\%} & \cellcolor{lightlightgray}\textbf{85.0$\pm$4.6\%}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Full results for the Google robot evaluations are shown in \cref{app:tab:rt1_robot_results_detailed}. Overall, we find that RT-1-X and Octo experience difficulty on the evaluation tasks; they are often unable to achieve a single success out of five trials in several tasks. On the other hand, RT-2-X and \name{} demonstrate strong performance, completing every task at least two times out of five trials; these two VLA policies perform comparably with each other on this particular evaluation suite.
+
+
+\subsection{Data-Efficient Adaptation Experiment Details}
+\label{sec:app:franka_evaluation}
+
+In this section, we provide more details on the data-efficient adaptation experiments discussed in \cref{sec:finetuning_exp}, where we investigate the effectiveness of fine-tuned \name{} policies on new robot setups such as Franka-Tabletop and Franka-DROID.
+
+\subsubsection{Franka-Tabletop and Franka-DROID Tasks}
+\label{sec:app:franka_evaluation_tasks}
+
+We collect 10--150 demonstrations of each of seven tasks. The first six tasks correspond to a robot setup which we denote as ``Franka-Tabletop'' (Franka Emika Panda robot mounted on top of a table), and the final task corresponds to a robot setup which we call ``Franka-DROID''.
+
+In the Franka-Tabletop setup, the first three of six tasks correspond to single-instruction tasks and are narrow, while the last three tasks correspond to multi-instruction tasks in which multiple objects are present in the scene and the robot must manipulate the correct one depending on the language instruction.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/franka_tabletop_tasks.pdf}
+    \caption{\textbf{Franka-Tabletop fine-tuning tasks.} Franka-Tabletop tasks used in the data-efficient adaptation experiments in \cref{sec:finetuning_exp} and described in detail in \cref{fig:app:franka_tabletop_tasks} are depicted above. The first three of six tasks, shown in the top three rows, only involve a single instruction, while the last three tasks in the bottom three rows involve multiple objects and instructions (the instructions specify the target object or target location). The first column shows sample initial states matching the training data distribution, while the second column shows out-of-distribution (OOD) initial states (\eg unseen backgrounds, target objects, distractors, and object positions/orientations). Every policy in \cref{sec:finetuning_exp} is evaluated with 10--12 rollouts on in-distribution tasks and 5--6 rollouts on OOD tasks.}
+    \label{fig:app:franka_tabletop_tasks}
+\end{figure}
+
+Below we describe each of the six Franka-Tabletop tasks shown in \cref{fig:app:franka_tabletop_tasks}:
+\begin{enumerate}
+    \item \textbf{Put Carrot in Bowl} (single-instruction): The robot's goal is to grasp the carrot and place it into the bowl. We collect 50 demonstrations of this task for the training dataset, randomly placing the carrot and the bowl at different locations on the table in every episode. The carrot is always initialized on the left side of the bowl. During evaluation, each trial is recorded as a success (1) or failure (0); there is no partial credit.
+    \item \textbf{Pour Corn into Pot} (single-instruction): The robot's goal is to grasp the red bowl, move towards the steel pot, and pour the contents (a yellow corn) into the pot. We collect 50 demonstrations of this task for the training dataset, randomly placing the bowl and the pot at different locations on the table in every episode. The bowl is always initialized on the right side of the pot. During evaluation, each trial is recorded as a success (1) or failure (0); there is no partial credit.
+    \item \textbf{Flip Pot Upright} (single-instruction): The robot's goal is to grasp the steel pot (which is initially oriented vertically), rotate it to be in the upright position, and place it back onto the table. We collect only 10 demonstrations of this task for the training dataset, randomly placing the steel pot at various locations within a small section of the table. During evaluation, each trial is recorded as a success (1), failure (0), or partial success (0.5). Partial successes include grasping the pot but not orienting it upright, or knocking it over to the upright position but not carefully guiding it. The robot must release the pot at the end of the episode for full credit.
+    \item \textbf{Move <object> onto Plate} (multi-instruction): The robot's goal is to grasp one out of three objects (depending on the target specified in the language instruction) and place it on the plate on the right side of the table. We collect 150 demonstrations of this task for the training dataset, randomly placing different combinations of three objects on the table and selecting one as the target. The plate is always initialized on the right side of the table. During evaluation, each trial is recorded as a success (1), failure (0), or partial success (0.5). Partial success is recorded when the first object that the robot makes contact with is the correct target object (\ie the object specified in the language instruction), but the robot does not complete the task.
+    \item \textbf{Knock <object> Over} (multi-instruction): The robot's goal is to approach one out of three objects (depending on the target specified in the language instruction) and push it until it falls over. We collect 70 demonstrations of this task for the training dataset, randomly placing different combinations of three objects on the table and selecting one as the target. During evaluation, each trial is recorded as a success (1), failure (0), or partial success (0.5). Partial success is recorded when the first object that the robot makes contact with is the correct target object (\ie the object specified in the language instruction), but the robot does not complete the task.
+    \item \textbf{Cover <object> with Towel} (multi-instruction): The robot's goal is to grasp the blue towel and place it on one out of three objects (depending on the target specified in the language instruction). We collect 45 demonstrations of this task for the training dataset, randomly placing different combinations of three objects on the table. During evaluation, each trial is recorded as a success (1), failure (0), or partial success (0.5). Partial success is recorded when the first object that the robot touches with the towel is the correct target object (\ie the object specified in the language instruction), but the robot does not complete the task (\eg it drops the towel onto the table instead of on top of the target object). Full credit is given when any part of the towel is resting over the top surface of the target object, \ie the object does not need to be fully covered.
+\end{enumerate}
+
+For every Franka-Tabletop task, we evaluate each method with 10--12 in-distribution trials and 5--6 OOD generalization trials. The in-distribution and OOD test conditions are depicted in \cref{fig:app:franka_tabletop_tasks} (second column).
+
+We describe the OOD test conditions for each of the six tasks below:
+\begin{enumerate}
+    \item Put Carrot in Bowl (OOD): An eggplant (unseen object) replaces the carrot.
+    \item Pour Corn into Pot (OOD): An unseen brown tablecloth covers the tabletop.
+    \item Flip Pot Upright (OOD): An unseen white tablecloth covers the tabletop
+    \item Move <object> onto Plate (OOD): A set of three unseen objects are placed on the table.
+    \item Knock <object> Over (OOD): Two unseen distractor objects (red plastic cup and brown box) are positioned behind the set of three seen objects.
+    \item Cover <object> with Towel (OOD): The three objects on the table are placed upside-down and at unseen positions.
+\end{enumerate}
+
+
+Finally, in the Franka-DROID environment, we experiment with one task and variants of it: \textbf{Wipe Table} (see \cref{fig:app:droid_wipe_task}). In this task, the robot's goal is to grab the brush and sweep all three small brown objects into the dustpan. We collect 70 demonstrations for this task for the training dataset, varying the positions of all the objects.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\linewidth]{figures/droid_wipe_task.jpeg}
+    \caption{\textbf{Franka-DROID fine-tuning task.} The ``Wipe Table'' task shown here is the final task used in the data-efficient adaptation experiments in \cref{sec:finetuning_exp}. The left image shows the initial conditions for an in-distribution trial. The right image shows an out-of-distribution trial in which unseen distractor objects are present on the table. To fully complete the task, the robot must grab the brush and sweep all three objects into the dustpan.}
+    \label{fig:app:droid_wipe_task}
+\end{figure}
+
+At test time, we evaluate on in-distribution conditions matching the training data (\cref{fig:app:droid_wipe_task}, left), as well as out-of-distribution (OOD) conditions in which distractor objects are also present in the scene on the table (\cref{fig:app:droid_wipe_task}, right). Since there are various possible outcomes for each trial, we define a scoring rubric as follows: The maximum score for each trial is 2 points. The policy receives the full 2 points if the robot sweeps all three objects into the dustpan. It receives 1 point for successfully sweeping one or two objects into the dustpan. Otherwise, it receives 0 points. We evaluate each policy with 18 in-distribution trials and 12 OOD trials, so each policy receives an aggregate score out of 60 points.
+
+
+
+
+\subsubsection{Detailed Franka-Tabletop and Franka-DROID Evaluation Results}
+\label{sec:app:detailed_franka_evaluation_results}
+
+Full evaluation results for both Franka-Tabletop and Franka-DROID evaluations are shown in \cref{app:tab:detailed_finetune_results}. We evaluate the methods discussed in \cref{sec:finetuning_exp}. We find that Diffusion Policy demonstrates strong performance on the single-instruction Franka-Tabletop tasks (\eg ``Put Carrot in Bowl'' and ``Pour Corn in Pot''), outperforming other methods. However, \name{} and Octo achieve higher performance in the more diverse multi-instruction tasks (``Move <object> onto Plate'', ``Knock <object> Over'', and ``Cover <object> with Towel''). In the Franka-DROID environment, \name{} obtains best results. Overall, we find that \name{} achieves the highest average performance across both tasks.
+
+\begin{table}[h!]
+\centering
+\caption{\textbf{Detailed data-efficient adaptation experiment results.} Here we present the full breakdown of results summarized in \cref{fig:finetune_results}. We report the performance of Diffusion Policy trained from scratch on new robot tasks, as well as generalist policies fine-tuned on the same data. Each policy is tested against both in-distribution and out-of-distribution (OOD) generalization conditions (see \cref{fig:app:franka_tabletop_tasks} for Franka-Tabletop tasks and \cref{fig:app:droid_wipe_task} for Franka-DROID tasks). We find that no single policy performs best on all tasks: Diffusion Policy achieves high success rates on single-instruction tasks, while \name{} and Octo performs well on diverse multi-instruction tasks. In terms of aggregate performance, however, \name{} obtains the highest average success rate across both environments.}
+\label{app:tab:detailed_finetune_results}
+\resizebox{\textwidth}{!}{\begin{tabular}{llcccccc}
+\toprule
+&& \# trials & Diffusion Policy & \makecell{Diffusion Policy\\(matched)} & Octo & \makecell{\name{}\\(scratch)} & \makecell{\name{}\\(ours)} \\
+\midrule
+Franka-Tabletop (5Hz) & ``Put Carrot in Bowl'' (in-distribution) & 10 & \textbf{90.0\%} & 80.0\% & 40.0\% & 70.0\% & 70.0\% \\
+& ``Put Carrot in Bowl'' (OOD) & 5 & 20.0\% & 0.0\% & 20.0\% & 0.0\% & \textbf{40.0\%} \\
+& ``Pour Corn into Pot'' (in-distribution) & 10 & \textbf{100.0\%} & 90.0\% & 0.0\% & 10.0\% & 50.0\% \\
+& ``Pour Corn into Pot'' (OOD) & 5 & \textbf{80.0\%} & 60.0\% & 0.0\% & 20.0\% & 60.0\% \\
+& ``Flip Pot Upright'' (in-distribution) & 10 & \textbf{100.0\%} & 85.0\% & 40.0\% & 85.0\% & \textbf{100.0\%} \\
+& ``Flip Pot Upright'' (OOD) & 5 & 50.0\% & 20.0\% & 0.0\% & 40.0\% & \textbf{80.0\%} \\
+& ``Move <object> onto Plate'' (in-distribution) & 12 & 25.0\% & 25.0\% & 41.7\% & 8.3\% & \textbf{75.0\%} \\
+& ``Move <object> onto Plate'' (OOD) & 6 & 8.3\% & 33.3\% & 8.3\% & 33.3\% & \textbf{58.3\%} \\
+& ``Knock <object> Over'' (in-distribution) & 12 & 33.3\% & 25.0\% & \textbf{83.3\%} & 75.0\% & 75.0\% \\
+& ``Knock <object> Over'' (OOD) & 6 & 16.7\% & 16.7\% & 33.3\% & 58.3\% & \textbf{83.3\%} \\
+& ``Cover <object> with Towel'' (in-distribution) & 12 & 16.7\% & 20.8\% & \textbf{91.7\%} & 41.7\% & 50.0\% \\
+& ``Cover <object> with Towel'' (OOD) & 6 & 16.7\% & 33.3\% & \textbf{91.7\%} & 50.0\% & 50.0\% \\
+\midrule
+& Average & & \cellcolor{lightlightgray} 48.5$\pm$4.9\% & \cellcolor{lightlightgray} 43.4$\pm$4.7\% & \cellcolor{lightlightgray} 43.4$\pm$4.4\% & \cellcolor{lightlightgray} 43.4$\pm$4.6\% & \cellcolor{lightlightgray} \textbf{67.2$\pm$4.0\%} \\
+\midrule
+Franka-DROID (15Hz) & ``Wipe Table'' (in-distribution) & 18 & 50.0\% & 27.8\% & 52.8\% & 25.0\% & 55.6\% \\
+& ``Wipe Table'' + Distractors (OOD) & 12 & 12.5\% & 25.0\% & 16.7\% & 16.7\% & 62.5\% \\
+\midrule
+& Average & & \cellcolor{lightlightgray} 35.0$\pm$8.0\% & \cellcolor{lightlightgray} 26.7$\pm$7.5\% & \cellcolor{lightlightgray} 38.3$\pm$8.5\% & \cellcolor{lightlightgray} 21.7$\pm$6.6\% & \cellcolor{lightlightgray} \textbf{58.3$\pm$7.2\%} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+Additionally, in \cref{app:tab:detailed_peft_results}, we show the detailed version of the parameter-efficient fine-tuning experiment results summarized in \cref{tab:partial_finetune_results}. In these experiments, we use a representative subset of two Franka-Tabletop tasks, with both in-distribution and OOD variants: one narrow single-instruction task (“Put Carrot in Bowl”) and one diverse multi-instruction task (“Move <object> onto Plate”). We use the same number of training demonstrations used in \cref{sec:finetuning_exp} (50 and 150, respectively), which is delineated in \cref{sec:app:franka_evaluation_tasks}.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Detailed parameter-efficient fine-tuning experiment results.} Here we present the detailed task performance results summarized in \cref{tab:partial_finetune_results}.}
+\label{app:tab:detailed_peft_results}
+\resizebox{\textwidth}{!}{\begin{tabular}{llcc|ccccc}
+\toprule
+&& \# trials & \makecell{Full FT} & Last layer only & \makecell{Frozen vision} & \makecell{Sandwich} & LoRA, r=32 & LoRA, r=64 \\
+\midrule
+Franka-Tabletop (5Hz) & ``Put Carrot in Bowl'' (in-distribution) & 10 & 90.0 & 40.0 & 40.0 & 90.0 & 60.0 & 90.0 \\
+& ``Put Carrot in Bowl'' (OOD) & 5 & 40.0 & 0.0 & 40.0 & 0.0 & 60.0 & 40.0 \\
+& ``Move <object> onto Plate'' (in-distribution) & 12 & 79.2 & 33.3 & 50.0 & 75.0 & 75.0 & 62.5 \\
+& ``Move <object> onto Plate'' (OOD) & 6 & 41.7 & 33.3 & 58.3 & 41.7 & 75.0 & 66.7 \\
+\midrule
+& Average & & \cellcolor{lightlightgray}\textbf{69.7$\pm$7.2\%} & \cellcolor{lightlightgray} 30.3$\pm$6.1\% & \cellcolor{lightlightgray} 47.0$\pm$6.9\% & \cellcolor{lightlightgray}62.1$\pm$7.9\% & \cellcolor{lightlightgray} \textbf{68.2$\pm$7.5\%} & \cellcolor{lightlightgray} \textbf{68.2$\pm$7.8\%} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+\section{RT-2-X vs. OpenVLA in BridgeData~V2 Evaluations}
+\label{sec:app:rt2x_vs_openvla_in_bridge}
+
+In this section, we provide additional details on RT-2-X vs. \name{} comparisons in BridgeData~V2 evaluations discussed in \cref{sec:zero_shot_exp}. As discussed previously, \name{} is pretrained on a larger subset of OpenX data than RT-2-X and uses a fused SigLIP-DinoV2 vision backbone rather than a single visual encoder. However, in addition to these factors, we believe that \name{}'s significant improvement upon RT-2-X specifically in BridgeData~V2 evaluations (as shown in \cref{fig:bridge_results}) also stems from more careful preprocessing of the Bridge dataset.
+
+During the development of the \name{} model, we discovered that the original version of the BridgeData~V2 dataset contained many transitions with all-zero (no-op) actions. For instance, in every demonstration, an all-zero action was recorded as the ground-truth action in the first timestep. Consequently, training a highly expressive VLA model on the original dataset without any data preprocessing led to a policy that frequently predicted all-zero actions and froze during evaluations. Therefore, we simply filtered out the first transition in every demonstration when training the \name{} model, and this was sufficient for mitigating the freezing behavior in most cases.
+
+However, the RT-2-X model was trained without such data preprocessing, so it often suffers the aforementioned freezing behavior if deployed out of the box without modifying the model querying procedure -- which severely deteriorates rollout performance. Since this is a proprietary model that is infeasible for us to re-train (e.g., with our preprocessed version of the BridgeData~V2 dataset), we mitigated this issue by simply querying the \emph{second-most-likely} action from the model, since the first-most-likely action was often all zeros while the second-most-likely action was not. (Note that this is the same workaround that was applied by the developers of the RT-2-X model for BridgeData~V2 evaluations reported in the Open X-Embodiment experiments \citep{open_x_embodiment_rt_x_2023}.) This workaround led to much stronger RT-2-X performance on BridgeData~V2 evaluations – though we believe that it is still suboptimal compared to re-training the model on the preprocessed version of the dataset.
+
+We also tried to \emph{dynamically} query RT-2-X, i.e., by first sampling the first-most-likely action and then sampling the second-most-likely action if the first one was all zeros. However, we empirically found that dynamic querying led to worse performance than simply querying the second-most-likely action at all times. We hypothesize that this is due to a change in the robot's dynamics that arises from dynamic querying: pausing in the middle of a trajectory to re-query the model leads to slight interruptions in the robot's movement due to non-neglible latency in the querying pipeline, and this leads to subtle performance degradation. Therefore, we report the performance of RT-2-X when always querying the second-most-likely action, as done in the Open X-Embodiment project~\citep{open_x_embodiment_rt_x_2023}.
+
+
+
+
+\section{Additional Experiments and Ablations}
+\label{sec:app:additional_ablation_experiments}
+
+In this section, we conduct several additional experiments to analyze the effects of individual components of the \name{} model architecture and training scheme, as well as provide quantitative evidence for claims made in earlier sections of this work. We aim to answer the following questions:
+
+\begin{enumerate}
+    \item How important is OpenX training and how does it impact OpenVLA's performance (\cref{sec:app:openx_pretraining_ablation})?
+    \item What effect does using a fused SigLIP-DinoV2 vision encoder have on \name{}'s performance, compared to using a SigLIP-only vision encoder (\cref{sec:app:dual_vs_single_vision_encoder})?
+    \item Is it better to fine-tune or freeze the vision encoder in \name{} (\cref{sec:app:finetuned_vs_frozen_vision_encoder})?
+    \item How do the quantized inference results discussed in \cref{sec:param_efficient_finetuning} change when policy performance is disentangled from model inference speed (\cref{sec:app:additional_quantized_inference_experiments})?
+\end{enumerate}
+
+We discuss the experimental setup and results addressing each of the above questions sequentially in the following sections.
+
+\subsection{OpenX Training Data Ablation Experiments}
+\label{sec:app:openx_pretraining_ablation}
+
+As discussed in \cref{sec:data_mix}, \name{} is trained on a large dataset of robot embodiments, scenes, and tasks from the Open X-Embodiment dataset~\citep{open_x_embodiment_rt_x_2023} (OpenX). In this section, we ablate the OpenX mixture and train a VLA policy solely on one robot dataset, to assess the impact of OpenX training on policy performance. Note that we have already observed the negative effect of ablating OpenX training in the fine-tuning regime, as discussed in \cref{sec:finetuning_exp} (see \name{}~(Scratch)), but we discuss additional experiments on another robot embodiment in this section to provide more supporting evidence.
+
+\textbf{Experimental setup and tasks.} We compare the original \name{} model with \textbf{\name{}-Bridge}, which is produced by taking the same pretrained VLM as \name{} (Prismatic VLM~\citep{karamcheti2024prismatic}) and fine-tuning it solely on BridgeData V2~\citep{walke2023bridgedata} rather than the entire OpenX training mixture discussed in \cref{sec:app:data_mix}. We evaluate \name{} and \name{}-Bridge on a subset of 8 representative tasks from the BridgeData V2 WidowX robot evaluation suite discussed in \cref{sec:app:bridge_evaluation_tasks}. The tasks are listed in \cref{app:tab:bridge_ablation_results}.
+
+\textbf{Results.} Results for the OpenX training mixture ablation are shown in \cref{app:tab:bridge_ablation_results}. By comparing \name{} with \name{}-Bridge, we see that performance drops drastically (reduction of 30 percent in absolute success rate), which demonstrates the importance of OpenX pretraining on final policy performance. Although the language grounding performance is not impacted, we observe performance reduction across all generalization categories. This result suggests that the large diversity of scenes, objects, and tasks in the OpenX training mixture is essential for unlocking improved generalization capabilities in the \name{} model.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{BridgeData~V2 WidowX ablation experiment results.} We evaluate various methods on a subset of 8 representative tasks to assess the importance of different components of the \name{} model architecture and training scheme. \name{}-Bridge is a version of \name{} without OpenX training (it is trained only on BridgeData V2), and \name{}-Bridge-SigLIP additionally ablates the fused vision backbone by removing the DinoV2 encoder (its vision backbone only consists of the SigLIP encoder). We observe that both OpenX training and the fused vision encoder improve policy performance, though the former has a much greater effect than the latter.}
+\label{app:tab:bridge_ablation_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+Category & Task & \# Trials & \makecell{\name{}\\\# Successes} & \makecell{\name{}-Bridge\\\# Successes} & \makecell{\name{}-Bridge-SigLIP\\\# Successes} \\
+\midrule
+Visual gen & Put Eggplant into Pot (Easy Version) & 10 & 10 & 8 & 8 \\
+Visual gen & Put Eggplant into Pot & 10 & 10 & 2 & 3 \\
+Visual gen & Put Cup from Counter into Sink & 10 & 7 & 4 & 2 \\
+Motion gen & Lift Eggplant & 10 & 7.5 & 5.5 & 6.5 \\
+Physical gen & Put Carrot on Plate & 10 & 8 & 4 & 1 \\
+Physical gen & Lift AAA Battery & 10 & 7 & 2 & 2 \\
+Semantic gen & Take Purple Grapes out of Pot & 10 & 4 & 3 & 3 \\
+Language grounding & Put \{Eggplant, Red Bottle\} into Pot & 10 & 7.5 & 8 & 7 \\
+\midrule
+&& Mean Success Rate & \cellcolor{lightlightgray}76.3 $\pm$ 4.8\% & \cellcolor{lightlightgray}45.6 $\pm$ 5.6\% & \cellcolor{lightlightgray}40.6 $\pm$ 5.5\% \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Dual vs. Single Vision Encoder Experiments}
+\label{sec:app:dual_vs_single_vision_encoder}
+
+The \name{} model architecture consists of a fused vision backbone that combines the SigLIP~\citep{zhai2023siglip} and DinoV2~\citep{oquab2023dinov2} encoders. In this section, we ablate the DinoV2 component to assess the importance of using a dual vision encoder.
+
+\textbf{Experimental setup and tasks.} We instantiate a model, \textbf{\name{}-Bridge-SigLIP}, which is a version of \name{} that is trained only on BridgeData V2 and consists of only the SigLIP encoder as the vision backbone. We compare this model with the \name{}-Bridge model discussed in the previous section (\cref{sec:app:openx_pretraining_ablation}), which shares the same model architecture as the original \name{} model and is only trained on Bridge robot data. Therefore, the only difference between \name{}-Bridge-SigLIP and \name{}-Bridge is that the former omits the DinoV2 encoder in the vision backbone. We evaluate these models on the same subset of 8 Bridge tasks described in the previous section.
+
+\textbf{Results.} Results for the dual vision encoder ablation are shown in \cref{app:tab:bridge_ablation_results}. The drop in performance from \name{}-Bridge to \name{}-Bridge-SigLIP implies that additionally including the DinoV2 encoder in the vision backbone improves policy performance. However, the 5 percent reduction in performance here is not as significant as the 30 percent drop in performance observed from ablating OpenX training. The low-level spatial features represented in DinoV2 appear to aid generalization in only some cases.
+
+\subsection{Fine-Tuned vs. Frozen Vision Encoder Experiments}
+\label{sec:app:finetuned_vs_frozen_vision_encoder}
+
+As discussed in \cref{sec:train_details}, prior work on VLMs observed higher performance from freezing the vision encoder than fine-tuning its parameters \citep{karamcheti2024prismatic}. However, when training \name{}, we fine-tuned all 7B parameters in the model, including the SigLIP-DinoV2 vision backbone, as we discovered early on during development that fine-tuning the vision encoder led to higher-performing VLAs — a finding which held across various pretrained VLMs and model architectures. We discuss details of such findings below.
+
+\textbf{Experimental setup and tasks.} In this section, we report the performance of two VLA policies produced by fine-tuning two different pretrained models from the Prismatic VLMs \citep{karamcheti2024prismatic} repository on BridgeData V2. The two pretrained models are named \textbf{SigLIP ViT-SO 224px} and \textbf{LLaVa v1.5 7B (Reproduction)}; see \citet{karamcheti2024prismatic} for details on their architectures and training mixtures. We evaluate both policies on various Bridge tasks shown in \cref{app:tab:frozen_vision_encoder_results}. Note that the evaluation configurations here differ from previously discussed Bridge evaluations, so the results are not directly comparable to results in other similar experiments.
+
+\textbf{Results.} Results for the fine-tuned vs. frozen vision encoder experiments are shown in \cref{app:tab:frozen_vision_encoder_results}. We find that for both VLAs tested, fine-tuning the vision encoder leads to significantly higher success rates across various tasks. Qualitatively, in some cases, deploying the frozen vision encoder policies leads to unstable robot behaviors that are clearly suboptimal. Consequently, we decided early on during development to not conduct further experimentation with frozen vision encoders.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Fine-tuned vs. frozen vision encoder experiment results.} We evaluate the performance of fine-tuning (``Fine-Tuned'') vs. freezing the vision encoder (``Frozen Vision'') in two VLA policies built on top of two different pretrained VLMs from the Prismatic VLMs \citep{karamcheti2024prismatic} repository. BridgeData V2 WidowX tasks shown here are performed in the same sink environment used for other Bridge experiments in this work (however, the initial environment configurations here differ, as these evaluations were conducted at an earlier stage in the project). We find that fine-tuning the vision encoder is crucial to obtain good policy performance. Certain frozen vision encoder evaluations were discontinued due to very poor (near-zero) performance and unstable robot behaviors. Among the evaluations where both frozen vision and fine-tuned approaches are tested, fine-tuning the vision encoder leads to 80.0\% average success versus 46.7\% average success from leaving it frozen.}
+\label{app:tab:frozen_vision_encoder_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{ll|cc|cc}
+\toprule
+&& \multicolumn{2}{c|}{SigLIP ViT-SO 224px} & \multicolumn{2}{c}{LLaVa v1.5 7B (Reproduction)} \\
+\cline{3-4} \cline{5-6}
+Task & \# Trials & \makecell{Frozen Vision\\\# Successes} & \makecell{Fine-Tuned\\\# Successes} & \makecell{Frozen Vision\\\# Successes} & \makecell{Fine-Tuned\\\# Successes} \\
+\midrule
+Put Eggplant into Pot & 10 & 7 & 10 & 5 & 9 \\
+Put Corn on Plate & 10 & 10 & 9 & 0 & 9 \\
+\midrule
+& Mean Success Rate & \cellcolor{lightlightgray}85 & \cellcolor{lightlightgray}\textbf{95} & \cellcolor{lightlightgray}25 & \cellcolor{lightlightgray}\textbf{90} \\
+\midrule
+Put \{ Eggplant, Red Bottle \} into Pot & 4 & 2 & 4 & -- & 3 \\
+Put \{ Blue Cup, Pink Cup \} on Plate & 4 & 0 & 0 & -- & 0 \\
+Lift \{ Cheese, Red Chili Pepper \} & 4 & 0 & 3 & -- & 2 \\
+Put \{ Strawberry, Lime \} into Pot & 4 & 1 & 0 & -- & 3 \\
+Move \{ Sushi, Grapes \} & 4 & 3 & 4 & -- & 3 \\
+\midrule
+& Mean Success Rate & \cellcolor{lightlightgray}30 & \cellcolor{lightlightgray}\textbf{55} & \cellcolor{lightlightgray}-- & \cellcolor{lightlightgray}55 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+\subsection{Additional Quantized Inference Experiments: Disentangling Policy Performance and Model Inference Speed}
+\label{sec:app:additional_quantized_inference_experiments}
+
+In \cref{sec:param_efficient_finetuning}, we evaluated \name{} with different levels of precision at inference time: half precision (bfloat16), 8-bit quantization, and 4-bit quantization. 8-bit quantization led to lower BridgeData V2 performance relative to the other two approaches, and we hypothesized that the reduction in performance was caused by lower model inference speed from the operations used in 8-bit quantization. In this section, we conduct experiments to assess the veracity of this claim.
+
+Specifically, we evaluate \name{} again with the three different levels of precision listed above, but now with \emph{blocking control}. In other words, each action is fully executed on the robot before the next one is predicted by the policy and executed by the controller. This scheme controls system dynamics across methods with varying amounts of latency and thus allows us to test the quality of a policy’s action predictions, independent of its prediction speed. Effectively, the precision levels that have higher throughput – bfloat16 and 4-bit quantization – are forced to run slower to match the dynamics observed when deploying \name{} with 8-bit precision. Therefore, we expect \name{}'s performance with 8-bit precision to match the performance of bfloat16 and 4-bit precision under blocking control.
+
+\textbf{Experimental setup and tasks.} We report the performance of \name{} with blocking control and quantized inference on the same subset of 8 BridgeData V2 tasks used in \cref{sec:app:openx_pretraining_ablation} and \cref{sec:app:dual_vs_single_vision_encoder}.
+
+\textbf{Results.} Quantized inference experiment results with blocking control are shown in \cref{app:tab:blocking_control_results}. Unlike in \cref{tab:quantized_results}, where 8-bit quantization led to the worst rollout performance due to low inference speed, here we observe that 8-bit quantization performs comparably to bfloat16 precision and 4-bit quantization given that we evaluate with blocking control to remove the influence of varying inference speeds on task performance. This confirms our hypothesis about the effect of inference speed on 8-bit quantization performance in previous experiments (when using non-blocking control). We also see no substantial performance degradation when using the lowest precision, 4-bit, as also observed in \cref{sec:param_efficient_finetuning}.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Quantized inference experiment results with blocking control.} We report the success rate and standard error of \name{} on various BridgeData V2 WidowX tasks with bfloat16 precision (the default approach), 8-bit quantization (int8), and 4-bit quantization (int4) at inference time. All average success rates have overlapping error bars, which suggests that all methods perform comparably.}
+\label{app:tab:blocking_control_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+Category & Task & \# Trials & \makecell{bfloat16\\\# Successes} & \makecell{int8\\\# Successes} & \makecell{int4\\\# Successes} \\
+\midrule
+Visual gen & Put Eggplant into Pot (Easy Version) & 10 & 10 & 10 & 10 \\
+Visual gen & Put Eggplant into Pot & 10 & 9 & 10 & 10 \\
+Visual gen & Put Cup from Counter into Sink & 10 & 5 & 5 & 3 \\
+Motion gen & Lift Eggplant & 10 & 8 & 7 & 7.5 \\
+Physical gen & Put Carrot on Plate & 10 & 10 & 10 & 10 \\
+Physical gen & Lift AAA Battery & 10 & 3 & 6 & 4 \\
+Semantic gen & Take Purple Grapes out of Pot & 10 & 2 & 2 & 2 \\
+Language grounding & Put \{Eggplant, Red Bottle\} into Pot & 10 & 9 & 9.5 & 8.5 \\
+\midrule
+&& Mean Success Rate & \cellcolor{lightlightgray}70.0 $\pm$ 5.1\% & \cellcolor{lightlightgray}74.4 $\pm$ 4.9\% & \cellcolor{lightlightgray}68.8 $\pm$ 5.2\% \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+\section{LIBERO Simulation Experiments}
+\label{sec:app:libero_sim_experiments}
+
+Our previous discussions in \cref{sec:finetuning_exp} and \cref{sec:param_efficient_finetuning} focused on adapting \name{} to novel \emph{real-world} robot setups and tasks. This section explores adapting \name{} to \emph{simulated} robot setups and tasks, specifically utilizing the \textbf{LIBERO} benchmark \citep{liu2024libero}. Our experimentation in simulation offers two key advantages:
+\begin{enumerate}
+    \item Demonstration of versatility: We show that \name{}, despite having been pretrained exclusively on real-world robot data, can effectively adapt to simulated domains, overcoming potential disparities between real-world and simulated environments and dynamics.
+    \item Enhanced accessibility and reproducibility: Integration of \name{} into a publicly available simulation platform makes our model more accessible to other researchers, especially those who may not have access to robotic hardware. Additionally, simulated experiments are more easily reproduced than their real-world counterparts.
+\end{enumerate}
+
+We discuss the experimental setup in \cref{sec:app:libero_sim_setup} and the results in \cref{sec:app:libero_sim_results}. We release the materials required to reproduce the experiments along with the \name{} codebase.
+
+\subsection{LIBERO Simulation Experimental Setup}
+\label{sec:app:libero_sim_setup}
+
+\textbf{Simulation setup and tasks.} The LIBERO benchmark \citep{liu2024libero} consists of four task suites designed for studying lifelong learning in robotic manipulation, and the original paper therefore investigates both forward and backward transfer to a variety of tasks. In our experiments, we focus solely on supervised fine-tuning on the target task suite, measuring the performance of various policies trained via behavioral cloning on successful demonstrations of the tasks.
+
+We perform experiments with the following four task suites, which each contain 10 tasks with 50 human-teleoperated demonstrations each:
+
+\begin{itemize}
+    \item \textbf{LIBERO-Spatial} consists of the same set of objects but different layouts, and tests the model's understanding of spatial relationships.
+    \item \textbf{LIBERO-Object} consists of the same scene layouts but different objects, and tests the model's understanding of object types.
+    \item \textbf{LIBERO-Goal} consists of the same objects and layouts but different task goals, and tests the model's knowledge of different task-oriented behaviors.
+    \item \textbf{LIBERO-Long} (also called \textbf{LIBERO-10}) consists of \emph{long-horizon} tasks with diverse objects, layouts, and tasks.
+\end{itemize}
+
+We make the following modifications to each of the training datasets above:
+\begin{enumerate}
+    \item To accommodate methods requiring higher-resolution images (such as $256 \times 256$px or $224 \times 224$px), we regenerate all demonstrations at an increased resolution of $256 \times 256$px. Originally, the dataset provided by the benchmark consists of $128 \times 128$px images. We find that simply upscaling these images to $256 \times 256$px results in poor image quality. Therefore, we choose to begin with higher-resolution images, which can be downscaled as necessary, ensuring higher image quality across various resolution requirements. These higher-resolution images were obtained by stepping through the simulation environments with the actions stored in the provided human-collected demonstrations and saving the images rendered by the simulator.
+    \item We filter out all ``no-op'' actions from the dataset, i.e., actions that have near-zero magnitude in the translation and rotation components and do not change the state of the robot's gripper. We find that this simple data cleaning step is crucial for highly expressive single-step policies such as \name{}, which otherwise learn to imitate these no-op actions and consequently freeze indefinitely at certain states during evaluation.
+    \item We rotate all third-person images at both train and test time by 180 degrees because we observe that the LIBERO environments return images that are upside down on our hardware.
+    \item Since we train policies via imitation learning, which expects demonstrations to be successful, we replay all demonstrations in the corresponding simulation environments and filter out the demonstrations that fail to complete the task (as determined by the environments' success criteria). As a result, we remove 68 of 500 LIBERO-Spatial demonstrations, 46 of 500 LIBERO-Object demonstrations, 72 of 500 LIBERO-Goal demonstrations, and 121 of 500 LIBERO-Long demonstratinos.
+    \item For all methods in our comparisons, we only utilize the static third-person camera images; we do not use the wrist camera images that are additionally provided in the original datasets. This is for sake of having fair comparisons, as OpenVLA's visual inputs only consist of third-person camera images.
+\end{enumerate}
+
+\textbf{Comparisons.} The methods that we compare include \textbf{Diffusion Policy\footnote{We use the implementation of Diffusion Policy that is described in the DROID dataset paper~\citep{khazatsky2024droid}, which conditions action generation on DistilBERT~\citep{sanh2019distilbert} language embeddings of the task label.}}~\citep{chi2023diffusionpolicy} trained from scratch, \textbf{Octo}~\citep{octo_2023} fine-tuned on the target dataset, and \textbf{\name{}} fine-tuned on the target dataset via LoRA ($r=32$) as described in \cref{sec:param_efficient_finetuning}. Each policy is trained independently on each of the task suites above (rather than training a single policy on all four suites combined). All policies are trained with the same set of demonstrations, so all methods benefit from the data cleaning steps described above.
+
+\textbf{Evaluation details.} To ensure lower variance in the experimental results, all methods are evaluated across 500 trials for each task suite, and the reported performance is the average success rate over three random seeds (resulting in 1500 total trials per statistic). Although we modify the training datasets, as described earlier, we do not change the test environments but rather use the same initial environment configurations provided by the original LIBERO benchmark.
+
+\subsection{LIBERO Simulation Experimental Results}
+\label{sec:app:libero_sim_results}
+
+We present the LIBERO experimental results in \cref{app:tab:libero_sim_results_table}. Importantly, we observe that \name{} can be effectively adapted to tasks in the LIBERO simulation environments, as it obtains highest average success rate and rank among the tested methods. However, we find that the overall margin between \name{} and the other methods are tighter here than in the real-world fine-tuning experiments discussed in \cref{sec:finetuning_exp}. We attribute this to the fact that \name{} was pretrained with purely real-world robot data and no simulation data, which suggests that fine-tuning the model on simulated robot tasks may not be as effective as fine-tuning it on real-world tasks due to the domain gap between simulated and real-world environments and dynamics. We see evidence for this notion in the results obtained by Octo – another policy pretrained on large amounts of real-world robot data – which also only achieves a small boost in overall performance relative to a simple, strong baseline such as Diffusion Policy trained from scratch. We expect increased gains in performance for the pretrained and fine-tuned methods if simulation data is added to the pretraining data mixture.
+
+\begin{table}[h]
+\centering
+\caption{\textbf{LIBERO simulation benchmark results.} We report the success rate (SR) and standard error of each method for the four task suites in the LIBERO benchmark, averaged over three random seeds with 500 trials each. In addition, we show the ranking of each method within each task suite, where a rank of 1 indicates the strongest method in the suite and a rank of 3 indicates the weakest method. (The average ranking is important to note since it informs which method may be most suitable to use as a default for a variety of tasks; it is more informative than the average success rate, which is not normalized by individual task suite difficulty.) Overall, we find that fine-tuned \name{} achieves highest average success rate and rank, followed by fine-tuned Octo and then Diffusion Policy trained from scratch.}
+\label{app:tab:libero_sim_results_table}
+\resizebox{\textwidth}{!}{\begin{tabular}{l|cc|cc|cc|cc|cc}
+\toprule
+& \multicolumn{2}{c|}{LIBERO-Spatial} & \multicolumn{2}{c|}{LIBERO-Object} & \multicolumn{2}{c|}{LIBERO-Goal} & \multicolumn{2}{c|}{LIBERO-Long} & \multicolumn{2}{c}{Average} \\
+\cline{2-3} \cline{4-5} \cline{6-7} \cline{8-9} \cline{10-11}
+& SR ($\uparrow$) & Rank ($\downarrow$)& SR ($\uparrow$) & Rank ($\downarrow$)& SR ($\uparrow$) & Rank ($\downarrow$)& SR ($\uparrow$) & Rank ($\downarrow$)& SR ($\uparrow$) & Rank ($\downarrow$)\\
+\midrule
+Diffusion Policy from scratch & 78.3 $\pm$ 1.1\% & 3 & \textbf{92.5 $\pm$ 0.7\%} & 1 & 68.3 $\pm$ 1.2\% & 3 & 50.5 $\pm$ 1.3\% & 3 & 72.4 $\pm$ 0.7\% & 2.5 \\
+Octo fine-tuned & 78.9 $\pm$ 1.0\% & 2 & 85.7 $\pm$ 0.9\% & 3 & \textbf{84.6 $\pm$ 0.9\%} & 1 & 51.1 $\pm$ 1.3\% & 2 & 75.1 $\pm$ 0.6\% & 2 \\
+OpenVLA fine-tuned (ours) & \textbf{84.7 $\pm$ 0.9\%} & 1 & 88.4 $\pm$ 0.8\% & 2 & 79.2 $\pm$ 1.0\% & 2 & \textbf{53.7 $\pm$ 1.3\%} & 1 & \textbf{76.5 $\pm$ 0.6\%} & \textbf{1.5} \\
+\bottomrule
+\end{tabular}}
+\end{table}

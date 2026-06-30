@@ -1,0 +1,133 @@
+
+\section{\includegraphics[scale=0.01]{figs/mcu_logo.png} MCU Benchmark}
+
+In this section, we first provide an overview of Minecraft and its game simulator, followed by a detailed outline of the construction process for the MCU benchmarking pipeline.
+
+\subsection{Minecraft Environment}
+\label{sec:minecraft_intro}
+
+% \haowei{TODO: rewrite this subsection to introduce how to interact with MC. e.g., We use the unmodified Minecraft 1.16.5 as our testing environment, which accepts mouse and keyboard inputs as the action space and outputs a 640 × 360 RGB image as the observation. Then talk about the merit of MC as a agent development platform (e.g., vast state space, allows for complex, diverse, open-ended tasks).}
+
+Minecraft is a voxel-based 3D video game that, due to its popularity and wide variety of mechanics, has become a prominent domain for RL research~\citep{rl-control,rl-deep}. Much of the prior work focuses on small, custom-built Minecraft environments with tasks such as navigation~\citep{navigation1,navigation2}, block placement~\citep{block1,block2}, combat~\citep{combat}, and other similar activities~\citep{activities}. More recent efforts have shifted towards studying the full, unmodified human action space, which encompasses tasks like drag-and-drop inventory management and item crafting. In this work, we employ unmodified Minecraft version 1.16.5 as our testing environment~\citep{minerl}, utilizing mouse and keyboard inputs as the action space and a 640 × 360 RGB image as the observation. The specifics of the action space will be detailed in~\cref{tab:actionspace}.
+
+% remember to cite in Minecraft sec
+% To address this issue, procedural generation techniques~\citep{procegen} were introduced, greatly expanding the state space of game environments and enabling more robust evaluation of generalization capabilities. Among these environments, Minecraft has emerged as a leading platform~\citep{vpt, minedojo, crafter, groot}. This popularity stems from two key factors: (1) \textbf{Minecraft provides a procedurally generated open-ended environment}, with $2^{64}$ possible initial maps and infinite open-ended tasks~\citep{open-end, open-world}, making it an ideal platform for studying generalization; (2) Unlike previous benchmarks that isolate tasks within separate state spaces, which may simplify the learning process, \textbf{Minecraft integrates all tasks into a shared observation space}, requiring agents to generalize without relying on memorized trajectories specific to particular environments. However, defining appropriate benchmarking methods for evaluating agents in such complex and open-ended settings remains an unresolved challenge — a limitation less pronounced in earlier benchmarks.
+
+As mentioned in~\cref{sec:intro}, Minecraft serves as a powerful experimental environment due to its unparalleled diversity, complexity, and open-ended nature, which enable creative gameplay and countless possibilities. Below, we outline the key features that make Minecraft particularly suitable for open-ended game agent development: 
+
+\begin{enumerate}
+    \item \textbf{Vast State Space.} Minecraft provides an extraordinarily large state space, as illustrated in Table~\ref{tab:state_space_comparison} with an intuitive comparison. Its expansive maps, functional blocks, and diverse mobs result in an immense number of possible configurations. This makes Minecraft an ideal platform for studying the generalizability of agents. Additionally, we present illustrative experiments in Appendix~\ref{state_space} to demonstrate the importance of vast state spaces for agent generalization.
+
+    \item \textbf{High Complexity Support.} Minecraft supports tasks requiring advanced problem-solving skills. For instance, \emph{obtain diamond} task~\citep{guss2019neurips} involves over 20 sub-goals, often takes hours to complete, and demands the ability to remember terrain and resource locations—showcasing the game's capability to facilitate complex task development and execution.
+
+    \item \textbf{Open-Endedness.} Minecraft encourages unrestricted exploration, allowing players to engage in a wide spectrum of challenges. These range from defeating the ender dragon, which requires long-horizon decision-making~\citep{jin2023mini}, to building a house with precise control and creativity~\citep{zhang2020high}. This open-ended nature fosters the development of agents capable of handling diverse and dynamic objectives.
+\end{enumerate}
+
+% To make MCU a convenient and generalizable benchmark, we build our simulator that obey the following rules: 1) MCU simulator adopts raw keyboard and mouse as inputs consistent with human-playing settings, and provides shared observation and action space for all tasks, ensuring generalization and continuous learning in Minecraft. 2) It provides convenient APIs to customize Minecraft environment such as \emph{spawn biome, summon mobs,} and \emph{initial inventory.} For tasks have ground-truth success, success status is provided for evaluation and RL training. 3) We incooperate model sets with text-conditioned, vision-conditioned and un-conditioned models, and support parallel inference for easy evaluation. 
+
+
+\subsection{Integration with MineStudio}
+\label{sec:minestudio}
+To create a robust and user-friendly benchmark, we develop MCU based on MineStudio~\citep{minestudio}, an open-source software package designed specifically to facilitate agent development in Minecraft. MineStudio provides intuitive APIs, extensive documentation and tutorials, making it an ideal foundation for our benchmarking framework.
+
+MineStudio offers users extensive customization options by allowing them to inherit from the \texttt{MinecraftCallback} class. This facilitates functionalities such as issuing cheat commands, logging episodes, and overriding observations. Leveraging this flexibility, our task configuration pipeline generates the necessary data for class \texttt{CommandsCallback}, \texttt{SummonMobsCallback} and \texttt{FastResetCallback} to initialize the environment. To ensure generality, MineStudio unifies the agent inference pipeline. Consequently, our evaluation pipeline observes only the generated trajectories, which are consistently formatted by \texttt{RecordCallback} for compatibility across diverse agents. Additionally, we employ \texttt{RewardsCallback} to support user-defined metrics, such as task success rates and our \emph{AutoEval} metrics, and to enable RL training with MCU evaluation results.
+
+% \paragraph{Human-consistent Interface.} We adopt raw keyboard and mouse inputs, consistent with human gameplay, and provide a shared observation and action space for all tasks. This ensures generalization and supports continuous learning across the Minecraft environment.
+
+% \paragraph{Customizable Environment.} We offer convenient APIs for customizing the Minecraft environment. Users can modify settings such as \emph{spawn biomes, summoned mobs,} and \emph{initial inventories}. For tasks that have ground-truth success criteria, MCU provides built-in success signals to facilitate evaluation and reinforcement learning (RL) training.
+
+% \paragraph{Flexible Agent Inference.} The simulator supports various agents, including text-conditioned, vision-conditioned, and unconditional agents. It also enables parallel inference, facilitating efficient evaluation of multiple tasks. 
+
+% We will introduce task distribution in subsection~\ref{sec:task_suite}.
+
+
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.99\linewidth]{figs/pipeline_1.pdf}
+    \caption{Automatic task generation and evaluation pipeline. \textbf{Top: Task Generation.} GPT-4o generates and verifies the environment initialization configuration for each atomic task, producing executable instructions compatible with Minestudio APIs. \textbf{Bottom: Automatic Evaluation.} A vision-language model (GPT-4o with vision) assesses task performance by analyzing sampled video frames against criteria generated by GPT-4o, providing detailed evidence and results. The GPT-4o used is \texttt{gpt-4o-2024-08-06}.}
+    \label{fig:pipeline}
+\end{figure*}
+
+%%%% 解释seed 和 final states
+
+
+\subsection{Atomic Tasks: Fundamental Testing Units in MCU}
+\label{sec:task_suite}
+We introduce the concept of \textit{atomic tasks} as the fundamental testing units in MCU. The inspiration for atomic tasks stems from unit testing in software development~\citep{unit_test}, where a system is decomposed into smaller, independently verifiable units. Similarly, atomic tasks are designed to isolate and evaluate specific agent capabilities. 
+
+An \textit{atomic task} $\mathcal{T}$ is defined solely by its goal $g$, independent of the methods, tools, or specific environmental conditions. During evaluation, an atomic task is instantiated, which induces a task-specific initial state distribution $\mathcal{P}(s_0|g)$ (see~\cref{sec:task_gen}). For example, the atomic task \texttt{mine stone} is purely goal-driven. Across different evaluation batches, it may manifest as \texttt{mine stone with a wooden pickaxe}, \texttt{mine stone during a rainy day}, or other variations. Regardless of these instances, the core goal remains consistent, ensuring a reliable test of whether the agent has genuinely acquired the underlying capability. This property makes atomic tasks an effective tool for evaluating an agent's ability to achieve goals under diverse and potentially unseen conditions.
+
+Atomic tasks can also be combined to form more complex tasks using logical operators such as ``and'' ($\bigwedge$) and ``or'' ($\bigvee$), or by introducing constraints such as ``when,'' ``where,'' and ``how.'' For instance, an agent could be tasked with \texttt{[mine oak log] or [mine grass] \{bare-handed\} and \{then\} [craft sticks]}, where \texttt{[]} denotes individual atomic tasks. This compositional approach enables the exploration of a vast task space by leveraging the combination of simple goals to create more challenging scenarios. We also incorporate this feature in MCU task generation pipeline as detailed in~\cref{app:compose_pipeline}
+
+To pursue task diversity, as outlined in~\cref{sec:intro}, we have collected \textit{3,452 atomic tasks}\footnote{The dataset is continuously expanding.}, each represented as a textual description. These tasks serve as the fundamental building blocks for task synthesis in MCU. They may be later composed (discussed in the previous paragraph) and instantiated using an LLM-based task configuration generator (see~\cref{sec:task_gen}). The atomic tasks are categorized into 11 major categories and 41 sub-categories, covering diverse challenges encountered in Minecraft. These tasks are sourced through the following pathways: (1) Distilling high-quality tasks from existing benchmarks, such as MineDojo~\citep{minedojo} and SkillForge~\citep{groot}. (2) Extracting tasks from the Minecraft Wiki\footnote{https://minecraft.wiki/}. (3) Synthesizing tasks using in-game data from the Minecraft simulator (e.g., generating tasks like \texttt{craft item X} if item ``X'' is craftable). (4) Brainstorming innovative tasks with input from domain experts and LLMs. Further details on the collection process for atomic tasks are provided in~\cref{sec:task-acquisition}.
+
+
+
+\subsection{Task Configuration Generation}
+\label{sec:task_gen}
+
+To execute automatic or compositional tasks in the Minecraft environment, tasks must be \emph{configured} by specifying parameters such as spawn biomes, player states, inventories, and surrounding mobs. We formalize this configuration process as sampling an initial state $s_0$ from a task-specific distribution $\mathcal{P}(s_0 | \mathcal{T})$. To simulate realistic gameplay, evaluate agents effectively on a given task $\mathcal{T}$, and ensure intra-task diversity (\cref{sec:intro}), we propose a scalable task configuration pipeline powered by LLMs. This pipeline incorporates an automatic verification mechanism to ensure task validity based on two criteria: (1) the sampled initial state $s_0$ exhibits high diversity, and (2) the environment includes all elements necessary to complete the task (i.e., $s_0$ is compatible with $\mathcal{T}$). By leveraging the knowledge and creativity of LLMs, this approach generates diverse and scalable task scenarios, addressing the limitations of manually predefined configurations. The implementation details are as follows.
+
+
+\paragraph{Config Generator}
+As detailed in~\cref{sec:minestudio}, we utilize three callbacks from MineStudio to initialize the task environment. A powerful LLM GPT-4o~\citep{gpt4} is prompted with a task description and few-shot examples of the parameter format to populate these callbacks, generating executable configurations and detailed task descriptions for text-conditioned agents and evaluation in~\cref{sec:auto_eval}. For instance, the atomic task \texttt{mine diamonds} may include the description ``mine diamonds with an iron pickaxe", with the initial state $s_0$ providing necessary resources (e.g., diamond ores and an iron pickaxe) to eliminate preparatory subtasks. To enhance task diversity, random factors such as ore placement and item arrangements are introduced to prevent predictability. The prompt also includes soft constraints to address LLM limitations, such as numerical insensitivity or confusion with game-specific rules. For crafting tasks requiring precise materials (e.g., 3 wool blocks and 3 wooden planks), surplus resources are instructed to be generated to account for LLM inaccuracies. Soft constraints also ensure environmental integrity by avoiding the generation of inaccessible structures (e.g., via the \texttt{/fill} command). Complete prompt details are provided in Appendix~\ref{app:prompt_conf_gen}.
+% Essential elements like crafting tables and furnaces are consistently reminded to ensure usability.
+
+\paragraph{Verification}
+
+To ensure the quality of the generated task configurations, the config generator incorporates a self-verification mechanism. Initially, the generated configuration is re-validated by the LLM using the Reflxion technique~\citep{reflexion}. If any errors are detected—such as summoning cows only for the task \texttt{hunt sheep} (\cref{fig:pipeline})—the config generator is prompted to regenerate the configuration. The generated configuration is also validated using the MineStudio Simulator to ensure executability. Error logs from the simulator are also utilized to guide further regeneration of the configuration if necessary.
+
+% LLMs have been observed to be insensitive to numerical details and occasionally confused by game-specific rules. To address these issues, we establish soft constraints that guide the LLMs towards more accurate outputs. For instance, when tasked with crafting items in Minecraft, which requires a precise number of materials such as three wool blocks and three wooden planks, we instruct the LLMs to provide a surplus of these items to account for their numerical insensitivity. Furthermore, we focus on refining the LLMs' understanding of game mechanics by setting reminders and constraints that highlight the limitations of certain elements, such as the inability to summon certain elements in Minecraft. When utilizing commands such as the '/fill' function, we have implemented constraints to prevent the creation of structures in inaccessible locations, like high in the sky, thereby maintaining the integrity of the game environment. Additionally, we have ensured that essential game elements like crafting tables, furnaces, and enchanting tables are consistently provided within the generated content, enhancing the overall usability and authenticity of the output.
+
+
+% \paragraph{Verification}
+% To ensure the quality of generated task, Mineflayer~\citep{mineflayer} is employed as a super-agent to conduct task verification. We validate generated scenes by executing tasks $\mathcal{T}$ within an initial environment $s_0$ for a maximum duration $d = 60$ seconds. Let $\mathcal{V}(g, s_0, d)$ represent the task execution process. If the agent successfully completes the task within the time limit, the scene is validated. If $\mathcal{V}(g, s_0, d)$ results in failure (i.e., the task is not completed within $d$), an error signal $\epsilon$ is sent back to the LLM. This feedback, denoted as $\mathcal{F}(\epsilon)$, prompts the LLM to generate a revised scene $s'_0$. The process ensure that the generated scenes meet benchmark standards for accuracy and usability.
+
+
+
+
+% \begin{algorithm}[h]
+% \captionsetup{} 
+% 	\caption{Task-centric evaluation process in MCU}
+%     \textbf{Input}: agent $\mathcal A$, task $\mathcal T$, evaluation method $Eval(\cdot)$ \\
+%     \textbf{Return:} an evaluation metric $m$
+% 	\begin{algorithmic}[1]
+%         \State $s_0\sim \mathcal P(s_0|\mathcal T)$ \Comment{Environment initialization}
+%         \State $traj \leftarrow \mathcal A(s_0; g)$, \Comment{Agent policy rollout}
+%         \State $m\leftarrow Eval(traj; g)$\Comment{Evaluation metric computation}
+% 	\end{algorithmic} 
+%  \label{alg:evaluation}
+% \end{algorithm}
+
+% In the realm of open-world settings, the open-ended tasks poses a significant challenge for traditional benchmark evaluations, which often rely on human judgment. Given the inherently diverse and ill-defined nature of these tasks, the absence of clear completion signals necessitates a more scalable approach. To address this, we propose an automated evaluation methodology that alleviates the reliance on costly human assessment, thereby enabling comprehensive and extensive task evaluation. 
+
+
+
+
+\subsection{Automatic Evaluation (\emph{AutoEval})}
+\label{sec:auto_eval}
+
+Automatic evaluation is critical for machine learning benchmarks but challenging to design for AI agents. This problem is framed as defining a scoring function $f$ that maps a task description $\mathcal{T}$ and an agent’s trajectory $\textit{traj} = \{s_0, a_0, s_1, a_1, \ldots, s_T\}$ to a normalized score reflecting the trajectory's quality with respect to $\mathcal{T}$. In digital agent benchmarks, success rate based on annotated criteria is commonly used for tasks with clear, objective metrics (e.g., coding, OS operations). However, in open-ended games like Minecraft, defining a single programmatic metric is often infeasible. To address this, we propose a VLM-based multi-dimensional evaluation framework for MCU, comprising two components (\cref{fig:pipeline}): (1) criteria generation: creating clear, task-specific evaluation dimensions; and (2) scoring with criteria: leveraging predefined criteria to infer quality scores from agent performance videos using VLM.
+
+
+
+\paragraph{Criteria Generation}
+Preliminary experiments reveal that directly prompting GPT-4o (as a VLM) to score trajectories without task-specific criteria leads to suboptimal performance (\cref{tab:human_align_acc}). To address this, we introduce a criteria generation pipeline that provides detailed scoring instructions. Specifically, we define six key dimensions for evaluating agent performance in Minecraft. Prior to evaluation, GPT-4o is prompted to generate task-specific criteria for each dimension. The dimensions are as follows, with an example shown in~\cref{fig:pipeline} (bottom): (1) \textbf{Task Progress:} Assesses critical steps and factors required for task completion. (2) \textbf{Action Control:} Evaluates the avoidance of unrelated or unnecessary actions. (3) \textbf{Material Usage:} Measures the selection and application of materials. (4) \textbf{Task Efficiency:} Focuses on minimizing repetitions and optimizing strategies. (5) \textbf{Error Recognition:} Assesses the ability to identify and correct errors. (6) \textbf{Creative Attempts:} Recognizes innovative approaches in task execution. Please check~\cref{app:prompt_conf_gen} for the prompts of criteria generation.
+
+
+
+\paragraph{Scoring with Criteria}
+As described in~\cref{sec:minestudio}, the agent's rollout trajectories are recorded in video format. To balance resource efficiency and evaluative effectiveness under specific research conditions, we extract one frame every 30 frames from the video. During the evaluation phase, the sampled frames, along with task-specific criteria, are input into the VLM. The VLM assesses each dimension by identifying supporting evidence from the video, providing evidence and explanations, and subsequently assigning a score. For each criterion, we define five scoring intervals: \emph{very poor}, \emph{poor}, \emph{fair}, \emph{good}, and \emph{excellent}, corresponding to scores of 0, 0.25, 0.5, 0.75, and 1, respectively. Please check~\cref{app:prompt_single_rating} for the prompts of scoring.
+
+
+
+
+% Video Language Models (VLMs) are particularly well-suited due to their multimodal understanding capabilities. VLMs are designed to process both visual and textual information, enabling them to analyze complex video content in the context of predefined evaluation criteria. This allows VLMs to effectively interpret agent behaviors, recognize patterns, and correlate these actions with specific scoring metrics. Furthermore, VLMs are capable of extracting detailed, context-aware insights from videos, which are essential for assessing nuanced aspects of performance, such as creativity or error correction. This level of analysis surpasses traditional video processing techniques, which often rely on superficial metrics like task completion time or number of actions. By leveraging VLMs, we ensure a thorough and objective evaluation process that captures the qualitative dimensions of agent performance, making it a robust tool for benchmarking in open-world environments.
+
+
+% We have amassed a dataset comprising over 3000 tasks across 16 distinct categories, sourced from Minecraft-related websites such as Wikipedia and human brainstorming. This dataset encompasses both programmatic tasks, such as crafting, mining, engaging in combat, and trading, and creative tasks, including tool utilization, construction, setting traps, navigation, and red-stone circuitry, among others. These categories represent a comprehensive range of activities that players typically engage in within Minecraft.
+
+
+
+

@@ -1,0 +1,30 @@
+\section{Training Procedure}
+\label{section:training-procedure}
+
+% [Training data, data sampling, training schedule, optimiser. Hyperparameters such as sequence length, batch size. Size of each model.] \gianluca{remove?}
+    
+In this section, we describe how the three trainable components of GAIA-1 were optimized. We provide details of hyperparameter configurations, hardware used and training times.
+
+\subsection{Image Tokenizer} 
+The image tokenizer (0.3B parameters) was trained on images of resolution $H\times W = 288 \times 512$ ($9/16$ ratio). The spatial downsampling of the encoder is $D=16$, therefore each image is encoded as $n=18\times 32 = 576$ discrete tokens with a vocabulary size $K=8192$. The bit compression is $\frac{288\times512\times3\times8}{18\times32\times 13} \approx 470$. 
+
+The discrete autoencoder was optimised with AdamW \citep{loshchilov19} and a learning rate of $1\times 10^{-4}$, weight decay $0.01$, beta coefficients $(0.5, 0.9)$. The loss weights are $\lambda_{L_1}=0.2$, $\lambda_{L_2}=2.0$, $\lambda_{L_{\text{perceptual}}}=0.1$, $\lambda_{L_{\text{GAN}}}=1.0$, $\lambda_{L_{\text{codebook}}}=1.0$, $\lambda_{L_{\text{DINO}}}=0.1$.
+
+The model was trained for 200k steps in 4 days with a batch size equal to 160, split across 32 A100 80GB GPUs. We used 5k of linear warm-up and 10k of cosine decay to a final learning rate of $1\times 10^{-5}$.
+
+\subsection{World Model}
+The world model (6.5B parameters) was trained on video sequences of size $T = 26$ at \SI{6.25}{\hertz}, which correspond to 4s-long videos. The text was encoded as $m=32$ text tokens per time step, and the action as $l=2$ tokens. The total sequence length of the world model is therefore $T \times (m + n + l) = 15860$. 
+
+The world model was optimized with AdamW and a learning rate of $1\times 10^{-4}$, weight decay $0.1$, beta coefficients $(0.9, 0.95)$, norm gradient clipping $1.0$. Training examples were either unconditioned, action-conditioned, or text conditioned. The ratios of these respective conditioning modes were 20\%/40\%/40\%.
+
+The model was trained for 100k steps in 15 days, with 2.5k of linear warm-up and 97.5k of cosine decay reducing the learning rate by a factor of 10 over the course of training. The batch size was 128 split across 64 A100 80GB GPUs. We used the FlashAttention v2 implementation~\citep{dao2022flashattention} in the transformer module, as it offered significant advantages in terms of both memory utilization and inference speed. To optimize distributed training, we used the Deepspeed ZeRO-2 training strategy \citep{rasley20} with activation checkpointing.
+
+
+
+\subsection{Video Decoder}
+
+The video decoder (2.6B) was trained on sequences of $T'=7$ images of resolution $H\times W = 288 \times 512$ sampled from the dataset at either \SI{6.25}{\hertz}, \SI{12.5}{\hertz} or \SI{25}{\hertz}. The training tasks (\Cref{fig:decoder-tasks}) were sampled with equal probability. We used a cosine $\beta$-noise schedule \citep{hoogeboom2023simple}.
+
+The video decoder was optimized with AdamW and a learning rate of $5\times 10^{-5}$, weight decay $0.01$, beta coefficients $(0.9, 0.99)$, norm gradient clipping $1.0$. The model was trained for 300k steps in 15 days, with 2.5k of linear warm-up and 5k of cosine decay to a final learning rate of $1\times 10^{-6}$. We used a weighted average of $L_1$ and $L_2$ losses with weights $\lambda_{L_1}=0.1$ and $\lambda_{L_2}=1.0$. The batch size was 64 split across 32 A100 80GB GPUs. We used an exponential moving average for the parameters with a decay of $0.999$. The training strategy was also Deepspeed ZeRO-2 with activation checkpointing.
+
+

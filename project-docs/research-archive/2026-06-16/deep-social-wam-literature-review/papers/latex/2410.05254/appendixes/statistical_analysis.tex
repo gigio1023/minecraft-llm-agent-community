@@ -1,0 +1,107 @@
+\subsection{Input of Linear Regression}
+\label{app:stat_analisys:lr_input}
+To support the statistical analysis presented in \S\ref{par:statistical_analysis}, we employed linear regression models. Each model was trained to predict a single outcome metric (fairness, efficiency, Alice's self-gain, or Bob's self-gain) within a specific family.
+The input features included all game-defining parameters (as listed in Table \ref{tab:configurations}), along with identifiers for the two players involved in the game.
+
+To represent player identity, we introduced two additional features, each indicating one of the players.\footnote{When analyzing model interactions (e.g., in Tables \ref{table:models_bargaining}, \ref{table:models_negotiation}, \ref{table:models_persuasion}), we replaced these two features with a single feature representing the pairwise identity of the two LLMs.}
+Within each game family, we combined the parameters defining the market (T, CI and MA/MT - see Table \ref{tab:configurations}) into a single parameter named \textit{market}, representing the interaction between the three original parameters. We do so because their interaction defines the structure of the market itself, and the total number of combinations was small enough to allow reliable modeling. Thus, for example, in bargaining games, the \textit{market} parameter became a vector with eight entries, corresponding to each possible combination arising from the Cartesian product of these three market-defining parameters.
+
+Each parameter was represented using a one-hot encoding vector, where each possible value of the parameter was assigned a distinct entry. The entry corresponding to the actual value of the parameter was set to 1, while all other entries were set to 0. For instance, the parameter $M$ was split into three distinct parameters: $M=10^2$, $M=10^4$ and $M=10^6$, each taking the value of 1 if the respective condition held and 0 otherwise. Figure~\ref{fig:lr_input} illustrates this feature representation.
+
+\begin{figure}[h]
+    \includegraphics[width=\textwidth]{figures/LR_input.pdf}
+\caption{Illustration of feature encoding for linear regression in a bargaining game.
+    Each row corresponds to a single bargaining game instance, encoded as a binary feature vector.
+    The input includes game-defining parameters ($\delta_A$, $\delta_B$, $M$), alongside a composite \textit{market} feature derived from the interaction of three specific parameters: $T$, $CI$, and $MA$.
+    This \textit{market} feature is one-hot encoded with eight possible values, representing all combinations of the three.
+    Player identities (Alice and Bob) are encoded using separate one-hot vectors with 13 possible values each.
+    The binary vectors at the bottom of the figure illustrate how all components are concatenated into a single input row, where each 1 indicates the active value of a categorical parameter for this particular bargaining game instance.}
+\label{fig:lr_input}
+\end{figure}
+
+\subsection{Baseline Models}
+\label{app:stat_analisys:baseline_models}
+Table~\ref{tab:default_params} presents the default parameter values used in our statistical analysis (see \S\ref{par:statistical_analysis}). These values serve as the reference points for estimating the impact of each parameter value on the target metrics. The selection of default values is based on the simplest model in game theory.
+
+\begin{table}[t]
+\centering
+\caption{Default parameter values used in the statistical analysis. 
+$T=\infty$ means a very large value of $T$, unknown to the players.
+CI = Complete Information.
+MA = Textual messages allowed.
+}
+
+% \begin{tabular}{ll|ll|ll}
+% \toprule
+% \multicolumn{2}{c|}{\textbf{Bargaining}} & \multicolumn{2}{c|}{\textbf{Negotiation}} & \multicolumn{2}{c}{\textbf{Persuasion}} \\
+% \midrule
+% $\delta_A$       & 0.8, \underline{0.9}, 0.95, 1           & $F_A$          & 0.8, \underline{1}, 1.2, 1.5               & p                   & $\frac{1}{3}$, \underline{0.5}, 0.8 \\
+% $\delta_B$       & 0.8, \underline{0.9}, 0.95, 1           & $F_B$          & 0.8, \underline{1}, 1.2, 1.5               & v                   & 1.2, \underline{1.25}, 2, 3, 4      \\
+% $M$              & $10^2$, \underline{$10^4$}, $10^6$      & $M$            & $10^2$, \underline{$10^4$}, $10^6$         & M       & $10^2$, \underline{$10^4$}, $10^6$  \\
+% $T$              & 12, \underline{$\infty$}                & $T$            & \underline{1}, 10, $\infty$                & $T$    & \underline{20}  \\
+% CI               & \underline{True}, False                 & CI             & \underline{True}, False                    & CI & \underline{True}, False             \\
+% MA               & True, \underline{False}                 & MA             & True, \underline{False}                    &      Messages type & \underline{Binary}, Textual   \\
+%                  &                             &                &                                &            Buyer type     & \underline{Long-living}, Myopic \\
+% \bottomrule
+% \end{tabular}
+% \label{tab:default_params}
+% \end{table}
+
+\begin{tabular}{ll|ll|ll}
+\toprule
+\multicolumn{2}{c|}{\textbf{Bargaining}} & \multicolumn{2}{c|}{\textbf{Negotiation}} & \multicolumn{2}{c}{\textbf{Persuasion}} \\
+\midrule
+$\delta_A$       & 0.9           & $F_A$          & 1               & p                   & 0.5 \\
+$\delta_B$       & 0.9           & $F_B$          & 1               & v                   & 1.25 \\
+$M$              & $10^4$        & $M$            & $10^4$          & M                   & $10^4$ \\
+$T$              & $\infty$      & $T$            & 1               & $T$                 & 20 \\
+CI               & True          & CI             & True            & CI                  & True \\
+MA               & False         & MA             & False           & Messages type       & Binary \\
+                 &               &                &                 & Buyer type           & Long-living \\
+\bottomrule
+\end{tabular}
+\label{tab:default_params}
+\end{table}
+
+
+
+\subsection{Predictive Validity of Linear Regression}
+\label{app:stat_analisys:validity}
+Section \ref{sec:EDA} describes the method used for our analyses, based on beta coefficient interpretation in linear regression. In this appendix, we demonstrate that linear regression achieves strong predictive performance compared to state-of-the-art (SOTA) models on tabular regression tasks.
+
+For each of the three game families (bargaining, negotiation, persuasion) and each of the four evaluation metrics (Efficiency, Fairness, Alice’s self-gain, Bob’s self-gain), we trained XGBoost (\cite{chen2016xgboost}) and CatBoost (\cite{prokhorenkova2018catboost}) as SOTA baselines.
+
+The dataset was randomly split into 80\% training and 20\% testing. All models received the full feature set as input (see \S\ref{sec:EDA} for details) and were tasked with predicting the target metric.
+
+Table~\ref{tab:rmse_results} summarizes the results. We find that the linear model performs on par with, and occasionally outperforms, the more complex SOTA models, with only minor differences in RMSE. These findings suggest that the relationships between game parameters and outcomes are largely linear, and thus support the use of beta coefficients as a reliable and interpretable tool for analyzing how input features, such as game configurations and agent identities, influence performance metrics.
+
+\begin{table}[ht]
+\centering
+\caption{Root Mean Squared Error (RMSE) for each model across families and metrics. Values are reported as mean ± standard deviation over 100 random seeds.}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Family} & \textbf{Metric} & \textbf{Linear Regression} & \textbf{XGBoost} & \textbf{CatBoost} \\
+\midrule
+\multirow{4}{*}{\textbf{Bargaining}} 
+ & Alice Self Gain     & 0.134 ± 0.001 & 0.134 ± 0.001 & 0.134 ± 0.001 \\
+ & Bob Self Gain       & 0.129 ± 0.002 & 0.129 ± 0.002 & 0.129 ± 0.002 \\
+ & Efficiency          & 0.131 ± 0.002 & 0.131 ± 0.002 & 0.131 ± 0.002 \\
+ & Fairness            & 0.157 ± 0.003 & 0.156 ± 0.003 & 0.156 ± 0.003 \\
+\midrule
+\multirow{4}{*}{\textbf{Negotiation}} 
+ & Alice Self Gain     & 0.137 ± 0.014 & 0.137 ± 0.014 & 0.136 ± 0.014 \\
+ & Bob Self Gain       & 0.139 ± 0.013 & 0.138 ± 0.012 & 0.138 ± 0.012 \\
+ & Efficiency          & 0.333 ± 0.004 & 0.331 ± 0.004 & 0.331 ± 0.004 \\
+ & Fairness            & 0.090 ± 0.003 & 0.088 ± 0.003 & 0.088 ± 0.003 \\
+\midrule
+\multirow{4}{*}{\textbf{Persuasion}} 
+ & Alice Self Gain     & 0.356 ± 0.003 & 0.353 ± 0.003 & 0.352 ± 0.003 \\
+ & Bob Self Gain       & 0.834 ± 0.011 & 0.842 ± 0.011 & 0.840 ± 0.011 \\
+ & Efficiency          & 0.388 ± 0.004 & 0.380 ± 0.004 & 0.378 ± 0.004 \\
+ & Fairness            & 0.379 ± 0.004 & 0.372 ± 0.005 & 0.371 ± 0.004 \\
+\bottomrule
+\end{tabular}
+\label{tab:rmse_results}
+\end{table}
+
+

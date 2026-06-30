@@ -1,0 +1,57 @@
+\section{Experimental Setup}
+\label{sec:setting}
+In this section, we summarise the settings where we compare the learning behavior of NL and LOLA agents. The first setting (Sec.~\ref{subsec:iterated}) consists of two classic infinitely iterated games, the iterated prisoners dilemma (IPD), ~\cite{luce1957games} and iterated matching pennies (IMP)~\cite{lee1967application}. Each round in these two environments requires a single action from each agent. We can obtain the discounted future return of each player given both players' policies, which leads to exact policy updates for NL and LOLA agents. The second setting (Sec.~\ref{subsec:coin}), Coin Game, a more difficult two-player environment, where each round requires the agents to take a sequence of actions and exact discounted future reward can not be calculated. The policy of each player is parameterised with a deep recurrent neural network.
+
+In the policy gradient experiments with LOLA, we assume off-line learning, i.e., agents play many (batch-size) parallel episodes using their latest policies. Policies remain unchanged within each episode, with learning happening between episodes. One setting in which this kind of offline learning naturally arises is when policies are trained on real-world data. For example, in the case of autonomous cars, the data from a fleet of cars is used to periodically train and dispatch new policies. 
+
+\subsection{Iterated Games}
+\label{subsec:iterated}
+We first review the two iterated games, the IPD and IMP, and explain how we can model iterated games as a memory-$1$ two-agent MDP.
+
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{c|c|c}
+\hline
+ & C & D \\
+\hline
+C & (-1, -1) & (-3, 0) \\
+\hline
+D & (0, -3) & (-2, -2)  \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Payoff matrix of prisoners' dilemma.}
+\label{tab:payoff}
+\vspace{-3ex}
+\end{table}
+
+Table~\ref{tab:payoff} shows the per-step payoff matrix of the prisoners' dilemma. In a single-shot prisoners' dilemma, there is only one Nash equilibrium \cite{fudenberg1991game}, where both agents defect. In the infinitely iterated prisoners' dilemma, the folk theorem \citep{roger1991game} shows that there are infinitely many Nash equilibria. Two notable ones are the always defect strategy (DD), and tit-for-tat (TFT). In TFT each agent starts out with cooperation and then repeats the previous action of the opponent. The average returns per step in self-play are $-1$ and $-2$ for TFT and DD respectively. 
+
+Matching pennies \cite{gibbons1992game} is a zero-sum game, with per-step payouts shown in Table~\ref{tab:pennies-payoff}. This game only has a single mixed strategy Nash equilibrium which is both players playing $50\% / 50\%$ heads / tails.  
+
+\begin{table}[h!]
+\begin{center}
+\begin{tabular}{c|c|c}
+\hline
+ & Head & Tail \\
+\hline
+Head & (+1, -1) & (-1, +1) \\
+\hline
+Tail & (-1, +1) & (+1, -1)  \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Payoff matrix of matching pennies.}
+\label{tab:pennies-payoff}
+\vspace{-3ex}
+\end{table}
+
+Agents in both the IPD and IMP can condition their actions on past history. Agents in an iterated game are endowed with a memory of length $K$, i.e., the agents act based on the results of the last $K$ rounds. Press and Dyson \cite{press2012iterated} proved that agents with a good memory-$1$ strategy can effectively force the iterated game to be played as memory-$1$. Thus, we consider memory-$1$ iterated games. 
+
+We model the memory-$1$ IPD and IMP as a two-agent MRP, where the state at time $0$ is empty, denoted as $s_0$, and at time $t\geq1$ is the joint action from $t-1$:
+    $s_t= (u^1_{t-1}, u^2_{t-1}) \quad \text{for $t>1$}$.
+
+Each agent's policy is fully specified by $5$ probabilities. For agent $a$ in the case of the IPD, they are the probability of cooperation at game start $\pi^a(C|s_0)$, and the cooperation probabilities in the four memories: $\pi^a(C|CC)$, $\pi^a(C|CD)$, $\pi^a(C|DC)$, and $\pi^a(C|DD)$. By analytically solving the multi-agent MDP we can derive each agent's future discounted reward as an analytical function of the agents' policies  and calculate the exact policy update for both NL-Ex and LOLA-Ex agents.
+
+We also organise a round-robin tournament where we compare LOLA-Ex to a number of state-of-the-art multi-agent learning algorithms, both on the  and IMP. 
+

@@ -1,0 +1,46 @@
+\begin{figure}[t!]
+\begin{algorithm}[H]
+  \caption{\oursf}
+  \small
+  \SetAlgoLined
+  \DontPrintSemicolon
+  \KwIn{Denoise timesteps $\{t_1, \dots, t_T\}$, teacher context length $L_t$, student context length $L_s$}
+  \KwIn{AR diffusion model $G_\theta$ (returns KV embeddings via $G_\theta^\text{KV}$)}
+
+  Initialize model output $\mathbf{X}_0 \gets []$\;
+  \added{Initialize noisy inputs $\mathbf{X}_s \gets []$}\;
+  Initialize KV cache $\mathbf{KV} \gets []$\;
+  Sample $s \sim \text{Uniform}(1, 2, \dots, T)$\;
+  \For{$i \gets 1$ \KwTo $L_t$}{
+    Initialize $x^i_{t_T} \sim \mathcal{N}(0, I)$\;
+    \For{$j \gets T$ \KwTo $s$}{
+      \If{$j = s$}{
+        \added{$\mathbf{X}_s.\text{append}(x^i_{t_j})$}\;
+        Set $\hat{x}^i_0 \gets G_\theta(x^i_{t_j}; t_j, \mathbf{KV})$\;
+        $\mathbf{X}_0.\text{append}(\hat{x}^i_0)$\;
+        \removed{Cache $\mathbf{kv}^i \gets G_\theta^\text{KV}(\texttt{stop\_grad}(\hat{x}^i_0); 0, \mathbf{KV})$}\;
+        \added{Cache $\mathbf{kv}^i \gets G_\theta^\text{KV}(\hat{x}^i_0; 0, \mathbf{KV})$}\;
+        $\mathbf{KV}.\text{append}(\mathbf{kv}^i)$\;
+        \lIf{$|\mathbf{KV}| > L_s$}{$\mathbf{KV}.\text{pop}(0)$}
+      }
+      \Else{
+        \removed{Set $\hat{x}^i_0 \gets \texttt{stop\_grad}(G_\theta(x^i_{t_j}; t_j, \mathbf{KV}))$}\;
+        \added{Set $\hat{x}^i_0 \gets G_\theta(x^i_{t_j}; t_j, \mathbf{KV})$}\;
+        Sample $\epsilon \sim \mathcal{N}(0, I)$\;
+        Set $x^i_{t_{j-1}} \gets \texttt{euler\_step}(\hat{x}^i_0, \epsilon, t_{j-1})$\;
+      }
+    }
+  }
+  \added{$\mathbf{X}_s \gets \texttt{stop\_grad}(\mathbf{X}_s)$}\;
+  \added{$\mathbf{X}_0 \gets \texttt{stop\_grad}(\mathbf{X}_0)$}\;
+  \added{$M \gets \texttt{TeacherForcingMask}(L_s, L_t)$}\;
+  \added{$\mathbf{X}_{\text{in}} \gets [\mathbf{X}_0, \mathbf{X}_s]$}\;
+  \added{$\hat{\mathbf{X}}_0 \gets G_\theta(\mathbf{X}_{\text{in}}; [0, t_s], \text{mask}=M)$}\;
+  Update $\theta$ via distribution matching loss\;
+\label{alg:self_forcing_algorithms}
+\end{algorithm}
+\caption{Diff-style pseudocode comparing a single generator train step of naively applying sliding-window self forcing to our efficient implementation, \oursf. Green ``+" lines denote lines from our algorithm that have been added while red ``-" denote lines that have been removed. Please also see~\cref{subsec:teacher_forcing_mask} for mask pseudocode and~\cref{fig:self_forcing} for a visualization.}
+\end{figure}
+
+    
+    

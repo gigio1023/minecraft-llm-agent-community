@@ -1,0 +1,55 @@
+\section{Experiments}
+\label{section:experiments}
+
+Sample-efficient reinforcement learning is a growing field with multiple benchmarks in complex visual environments \citep{crafter, minerl}. In this work, we focus on the well established Atari 100k benchmark \citep{simple}. We present the benchmark and its baselines in Section \ref{section:benchmark_baselines}. We describe the evaluation protocol and discuss the results in Section \ref{section:results}. Qualitative examples of the world model's capabilities are given in Section \ref{section:analysis}.
+
+
+\subsection{Benchmark and Baselines}
+\label{section:benchmark_baselines}
+
+\input{figures/figure_rew_done}
+
+\input{table_1}
+
+Atari 100k consists of 26 Atari games \citep{ale} with various mechanics, evaluating a wide range of agent capabilities. In this benchmark, an agent is only allowed 100k actions in each environment. This constraint is roughly equivalent to 2 hours of human gameplay. By way of comparison, unconstrained Atari agents are usually trained for 50 million steps, a 500 fold increase in experience. 
+
+Multiple baselines were compared on the Atari 100k benchmark. SimPLe \citep{simple} trains a policy with PPO \citep{ppo} in a video generation model. CURL \citep{curl} develops off-policy agents from high-level image features obtained with contrastive learning. DrQ \citep{drq} augments input images and averages Q-value estimates over several transformations. SPR \citep{spr} enforces consistent representations of input images across augmented views and neighbouring time steps. The aforementioned baselines carry additional techniques to improve performance, such as prioritized experience replay \citep{per}, epsilon-greedy scheduling, or data augmentation.
+
+We make a distinction between methods with and without lookahead search. Indeed, algorithms relying on search at decision time \citep{alphago,alphazero,muzero} can vastly improve agent performance, but they come at a premium in computational resources and code complexity. MuZero \citep{muzero} and EfficientZero \citep{efficientzero} are the current standard for search-based methods in Atari 100k. MuZero leverages Monte Carlo Tree Search (MCTS) \citep{mcts_bandit, mcts_go} as a policy improvement operator, by unrolling multiple hypothetical trajectories in the latent space of a world model. EfficientZero improves upon MuZero by introducing a self-supervised consistency loss, predicting returns over short horizons in one shot, and correcting off-policy trajectories with its world model.
+
+\input{figures/figure_aggregates}
+\input{figures/figure_pp_and_poi}
+
+\subsection{Results}
+\label{section:results}
+
+
+The human normalized score is the established measure of performance in Atari 100k. It is defined as $\frac{score\_{agent} - score\_{random}}{score\_{human} - score\_{random}}$, where \textit{score\_random} comes from a random policy, and \textit{score\_human} is obtained from human players \citep{dueling_networks}. 
+
+Table \ref{tab:atari_results_full} displays returns across games and human-normalized aggregate metrics. For MuZero and EfficientZero, we report the averaged results published by \citet{efficientzero} (3 runs). We use results from the Atari 100k case study conducted by \citet{agarwal2021deep} for the other baselines (100 new runs for CURL, DrQ, SPR, and 5 existing runs for SimPLe). Finally, we evaluate \textsc{iris} by computing an average over 100 episodes collected at the end of training for each game (5 runs).
+
+
+\citet{agarwal2021deep} discuss the limitations of mean and median scores, and show that substantial discrepancies arise between standard point estimates and interval estimates in RL benchmarks. Following their recommendations, we summarize in Figure \ref{fig:aggregates} the human normalized scores with stratified bootstrap confidence intervals for mean, median, and interquartile mean (IQM). For finer comparisons, we also provide performance profiles and probabilities of improvement in Figure \ref{fig:pp_and_poi}.
+
+With the equivalent of only two hours of gameplay, \textsc{iris} achieves a superhuman mean score of 1.046 (+70\%), an IQM of 0.501 (+49\%), an optimality gap of 0.512 (+11\%), and outperforms human players on 10 out of 26 games (+67\%), where the relative improvements are computed with respect to SPR \citep{spr}. These results constitute a new state of the art for methods without lookahead search in the Atari 100k benchmark. We also note that \textsc{iris} outperforms MuZero, although the latter was not designed for the sample-efficient regime.   
+
+In addition, performance profiles (Figure \ref{fig:performance_profile}) reveal that \textsc{iris} is on par with the strongest baselines for its bottom 50\% of games, at which point it stochastically dominates \citep{agarwal2021deep, dror2019deep} the other methods. Similarly, the probability of improvement is greater than 0.5 for all baselines (Figure \ref{fig:probability_of_improvement}).   
+
+In terms of median score, \textsc{iris} overlaps with other methods (Figure \ref{fig:aggregates}). Interestingly, \citet{spr} note that the median is only influenced by a few decisive games, as evidenced by the width of the confidence intervals for median scores, even with 100 runs for DrQ, CURL and SPR. 
+
+We observe that \textsc{iris} is particularly strong in games that do not suffer from distributional shifts as the training progresses. Examples of such games include \textit{Pong}, \textit{Breakout}, and \textit{Boxing}. On the contrary, the agent struggles when a new level or game mechanic is unlocked through an unlikely event. This sheds light on a double exploration problem. \textsc{iris} has to first discover a new aspect of the game for its world model to internalize it. Only then may the policy rediscover and exploit it. Figure \ref{fig:frostbite_krull} details this phenomenon in \textit{Frostbite} and \textit{Krull}, two games with multiple levels. In summary, as long as transitions between levels do not depend on low-probability events, the double exploration problem does not hinder performance. 
+
+Another kind of games difficult to simulate are visually challenging environments where capturing small details is important. As discussed in Appendix \ref{appendix:ablation_tokens}, increasing the number of tokens to encode frames improves performance, albeit at the cost of increased computation.
+
+\subsection{World Model Analysis}
+\label{section:analysis}
+
+As \textsc{iris} learns behaviors entirely in its imagination, the quality of the world model is the cornerstone of our approach. For instance, it is key that the discrete autoencoder correctly reconstructs elements like a ball, a player, or an enemy. Similarly, the potential inability of the Transformer to capture important game mechanics, like reward attribution or episode termination, can severely hamper the agent's performance. Hence, no matter the amount of imagined trajectories, the agent will learn suboptimal policies if the world model is flawed.
+
+While Section \ref{section:results} provides a quantitative evaluation, we aim to complement the analysis with qualitative examples of the abilities of the world model. Figure \ref{fig:kungfu} shows the generation of many plausible futures in the face of uncertainty. Figure \ref{fig:pong} depicts pixel-perfect predictions in \textit{Pong}. Finally, we illustrate in Figure \ref{fig:breakout_gopher} predictions for rewards and episode terminations, which are crucial to the reinforcement learning objective.
+
+\input{figures/figure_frostbite_krull}
+
+
+
+

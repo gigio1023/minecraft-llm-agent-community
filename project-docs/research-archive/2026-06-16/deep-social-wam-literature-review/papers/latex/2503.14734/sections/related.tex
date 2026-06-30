@@ -1,0 +1,53 @@
+\section{Related Work}
+
+\textbf{Foundation Models in Robotics.} 
+Developing and using foundation models~\citep{bommasani2021opportunities} for robotics has been of great interest recently. 
+% non-VLA work that uses LLMs/VLMs 
+One common approach is to leverage existing pre-trained foundation models as high-level black-box reasoning modules in conjunction with low-level robot-specific policies~\citep{saycan-2022, innermono-2022, progprompt-2022, driess2023palm, code-as-policies-2022, text2motion-23, groundeddecoding-2024}. This approach allows the robot to plan sequences of low-level skills or motions using the pre-trained foundation model. However, it assumes the availability of these low-level policies and a sufficient interface to connect them to the black-box foundation models. 
+% one core limitation of this approach is a lack of end-to-end optimization for the downstream robotics task. 
+% VLA work
+An alternative approach is to finetune pre-trained foundation models on robotics data to build Vision-Language-Action (VLA) models~\citep{rt1-2022, rt22023arxiv, black2024pi_0, kim24openvla, zheng2025tracevla, wen2024tinyvla, cheang2024gr2vla, li2023vision, zhen20243dvla, huang2023embodied, ye2025latent, yang2025magma}. Instead of enforcing a rigid hierarchy between high-level VLM planning and low-level control, these VLA models allow for end-to-end optimization toward the downstream deployment tasks. We take a similar approach to train \modelname{} and use the Eagle-2 model~\citep{eagle2} as our base Vision Language Model (VLM). We fine-tune our VLM together with a flow-matching~\citep{flowmatching, liu2022flow, hu2024adaflow} action generation model with action chunking~\citep{action_chunking}. In contrast to prior VLA models \citep{black2024pi_0} that use a mixture-of-experts architecture to bridge the base VLM model with the action generation model, we use a simple cross-attention mechanism. This approach provides flexibility regarding the exact architecture of the VLM model and the action generation model we can use. Furthermore, we use embodiment-specific state and action projector modules, which support different robot embodiments, including latent~\citep{ye2025latent} and IDM-based~\citep{baker2022video} actions. The use of these projectors is similar to those in \citet{octo_2023}, though that work did not fine-tune the VLM models. 
+
+
+
+\textbf{Datasets for Robot Learning.} 
+% Collecting large-scale datasets in robotics is a challenging endeavor, but there have been several prior attempts to address this problem. 
+A core challenge in robot learning is the scarcity of large-scale, diverse, and embodied datasets necessary to train generalist robots. 
+% TODO: we could consider discussing self-supervised approaches here (e.g. RL)
+% Real robot teleoperation, large-scale datasets
+One common approach is to use robot teleoperation~\citep{zhang2017deep, mandlekar2018roboturk, mandlekar2019scaling, mandlekar2020human, wu2023gello, action_chunking, aldaco2024aloha, fu2024mobile, iyer2024open, dass2024telemoma}, where a human uses a device such as a smartphone or Virtual Reality (VR) controller, to control a robot to perform tasks of interest. 
+The robot sensor streams and robot controls during operation are logged to a dataset, allowing for high-quality task demonstrations to be collected.
+Recently, this approach has been scaled by utilizing large teams of human operators and robot fleets over extended periods of time (\eg, months), resulting in large-scale robot manipulation datasets with thousands of hours of demonstrations~\citep{ebert2021bridge, brohan2022rt, ahn2022can, lynch2022interactive, o2024open, contributors2025agibotworld, black2024pi_0}. 
+However, collecting data this way requires extensive cost and human effort.
+Another line of work, instrumented human demonstrations, uses special hardware to capture robot-relevant observation and action data without explicitly teleoperating the target robot. For example, \cite{chi2024universal, seo2024legato} use hand-held robot grippers, \citet{fang2024airexo} uses a robot-like exoskeleton, and \cite{kareer2024egomimicscalingimitationlearning} uses special glasses to capture human hand motions, which are retargeted to robot action data. These approaches tend to result in faster data collection, though they have a mismatch with the downstream robot compared to direct robot teleoperation.
+% % Simulation, data generation
+% There are other compelling alternatives to the burden of real-world on-robot data collection.
+% Recently, several works~\cite{mandlekar2023mimicgen, james2020rlbench, dalal2023imitating, gu2023maniskill2, ha2023scaling, robocasa2024, jiang2024dexmimicen, wang2023robogen, garrett2024skillmimicgen, yang2025physics} have proposed automated data generation pipelines that can leverage simulation to produce thousands of task demonstrations with minimal human effort. 
+% This makes it easy to generate large-scale datasets; however, utilizing these datasets can be challenging due to the simulation-to-reality gap.
+% % TODO: If we want to cite robot-free data collection like UMI, this could be one place to do it.
+% % Dream data
+% Another promising avenue is to leverage advances in generative models, such as video generation models, to augment existing sets of robot demonstrations~\cite{agarwal2025cosmos, mandi2022cacti, yu2023scaling, chen2023genaug}. For example, given a language prompt and an initial camera frame that shows a robot workspace, a video generation model could create new video demonstrations for the robot to learn from. Similarly, such a model could be applied to augment the visuals in existing task demonstrations.
+% Human video
+A separate line of work makes use of human video datasets~\citep{grauman2024ego, grauman2022ego4d, goyal2017something, damen2018scaling, miech2019howto100m}, which are plentiful and substantially easier to collect than on-robot data, as a source of training data for robots. 
+Some works~\citep{nair2022r3m, wu2023unleashing, karamcheti2023language} use human video datasets to pre-train representations that are then used as a feature space for training policies on downstream robot datasets. Other works~\cite{bharadhwaj2024gen2act, bharadhwaj2024track2act, ren2025motion} try to jointly use human video data and robot data through intermediate representations for the motions in the video. \citet{ye2025latent} shows that pretraining VLAs with \textit{latent} actions only on human videos yields positive transfer to downstream robotic tasks.
+% Prior works~\citep{nair2022r3m, wu2023unleashing, karamcheti2023language, bharadhwaj2024gen2act, bharadhwaj2024track2act, ren2025motion} have attempted to use human videos~\citep{grauman2024ego, grauman2022ego4d, goyal2017something, damen2018scaling, miech2019howto100m} as a source of training data for robots~\checkthis{make this sentence crispier - \textit{how} they use human videos}. 
+% While this is a rich source of data, making use of the data can be difficult due to the embodiment gap between humans and robots. In this work, we use embodiment-specific state and action projector models to enable training on these different embodiments.
+% \checkthis{also mention instrumented human data like UMI, LEGATO, EgoMimic? KL: added above}
+% Model tries to combine all of them together
+Rather than relying on a single type of training data, we developed techniques to effectively learn from a diverse assortment of real-world robot data, human video data, and synthetic data.
+
+
+\textbf{Synthetic Data Generation in Robotics.} 
+% Simulation, data generation
+Real-world robot data collection requires large amounts of time and considerable human cost. By contrast, data collection in simulation can be substantially more efficient and less painful, making it a compelling alternative. 
+% There are other compelling alternatives to the burden of real-world on-robot data collection.
+Recently, several works~\citep{mandlekar2023mimicgen, james2020rlbench, dalal2023imitating, gu2023maniskill2, ha2023scaling, robocasa2024, jiang2024dexmimicen, wang2023robogen, garrett2024skillmimicgen, yang2025physics} have proposed automated data generation pipelines that can leverage simulation to produce thousands of task demonstrations with minimal human effort. 
+This makes it easy to generate large-scale datasets; however, utilizing these datasets can be challenging due to the simulation-to-reality gap.
+% TODO: If we want to cite robot-free data collection like UMI, this could be one place to do it.
+% Dream data
+
+Another promising avenue has been using neural generative models to augment existing sets of robot demonstrations~\citep{mandi2022cacti, yu2023scaling, chen2023genaug}. However, previous work have been limited to utilizing in-painting or text-to-image diffusion models to augment the training data. In our work, we leverage the recent advancements in video generative models~\citep{agarwal2025cosmos, wan2.1} to create entire neural trajectories, at a scale that has never been explored before: $\sim$300k neural trajectories which amounts to 827 hours of robot trajectories.
+
+In our model, we make use of large synthetic simulation datasets generated by MimicGen~\citep{mandlekar2023mimicgen} and DexMimicGen~\citep{jiang2024dexmimicen}, as well as neural-generated video datasets with state-of-the-art video generation models. Our way of co-training with synthetically generated and real-world data sets us from other large-scale VLA efforts. 
+% In our model, we make use of both synthetically generated simulation data, and data from generative models.~\checkthis{be more concrete how we generate synthetic data? how we do things differently?}
+

@@ -1,0 +1,41 @@
+\begin{table}[t]
+\centering
+\vspace{-1em}
+\caption{Evaluation results of several model variants.}
+\label{table:dataset_composition}
+\scriptsize
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lllll}
+\toprule
+Model                  &  \#Training Token & MMLU (5-shot) &  TruthfulQA (0-shot) & MT-Bench Score (GPT-4) \\
+\midrule
+LLaMA-7B               &  1T    & 35.2  & 0.22  & 2.74  \\
+LLaMA-13B              &  1T    & 47.0  & 0.26  & 2.61  \\  \hline
+Alpaca-7B              &  4.4M  & 40.1  & 0.26  & 4.54  \\
+Alpaca-13B             &  4.4M  & 48.1  & 0.30  & 4.53  \\
+Vicuna-7B (selected)   &  4.8M  & 37.3  & 0.32  & 5.95  \\
+Vicuna-7B (single)     &  184M  & 44.1  & 0.30  & 6.04  \\
+Vicuna-7B (all)        &  370M  & 47.1  & 0.32  & 6.00  \\
+Vicuna-13B (all)       &  370M  & \textbf{52.1}  & \textbf{0.35} & \textbf{6.39} \\
+\midrule
+GPT-3.5                &  -     & 70.0  & - & 7.94 \\
+GPT-4                  &  -     & \textbf{86.4}  & - & \textbf{8.99} \\
+\bottomrule
+\end{tabular}
+}
+\vspace{-1.5em}
+\end{table}
+
+
+\section{Human Preference Benchmark and Standardized Benchmark}
+\label{sec:training_data}
+Human preference benchmarks such as MT-bench and Chatbot Arena serve as valuable additions to the current standardized LLM benchmarks. They focus on different aspects of a model and the recommended way is to comprehensively evaluate models with both kinds of benchmarks.
+
+We evaluate several model variants derived from LLaMA on MMLU~\cite{hendrycks2020measuring}, Truthful QA~\cite{lin2021truthfulqa} (MC1), and MT-bench (GPT-4 judge). The training details are in \Cref{sec:training-details}.
+Since we have shown that GPT-4 single-answer grading also performs well in \Cref{sec:agreement}, we use GPT-4 single-answer grading for MT-bench in favor of its scalability and simplicity.
+We ask GPT-4 to give a score for each turn on a scale of 10 by using our prompt templates (\Cref{fig:default-prompt-single}, \Cref{fig:reference-mt-single}) and report an average score of $160=80 \times 2$ turns. 
+\Cref{table:dataset_composition} shows the results.
+We find that fine-tuning on high-quality dialog datasets (i.e., ShareGPT) can consistently improve the model performance on MMLU and the improvement scales with fine-tuning data size.
+On the other hand, a small high-quality conversation dataset can quickly teach the model a style preferred by GPT-4 (or approximately human) but cannot improve MMLU significantly, as shown by the Vicuna-7B (selected) which is trained with only 4.8M tokens or 3K conversations. In \Cref{table:dataset_composition}, no single benchmark can determine model quality, meaning that a comprehensive evaluation is needed. Our results indicate that using LLM-as-a-judge to approximate human preferences is highly feasible and could become a new standard in future benchmarks. We are also hosting a regularly updated leaderboard with more models \footnote{\url{https://huggingface.co/spaces/lmsys/chatbot-arena-leaderboard}}.
+Notably, DynaBench~\cite{kiela2021dynabench}, a research platform dedicated to dynamic data collection and benchmarking, aligns with our spirit. DynaBench addresses the challenges posed by static standardized benchmarks, such as saturation and overfitting, by emphasizing dynamic data with human-in-the-loop. Our LLM-as-a-judge approach can automate and scale platforms of this nature.
+

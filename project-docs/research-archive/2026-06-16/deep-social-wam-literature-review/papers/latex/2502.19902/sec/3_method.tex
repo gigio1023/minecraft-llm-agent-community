@@ -1,0 +1,90 @@
+\section{Preliminaries and Problem Formulation}
+In Minecraft, agents \cite{vpt,lifshitz2024steve,cai2023groot} exhibit behavior patterns similar to humans: at each time step \( t \), the agent receives a visual observation \( o_t \) and generates control actions \( a_{t+1} \) using the mouse and keyboard. These actions interact with the environment, resulting in a new visual observation \( o_{t+1} \). Through continuous interactions, a trajectory \( J =\) \(\{(o_1, a_1), (o_2, a_2), (o_3, a_3), \ldots, (o_T, a_T)\}\) is formed, where \( T \) represents the length of the trajectory. Previous work primarily trained Minecraft agents using reinforcement learning \cite{fan2022minedojo} or behavior cloning \cite{lifshitz2024steve,cai2023groot}. For example, in behavior cloning, the goal of the policy $p_{\theta}(a_{t+1}| o_{1:t}) $ is to minimize the negative log-likelihood of the actions at each time step \( t \) given the trajectory \( J \). Considering that such trajectories are typically generated under explicit or implicit goals, many recent approaches condition the behavior on a (implicit or explicit) goal \( g \) and learn goal-conditioned policy $p_{\theta}(a_{t+1}| o_{1:t}, g)$ \cite{lifshitz2024steve,cai2023groot}. Generally, for both agents and humans, the explicit goal \( g \) is a natural language instruction.
+
+Formally, given a trajectory \( J \) with length \( T \), standard behavior cloning trains the policy $p_\theta(\cdot )$ with parameters $\theta$ by minimizing the negative log-likelihood of actions:
+
+\begin{equation}
+  \min_{\theta } \sum_{t=1}^{T} -\log_{}{p_\theta (a_{t+1} | o_{1:t},g)} 
+\end{equation}
+
+
+\section{Optimus-2}
+In this section, we first give an overview of our proposed agent framework, Optimus-2. As shown in Figure \ref{fig:fig1} (left), it includes a planner for generating a series of executable sub-goals and a policy that sequentially executes these sub-goals to complete the task.
+
+Next, we introduce how to implement Optimus-2's planner (Sec. \ref{planner}). Subsequently, we elaborate on how to implement the proposed GOAP (Sec. \ref{policy}). Finally, in Sec \ref{MGOA}, we introduce an automated dataset generation method to obtain a high-quality Minecraft Goal-Observation-Action dataset (MGOA) for training GOAP.
+
+%Given a task and the current observation, the Planner generates a series of executable sub-goals. The proposed GOAP then sequentially executes these sub-goals based on observations, producing low-level actions to interact with the environment. 
+
+\subsection{MLLM-based Task Planner}
+\label{planner}
+In Minecraft, a complex task consists of multiple intermediate steps, i.e., sub-goals. For example, the task ``I need a wooden pickaxe'' includes five sub-goals: `chop a tree to get logs \includegraphics[width=0.3cm]{figures/logo/wood.pdf}', `craft four planks \includegraphics[width=0.3cm]{figures/logo/planks.pdf}', `craft a crafting table \includegraphics[width=0.3cm]{figures/logo/crafting_table.pdf}', `craft two sticks \includegraphics[width=0.3cm]{figures/logo/stick.pdf}', and `craft a wooden pickaxe \includegraphics[width=0.3cm]{figures/logo/wooden_pickaxe.pdf}'. Therefore, a planner is essential for the agent, as it needs to decompose the given complex task into a sequence of executable sub-goals for the policy to execute sequentially. In this paper, we follow Li et al. \cite{li2024optimus}, employing an MLLM as the planner, which takes current observation and task instruction as input to generate sub-goals. 
+
+%In practice, the Planner generates open-ended format sub-goals, such as `locate and chop down a tree to gather 4 logs' or `obtain 3 sticks from the remaining planks'. However, existing policies struggle to handle these sub-goals due to limitations in language comprehension, resulting in task failures. In the following sections, we introduce GOAP to address this issue.
+\subsection{Goal-Observation-Action Conditioned Policy}
+\label{policy}
+According to Sec 3., a key insight into the relationship among observation $o$, action $a$, and sub-goal $g$ is: that the observation \( o \) and action \( a \) at the same time step have a causal relationship; and the sub-goal \( g \) is a natural language description of the observation-action sequence over a certain time. To better model the relationships among the three elements mentioned above, we propose first integrating the representations of observation and action at each time step, then modeling the observation-action sequences along the temporal dimension, and finally aligning the observation-action sequences with the sub-goal for action prediction.
+
+Motivated by this, we propose a novel Goal-Observation-Action conditioned Policy, GOAP. As shown in Figure \ref{fig:fig2}, our GOAP consists of an Action-guided Behavior Encoder that dynamically models observation-action sequences into fixed-length behavior tokens and an MLLM that aligns such behavior tokens with sub-goal for action prediction.
+
+\subsubsection{Action-guided Behavior Encoder}
+Previous policies often overlook the causal relationship between observation and action at each timestep. Moreover, it remains a challenge to model the long-term observation-action sequence without exceeding input length constraints. To this end, we propose an Action-guided Behavior Encoder that integrates the representations of observation and action at each time step and then dynamically models the historical sequences into the fix-length behavior tokens. 
+\input{table/tb_dataset}
+
+Firstly, for the timestep $t$, we pass observation $o_t$ into a visual encoder $\texttt{VE}$ to obtain the visual features: 
+\begin{equation}
+ v_t \gets \texttt{VE}(o_t)
+\end{equation}
+where \( v_t \in \mathbb{R}^{P \times d} \), \( P \) is the number of patches for each image, and \( d \) is the dimension of the extracted image feature. In practice, we employ ViT \cite{dosovitskiy2020vit} as our visual encoder.
+
+Then, we introduce a \textbf{Causal Perceiver} module to model the relationship between observations and actions. It takes the visual feature \( v_t \) as query tokens and the action embedding \( a_t \) as key and value. The module then constructs the information interaction between action \( a_t \) and \( v_t \) through a cross-attention mechanism:
+\begin{equation}
+\label{eq:kqv}
+Q=v_t W_{v}^{Q}, K=a_t W_{a}^{K}, V=a_t W_{a}^{V}
+\end{equation}
+\begin{equation}
+\label{eq:crossatt}
+\hat{v}_{t}=CrossAttn(Q, K, V )=Softmax(\frac{QK^{T} }{\sqrt{d} } )V
+\end{equation}
+where \(W_{v}^{Q} \), \( W_{a}^{K} \), and \( W_{a}^{V} \) represent the weight matrices for the query (Q), key (K), and value (V), respectively. \(CrossAttn(\cdot)\) denotes the cross-attention layer, and \( d \) is the dimension of the image features. In this way, it explicitly assigns action information $a_{t}$ at time step $t$ to the visual features $\hat{v}_{t}$, enhancing the causal relationship between observations and actions.
+
+Subsequently, we introduce a \textbf{History Aggregator} module to capture the information of the observation-action sequence along the temporal dimension, serving as the behavior representation. At each timestep $t$, behavior tokens $B_t$ serve as queries, while the sequence of historical behavior tokens $H_{t} = [B_{1}, B_{2}, \dots, B_{t-1}]$ acts as keys and values. The current behavior tokens interact with the historical sequence through a history-attention layer \(HisAttn(\cdot)\):
+\begin{equation}
+\hat{B}_{t}=HisAttn(Q, K, V )=Softmax(\frac{QK^{T} }{\sqrt{d} } )V
+\end{equation}
+where $Q$, $K$, and $V$ are calculated similarly to Eq \ref{eq:kqv}. 
+
+
+Finally, another cross-attention layer is introduced, using the behavior tokens $\hat{B}_{t}$ as queries, and the visual features $\hat{v}_{t}$ as keys and values. In this way, the behavior tokens incorporate the current observation-action information. Following the approach of He et al. \cite{he2024ma}, we construct a memory bank for historical behavior tokens \( H_{t} \), utilizing the similarity between adjacent features to aggregate and compress the behavior tokens. This method not only preserves early historical information but also keeps the historical behavior token sequence \( H_{t} \) at a fixed length to reduce computational costs. Leveraging the Action-guided Behavior Encoder, we obtain behavior tokens $\hat{B}_{t}$, which correspond to the observation-action sequence from the start to the current time step \( t \).
+
+%Compared to previous work \cite{vpt,lifshitz2024steve,cai2023groot}, our Action-guided Behavior Encoder has three advantages: 1) We utilize a ViT to capture the complete visual information at each time step, whereas previous work rely on a single token to aggregate visual features, leading to significant loss of visual information; 2) It integrates action information at each time step into the visual features, allowing for better learning of the causal relationship between observations and actions; 3) It aggregates the complete historical sequence information, considering dynamic integration along the temporal dimension and significantly compressing the input sequence length, thus making inference more efficient.
+
+\subsubsection{MLLM Backbone}
+To model the relationship between the sub-goal and observation-action sequence, we introduce an MLLM that takes the sub-goal $g$, current observation features $v_t$, and behavior tokens ${B}_{t}$ as input to predict subsequent actions auto-regressively. To enable the MLLM backbone \texttt{MLLM} to predict low-level actions, we employ VPT \cite{vpt} as action head \texttt{AH} to map output embeddings $\bar{a}_{t+1}$ of language model into the action space.
+\begin{equation}
+ \bar{a}_{t+1} \gets \texttt{MLLM}(\left [ g, v_t, B_t \right ] )
+\end{equation}
+\begin{equation}
+ a_{t+1} \gets \texttt{AH}(\bar{a}_{t+1})
+\end{equation}
+
+Formally, given a dataset \( \mathcal{D} = \{(o_{1:T}, a_{1:T})\}_{M} \) with \( M \) complete trajectories, we train GOAP to learn the behavior distribution from $\mathcal{D}$ via behavioral cloning. Moreover, we introduce a KL-divergence loss to measure the output distribution similarity between GOAP and VPT \cite{vpt}. This helps our model effectively learn the knowledge from the teacher model VPT. The training loss can be formulated as follows:
+\vspace{-5pt}
+\begin{equation}
+\begin{split}
+\mathcal{L}_{\theta} = \lambda _{BC} \sum_{t=1}^{T} -\log_{}{p_\theta (a_{t+1} | o_{1:t},a_{1:t},g)} \\ 
++ \lambda _{KL} \sum_{t=1}^{T} D_{KL} ( q_\phi (a_{t+1} | o_{1:t}) \parallel p_\theta (a_{t+1} | o_{1:t},g)) 
+\end{split}
+\end{equation}
+where $\lambda _{BC}$ and $\lambda _{KL}$ are trade off coefficients, $p_\theta$ is the GOAP, $q_\phi$ is the teacher model.
+
+\input{table/tb_main_atomic}
+
+\subsection{MGOA Dataset}
+\label{MGOA}
+In Minecraft, there remains a significant lack of high-quality goal-observation-action pairs to support behavior cloning training. Previous work has primarily relied on gameplay videos as training data. These datasets either lack natural language instructions (explicit goals) \cite{vpt,cai2023groot}, or use actions predicted by IDM models \cite{vpt} for each observation as pseudo-labels \cite{lifshitz2024steve,vpt}, which leads to a risk of misalignment between observations and actions. Inspired by Li et al. \cite{li2024optimus}, we propose an automated data generation pipeline that enables the creation of aligned goal-observation-action pairs without the need for manual annotations or human contractors. First, we utilize existing agents \cite{lifshitz2024steve}, providing them with clear natural language instructions to attempt task completion in Minecraft. We then record the actions and corresponding observations during goal execution, generating goal-observation-action pairs. 
+
+\input{table/tb_main_horizon}
+\input{table/tb_main_open}
+To ensure the quality of the generated data, we apply the following filtering criteria: 1) only recording videos in which the task is successfully completed, and 2) discarding videos where task execution takes an excessive amount of time.  For more details, please refer to \textbf{Sup. C}. Through this automated approach, we obtained 25k high-quality Minecraft Goal-Observation-Action (MGOA) dataset. A comparison of the MGOA dataset with the existing Minecraft datasets is shown in Table \ref{tb:dataset}. Our automated data generation pipeline offers several key advantages: 1) it enables the generation of aligned goal-observation-action pairs without the need for manual annotation or pseudo-labeling; 2) its construction process is parallelizable, allowing for rapid dataset generation; and 3) it leverages local agents for data generation, resulting in low-cost production.
+
+

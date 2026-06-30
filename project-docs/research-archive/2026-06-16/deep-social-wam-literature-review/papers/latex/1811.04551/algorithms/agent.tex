@@ -1,0 +1,52 @@
+\begin{algorithm}[htpb]
+\SetEndCharOfAlgoLine{}
+\SetKwComment{Comment}{// }{}
+\SetKwInOut{Input}{Input}
+\Input{\\\hspace{-3.6em}\small
+\begin{tabular}[t]{l @{\hspace{.5em}} l}%
+$R$ & Action repeat \\
+$S$ & Seed episodes \\
+$C$ & Collect interval \\
+$B$ & Batch size \\
+$L$ & Chunk length \\
+$\alpha$ & Learning rate \\
+%\end{tabular}\hspace{.5em}%
+\end{tabular}\hspace{-0.5em}%
+\begin{tabular}[t]{l @{\hspace{.5em}} l}%
+$\p(s_t|s_{t-1},a_{t-1})$ & Transition model \\
+$\p(o_t|s_t)$ & Observation model \\
+$\p(r_t|s_t)$ & Reward model \\
+$\q(s_t|o_{\leq t},a_{<t})$ & Encoder \\
+$\p(\epsilon)$ & Exploration noise \\
+\end{tabular}%
+}
+\BlankLine
+Initialize dataset $\mathcal{D}$ with $S$ random seed episodes. \;
+Initialize model parameters $\theta$ randomly. \;
+\While{not converged}{
+  \BlankLine
+  \Comment{Model fitting}
+  \For{update step $s=1..C$}{
+    Draw sequence chunks $\{(o_t,a_t,r_t)_{t=k}^{L+k}\}_{i=1}^B\sim\mathcal{D}$ uniformly at random from the dataset. \;
+    Compute loss $\mathcal{L}(\theta)$ from \cref{eq:elbo}. \;
+    Update model parameters $\theta\leftarrow\theta-\alpha\nabla_\theta\mathcal{L}(\theta)$. \;
+  }
+  \BlankLine
+  \Comment{Data collection}
+  $o_1\leftarrow\texttt{env.reset()}$ \;
+  \For{time step $t=1..\ceil[\big]{\frac{T}{R}}$}{
+    Infer belief over current state $\q(s_t|o_{\leq t},a_{<t})$ from the history. \;
+    $a_t\leftarrow\texttt{planner(}\q(s_t|o_{\leq t},a_{<t}),p\texttt{)}$, see \cref{alg:planner} in the appendix for details. \;
+    Add exploration noise $\epsilon\sim\p(\epsilon)$ to the action. \;
+    \For{action repeat $k=1..R$}{
+      $r_t^k,o_{t+1}^k\leftarrow\texttt{env.step(}a_t\texttt{)}$ \;
+    }
+    $r_t,o_{t+1} \leftarrow \sum_{k=1}^R r_t^k, o_{t+1}^R$ \;
+  }
+  $\mathcal{D}\leftarrow\mathcal{D}\cup\{(o_t,a_t,r_t)_{t=1}^T\}$ \;
+  \BlankLine
+}
+%\vspace{-2ex}
+\caption{\fullmethod (\method)}
+\label{alg:agent}
+\end{algorithm}

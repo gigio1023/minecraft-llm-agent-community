@@ -1,0 +1,153 @@
+\clearpage
+\setcounter{page}{1}
+\setcounter{section}{0}
+\maketitlesupplementary
+\renewcommand{\thesection}{\Alph{section}}
+
+\noindent The supplementary document is organized as follows:
+
+\begin{itemize}
+\setlength{\itemsep}{10pt}
+    \item Sec. \ref{sup:limitation}: Limitation and Future Work.
+    
+    \item Sec. \ref{sup:mc}: Minecraft Environment.
+    
+    \item Sec. \ref{sup:dataset}: MGOA Dataset.
+    
+    \item Sec. \ref{sup:train}: Training Details.
+    
+    \item Sec. \ref{sup:evaluate}: Evaluation Benchmark.
+    
+    \item Sec. \ref{sup:exp}: Experimental Results.
+
+    \item Sec. \ref{sup:case}: Case Study.
+\end{itemize}
+
+\section{Limitation and Future Work}
+\label{sup:limitation}
+In this paper, we aim to explore how agents can mimic human behavior patterns in Minecraft to accomplish various tasks. Experimental results demonstrate that Optimus-2 performs exceptionally well in both atomic tasks and long-horizon tasks. However, due to the lack of sufficient high-quality data for open-ended tasks (such as ``building a house'' and ``defeating the Ender Dragon''), there remains significant room for improvement. Once such datasets are available, the ability of Optimus-2 to complete open-ended tasks will be enhanced. Moreover, despite showing promising performance in Minecraft, we have not yet extended our exploration to other simulation platforms, which represents a potential direction for future research.
+
+
+\section{Minecraft}
+\label{sup:mc}
+\input{Supplementary/picture/behavior}
+Minecraft is an extremely popular sandbox video game developed by Mojang Studios \footnote{https://www.minecraft.net/en-us/article/meet-mojang-studios}. It allows players to explore a blockly, procedurally generated 3D world with infinite terrain, discover and extract raw materials, craft tools and items, and build structures or earthworks. In this enviroment, AI agents need to face situations that are highly similar to the real world, making judgments and decisions to deal with various environments and problems. As shown in Figure \ref{fig:behavior}, both agents and humans are required to receive natural language instructions and current observations as input, and then output low-level actions, such as mouse and keyboard control commands. Therefore, Minecraft serves as an ideal open-world environment for training agent that can learn human behavior patterns.
+
+
+\subsection{Basic Rules}
+\noindent\textbf{Biomes.} The Minecraft world is divided into different areas called ``biomes''. Different biomes contain different blocks and plants and change how the land is shaped. There are 79 biomes in Minecraft 1.16.5, including ocean, plains, forest, desert, etc. Diverse environments have high requirements for the generalization of agents.
+
+\noindent\textbf{Item.} In Minecraft 1.16.5, there are $975$ items can be obtained, such as wooden pickaxe \includegraphics[width=0.25cm]{figures/logo/wooden_pickaxe.pdf}, iron sword \includegraphics[width=0.25cm]{figures/logo/iron_sword.pdf}. Item can be obtained by crafting or destroying blocks or attacking entities. For example, agent can attack cows \includegraphics[width=0.25cm]{figures/logo/cow.pdf}  to obtain leather \includegraphics[width=0.25cm]{figures/logo/leather.pdf} and beef \includegraphics[width=0.25cm]{figures/logo/beef.pdf}. Agent also can use $1$ stick \includegraphics[width=0.25cm]{figures/logo/stick.pdf} and $2$ diamonds \includegraphics[width=0.25cm]{figures/logo/diamond.pdf} to craft diamond sword \includegraphics[width=0.25cm]{figures/logo/diamond_sword.pdf}.
+
+\noindent\textbf{Technology Tree.} In Minecraft, the technology hierarchy comprises six levels: wood \includegraphics[width=0.25cm]{figures/logo/wood.pdf}, stone \includegraphics[width=0.25cm]{figures/logo/cobblestone.pdf}, iron \includegraphics[width=0.25cm]{figures/logo/iron_ingot.pdf}, gold \includegraphics[width=0.25cm]{figures/logo/gold_ingot.pdf}, diamond \includegraphics[width=0.25cm]{figures/logo/diamond.pdf}, and redstone \includegraphics[width=0.25cm]{figures/logo/readstone.pdf}. Each tool level corresponds to specific mining capabilities. Wooden tools can mine stone-level blocks but are incapable of mining iron-level or higher-level blocks. Stone tools can mine iron-level blocks but cannot mine diamond-level or higher-level blocks. Iron tools are capable of mining diamond-level blocks. Finally, diamond tools can mine blocks of any level, including redstone-level.
+
+\input{Supplementary/table/action_space}
+
+\noindent\textbf{Gameplay progress.} Progression in Minecraft primarily involves discovering and utilizing various materials and resources, each unlocking new capabilities and opportunities. For instance, crafting a wooden pickaxe \includegraphics[width=0.25cm]{figures/logo/wooden_pickaxe.pdf} enables players to mine stone \includegraphics[width=0.25cm]{figures/logo/cobblestone.pdf}, which can then be used to create a stone pickaxe \includegraphics[width=0.25cm]{figures/logo/stone_pickaxe.pdf} and a furnace \includegraphics[width=0.25cm]{figures/logo/furnace.pdf}. These tools allow for the mining and smelting of iron ore \includegraphics[width=0.25cm]{figures/logo/iron_ore.pdf}. Subsequently, crafting an iron pickaxe \includegraphics[width=0.25cm]{figures/logo/iron_pickaxe.pdf} enables the extraction of diamonds \includegraphics[width=0.25cm]{figures/logo/diamond.pdf}, while a diamond pickaxe \includegraphics[width=0.25cm]{figures/logo/diamond_pickaxe.pdf} can mine virtually any block in the game. Similarly, cultivating crops facilitates breeding various animals, each providing unique resources beyond sustenance. Drops from enemies also serve specific purposes, with some offering greater utility than others. By integrating resources from mining, farming, and breeding, players can enchant their equipment, further enhancing their capabilities. Additionally, collecting and crafting materials support construction, enabling players to create diverse structures. Beyond practical functions, such as building secure bases or farms, constructing personalized structures forms a significant aspect of the Minecraft experience. Figure~\ref{fig:example_long_horizon} illustrates an example of progression: crafting an iron sword \includegraphics[width=0.25cm]{figures/logo/iron_sword.pdf}.
+
+
+\input{Supplementary/MGOA_data}
+
+\input{Supplementary/picture/gen-data-pipeline}
+
+
+
+\subsection{Observation and Action Spaces}
+
+\textbf{Observation.}
+In this paper, observation space of agent is completely consistent with human players. The agent only receives an RGB image with dimensions of $640 \times 360$ during the gameplay process, including the hotbar, health indicators, food saturation, and animations of the player's hands. It is worth helping the agent see more clearly in extremely dark environments, we have added a night vision effect for the agent, which increases the brightness of the environment during the night.
+
+\noindent\textbf{Action Spaces.}
+In MineRL \cite{guss2019minerl} environment, agent's action space is almost similar to human players. It consists of two parts: the mouse and the keyboard. The keypresses are responsible for controlling the movement of agents, such as jumping, forward, back, etc. The mouse movements are responsible for controlling the perspective of agents and the cursor movements when the GUI is opened. The left and right buttons of the mouse are responsible for attacking and using or placing items. In Minecraft, precise mouse movements are important when completing complex tasks that need open inventory or crafting table. In order to achieve both the same action space with MineDojo \cite{fan2022minedojo}, we abstract the craft and the smelt action into action space. The detailed action space is described in Table \ref{tab:action_space}.
+
+
+
+\section{MGOA Dataset}
+\label{sup:dataset}
+In Minecraft, there is still a lack of sufficient high-quality goal-observation-action pairs to support the training of Optimus-2. To address this, we propose an automated dataset construction process aimed at creating high-quality Minecraft Goal-Observation-Action (MGOA) datasets. Through this method. MGOA contains 25,000 videos, providing about 30M goal-observation-action pairs. It contains 8 \textit{Atomic Tasks} across 5 tech levels: ‘Log \includegraphics[width=0.25cm]{figures/logo/wood.pdf}’, ‘Seed \includegraphics[width=0.25cm]{figures/logo/seeds.pdf}’, ‘Dirt \includegraphics[width=0.25cm]{figures/logo/dirt.pdf}’, ‘Stone \includegraphics[width=0.25cm]{figures/logo/cobblestone.pdf}’, ‘Iron \includegraphics[width=0.25cm]{figures/logo/iron_ore.pdf}’, ‘Gold \includegraphics[width=0.25cm]{figures/logo/gold_ingot.pdf}’, ‘Diamond \includegraphics[width=0.25cm]{figures/logo/diamond.pdf}’, ‘Redstone \includegraphics[width=0.25cm]{figures/logo/readstone.pdf}’. Note that the \textit{Atomic Tasks} in MGOA require minimal steps and can typically be completed within 2 $\sim$ 3 minutes. For instance, the task ‘Iron \includegraphics[width=0.25cm]{figures/logo/iron_ore.pdf}’ involves mining iron with a stone pickaxe, without the need to gather raw materials to craft the stone pickaxe. The statistics for the MGOA dataset is shown in Figure \ref{fig:mgoa_data}. We provide several examples of the dataset in the \texttt{MGOA\_samples} folder within the supplementary materials. We will release this dataset to contribute to the development of open-world agents within the community.
+
+
+
+\subsection{Dataset Construction} 
+\noindent\textbf{Pipeline.} Inspired by Li et al. \cite{li2024optimus}, we employed a prior policy (STEVE-1 \cite{lifshitz2024steve} in our work) to perform specific tasks in Minecraft, and recorded the corresponding videos and actions to generate goal-observation-action pairs. As illustrated in Figure~\ref{fig:dataset_pipeline}, we employed a custom script to extract item names from the Minecraft Wiki\footnote{https://minecraft.wiki/}. Using these item names, we queried GPT-4\footnote{https://openai.com/index/gpt-4-research/} with a predefined prompt template to generate task instructions, thereby constructing an Instruction Pool. The task instructions from the Instruction Pool serve as input to STEVE-1 \cite{lifshitz2024steve}, enabling it to interact with the environment to complete the tasks. During task execution, each frame and corresponding action were recorded and stored. To expedite data generation, we instantiated multiple policies and used parallelization to quickly produce large amounts of data. 
+
+\noindent\textbf{Data Filtering.} We judged task success based on environmental feedback. For example, feedback like ``obtained new item, diamond axe'' indicated that the task ``craft a diamond axe'' was successfully completed. During the dataset generation process, we observed a significant amount of low-quality video data due to limitations in the policy's ability to follow instructions. Examples of low-quality data included task failures or task completion timeouts. To address this issue, we established two filtering criteria to ensure data quality: (1) only retaining data from successfully completed tasks, and (2) removing data for tasks that lasted longer than 2 minutes. These criteria allowed us to automatically filter out low-quality data, significantly reducing the cost of constructing the dataset. As a result, we obtained a high-quality MGOA dataset consisting of 25,000 samples.
+
+\subsection{Comparison with Existing Datasets} 
+Previous gameplay videos were primarily obtained through two methods below.
+
+\noindent\textbf{Video Platform}: For example, MineDojo \cite{fan2022minedojo} collected game videos uploaded by human players on platforms such as YouTube and Twitter, combining the video content with corresponding titles or subtitles to form video-text pairs. However, this dataset lacked recorded actions. To address this, VPT \cite{vpt} used an Inverse Dynamics Model (IDM) to generate action sequences from the videos. However, the actions predicted by the IDM model are only approximations, which introduces a potential risk of misalignment between the frames and the corresponding actions.
+
+\noindent\textbf{Human Contractors}: VPT \cite{vpt} hired human players to freely explore Minecraft and used the frames and actions to construct a video-action dataset. However, this dataset lacked explicit natural language instructions. To create goal-observation-action pairs, STEVE-1 \cite{lifshitz2024steve} used GPT-3.5 to generate specific task descriptions based on the gameplay, thereby integrating natural language instructions into the dataset. However, they provide only approximately 32k aligned goal-observation-action pairs, which remains a relatively scarce amount of data.
+
+In addition, some work \cite{qin2023mp5,wang2024omnijarvis} have utilized GPT-4V to generate image captions, task planning, and reflections, thereby creating image-text pairs that form instruction-following datasets.
+
+Distinct from the aforementioned datasets, the MGOA dataset directly captures agents performing specific tasks, offering clear natural language instructions with a one-to-one correspondence between observations and actions. Furthermore, through rigorous data filtering, redundant action sequences that do not contribute to task completion are excluded from MGOA. In addition, compared to the small-scale goal-observation-action datasets currently available, MGOA offers 25,000 videos, encompassing approximately 30 million goal-observation-action pairs. This dataset is not only significantly larger but also highly scalable in an automated manner. 
+
+
+\input{Supplementary/atomic-task}
+\input{Supplementary/long-horizon}
+\section{Training Details}
+\label{sup:train}
+\subsection{Training Pipeline}
+One of the key factors in implementing our proposed method lies in the efficient alignment of language with the observation-action sequence, and subsequently translating language space into the action space. To tackle this problem, we adopt a two-phase training approach. First, we align language with the observation-action sequence via behavior pre-training. Then, we transform the language space into the action space through action fine-tuning. 
+
+\input{Supplementary/table/tb_hyperparameter}
+\noindent\textbf{Behavior Pre-training}: During the pre-training phase, we integrated the Vision-guided Behavior Encoder into the model. We used OpenAI Contractor Dataset \cite{vpt} and a subset of MGOA as training data, which comprised approximately 5,000 videos. To balance efficiency and effectiveness, we freeze the visual encoder, then tune the Vision-guided Behavior Encoder along with a large language model (LoRA \cite{hu2021lora}). During pre-training, we set the learning rate to 0.0001 and trained for 5 epochs. The hyperparameter settings are shown in Table \ref{tb:hyper}.
+
+
+
+\noindent\textbf{Action Fine-tuning}: During the fine-tuning phase, we adapted the general MLLM DeepSeek-VL-1.3B \cite{lu2024deepseek} to the Minecraft environment, transitioning the model's output space from language to low-level actions. We fine-tuned it using OpenAI Contractor Dataset \cite{vpt} and MGOA, which comprises approximately 20,000 videos. In this phase, we freeze the Vision-guided Behavior Encoder, visual encoder, and large language model (LoRA), and only fine-tuned the action head. During fine-tuning, we set the learning rate to 0.00004 and train for 10 epochs. The hyperparameter settings are shown in Table \ref{tb:hyper}.
+
+
+\subsection{Implementation Details}
+For the planner, we follow Li et al. \cite{li2024optimus}, employing Multimodal Hybrid Memory empowered GPT-4V for planning and reflection. For the policy, we train the GOAP through the above pipeline. All experiments were conducted on 8x NVIDIA L40 GPUs. For the MGOA dataset, data collection and filtering were conducted in parallel, taking approximately 7 days. Training required around 2 days, while inference and evaluation on atomic tasks, long-horizon tasks, and open-ended instruction tasks took approximately 4 days.
+
+\section{Benchmark}
+\label{sup:evaluate}
+\subsection{Evaluation Tasks}
+The evaluation tasks are divided into three categories: \textit{Atomic Tasks}, \textit{Long-horizon Tasks}, and \textit{Open-ended Instruction Tasks}. For each task, the agent's environment is randomly initialized each time, and every task is executed at least 30 times. For \textit{Atomic Tasks}, we follow the setting of prior work \cite{lifshitz2024steve,wang2024omnijarvis}, which requires the agent to execute the task within 2 minutes. We then report the average reward for the task, defined as the number of items obtained.
+ For \textit{Open-ended Instruction Tasks} and \textit{Long-horizon Tasks}, we report the average success rate (SR) for each task. 
+
+\textit{Atomic Tasks.} As shown in Figure \ref{fig:example_atomic}, Atomic Tasks are short-term skills in Minecraft, such as ``chop a tree to get logs \includegraphics[width=0.25cm]{figures/logo/wood.pdf}'', ``mine dirt \includegraphics[width=0.25cm]{figures/logo/dirt.pdf}'', ``collect seeds \includegraphics[width=0.25cm]{figures/logo/seeds.pdf}'', and ``dig down to mine stone \includegraphics[width=0.25cm]{figures/logo/cobblestone.pdf}'', etc.
+
+\textit{Long-horizon Tasks.} As shown in Figure \ref{fig:example_long_horizon}, Long-Horizon Tasks are a sequence of \textit{Atomic Tasks}. For example, ``craft an iron sword from scratch'' requires completing the atomic tasks of ``chop 7 logs'', ``craft 21 planks'', ``craft 5 sticks'', ``craft 1 crafting table'', and so on. These \textit{Atomic Tasks} are interdependent, meaning that the failure of any single atomic task will result in the failure of the entire \textit{Long-horizon Task}.
+
+\textit{Open-ended Instruction Tasks.} Open-Ended Instruction Tasks are not limited to predefined text formats; rather, they involve flexible language directives that prompt the agent to accomplish long-horizon tasks. These tasks evaluate the agent’s capacity to interpret and execute instructions expressed in open-ended natural language. We selected Torch \includegraphics[width=0.25cm]{figures/logo/torch.pdf}, Rail \includegraphics[width=0.3cm]{figures/logo/rail.pdf}, Golden Shovel \includegraphics[width=0.3cm]{figures/logo/Golden_Shovel.pdf}, Diamond Pickaxe \includegraphics[width=0.3cm]{figures/logo/diamond_pickaxe.pdf}, and Compass \includegraphics[width=0.3cm]{figures/logo/compass.pdf} as evaluation tasks. Instruction for each task are shown in Table \ref{tab:ins_craft_torch}, Table \ref{tab:ins_craft_rail}, Table \ref{tab:ins_craft_golden_shovel}, Table \ref{tab:ins_craft_diamond_pickaxe} and Table \ref{tab:ins_craft_compass}.
+
+% \input{Supplementary/open_end_ins}
+
+
+\subsection{Baselines}
+In this section, we provide a brief overview of existing Minecraft agents and compare them with our proposed Optimus-2. Current agents can be broadly categorized into two types: policy-based agents and planner-policy agents.
+
+\noindent\textbf{Policy-based Agents}. Policy-based agents \cite{vpt,cai2023groot,lifshitz2024steve,fan2022minedojo,cai2023open} refer to those trained through reinforcement learning or imitation learning, capable of completing atomic tasks within Minecraft. However, due to limitations in instruction understanding and reasoning abilities, they struggle to accomplish long-horizon tasks.
+
+\noindent\textbf{Planner-Policy Agents}. Planner-policy agents \cite{wang2023describe,qin2023mp5,li2024auto,wang2023jarvis,li2024optimus,wang2024omnijarvis} refer to non-end-to-end architectures that utilize a MLLM (Multi-Layered Language Model) as a planner to decompose complex instructions into a sequence of sub-goals executable by a policy. While significant progress has been made, the current performance bottleneck stems from the policy's ability to effectively understand and execute the sub-goals generated by the planner.
+
+\noindent\textbf{Comparison with Existing Agents}. As a core contribution of this work, we propose a novel Goal-Observation-Action Conditioned Policy, GOAP. It integrates two key components: an Action-Guided Behavior Encoder for modeling observation-action sequences, and an MLLM for aligning sub-goals with these sequences. Leveraging the MLLM's advanced understanding of open-ended instructions, GOAP demonstrates superior instruction-following capabilities compared to existing policies. On top of GOAP, the proposed agent, Optimus-2, exhibits superior performance in long-horizon tasks, outperforming the current state-of-the-art across all seven task groups.
+
+\section{Experimental Results}
+\label{sup:exp}
+In this section, we report the experimental results of Optimus-2 on each \textit{Long-horizon task}.
+
+\subsection{Results on Long-horizon Task}
+In this section, we report the results of Optimus-2 on each \textit{Long-horizon Task}, with details including task name, numbers of sub-goals, success rate (SR), and eval times. As shown in Tables \ref{tab:wooden_result} and \ref{tab:gold_result}, Optimus-2 demonstrates superior performance across all 67 \textit{Long-horizon Tasks}. Since Optimus-2 is randomly initialized in arbitrary environments for each task execution, the experimental results also highlight its generalization capability across diverse environments.
+
+
+
+\section{Case Study}
+\label{sup:case}
+In this section, we provide additional cases to illustrate the differences in the ability of VPT (text) \cite{vpt}, STEVE-1 \cite{lifshitz2024steve}, and Optimus-2 to perform \textit{Open-ended Instruction Tasks}. We provide different open-ended instructions requiring the agent to perform tasks across various biomes. As shown in Figure \ref{fig:case1}, Figure \ref{fig:case2}, and Figure \ref{fig:case3}, Optimus-2 effectively completes all tasks, while VPT (text) and STEVE-1 fail due to limitations in language understanding and multimodal perception capabilities. Moreover, we provide several demo videos of Optimus-2 performing long-horizon tasks in the \texttt{Optimus2\_videos} folder within the supplementary materials.
+
+
+\input{Supplementary/open_example}
+
+
+\input{Supplementary/table/optimus1_benchmark_result/wooden_result}
+
+\input{Supplementary/table/optimus1_benchmark_result/golden_result}
+
+\input{Supplementary/case_study}
+
+\clearpage

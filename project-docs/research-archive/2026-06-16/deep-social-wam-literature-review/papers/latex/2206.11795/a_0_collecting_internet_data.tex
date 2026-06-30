@@ -1,0 +1,181 @@
+\section{Collecting Internet Data}
+\label{appendix:collecting_internet_data}
+\subsection{Initial Unclean Dataset Curation}\label{section:data_collection}
+
+Our goal was to curate a video dataset of Minecraft gameplay from the survival game mode. Additionally, we prefer the data come from game modes as close as possible to our evaluation environment, meaning preferably coming from Minecraft version 1.16, being on a computer (which uses a mouse and keyboard vs. video game controllers with keypads and other buttons), being single- (vs. multi-) player, and having the default look of the game (vs. modifications that alter that style, such as to make it look realistic). To try to accomplish these goals, we collect a dataset by performing keyword searches of publicly available videos on the internet. A list of search queries we used are given in Table~\ref{tab:query_strings}.
+
+\begin{table}[h]
+\centering
+\begin{center}
+\begin{tabular}{ |l|}
+\hline
+minecraft survival longplay \\
+minecraft gameplay no webcam \\
+minecraft gameplay survival mode \\
+minecraft survival tutorial \\
+minecraft survival guide \\
+minecraft survival let's play \\
+minecraft survival for beginners \\
+minecraft beginners guide \\
+ultimate minecraft starter guide \\
+minecraft survival guide 1.16 \\
+minecraft how to start a new survival world \\
+minecraft survival fresh start \\
+minecraft survival let's play episode 1 \\
+let's play minecraft episode 1 \\
+minecraft survival 101 \\
+minecraft survival learning to play \\
+how to play minecraft survival \\
+how to play minecraft \\
+minecraft survival basic \\
+minecraft survival for noobs \\
+minecraft survival for dummies \\
+how to play minecraft for beginners \\
+minecraft survival tutorial series \\
+minecraft survival new world \\
+minecraft survival a new beginning \\
+minecraft survival episodio 1 \\
+minecraft survival {\sffamily\foreignlanguage{russian}{epizod}} 1 \\
+minecraft survival 1. bölüm \\
+i made a new minecraft survival world \\
+\hline
+\end{tabular}
+\end{center}
+\caption{\label{tab:query_strings}Search terms used for generating the initial web dataset.}
+\end{table}
+
+For videos that have metadata available, we perform an additional step of metadata-based filtering to eliminate videos that do not fit our target distribution. In this step, we look for a list of blacklist keywords in the video title and description and reject videos that contain these terms. The blacklist keywords we use are: \{ps3, ps4, ps5, xbox 360, playstation, timelapse, multiplayer, minecraft pe, pocket edition, skyblock, realistic minecraft, how to install, how to download, realmcraft, animation\}. This process yielded us $\sim$270k hours of unlabeled data, which we filter down to only a ``clean'' subset as described in the next section.
+
+
+
+\subsection{Training a Model to Filter out Unclean Video Segments}\label{section:svm}
+
+We restrict the scope of this work to the Minecraft Survival game mode and therefore limit our training dataset to clips that are obtained from this mode that are relatively free from visual artifacts. To do so, we asked contractors to label a set of random video frames (images) from Minecraft videos (N=8800). These images were from  a random subset of the videos we collected toward the beginning of the project (Section~\ref{section:data_collection}).
+
+
+\subsubsection{Label Collection}
+
+
+We asked 5 workers on Amazon Mechanical Turk (mTurk) that we selected with a sample qualification task to label random screen capture images to be used in training the classifier. A sample worker interface that the workers saw on mTurk is given in Figure~\ref{fig:mTurk_worker_interface}.
+
+We asked workers to label videos as being in one of the following three categories (see Figure~\ref{fig:a_1_data_class_examples} for visual examples of each class):
+\begin{enumerate}
+    \item \texttt{Minecraft Survival Mode - No Artifacts:} Video frames (images) that correspond to the Minecraft Survival game mode that do not contain any non-game visual artifacts (e.g.\ subscribe buttons, channel logos, advertisements, picture-in-picture of the narrator, etc.).
+    \item \texttt{Minecraft Survival Mode - with Artifacts:} Video frames (images) of the Minecraft Survival game mode that include such visual artifacts. 
+    \item \texttt{None of the Above:} Video frames (images) that are not from the Minecraft survival game mode, including those from other Minecraft game modes such as \emph{creative} mode or even other games/topics entirely.
+\end{enumerate}
+
+The full set of instructions workers received are as follows (note that we also included multiple image examples from each category in the worker instructions, similar to the sample subset provided in Figure~\ref{fig:a_1_data_class_examples}):
+
+\noindent\fbox{%
+    \parbox{\textwidth}{
+~\\
+Please help us identify screenshots that belong only to the survival mode in Minecraft. Everything else (Minecraft creative mode, other games, music videos, etc.) should be marked as \texttt{None of the above}. Survival mode is identified by the info at the bottom of the screen:
+\begin{itemize}
+    \item a health bar (row of hearts)
+    \item a hunger bar (row of chicken drumsticks)
+    \item a bar showing items held
+\end{itemize}
+
+{\bf Survival Mode}
+
+Valid survival mode videos have health/hunger bars and an item hotbar at the bottom of the screen. 
+
+{\bf Creative Mode}
+
+Creative mode only has an item hotbar and should be classified as \texttt{None of the Above}. 
+
+~\\
+
+{\bf Label Descriptions}
+
+\begin{itemize}
+\item
+\texttt{Minecraft Survival Mode - No Artifacts:}
+These images will be clean screenshots from the Minecraft survival mode gameplay without any noticeable artifacts.
+\item
+\texttt{Minecraft Survival Mode - with Artifacts:}
+These images will be valid survival mode screenshots, but with some added artifacts. Typical artifacts may include image overlays (a logo/brand), text annotations, a picture-in-picture of the player, etc.
+\item
+\texttt{None of the Above:}
+Use this category when the image is not a valid Minecraft survival screenshot. It may be a non-Minecraft frame or from a different game mode. In non-survival game modes such as the creative mode, the health/hunger bars will be missing from the image, the item hotbar may or may not be still present.
+\end{itemize}
+}}
+
+
+In total, we spent \$319.96 on human labeling experiments on mTurk, of which \$159.98 was directly paid to workers. The remaining amount was spent towards Amazon platform fees. The workers received \$0.01 per labeled image, at an hourly compensation of \$7.20 (based on an estimated labeling time of 5 seconds/image – in our internal sample run of the same task, we found the average labeling time to be < 3 seconds).
+
+Since we perform rigorous keyword and metadata based filtering of videos (as described in \ref{section:data_collection}) from which we served sample images to be labeled, serving offensive content to workers was extremely low risk and no such images were detected during our manual checks. We only collected labels during our experiment, and the workers were fully anonymized via the mTurk platform, therefore no personally identifiable information (PII) was collected.
+
+\begin{figure}[htbp]
+\includegraphics[width=\linewidth]{assets/a_1/mTurk_screenshot.png} 
+\caption{Amazon Mechanical Turk worker interface showing an example labeling task}
+\label{fig:mTurk_worker_interface}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+     \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{assets/a_1/clean_1.png} 
+    \end{subfigure}
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{assets/a_1/artifacts_1.png} 
+    \end{subfigure}
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{assets/a_1/notmc_1.png} 
+    \end{subfigure}
+    \caption{\label{fig:a_1_data_class_examples}\textbf{(Left)} Sample image for Class 1: \texttt{Minecraft Survival Mode - No Artifacts}. \textbf{(Middle)} Sample image for Class 2: \texttt{Minecraft Survival Mode - with Artifacts} – Image contains annotations and picture-in-picture of the narrator. \textbf{(Right)} Sample image for Class 3: \texttt{None of the Above} – Image is missing the hotbar as well as health and armor bars, indicating that it was not captured during survival mode gameplay}
+\end{figure}
+
+\subsubsection{SVM Training}
+
+With the image labels collected as described in the previous section, we trained a classifier to extract video segments that consist of frames from the \texttt{Minecraft Survival Mode - No Artifacts} category.
+Given a set of labeled images, we obtain embeddings for each image using the RN50x64 ResNet CLIP Model.\cite{radford2021learning} This is a ResNet-based CLIP model that is scaled up to have approximately 64x the compute of a ResNet-50. We then train a Support Vector Machine (SVM) using the RBF kernel to obtain a frame classifier. We use the Scikit-learn\cite{pedregosa2011scikit} SVM implementation with the parameter configuration given in Table~\ref{svmtable}.
+
+
+\begin{table}[htbp]
+\centering
+\begin{center}
+\begin{tabular}{ |l|l|l|}
+\hline
+ CLIP Model Specification & \multicolumn{2}{l|}{RN50x64 (see text)}\\
+ \hline
+ CLIP Input Image Resolution & \multicolumn{2}{l|}{448x448x3} \\
+ \hline
+ CLIP Embedding Feature Length & \multicolumn{2}{l|}{1024} \\
+ \hline
+ \multirow{3}{*}{SVM Parameters} & Kernel & \texttt{rbf} \\
+ \cline{2-3} 
+ & C & \texttt{20}\\
+ \cline{2-3} 
+ & Gamma & \texttt{scale} \\
+  \hline
+ \multirow{3}{*}{Sample Size} & Class 1 & 2200 \\
+ \cline{2-3} 
+ & Class 2 & 2200\\
+ \cline{2-3} 
+ & Class 3 & 4400 \\
+ \hline
+\end{tabular}
+\end{center}
+\caption{Feature Extraction Details and SVM Configuration. The parameters are for the SVM implementation in Scikit-learn\cite{pedregosa2011scikit}.
+}
+\label{svmtable}
+\end{table}
+
+Finally, we apply the classifier to frames of raw video sequences at a rate of 3 frames/second. We filter for videos that consist of at least 80\% "clean" frames at this stage (Classes \texttt{Minecraft Survival Mode - with Artifacts} and \texttt{None of the Above} are both considered not clean). From this set, we apply a median filter (with a kernel size of 7) to the labels and segment videos by splitting the "clean" segments that are at least 5s in duration. The result of this is our final \texttt{web\_clean} dataset.
+
+\subsection{\texttt{early\_game} Dataset}
+ \label{appendix:early_game_data}
+The \texttt{early\_game} dataset is a $\sim$3000 hour subset of \texttt{web\_clean} targeted at ``early game'' Minecraft behavior, i.e. instances where players start in a fresh world with no items. We obtain the metadata text that accompanies the videos in \texttt{web\_clean} and determine whether any of the following regular expressions match:
+\begin{itemize}
+    \item (ep|episode|eps|day|session|sesh|chapter|chap\\.|series|part|parte|pt|round|day|t\d{\^{a}}p|b\"ol\"um|episodio|\sffamily\foreignlanguage{russian}{епизод}|\sffamily\foreignlanguage{russian}{эпизод})( )*(\textbackslash.1|\#1|1|\textbackslash.01|\#01|01|one[\hspace{1.5px}$\hat{ }$\hspace{1.5px}0-9]|\$)
+    \item start
+    \item beginning
+    \item (new|fresh|clean).*(world|game|play)
+    \item from scratch
+\end{itemize}
+From this set of videos, we take only the first 5 minutes of each video.

@@ -1,0 +1,59 @@
+\section{Method}
+\label{sec:method}
+
+\input{figures/figure_imagination_kungfu}
+
+We formulate the problem as a Partially Observable Markov Decision Process (\textsc{pomdp}) with image observations $x_t \in \mathbb{R}^{h \times w \times 3}$, discrete actions $a_t \in \{1, \dots, A\}$, scalar rewards $r_t \in \mathbb{R}$, episode termination $d_t \in \{0, 1\}$, discount factor $\gamma \in (0, 1)$, initial observation distribution $\rho_0$, and environment dynamics $x_{t+1}, r_t, d_t \sim p(x_{t+1}, r_t, d_t \mid x_{\le t}, a_{\le t})$. The reinforcement learning objective is to train a policy $\pi$ that yields actions maximizing the expected sum of rewards $\mathbb{E}_\pi[\sum_{t \ge 0} \gamma^t r_t]$.
+
+Our method relies on the three standard components to learn in imagination \citep{sutton}: experience collection, world model learning, and behavior learning. In the vein of \citet{worldmodels, simple, dreamerv1, dreamerv2}, our agent learns to act exclusively within its world model, and we only make use of real experience to learn the environment dynamics.
+
+We repeatedly perform the three following steps: 
+\begin{itemize}[left=1em]
+    \setlength\itemsep{0.5em}
+    \item \texttt{collect\_experience}: gather experience in the real environment with the current policy. 
+    \item \texttt{update\_world\_model}: improve rewards, episode ends and next observations predictions.
+    \item \texttt{update\_behavior}: in imagination, improve the policy and value functions. 
+\end{itemize}
+
+The world model is composed of a discrete autoencoder \citep{vqvae}, to convert an image to tokens and back, and a \textsc{gpt}-like autoregressive Transformer \citep{vaswani, radford_gpt2, brown_gpt3}, whose task is to capture environment dynamics. Figure \ref{fig:method} illustrates the interplay between the policy and these two components during imagination. We first describe the autoencoder and the Transformer in Sections \ref{section:im_to_tok} and \ref{section:modeling_dynamics}, respectively. Section \ref{section:learn_in_imagination} then details the procedure to learn the policy and value functions in imagination. Appendix \ref{appendix:architectures} provides a comprehensive description of model architectures and hyperparameters. Algorithm \ref{alg:iris} summarizes the training protocol.
+
+\subsection{From image observations to tokens}
+\label{section:im_to_tok}
+
+The discrete autoencoder $(E, D)$ learns a symbolic language of its own to represent high-dimensional images as a small number of tokens. The back and forth between frames and tokens is illustrated with green arrows in Figure \ref{fig:method}.
+
+More precisely, the encoder $E : \mathbb{R}^{h \times w \times 3} \rightarrow \{ 1, \dots, N \}^K$ converts an input image $x_t$ into $K$ tokens from a vocabulary of size $N$. Let $\mathcal{E} = \{e_i\}_{i=1}^N \in \mathbb{R}^{N \times d}$ be the corresponding embedding table of $d$-dimensional vectors. The input image $x_t$ is first passed through a Convolutional Neural Network (\textsc{cnn}) \citep{cnn_lecun} producing output $y_t \in \mathbb{R}^{K \times d}$. We then obtain the output tokens $z_t = (z_t^1, \dots, z_t^K) \in \{ 1, \dots, N \}^K$ as $z_t^k = \argmin_{i} \norm{y_t^k - e_i}_2$, the index of the closest embedding vector in $\mathcal{E}$ \citep{vqvae, vqgan}. Conversely, the \textsc{cnn} decoder $D : \{1, \dots, N\}^K \rightarrow \mathbb{R}^{h \times w \times 3}$ turns $K$ tokens back into an image. 
+
+This discrete autoencoder is trained on previously collected frames, with an equally weighted combination of a $L_1$ reconstruction loss, a commitment loss \citep{vqvae, vqgan}, and a perceptual loss \citep{vqgan, johnson, larsen}. We use a straight-through estimator \citep{straightthrough} to enable backpropagation training. 
+
+
+\subsection{Modeling dynamics}
+\label{section:modeling_dynamics}
+
+At a high level, the Transformer $G$ captures the environment dynamics by modeling the language of the discrete autoencoder over time. Its central role of unfolding imagination is highlighted with the blue arrows in Figure \ref{fig:method}. 
+
+Specifically, $G$ operates over sequences of interleaved frame and action tokens. An input sequence $(z_0^1, \dots, z_0^K, a_0, z_1^1, \dots, z_1^K, a_1, \dots, z_t^1, \dots, z_t^K, a_t)$ is obtained from the raw sequence $(x_0, a_0, x_1, a_1, \dots, x_t, a_t)$ by encoding the frames with $E$, as described in Section \ref{section:im_to_tok}.
+
+At each time step $t$, the Transformer models the three following distributions: 
+\begin{alignat}{4}
+& \text{Transition: }   &   \hat{z}_{t+1}         &   \sim p_G\big(     \hat{z}_{t+1}  &  \mid z_{\le t}, a_{\le t} \big) & \text{ with } \hat{z}_{t+1}^k \sim p_G\big(\hat{z}_{t+1}^k \mid z_{\le t}, a_{\le t}, z_{t+1}^{<k} \big)\\
+& \text{Reward: }       &   \hat{r}_t \text{~~}   &   \sim p_G\big(\text{~~} \hat{r}_t &  \mid z_{\le t}, a_{\le t} \big) & \\
+& \text{Termination: }  &   \hat{d}_t \text{~~}   &   \sim p_G\big(\text{~~} \hat{d}_t &  \mid z_{\le t}, a_{\le t} \big) & 
+\end{alignat}
+
+Note that the conditioning for the $k$-th token also includes $z_{t+1}^{<k} \coloneqq (z_{t+1}^1, \dots, z_{t+1}^{k-1})$, the tokens that were already predicted, i.e. the autoregressive process happens at the token level.
+
+We train $G$ in a self-supervised manner on segments of $L$ time steps, sampled from past experience. We use a cross-entropy loss for the transition and termination predictors, and a mean-squared error loss or a cross-entropy loss for the reward predictor, depending on the reward function.
+
+\subsection{Learning in imagination}
+\label{section:learn_in_imagination}
+
+\input{figures/figure_pixel_perfect}
+
+Together, the discrete autoencoder $(E,D)$ and the Transformer $G$ form a world model, capable of imagination. The policy $\pi$, depicted with purple arrows in Figure \ref{fig:method}, exclusively learns in this imagination \textsc{mdp}. 
+
+At time step $t$, the policy observes a reconstructed image observation $\hat{x}_t$ and samples action $a_t \sim \pi(a_t | \hat{x}_{\le t})$. The world model then predicts the reward $\hat{r}_t$, the episode end $\hat{d}_t$, and the next observation $\hat{x}_{t+1} = D(\hat{z}_{t+1})$, with $\hat{z}_{t+1} \sim p_G(\hat{z}_{t+1} \mid z_0, a_0, \hat{z}_1, a_1, \dots, \hat{z}_t, a_t)$. This imagination procedure is initialized with a real observation $x_0$ sampled from past experience, and is rolled out for $H$ steps, the imagination horizon hyperparameter. We stop if an episode end is predicted before reaching the horizon. Figure \ref{fig:method} illustrates the imagination procedure.
+
+As we roll out imagination for a fixed number of steps, we cannot simply use a Monte Carlo estimate for the expected return. Hence, to bootstrap the rewards that the agent would get beyond a given time step, we have a value network $V$ that estimates $V(\hat{x}_t) \simeq \mathbb{E}_\pi\big[ \sum_{\tau \ge t} \gamma^{\tau - t} \hat{r}_\tau \big]$.
+
+Many actor-critic methods could be employed to train $\pi$ and $V$ in imagination \citep{sutton, simple, dreamerv1}. For the sake of simplicity, we opt for the learning objectives and hyperparameters of DreamerV2 \citep{dreamerv2}, that delivered strong performance in Atari games. Appendix \ref{appendix:actor_critic} gives a detailed breakdown of the reinforcement learning objectives.

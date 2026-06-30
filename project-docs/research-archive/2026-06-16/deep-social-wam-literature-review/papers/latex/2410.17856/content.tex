@@ -1,0 +1,358 @@
+\begin{strip}\centering
+\includegraphics[width=0.95\linewidth]{figures/teaser.png}
+\vspace{2.0mm}
+\captionof{figure}{
+\textbf{Our pipeline solves creative tasks, such as \textit{get the obsidian} in the original Minecraft version, using the action space identical to human players (mouse \& keyboard).} 
+We present a novel instruction interface, \emph{visual-temporal context prompting}, under which we learn a spatial-sensitive policy, \agent. VLMs identify regions of interest within each observation, effectively guiding \agent interactions. 
+}
+\label{fig:teaser}
+\end{strip}
+
+
+\section{Introduction}
+\label{sec:intro}
+
+\begin{figure*}[ht]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/comparison.png}
+\end{center}
+\vspace{-2.0 mm}
+\caption{
+\textbf{Different pipelines in solving embodied decision-making tasks.} 
+\textbf{(a)} End-to-end pipeline modeling token sequences of language, observations, and actions. 
+\textbf{(b)} Language prompting: VLMs decompose instructions for language-conditioned policy execution. 
+\textbf{(c)} Latent prompting: maps discrete behavior tokens to low-level actions. 
+\textbf{(d)} Future-image prompting: fine-tunes VLMs and diffusion models for image-conditioned control. 
+\textbf{(e)} Visual-temporal prompting: VLMs generate segmentations and interaction cues to guide \agent. 
+}
+\label{fig:comparison}
+\end{figure*}
+
+Pre-trained foundation vision-language models (VLMs) \citep{gemini, gpt4} have shown impressive performance in reasoning, visual question answering, and task planning \citep{rt-2,palm-e,deps,agentsurvey}, primarily due to training on internet-scale multimodal data. Recently, there has been growing interest in transferring these capabilities to embodied decision-making in open-world environments. Existing approaches can be broadly categorized into (i) end-to-end and (ii) hierarchical approaches. End-to-end approaches, such as RT-2 \citep{rt-2}, Octo \citep{octo}, LEO \citep{leo}, and OpenVLA \citep{openvlm}, aim to enable VLMs to interact with environments by collecting robot manipulation trajectory data annotated with text. This data is then tokenized to fine-tune VLMs into vision-language-action models (VLAs) in an end-to-end manner, as illustrated in Figure \ref{fig:comparison}(a). However, collecting such annotated trajectory data is resource-intensive and difficult to scale. Moreover, introducing the action modality risks compromising the foundational abilities of VLMs. 
+% \anji{Now we move on to ``hierarchical approaches''.}
+% Alternative approaches \citep{deps, voyager, palm-e} leverage VLMs’ reasoning abilities to zero-shot decompose tasks into language-based sub-tasks, with a separate language-conditioned policy executing them in the environment, refer to Figure \ref{fig:comparison}(b). However, language instructions often fail to effectively convey spatial information, limiting the tasks agents can solve. For example, when multiple homonymous objects appear in an observation image, distinguishing a specific one using language alone may require extensive spatial descriptors, increasing data collection complexity and learning difficulty for the language-conditioned policy. 
+
+Hierarchical agent architectures typically consist of a high-level reasoner and a low-level policy, which can be trained independently. In this architecture, the ``communication protocol'' between components defines the capability limits of the agent. Alternative approaches \citep{deps, voyager, palm-e} leverage VLMs’ reasoning abilities to zero-shot decompose tasks into language-based sub-tasks, with a separate language-conditioned policy executing them in the environment, refer to Figure \ref{fig:comparison}(b). However, language instructions often fail to effectively convey spatial information, limiting the tasks agents can solve. For example, when multiple homonymous objects appear in an observation image, distinguishing a specific one using language alone may require extensive spatial descriptors, increasing data collection complexity and learning difficulty for the language-conditioned policy. 
+% \anji{Now that we have introduced hierarchical approaches, we can mention the different ``interacting interfaces'' as shown in Figure 2. (This is what the following paragraph is about.)}\anji{The point is to add the high-level skeleton as in the comments to make it easier for the readers to grasp our main idea.}
+To address this issue, approaches like STEVE-1 \citep{steve1}, GROOT-1 \citep{groot1}, and MineDreamer \citep{minedreamer} propose using a purely vision-based interface to convey task information to the low-level policy. MineDreamer, in particular, uses hindsight relabeling to train an image-conditioned policy \citep{steve1} for interaction, while jointly fine-tuning VLMs and diffusion models to generate goal images that guide the policy, shown in Figure \ref{fig:comparison}(d). Although replacing language with imagined images as the task interface simplifies data collection and policy learning, predicting future observations requires building a world model, which still faces challenges such as hallucinations, temporal inconsistencies, low-quality generation, and limited temporal scope. 
+
+In human task execution, such as object grasping, people do not pre-imagine holding an object but maintain focus on the target object while approaching its affordance. When the object is obscured, humans rely on memory to recall its location and connect past and present visual scenes. This use of visual-temporal context enables humans to solve tasks effectively in novel environments. 
+Building on this idea, we propose a novel communication protocol called \textbf{visual-temporal context prompting}, as shown in Figure \ref{fig:comparison}(e). This allows users/reasoners to apply object segmentation to highlight regions of interest in past and current visual observations and convey interaction-type cues via a set of skill primitives. Based on this, we learn \textbf{\agent}, a low-level policy that uses visual observations and reasoner-provided segmentations as task prompts to predict actions causally. Specifically, a transformer \citep{transformerxl} models dependencies between observations, essential for representing tasks in partially observable environments. As a bonus feature, \agent can enhance its object-tracking capabilities during inference by integrating the state-of-the-art video segmentation model, SAM-2 \citep{sam2}, in a plug-and-play fashion. Additionally, we propose a \textbf{backward trajectory relabeling} method, which efficiently generates segmentation annotations in reverse temporal order using SAM-2, facilitating the creation of training datasets for \agent. 
+Finally, we develop a hierarchical agent architecture leveraging visual-temporal context prompting, which perfectly inherits the vision-language reasoning capabilities of foundational VLMs. Experiments in Minecraft demonstrate that our pipeline enables agents to complete tasks previously unattainable by other methods, while the hierarchical architecture effectively solves long-horizon tasks. 
+
+Our main contributions are threefold:
+\textbf{(1)} We present \textbf{visual-temporal context prompting}, a novel protocol that effectively communicates spatial and interaction cues in hierarchical agent architecture. 
+\textbf{(2)} We learn \textbf{\agent}, the first segmentation-conditioned policy in Minecraft, capable of interacting with nearly all the objects. 
+\textbf{(3)} We develop \textbf{backward trajectory relabeling} method that can automatically detect and segment desired objects in collected trajectories with pre-trained SAMs for training \agent. 
+
+% With the support of large-scale multimodal data from the internet, pre-trained foundation vision-language models (VLMs) \citep{gemini, gpt4} have demonstrated impressive performance in areas such as logical reasoning, visual question answering, and task planning. In recent years, researchers have explored transferring the capabilities of these foundation VLMs to the domain of embodied decision-making in open-world environments, aiming to advance the development of general artificial intelligence. To enable VLMs to interact with environments, works such as RT-2 \citep{rt-2}, Octo \citep{octo}, Leo \citep{leo}, and OpenVLA \citep{openvlm} have collected robot manipulation trajectory data annotated with text, which is tokenized and used to fine-tune VLMs into vision-language-action (VLA) models. However, the collection of trajectory data is prohibitively expensive, making it challenging to scale such approaches. Moreover, the introduction of new modality data may degrade the foundational capabilities of VLMs. 
+% Approaches like \citep{deps, voyager, palm-e} have proposed leveraging the inherent reasoning capabilities of VLMs to zero-shot decompose tasks into a series of sub-tasks described in language, while learning a separate language-conditioned policy to execute these sub-tasks in the environment. However, language instructions often struggle to convey spatial information effectively, which significantly limits the types of tasks an agent can handle. For instance, when multiple identical objects are present in an observation, distinguishing a specific object using language may require combining a large number of spatial descriptors, substantially increasing the difficulty of data collection and the learning complexity of the language-conditioned policy. 
+
+% To address this issue, approaches such as STEVE-1 \citep{steve1}, GROOT-1\cite{groot1}, and MineDreamer \citep{minedreamer} propose using a purely vision-based interface to convey task information to the low-level policy. Specifically, MineDreamer employs a hindsight relabeling technique to train an image-conditioned policy \citep{steve1} for environment interaction, while fine-tuning a VLM and Diffusion Model to generate goal images that guide the policy. Although removing the language modality from the task interface significantly reduces the complexity of data collection and policy learning, predicting future environmental observations essentially involves building a world model, which remains challenged by unsolved issues such as hallucinations, temporal inconsistencies, low generation quality, and limited temporal scope. 
+% Considering how humans perform environment interaction tasks, such as object grasping, they typically do not pre-imagine a scene of holding an object. Instead, their visual focus remains locked on the target object. When the target object is absent from the current visual observation, humans often rely on memory to recall the object’s previous location and attempt to connect the remembered scene with the current one. Using visual context to express task information allows humans to solve problems effectively in novel environments. 
+
+% Inspired by this, we propose a task representation method called visual-temporal context prompting. Specifically, we allow users to apply object segmentation to highlight regions of interest within past visual observations (including the current observation) and convey desired interaction types through predefined skill primitives. We introduce \agent, a conditioned policy that takes a sequence of visual observations from the environment and user-provided object segmentations as task prompts to causally predict actions. Notably, we use a transformer architecture to model dependencies between visual observations, which is crucial for representing tasks in partially observable environments. 
+% As an additional feature, we demonstrate that \agent can enhance its object-tracking capabilities during inference by integrating the state-of-the-art video segmentation model, SAM-2 \citep{sam2}, in a plug-and-play manner. To train \agent, we propose a backward trajectory relabeling method that efficiently generates segmentation annotations for each trajectory frame using pre-trained vision-language and video segmentation models. 
+% Finally, we build a hierarchical agent architecture based on the visual-temporal context prompting mechanism. This architecture inherits the vision-language reasoning capabilities of VLA foundation models while accurately conveying task information to the policy via spatial data. Experiments in the open-world environment of Minecraft show that our proposed pipeline enables the agent to complete tasks previously unattainable by other methods. Moreover, the hierarchical architecture demonstrates significant performance improvements in solving long-horizon planning tasks.
+
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/pipeline.pdf}
+\end{center}
+\caption{
+\textbf{\agent architecture.} \agent processes interaction types ($c$), observations ($o$), and object segmentations ($m$) to predict actions ($a$) using a causal transformer. Observations and segmentations are concatenated and passed through a visual backbone for deep fusion. Interaction types and segmentations are randomly dropped with a set probability during training. 
+}
+\label{fig:pipeline}
+\end{figure*}
+
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+% \anji{Maybe a better order of paragraphs is RL, VLM, SAM.}
+
+\paragraph{Offline Reinforcement Learning}
+We model the open-world interaction problem as a Markov Decision Process (MDP) $\left< \mathcal{O}, \mathcal{A}, \mathcal{P}, \mathcal{C}, \mathcal{M}, \mathcal{R} \right>$, where $\mathcal{O}$ and $\mathcal{A}$ represent the observation and action spaces, $\mathcal{P}: \mathcal{O} \times \mathcal{A} \times \mathcal{O} \rightarrow \mathbb{R}^{+}$ describes the environment dynamics, $\mathcal{C}$ is the set of interaction types, and $\mathcal{M}$ is the segmentation mask space. The binary reward function $\mathcal{R}: \mathcal{O} \times \mathcal{A} \times \mathcal{C} \times \mathcal{M} \rightarrow \{0, 1\}$ determines whether the policy has completed the specified interaction with the object indicated by the segmentation mask at each time step. The objective of reinforcement learning is to learn a policy that maximizes the expected cumulative reward, $\mathbb{E} \left[ \sum_{t=1}^{T} r_t \right]$, where $r_t$ is the reward at time step $t$. 
+Our proposed \emph{backward trajectory relabeling} method ensures that each trajectory attains a positive reward based on current object segmentations. This allows us to discard the rewards and learn a conditioned policy $\pi(a | o, c, m)$ directly using behavior cloning. In the offline setting, agents do not interact with the environment but rely on a fixed, limited dataset of trajectories. This setting is harder as it removes the ability to explore the environment and gather additional feedback. 
+
+\paragraph{Vision Language Models} 
+Vision-Language Models (VLMs) are machine learning models capable of processing both image and language modalities. Recent advances in generative pretraining have led to the emergence of conversational models like Gemini \citep{gemini}, GPT-4o \citep{gpt4}, and Molmo \citep{molmo}, which are trained on large-scale multimodal data and can reason and generate human-like responses based on text and images. Models such as Palm-E \citep{palm-e} have demonstrated strong abilities in embodied question-answering and task planning. However, standalone VLMs cannot often interact directly with environments. Some approaches use VLMs to generate language instructions for driving low-level controllers, but these methods struggle with expressing spatial information. This work focuses on releasing VLMs’ spatial understanding in embodied decision-making scenarios. 
+Molmo can accurately identify correlated objects in images using a list of $(x, y)$ coordinates, as demonstrated in \url{https://molmo.allenai.org}. 
+
+\paragraph{Segment Anything Models} 
+The Segment Anything Model (SAM, \cite{sam}), introduced by Meta, is a segmentation model capable of interactively segmenting objects based on point or bounding box prompts, or segmenting all objects in an image at once. It demonstrates impressive zero-shot generalization in both real-world and video game environments. Recently, Meta introduced SAM-2 \citep{sam2}, extending segmentation to the temporal domain. With SAM-2, users can prompt object segmentation with points or bounding boxes on a single video frame, and the model will track the object forward or backward in time, refer to \url{https://ai.meta.com/sam2}. Remarkably, SAM-2 continues tracking even if the object disappears and reappears, making it well-suited for partially observable open-world environments. In addition, we find the SAM models can be equipped with a text prompt module, enabling them to ground text-based concepts in visual images, as seen in grounded SAM \citep{liu2023grounding}. 
+
+
+
+\section{Methods}
+\label{sec:method}
+
+\paragraph{Overview} Our work focuses on addressing complex interactive tasks in open-world environments like Minecraft. We leverage VLMs’ visual-language reasoning capabilities to decompose tasks into multiple steps and determine object interactions based on environmental observations. For example, the \textit{``build nether portal''} task requires a sequence of block placements at specific locations. A controller is also needed to map these steps into low-level actions. To convey spatial information accurately, we propose a visual-temporal context prompting protocol and a low-level policy, \agent. Pretrained VLMs process a sequence of frames $o_{1:t}$  and a language-based task description to generate object segmentations $m_{1:t}$  and interaction types $c_{1:t}$, representing the interaction steps. The learned \agent $\pi(a_t | o_{1:t}, m_{1:t}, c_{1:t})$ interprets these outputs to interact with the environment in real-time. In this section, we outline \agent’s architecture and training methods, the dataset collection process, and a pipeline integrating \agent with state-of-the-art VLMs. 
+
+% \anji{I think we need to first have a short section describing the overall setting: we have an environment and are given an instruction (e.g., build a house). Then how does this relate to \agent? What does this model take as input? How should we use it?}
+% \anji{We can introduce notations about the trajectory (e.g., $o, m, c, a$) there.}
+
+% \anji{It reads better to have the third subsection described first, treating \agent as a black box. Then we can open up the black box.}
+
+% In this section, we introduce \agent, a conditioned policy that prompts precise spatial interaction information in visual-temporal contexts. We first describe the model architecture and training process, followed by the data collection methods. Finally, we explain how \agent integrates with general vision-language models to solve complex long-horizon tasks. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/datapipe.png}
+\end{center}
+\caption{
+\textbf{Trajectory relabeling pipeline in Minecraft.} A bounding box and point selection are applied to the image center in the frame preceding the interaction event to identify the interaction object. SAM-2 is then run in reverse temporal order for a specified duration, with the interaction type remaining consistent throughout. 
+} 
+\label{fig:datapipe}
+\end{figure*}
+
+\paragraph{\agent Architecture}
+To train \agent, we prepare interaction trajectory data in the format:
+$\tau = (o_1, m_1, c_1, a_1, \cdots, o_T, m_T, c_T, a_T)$,
+where $o_t \in \mathbb{R}^{3xHxW}$ is the visual observation at time $t$, $m_t \in \{0, 1\}^{1xHxW}$ is a binary mask highlighting the object in $o_t$ for future interaction, $c_t \in \mathbb{N}$ denotes the interaction type, and $a_t$ is the action. If both $m_t$ and $c_t$ are zeros, no region is highlighted at $o_t$. 
+As shown in Figure \ref{fig:pipeline}, \agent is formalized as a conditioned policy, $\pi(a_t | o_{1:t}, m_{1:t}, c_{1:t})$, which takes a sequence of observations and object-segmented interaction regions to causally predict actions. To effectively encode spatial information, inspired by \cite{controlnet}, we concatenate the observation and object segmentation pixel-wise into a 4-channel image, which is processed by a visual backbone for deep fusion, followed by an attention pooling layer: 
+\begin{align}
+h_t &\leftarrow \texttt{Backbone}([o_t, m_t]), \\
+x_t &\leftarrow \texttt{AttentionPooling}(h_t). 
+\end{align}
+We extend the input channels of the first convolution layer in the pre-trained visual backbone from 3 to 4, initializing the new parameters to zero to minimize impact during early training. A TransformerXL \citep{transformerxl, vpt} module is then used to model temporal dependencies between observations and incorporate interaction type information to predict the next action $\hat{a}_t$: 
+\begin{equation}
+    \hat{a}_t \leftarrow \texttt{TransformerXL}(c_1, x_1, \cdots, c_t, x_t). 
+\end{equation}
+We delay the integration of interaction type information $c_t$ until after fusing $m_t$ and $o_t$, enabling the backbone to share knowledge across interaction types and mitigating data imbalance. Behavior cloning loss is used for optimization. However, this approach risks making $a_t$ overly dependent on $m_t$ and $c_t$, reducing the model's temporal reasoning capability. To address this, we propose randomly dropping segmentations with a certain probability, forcing the model to infer user intent from past inputs (visual-temporal context). The final optimization objective is: 
+\begin{equation}
+    \mathcal{L} = -\sum_{t=1}^{|\tau|} \log \pi(a_t | o_{1:t}, m_{1:t} \odot w_{1:t}, c_{1:t} \odot w_{1:t}), 
+\end{equation}
+where $w_t \sim \text{Bernoulli}(1-p)$ represents a mask, with $p$ denoting the dropping probability, $\odot$ denotes the product operation over time dimension. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/combination.png}
+\end{center}
+\vspace{-4.0 mm}
+\caption{
+\textbf{A hierarchical agent structure based on our proposed visual-temporal context prompting. } A GPT-4o model decomposes complex tasks into steps based on the current observation, while the Molmo model identifies interactive objects by outputting points. SAM-2 segments these objects based on the point prompts, and \agent uses the object masks and interaction types to make decisions. GPT-4o and Molmo run at low frequencies, while SAM-2 and \agent operate at the same frequency as the environment. 
+} 
+\label{fig:inference}
+\end{figure*}
+
+\paragraph{Backward Trajectory Relabeling} We seek to build a dataset for training \agent. The collected trajectory data $\tau$ typically contains only observations and actions. To generate object segmentations and interaction types for each frame, we propose a hindsight relabeling technique \citep{her} combined with an object tracking model \citep{sam2} for efficient data labeling. We first define a set of interactions $\mathcal{C}$ and identify frames where interaction events occur, detected using a pre-trained vision-language model, such as \cite{gpt4}. Then, we traverse the trajectory in reverse order, segmenting interacting objects in frame $t$ via an open-vocabulary grounding model \citep{liu2023grounding}. Finally, SAM-2 \citep{sam2} is used to track and generate segmentations for frames $t-1, t-2, \dots, t-k$, where $k$ is the window length. 
+
+For Minecraft, we use contractor data \citep{vpt} from OpenAI, consisting of 1.6 billion frames of human gameplay. This dataset includes meta information for each frame, recording interaction events such as \textit{kill entity}, \textit{mine block}, \textit{use item}, \textit{interact}, \textit{craft}, and \textit{switch}, eliminating the need for vision-language models to detect events. We observed that interacting objects are often centered in the previous frame, allowing the use of a fixed-position bounding box and point with the SAM model for segmentation, replacing open-vocabulary grounding models. 
+We also introduced an additional interaction type, \textit{navigate}, where significant player displacement over a trajectory identifies the most prominent object in the final frame as the target. As shown in Figure \ref{fig:datapipe}, the entire labeling process can be automated using SAM-2.
+
+
+
+\paragraph{Integration with High-level Reasoner} 
+Completing complex long-horizon tasks in open-world environments requires agents to have strong commonsense knowledge and visual-language reasoning, both of which are strengths of modern VLMs. As shown in Figure \ref{fig:inference}, we design a hierarchical agent architecture comprising GPT-4o \citep{gpt4}, Molmo \citep{molmo}, SAM-2 \citep{sam2}, and ROCKET-1. GPT-4o decomposes tasks into object interactions based on an observation $o_{t-k}$, leveraging its extensive knowledge and reasoning abilities. Since GPT-4o cannot directly output the object masks, Molmo generates $(x, y)$ coordinates for the described objects. SAM-2 then produces the object mask $m_{t-k}$ from these coordinates and efficiently tracks objects $m_{t-k+1:t}$ in subsequent observations. ROCKET-1 uses the generated masks $m_{t-k:t}$ and interaction types $c_{t-k:t}$ from GPT-4o to engage with the environment. Due to the high computational cost, GPT-4o and Molmo run at lower frequencies, while SAM-2 and ROCKET-1 operate at the environment’s frequency. 
+
+\begin{table}[t]
+\footnotesize
+\centering
+\setlength{\tabcolsep}{3.5 mm}
+% \renewcommand{\arraystretch}{1.1}
+\caption{
+\textbf{Hyperparameters for training \agent.} 
+} \label{table:implementation}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Hyperparameter}  & \textbf{Value}   \\ \midrule
+Input Image Size         & $224 \times 224$ \\
+Visual Backbone          & EfficientNet-B0 (4 channels)  \\
+Policy Transformer       & TransformerXL \\
+Number of Policy Blocks  & $4$         \\
+Hidden Dimension         & $1024$      \\
+Trajectory Chunk size    & $128$       \\
+Dropout Rate $p$         & $0.75$      \\
+Optimizer                & AdamW       \\
+Weight Decay             & $0.001$     \\
+Learning Rate            & $0.00004$   \\
+Warmup Steps             & $2000$      \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\section{Results and Analysis}
+\label{sec:results}
+
+We first provide a detailed overview of the experimental setup, including the benchmarks, baselines, and implementation details. We then explore \agent’s performance on both short-horizon and long-horizon tasks. Finally, we conduct comprehensive ablation studies to validate the rationale behind our design choices. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.98\linewidth]{figures/tasks.png}
+\end{center}
+\vspace{-3 mm}
+\caption{
+\textbf{A benchmark for evaluating open-world interaction capabilities of agents. } The benchmark contains six interaction types in Minecraft, totaling 12 tasks. Unlike previous benchmarks, these tasks emphasize interacting with objects at specific spatial locations. For example, in \textit{``hunt the sheep in the right fence,''} the task fails if the agent kills the sheep on the left side. Some tasks, such as \textit{``place the oak door on the diamond block,''} never appear in the training set. It is also designed to evaluate zero-shot generalization capabilities. 
+} 
+\label{fig:benchmark}
+\end{figure*}
+
+\begin{table*}[ht]
+\centering
+\setlength{\tabcolsep}{1.1 mm}
+\renewcommand{\arraystretch}{1.1}
+\footnotesize
+\caption{
+\textbf{Results on the Minecraft Interaction benchmark. } Each task is tested 32 times, and the average success rate (in $\%$) is reported as the final result. ``Human'' indicates instructions provided by a human. The subscript ``+" indicates the improvement over the previous best.
+} \label{tab:results}
+\begin{tabular}{@{}lcccccccccccccc@{}}
+\toprule
+\multirow{2}{*}{\textbf{Method}} & \multirow{2}{*}{\textbf{Prompt}} & \multicolumn{2}{c}{\textbf{Hunt}} & \multicolumn{2}{c}{\textbf{Mine}} & \multicolumn{2}{c}{\textbf{Interact}} & \multicolumn{2}{c}{\textbf{Navigate}} & \multicolumn{2}{c}{\textbf{Tool}} & \multicolumn{2}{c}{\textbf{Place}} & \multirow{2}{*}{\textbf{Overall}} \\ \cmidrule(lr){3-14}
+                        &                         &  \includegraphics[scale=0.5,valign=c]{figures/icons/hunt_sheep.png}           &  \includegraphics[scale=0.5,valign=c]{figures/icons/hunt_cow.png}          &  \includegraphics[scale=0.5,valign=c]{figures/icons/mine_emerald.png}           & \includegraphics[scale=0.5,valign=c]{figures/icons/mine_coal.png}           & \includegraphics[scale=0.5,valign=c]{figures/icons/interact_chest.png}      &  \includegraphics[scale=0.5,valign=c]{figures/icons/interact_house.png}      & \includegraphics[scale=0.5,valign=c]{figures/icons/navigate_house.png}              & \includegraphics[scale=0.5,valign=c]{figures/icons/navigate_water.png}             & \includegraphics[scale=0.5,valign=c]{figures/icons/tool_fire.png}            & \includegraphics[scale=0.5,valign=c]{figures/icons/tool_lava.png}           & \includegraphics[scale=0.5,valign=c]{figures/icons/place_minecart.png}            & \includegraphics[scale=0.5,valign=c]{figures/icons/place_door.png}            &                          \\ \midrule
+VPT-bc                & N/A                     &   13          &  16          &  0           &  13          &  3             &  31            &  0             &  9            &  0           &   0         &  0           &  0     &  7                       \\
+STEVE-1  & Human & 0  & 6  & 0  & 69 & 0  & 3  & 0  & 31 & 91 & 6  & 16 & 0  &  19 \\
+GROOT-1  & Human & 9  & 22 & 0  & 6  & 3  & 6  & 0  & 3  & 47 & 13 & 3  & 0  &  9 \\ % \hdashline[1pt/3pt]
+ ROCKET-1                & Molmo               &  $\mathbf{91}_{+82}$           &  $\mathbf{84}_{+62}$          &  $\mathbf{78}_{+78}$           &  $\mathbf{75}_{+6}$          & $\mathbf{81}_{+78}$              &  $\mathbf{50}_{+19}$            &  $\mathbf{78}_{+78}$             &  $\mathbf{97}_{+66}$            &  $\mathbf{94}_{+3}$           &  $\mathbf{91}_{+78}$          &  $\mathbf{72}_{+56}$           &  $\mathbf{91}_{+91}$           &  $\mathbf{82}_{+63}$                        \\
+ ROCKET-1                & Human                   & $\mathbf{94}_{+85}$            &  $\mathbf{91}_{+69}$          &  $\mathbf{91}_{+91}$           & $\mathbf{94}_{+25}$           & $\mathbf{94}_{+91}$              & $\mathbf{91}_{+60}$             &   $\mathbf{97}_{+97}$            & $\mathbf{97}_{+66}$             &    $\mathbf{97}_{+6}$          &    $\mathbf{97}_{+84}$         &  $\mathbf{94}_{+78}$            &   $\mathbf{97}_{+97}$           &  $\mathbf{95}_{+76}$                        \\
+ \bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Experimental Setup}
+
+\paragraph{Implementation Details} 
+Briefly, we present \agent’s model architecture, hyperparameters, and optimizer configurations in Table \ref{table:implementation}. During training, each complete trajectory is divided into 128-length segments to reduce memory requirements. During inference, \agent can access up to 128 frames of past observations. Most training parameters follow the settings from prior works such as \cite{groot1, groot1-5, vpt}. 
+
+\paragraph{Environment and Benchmark} We use the unmodified Minecraft 1.16.5 \citep{minerl,mcu} as our testing environment, which accepts mouse and keyboard inputs as the action space and outputs a $640\times360$ RGB image as the observation. To comprehensively evaluate the agent’s interaction capabilities, as shown in Figure \ref{fig:benchmark}, we introduce the \textbf{Minecraft Interaction Benchmark}, consisting of six categories and a total of 12 tasks, including \textit{Hunt}, \textit{Mine}, \textit{Interact}, \textit{Navigate}, \textit{Tool}, and \textit{Place}. This benchmark emphasizes object interaction and spatial localization skills. For example, in the \textit{``hunt the sheep in the right fence''} task, success requires the agent to kill sheep within the right fence, while doing so in the left fence results in failure. In the \textit{``place the oak door on the diamond block''} task, success is achieved only if the oak door is adjacent to the diamond block on at least one side. 
+
+\paragraph{Baselines} We compare our methods with the following baselines: (1) VPT \citep{vpt}: A foundational model pre-trained on large-scale YouTube data, with three variants—VPT (fd), VPT (bc), and VPT (rl)—representing the vanilla foundational model, behavior-cloning finetuned model, and RL-finetuned model, respectively. In this study, we utilize the VPT (bc) variant. 
+(2) STEVE-1 \citep{steve1}: An instruction-following agent finetuned from VPT, capable of solving various short-horizon tasks. We select the text-conditioned version of STEVE-1 for comparison. 
+(3) GROOT-1 \citep{groot1}: A reference-video conditioned policy designed to perform open-ended tasks, trained on 2,000 hours of long-form videos using latent variable models. 
+
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=0.99\linewidth]{figures/demo.png}
+\end{center}
+% \vspace{-3 mm}
+\caption{
+\textbf{Screenshots of our agent when completing long-horizon tasks. } 
+} 
+\label{fig:demo}
+\end{figure*}
+
+\begin{table*}[]
+\centering
+\setlength{\tabcolsep}{2.6 mm}
+\renewcommand{\arraystretch}{1.1}
+\footnotesize
+\caption{
+\textbf{Comparison of hierarchical architectures with different communication protocols. } All the seven tasks are long-horizon and require complex reasoning capabilities. 
+} \label{tab:long-horizon}
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+\textbf{Method} & \textbf{Communication Protocol} & \textbf{Policy} & \includegraphics[scale=0.25,valign=c]{figures/icons/wooden_pickaxe.png} & \includegraphics[scale=0.25,valign=c]{figures/icons/furnace.png} & \includegraphics[scale=0.25,valign=c]{figures/icons/shears.png} & \includegraphics[scale=0.25,valign=c]{figures/icons/diamond.png} & \includegraphics[scale=0.25,valign=c]{figures/icons/steak.png} & \includegraphics[scale=0.25,valign=c]{figures/icons/obsidian.png} & \includegraphics[scale=0.25,valign=c]{figures/icons/pink_wool.png} \\ \midrule
+DEPS        & language                & STEVE-1  &   $95\%$              &  $75\%$       &   $15\%$     &  $2\%$            &   $15\%$        &    $0\%$      &  $0\%$         \\
+MineDreamer$^*$ & future image            & STEVE-1  &  $95\%$               &   -    &   -     &    -          &   $0\%$        &  $0\%$        &  $0\%$         \\
+OmniJarvis  & latent code             & GROOT-1  &  $95\%$              &  $90\%$       &  $20\%$      &   $8\%$           &    $40\%$       &  $0\%$        &   $0\%$   \\ % \hdashline[1pt/3pt]
+\textbf{Ours}        & visual-temporal context & ROCKET-1 &  $\mathbf{100}\%$               &   $\mathbf{100}\%$      &  $\mathbf{45}\%$      &  $\mathbf{25}\%$            &  $\mathbf{75}\%$         &   $\mathbf{50}\%$       &  $\mathbf{70}\%$        \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Performance on Short-Horizon Tasks} 
+% \yitao{differetn communities have different interpretations of short vs. long horizon. Maybe it is worth commenting about how long a typical short-horizon task is.} 
+To quantitatively assess \agent’s performance on short-horizon tasks, we evaluated it on the Minecraft Interaction Benchmark, with results as illustrated in Table \ref{tab:results}. Since \agent operates as a low-level policy, it requires a high-level reasoner to provide prompts within a visual-temporal context, driving \agent’s interactions with the environment. We tested two reasoners: (1) A skilled Minecraft human player, who can provide prompts to \agent at any interaction moment, serving as an oracle reasoner that demonstrates the upper bound of \agent’s capabilities. (2) A Molmo 72B model \citep{molmo}, where a predefined Molmo prompt is set for each task to periodically select points in the observation as prompts, which are then processed into object segmentations by the SAM-2 model \citep{sam2}. Between Molmo’s invocations, SAM-2’s tracking capabilities offer object segmentations to guide \agent. For all baselines, humans provide prompts. We found that \agent + Molmo consistently outperformed all baselines across all tasks, notably achieving a $91\%$ success rate in the \textit{``place oak door on the diamond block''} \includegraphics[scale=0.5,valign=c]{figures/icons/place_door.png} task, which no baseline could complete. Furthermore, given that this task is unlikely to appear in the training set, our pipeline demonstrates strong zero-shot generalization capabilities. 
+
+\subsection{Performance on Long-Horizon Tasks}
+% \subsection{Chaining Skills with High-level Reasoners} 
+We compared hierarchical agent architectures based on different communication protocols: (1) language-based approaches, exemplified by DEPS \citep{deps}; (2) future-image-based methods, represented by MineDreamer \citep{minedreamer}; (3) latent-code-based methods, as in OmniJarvis \citep{omnijarvis}; and (4) our proposed approach based on visual-temporal context, as illustrated in the Figure \ref{fig:inference}. 
+For MineDreamer, we used the planner provided by DEPS and MineDreamer as the controller to complete the long-horizon experiment.
+We evaluated these methods on seven crafting or mining tasks, each requiring long-horizon planning: obtaining a wooden pickaxe (3600), furnace (6000), shears (12000), diamond (24000), steak (6000), obsidian (24000), and pink wool (6000), where the numbers in parentheses represent the time limit for each task. In the first five tasks, the agent starts from scratch, while for the obsidian task, we provided an empty bucket and a diamond pickaxe in advance, and for the pink wool task, we provided shears beforehand. Taking the obsidian task as an example, the player must first locate a nearby water source, fill the bucket, find a nearby lava pool, pour the water to form obsidian, and finally switch to the diamond pickaxe to mine the obsidian. We found that our approach significantly improved success rates on the first five tasks, particularly achieving a $35\%$ increase in the steak task. For the last two tasks, all previous baseline methods failed, while our approach achieved a $75\%$ success rate on the wool dyeing task. Screenshots are presented in Figure \ref{fig:demo}. 
+
+\begin{table}[]
+\centering
+\setlength{\tabcolsep}{2.5 mm}
+\caption{
+\textbf{Comparison between different SAM-2 variants.} We studied the impact of SAM-2 models of different sizes on the agent's object-tracking capability (metric: success rate) and inference speed (metric: frame-per-second, FPS) on ``Hunt right sheep''  and ``Mine emerald ore'' tasks. ``P-GAP'' indicates the number of frames between prompts generated by Molmo. 
+} \label{tab:ablation-sam}
+\renewcommand{\arraystretch}{1.1}
+\footnotesize
+% \begin{tabular}{@{}lc|ccc@{}}
+\begin{tabular}{@{}
+>{\columncolor[HTML]{EFEFEF}}l 
+>{\columncolor[HTML]{EFEFEF}}c ccc@{}}
+\toprule
+\textbf{Variants}              & \textbf{P-GAP}     & \textbf{FPS} $\uparrow$ & \includegraphics[scale=0.5,valign=c]{figures/icons/hunt_sheep.png} $\uparrow$ & \includegraphics[scale=0.5,valign=c]{figures/icons/mine_emerald.png} $\uparrow$ \\ \midrule
+baseline (w/o sam2)        &  $3$ & $0.9$ & $84\%$ & $\mathbf{82}\%$      \\
+baseline (w/o sam2)        & $30$ & $\mathbf{9.2}$ & $0\%$  & $3\%$  \\
++sam2\_tiny                & $30$ & $5.4$ & $84\%$ & $69\%$ \\
++sam2\_small               & $30$ & $5.1$ & $88\%$ & $50\%$ \\
++sam2\_base\_plus          & $30$ & $3.0$ & $88\%$ & $63\%$ \\
++sam2\_large               & $30$ & $2.4$ & $\mathbf{91}\%$ & $78\%$ \\ \bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{What Matters for \agent?}
+We conduct ablation studies on short-horizon tasks of Minecraft Interaction benchmark: ``Hunt right sheep (\includegraphics[scale=0.5,valign=c]{figures/icons/hunt_sheep.png})''  and ``Mine emerald (\includegraphics[scale=0.5,valign=c]{figures/icons/mine_emerald.png})''. 
+
+\paragraph{SAM-2 Models} The SAM-2 model acts as a proxy segmentation generator when the high-level reasoner fails to provide timely object segmentations. We evaluate the impact of different SAM-2 model sizes on task performance and inference speed, as shown in Table \ref{tab:ablation-sam}. Results indicate that with low-frequency prompts from the high-level reasoner (Molmo 72B) at $1.5$ (game frequency is 20), SAM-2 greatly improves task success rates. While ``sam2\_hiera\_large'' is the best, increasing the SAM-2 model size yields performance gains at the cost of higher time. 
+
+
+% \paragraph{Segmentation Dropout During Training} 
+
+\paragraph{Interaction-Type Information Fusion Location} We modified the visual backbone’s input layer from 3 to 4 channels, allowing \agent to integrate object segmentation information. For fusing interaction-type information, we explored two approaches: (1) keeping the object segmentation channel binary and encoding interaction types via an embedding layer for fusion in TransformerXL, and (2) directly encoding interaction types into the object segmentation for fusion within the visual backbone. As shown in Table \ref{tab:ablation-fusion}, the first approach significantly outperformed the second, as it allows the visual backbone to share knowledge across different interaction types and focus on recognizing objects of interest without being affected by imbalanced interaction-type distributions. 
+
+
+% \begin{table}[]
+% \centering
+% \setlength{\tabcolsep}{2.2 mm}
+% \caption{
+% \textbf{Effect of segmentation dropout rates on \agent’s intent inference from past observations. } Experiments are evaluated on ``Hunt right sheep (\includegraphics[scale=0.5,valign=c]{figures/icons/hunt_sheep.png})''  and ``Mine emerald ore (\includegraphics[scale=0.5,valign=c]{figures/icons/mine_emerald.png})'' tasks. 
+% } \label{tab:ablation-droprate}
+% \renewcommand{\arraystretch}{1.1}
+% \footnotesize
+% \begin{tabular}{@{}lccccc@{}}
+% \toprule
+% \textbf{Training Dropout Rate}                  & $\mathbf{0}\%$ & $\mathbf{50}\%$ & $\mathbf{75}\%$ & $\mathbf{100}\%$ \\ \midrule
+% Hunt Right Sheep (\includegraphics[scale=0.5,valign=c]{figures/icons/hunt_sheep.png})       & $\%$  & $\%$  & $91\%$  & $0\%$  \\
+% Mine Emerald Ore (\includegraphics[scale=0.5,valign=c]{figures/icons/mine_emerald.png})     & $\%$  & $\%$  & $78\%$  & $3\%$  \\ 
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+\begin{table}[]
+\centering
+\setlength{\tabcolsep}{2.55 mm}
+\caption{
+\textbf{Comparison of interaction-type information fusion at different positions.} 
+} \label{tab:ablation-fusion}
+\renewcommand{\arraystretch}{1.1}
+\footnotesize
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Interaction Type Fusion}              & \textbf{Hunt} (\includegraphics[scale=0.5,valign=c]{figures/icons/hunt_sheep.png})$\uparrow$ & \textbf{Mine} (\includegraphics[scale=0.5,valign=c]{figures/icons/mine_emerald.png}) $\uparrow$ \\ \midrule
+in transformer layer & $\mathbf{91}\%$ & $\mathbf{78}\%$ \\
+in visual backbone   & $72\%$ & $69\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+
+\section{Related Works}
+\label{sec:related}
+
+\paragraph{Instructions for Multi-Task Policy} 
+The task instruction of a multi-task policy directly determines the types of tasks the policy can solve. Most current approaches \citep{rt-1, rt-2, language_table, worldmc, leo} use natural language to describe task details and collect large amounts of text-demonstration data pairs to train a language-conditioned policy for interaction with the environment. Although natural language can express a wide range of tasks, it struggles to represent spatial relationships effectively. Additionally, gathering text-annotated demonstration data is costly, limiting the scalability of these methods. Alternatives, such as \cite{steve1, zson, rt-sketch}, use images to drive goal-conditioned policies, typically learning through hindsight relabeling in a self-supervised manner. While this reduces the need for annotated data, future images are often insufficiently expressive, making it difficult to capture detailed task execution processes. Methods like \cite{groot1, bcz} propose using reference videos to describe tasks, offering strong expressiveness but suffering from ambiguity, which may lead to inconsistencies between policy interpretation and human understanding, raising safety concerns. \cite{rt-trajectory} suggests representing tasks with rough robot arm trajectories, enabling novel task completion but only in fully observable environments, limiting its applicability in open-world settings. CLIPort \citep{cliport}, which addresses pick-and-place tasks by controlling the robot’s start and end positions using heatmaps, bears some resemblance to our proposed visual-temporal context prompting method. However, CLIPort focuses solely on the pick-and-place task solutions in a fully observable environment. 
+
+
+\paragraph{Agents in Minecraft} 
+Minecraft offers a highly open sandbox environment with complex tasks and free exploration, ideal for testing AGI’s adaptability and long-term planning abilities. Its rich interactions and dynamic environment simulate real-world challenges, making it an excellent testbed for AGI. 
+One line of research focuses on low-level control policies in Minecraft. \cite{vpt} annotated a large YouTube Minecraft video dataset with actions and trained the first foundation agent in the domain using behavior cloning, but it lacks instruction-following capabilities. 
+\cite{worldmc} employs a goal-sensitive backbone and horizon prediction module to enhance multi-task execution in partially observable environments, but it only solves tasks seen during training. \cite{minedojo} fine-tunes a vision-language alignment model MineCLIP using YouTube video data, and incorporates it into a reward shaping mechanism for training a multi-task agent, though task transfer still requires extensive environment interaction. \cite{steve1} uses hindsight-relabeling to learn an image-goal-conditioned policy and aligns image and text spaces via MineCLIP, but this approach is limited to short-horizon tasks. \cite{groot1} uses reference videos as task representations and trains a video-conditioned policy through a latent variable model, but generating environment-consistent reference videos remains a challenge. 
+Another research focus integrates vision-language models for long-horizon task planning in Minecraft~\citep{plan4mc,rat,mp5,steveeye,liu2024rlgpt}. DEPS \citep{deps}, the first to apply large language models in Minecraft, uses a four-step process to decompose tasks, achieving the diamond mining challenge with minimal training. Voyager \citep{voyager} highlights LLM-based agents’ autonomous exploration and skill-learning abilities. Jarvis-1 \citep{jarvis-1} extends DEPS with multimodal memory, improving long-horizon task success rates by recalling past experiences. OmniJarvis \citep{omnijarvis} learns a behavior codebook using self-supervised methods to jointly model language, images, and actions. MineDreamer \citep{minedreamer} fine-tunes VLMs and a diffusion model to generate goal images for task execution, though it faces challenges with image quality and consistency.
+
+
+
+\section{Conclusions}
+\label{sec:conclusion}
+
+In this paper, we propose a novel hierarchical agent architecture to address the challenges of open-world interaction. To bridge spatial information gaps, we introduce a visual-temporal context prompting method that communicates intent between the high-level reasoner and the low-level policy. We develop \agent, an object-segmentation-conditioned policy responsible for real-time interaction with objects in the environment. This architecture can also leverage SAM-2 plug-and-play to enhance the policy’s object-tracking capabilities. Extensive experiments in Minecraft demonstrate that our approach successfully harnesses the powerful visual-language reasoning abilities of VLMs for embodied decision-making, achieving significantly superior open-world interaction performance compared to baseline methods. 
+
+\section{Limitations}
+\label{sec:limitations}
+Although \agent significantly enhances interaction capabilities in Minecraft, it cannot engage with objects that are outside its field of view or have not been previously encountered. For instance, if the reasoner instructs \agent to eliminate a sheep that it has not yet seen, the reasoner must indirectly guide \agent’s exploration by providing segmentations of other known objects. This limitation reduces \agent’s efficiency in completing simple tasks and necessitates frequent interventions from the reasoner, leading to increased computational overhead. 

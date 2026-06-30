@@ -1,0 +1,69 @@
+
+\subsection{Learning}
+\subseckiny
+\label{sec:Learning}
+
+We consider a standard reinforcement learning setup. At each step $t$, the agent receives an observation $x_t$ from the environment and selects an action $a_t$ from a finite set of possible actions. The environment responds with a new observation $x_{t+1}$ and a scalar reward $r_t$. The process continues until the terminal state is reached, after which it restarts. The goal of the agent is to maximise the discounted return 
+$R_t= \sum_{k=0}^{\infty} \gamma^k r_{t+k+1}$ with $\gamma \in [0,1]$. The agent's behaviour is defined by its action-selection policy $\pi$. FuN produces a distribution over possible actions (a stochastic policy) as defined in eq.~\ref{eqn:FuN:pi}.
+
+The conventional wisdom would be to train the whole architecture monolithically through gradient descent on either the policy directly or via TD-learning. Notice, that since FuN is fully differentiable we could train it end-to-end using a policy gradient algorithm operating on the actions taken by the Worker. The outputs $g$ of the Manager would be trained by gradients coming from the Worker. This, however would deprive Manager's goals $g$ of any semantic meaning, making them just internal latent variables of the model. 
+We propose instead to independently train Manager to predict advantageous directions (transitions) in state space and to intrinsically reward the Worker to follow these directions.
+If the Worker can fulfil the goal of moving in these directions (as it is rewarded for doing), then we ought to end up taking advantageous trajectories through state-space.
+We formalise this in the following update rule for the Manager:
+
+\begin{equation}
+\nabla g_t = A^M_t \nabla_{\theta} d_{\cos}(s_{t+c} - s_t, g_t(\theta)),
+\label{eqn:manager_update}
+\end{equation}
+
+where $A^M_t = R_t - V^M_t(x_t,\theta)$ is the Manager's advantage function, computed using a value function estimate $V^M_t(x_t,\theta)$ from the internal critic; $d_{\cos}(\alpha,\beta)=\alpha^T\beta/(|\alpha||\beta|)$ is the cosine similarity between two vectors. Note: the dependence of $s$ on $\theta$ is ignored when computing $\nabla_{\theta} d_{\cos}$ -- 
+this avoids trivial solutions. Notice that now $g_t$ acquires a semantic meaning as an advantageous direction in the latent state space at a horizon $c$, which defines the temporal resolution of the Manager. 
+
+
+The intrinsic reward that encourages the Worker to follow the goals is defined as: 
+\begin{equation}
+r^I_t = 1/c \sum_{i=1}^c d_{\cos}(s_{t} - s_{t-i}, g_{t-i}) 
+\label{eqn:intrinsic_reward}
+\end{equation}
+
+
+We use directions because it is more feasible for the Worker to be able to reliably cause directional shifts in the latent state than it is to assume that the Worker can take us to (potentially) arbitrary new absolute locations. It also gives a degree of invariance to the goals and allows for structural generalisation -- the same directional sub-goal $g$ can invoke a sub-policy that is valid and useful in a large part of the latent state space; e.g. evade an enemy, swim up for air, etc. We compare absolute against directional goals empirically in section~\ref{subsec:ablative}. 
+
+The original feudal reinforcement learning formulation of~\citet{dayan1993feudal} advocated completely concealing the reward from the environment from lower levels of hierarchy. In practice we take a softer approach by adding an intrinsic reward for following the goals, but retaining the environment reward as well. The Worker is then trained to maximise a weighted sum $R_t + \alpha R^I_t$, where $\alpha$ is a hyper-parameter that regulates the influence of the intrinsic reward. The Worker’s policy $\pi$ can be trained to maximise intrinsic reward by using any off-the shelf deep reinforcement learning algorithm. Here we use an advantage actor critic~\cite{mnih2016asynchronous}:
+\begin{equation}
+\nabla \pi_t  = A^D_t \nabla_{\theta}\log\pi(a_t|x_t;\theta)
+\label{eqn:doer_update}
+\end{equation}
+
+The Advantage function $A^D_t = (R_t + \alpha R^I_t - V^D_t(x_t;\theta))$
+is calculated using an internal critic, which estimates the value functions for both rewards.
+
+Note that the Worker and Manager can potentially have different discount factors $\gamma$ for computing the return. 
+This allows, for instance, the Worker to be more greedy and focus on immediate rewards while the Manager can consider a long-term perspective.
+
+\subseckiny
+\subsection{Transition Policy Gradients}
+\subseckiny
+\label{subsec:tpg}
+
+
+We now motivate our proposed update rule for the Manager as a novel form of policy gradient with respect to a \emph{model} of the Worker's behaviour.
+Consider a high-level policy $o_t = \mu(s_t, \theta)$ that selects among sub-policies (possibly from a continuous set), where we assume for now that these sub-policies are fixed duration behaviours (lasting for $c$ steps). 
+Corresponding to each sub-policy is a transition distribution, $p(s_{t+c}|s_t,o_t)$, that describes the distribution of states that we end up at the end of the sub-policy, given the start state and the sub-policy enacted. The high-level policy can be composed with the transition distribution to give a `transition policy' $\pi^{TP}(s_{t+c}|s_t) = p(s_{t+c}|s_t,\mu(s_t, \theta))$ describing the distribution over end states given start states. It is valid to refer to this as a policy because the original MDP is isomorphic to a new MDP with policy $\pi^{TP}$ and transition function $s_{t+c} = \pi^{TP}(s_t)$ (i.e. the state always transitions to the end state picked by the transition policy). As a result, we can apply the policy gradient theorem to the transition policy $\pi^{TP}$, so as to find the performance gradient with respect to the policy parameters, \vspace{-5mm}
+
+
+\begin{equation}
+\nabla_{\theta} \pi^{TP}_t = \mathbb{E} \left[ (R_t - V(s_t)) \nabla_{\theta} \log p(s_{t+c}|s_t, \mu(s_t,\theta))\right]
+\label{eqn:tpg}
+\end{equation}
+
+
+In general, the Worker may follow a complex trajectory. A naive application of policy gradients requires the agent to learn from samples of these trajectories. But if we know where these trajectories are likely to end up, by modelling the transitions, then we can skip directly over the Worker's behaviour and instead follow the policy gradient of the predicted transition. 
+FuN assumes a particular form for the transition model: that the direction in state-space, $s_{t+c} - s_t$, follows a von Mises-Fisher distribution. Specifically, if the mean direction of the von Mises-Fisher distribution
+is given by $g(o_t)$ (which for compactness we write as $g_t$) we would have
+$p(s_{t+c}|s_t,o_t) \propto e^{d_{\cos}(s_{t+c} - s_t, g_t)}$. If this functional form
+\emph{were} indeed correct, then we see that our proposed update heuristic for the
+Manager, eqn.\ref{eqn:manager_update}, is in fact the proper form for the transition
+policy gradient arrived at in eqn.\ref{eqn:tpg}.
+
+Note that the Worker's intrinsic reward (eqn.~\ref{eqn:intrinsic_reward}) is based on the log-likelihood of state trajectory. Through that the FuN architecture actively encourages the functional form of the transition model to hold true. Because the Worker is learning to achieve the Manager's direction, its transitions should, over time, closely follow a distribution around this direction, and hence our approximation for transition policy gradients should hold reasonably well. 

@@ -1,0 +1,146 @@
+
+\section{Experiments}\label{sec::exp}
+In this section, we conduct experiments to study the ability of EconAgent, aiming to answer the following research questions (RQ).
+\begin{itemize}[leftmargin=*]
+    \item \textbf{RQ1}: How do the EconAgent behave in the simulation environment, compared with the traditional agents?
+    \item \textbf{RQ2}: How do the perception and reflection modules in EconAgent affect the simulation results?
+    \item \textbf{RQ3}: Does the decision-making mechanism of EconAgent possess interpretability, and can it address the challenges faced by traditional agents?
+    \item \textbf{RQ4}: Can the simulation based on EconAgent reflect the impact of external intervention?
+\end{itemize}
+
+
+\subsection{Experimental Setup}
+We investigate some phenomena of paramount interest in macroeconomics, including several macroeconomic indicators and two macroeconomic regularities. 
+For comparative analysis, we select representative rule-based~\cite{lengnick2013agent,gatti2011macroeconomics} and learning-based~\cite{zheng2022ai} agent models.
+
+\paragraph{Definition of Macroeconomics Indicators} Annual nominal GDP is defined as the sum of $S\times P$ over one year. As for real GDP, we set the first year in the simulation as the reference year and replace $P$ with $P_0$, where $P_0$ is the goods price in the reference year. The definition of the annual (price) inflation rate and the unemployment rate is shown in Eq. \ref{def-indicator}. For wage inflation, the definition is similar to that of price inflation, where the average price is replaced with the average wage across all the agents.
+
+
+\paragraph{Baselines} We select \textbf{LEN}~\cite{lengnick2013agent} and \textbf{CATS}~\cite{gatti2011macroeconomics} as the baselines because 1) they partially reproduce the aforementioned macroeconomics phenomena within their own (more complex) simulation frameworks, and 2) carefully designed decision rules of working and consumption are representative, reflecting typical decision-making observed in real-life scenarios. Considering the importance of agents' heterogeneity in macroeconomic simulation, we also combine these two baselines as an additional baseline \textbf{Composite}, where each agent randomly adopts one rule of them.
+Besides, we select a learning-based method, AI-Economist~\cite{zheng2022ai} \textbf{AI-Eco}, which builds on the assumption of rational decision-making and employs reinforcement learning~(RL)~\cite{arulkumaran2017deep} to maximize the agent's utility. 
+
+
+
+The details of decision rules in LEN and CATS and the training process for AI-Economist are provided in the supplementary materials.
+
+\paragraph{Simulation Parameters} 
+We simulate $N=100$ agents. The productivity is set as $A = 1$ for simplicity. The initial goods price is the average hourly wage across all the agents. For the labor and consumption dynamics, $\alpha_w = 0.05$ and $\alpha_P = 0.10$. For the financial market, $r^n = 0.01$, $\pi^t = 0.02$, $u^n = 0.04$, and $\alpha^{\pi} = \alpha^u = 0.5$. Note that our results and conclusions are not sensitive to these parameters.
+
+Our simulation is implemented with Python. We use GPT-3.5-turbo-0613 provided by OpenAI API as the LLM\footnote{https://platform.openai.com/}. In practice, we find $L=1$ works well in the simulation. Other detailed simulation parameters, crucial for replicability and deeper understanding, are provided in the supplementary materials.
+
+\subsection{Macroeconomic Emergence~(RQ1)}
+Our evaluation encapsulates a broad spectrum of macroeconomic indicators and regularities~\cite{lengnick2013agent,gatti2011macroeconomics,dawid2018agent,axtell2022agent}. The performance of EconAgent was compared with that of representative rule-based baselines, as detailed in two referenced works and their combination~\cite{lengnick2013agent,gatti2011macroeconomics}. 
+
+\paragraph{Macroeconomic Indicators} In Figure~\ref{fig::annual-indicators}, we depict the fluctuations of the annual inflation rate, unemployment rate, nominal GDP, and growth rate of nominal GDP. Note that the unreasonable unemployment rate~(around 46\%) and nominal GDP for AI-Eco are not reported. Both rule-based and RL-driven baselines produce \textbf{anomalous indicators and large fluctuations}. In contrast, agent decision-making based on EconAgent has manifested more \textbf{stable and numerically plausible} macroeconomic phenomena across multiple facets, even without fine-grained calibration. Specifically, the inflation rate consistently fluctuated within a -5\% to 5\% range after the 3-th year, whereas the baselines exhibited significantly larger oscillations, at times even surpassing 20\%. This indicates that the decision-making of EconAgent is coherent and more closely emulates real-world human choices, leading to easier attainment of equilibrium between supply and demand in the consumption market. The unemployment rate generally varied between 2\% and 12\%\footnote{The increase in the unemployment rate after year 15 is actually a normal fluctuation. See Figure \ref{fig::unemployment-c}.}, which aligns well with real-world economic activities~\cite{gatti2011macroeconomics}. Both the nominal GDP and its growth rate also fluctuated within more reasonable numerical bounds like the inflation rate does. We also provide quarterly indicators in the appendix.
+
+
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.96\linewidth]{figs/legend-line.pdf} \
+\subfloat{\includegraphics[width=0.49\linewidth]{figs/inflation-year.pdf}} \subfloat{\includegraphics[width=0.49\linewidth]{figs/unemployment-year.pdf}} \
+\subfloat{\includegraphics[width=0.49\linewidth]{figs/nominal_gdp-year.pdf}}
+\subfloat{\includegraphics[width=0.49\linewidth]{figs/nominal_gdp_growth-year.pdf}} \
+\caption{Annual variations of macroeconomic indicators, where the simulation based on EconAgent shows more stable and numerically plausible indicators.}\label{fig::annual-indicators}
+\end{figure}
+
+
+
+
+
+
+\paragraph{Macroeconomic Regularities} As the two most commonly used regularities in macroeconomic simulations for validating the plausibility of simulation results, the Phillips Curve~\cite{phelps1967phillips} and Okun's Law~\cite{okun1963potential} respectively describe the negative correlations between the annual unemployment rate and wage inflation, and the annual growth rate of unemployment and real GDP growth. As shown in Figure~\ref{fig::correlation-curves}, only the decision-making of EconAgent has \textbf{correctly manifested phenomena in accordance with these two regularities}~(Pearson correlation coefficient is -0.619, $p<0.01$ and -0.918, $p<0.001$). Notably, the rule-based baseline method displayed an \textbf{incorrect positive relationship on the Phillips Curve}. We attribute this advantage to the LLM's accurate perception that consumption should be reduced when unemployed, a point which will be elaborated upon in the subsequent section. Note that the Phillips Curve for AI-Eco is not shown due to the very large unemployment rate.
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.96\columnwidth}
+    \includegraphics[width=\linewidth]{figs/legend-scatter.pdf}
+\end{subfigure}
+
+\includegraphics[width=0.48\columnwidth]{figs/Phillips_Curve.pdf}
+\includegraphics[width=0.49\columnwidth]{figs/Okun_Law.pdf}
+\caption{Only the simulation based on EconAgent emerges correct Phillips Curve and Okun's Law.} \label{fig::correlation-curves}
+\end{figure}
+
+\subsection{Ablation Study~(RQ2)} 
+We separately remove the perception module and the reflection module, and the results of 10 years are as shown in Figure \ref{fig::ablation}. We observe that when there is no perception capability, the inflation rate and unemployment rate fluctuations significantly decrease, appearing "too stable", especially for the unemployment rate. This suggests that the agents have low sensitivity to changes in their economic conditions and cannot make adaptive decision adjustments. When there is no reflection capability, the inflation rate exhibits anomalies close to 15\% in the first three years, emphasizing the importance of long-term (a quarter in our experiments) economic environment perception.
+
+\begin{figure}[t]
+\centering
+{\includegraphics[width=0.8\linewidth]{figs/legend-ablation.pdf}}
+\subfloat[Inflation Rate]{\includegraphics[width=0.49\linewidth]{figs/ablation-inflation-year.pdf}} \
+\subfloat[Unemployment Rate]{\includegraphics[width=0.49\linewidth]{figs/ablation-unemployment-year.pdf}} \
+\caption{Ablation study on perception and memory modules.}\label{fig::ablation}
+\end{figure}
+
+\subsection{Decision-Making Abilities~(RQ3)}
+\paragraph{Decision Rationality}
+Given that an agent's decisions (propensity of working and consumption) may be influenced by multiple economic variables such as income and savings, we employ regression analysis to delve into the factors affecting these decisions. Specifically, the regression equation is as follows:
+\begin{equation}
+    p^w_i, p^c_i \sim v_i + \hat{c}_i + T(z_i) + z^r + P + s_i + r,
+\end{equation}
+where $\hat{c}_i, T(z_i), z^r$ denotes real consumption, the tax paid, and redistribution in the previous month. These independent variables are embedded in the LLM prompts to influence the agent's decisions. We have conducted individual regression analyses on all $N=100$ agents' 240 decisions (spanning 20 years) after applying z-score normalization on all the variables and tabulated the significance of the impact of each economic variable on their decisions. Table \ref{table:num_agents} presents the number of agents for whom the effects of the variables are statistically significant, \textit{i.e.}, $p \leq 0.05$. We observe that 1) the effects of taxation, redistribution, and expected monthly income on the work propensity of the majority of agents are significant, 2) in comparison to work propensity, the previous month's consumption, current savings, and bank interest rates significantly influence the consumption propensity of a greater number of agents, and 3) goods price has a significant impact on both work and consumption propensity for most agents. These phenomena are \textbf{consistent with economic common sense about how people make decisions} in daily life. 
+
+\begin{table}[t]
+\caption{The number of agents for whom the effects of the variables on decisions are statistically significant.}
+    \centering
+    \begin{tabular}{c|c|c|c|c|c|c|c}
+    \toprule
+     & $v_i$ & $\hat{c}_i$ & $T(z_i)$ & $z^r$ & $P$ & $s_i$ & $r$\\
+    \hline
+    $p^w_i$ & 60 & 37 & 60	& 65 & 58& 56& 31 \\
+    $p^c_i$ & 65 & 73 & 51 & 52 & 62 & 100 & 49 \\
+    \bottomrule
+    \end{tabular}
+    \label{table:num_agents}
+\end{table}
+
+\paragraph{Agent Heterogeneity}
+We further investigate whether EconAgent autonomously exhibit heterogeneity in decision-making mechanisms. Figure \ref{fig::explain-Phillips} (a) demonstrates an incremental growth in consumption propensity with age, aligning broadly with empirical regularities observed in traditional macroeconomic research~\cite{carroll1997buffer}.
+
+\paragraph{Influence of Macroeconomic Trends}
+Through interactions with the model, we decipher the underlying reasons for the emergence of negative correlations in the Phillips curve. We first calculate the average consumption propensity across all the agents of two years with the highest and lowest unemployment rates. Figure \ref{fig::explain-Phillips} (b) shows the comparison results, where *** denotes a significant disparity with $p<0.001$. Obviously, high unemployment leads to low consumption propensity significantly. To delve deeper into the reasons why agents opt to reduce consumption in the labor market of high unemployment rates, we randomly select an agent and input its conversations with LLM from the year with the highest unemployment rate back into the LLM. We then prompt the LLM to summarize the economic dynamics for each quarter and provide rationales for the consumption decisions made. The following responses demonstrate that agents have a \textbf{perception of macroeconomic trends and are cautious about their spending when facing deflation in the labor market under a high unemployment rate}.
+
+\begin{center}
+\begin{minipage}{0.92\linewidth}
+\begin{shaded}
+\textit{In the last quarter, I have adjusted my \textbf{willingness to work} and my \textbf{planned expenditures} on essential goods slightly \textbf{downwards}. This decision is primarily influenced by the \textbf{continued deflation in the labor market}, resulting in a decrease in my expected income. With a lower income, I need to be \textbf{cautious about my spending} and ensure that I have enough savings for \textbf{future expenses and unforeseen circumstances} \ldots}
+\end{shaded}
+\end{minipage}
+\end{center}
+
+\begin{figure}[t]
+\centering
+\subfloat[Consumption \textit{v.s.} Age]{\includegraphics[width=0.49\linewidth]{figs/age_consumption.pdf}} \
+\subfloat[Consumption \textit{v.s.} Unemployment]
+{\includegraphics[width=0.47\linewidth]{figs/unemployment-consumption.pdf}} \
+
+\caption{The modeling of agent heterogeneity and the influence of macroeconomic trends.} \label{fig::explain-Phillips}
+\end{figure}
+
+\subsection{External Intervention~(RQ4)}
+We further investigate the impact of external interventions on agent behavior and the resulting changes in macroeconomic simulation outcomes, a topic widely discussed in many economic ABM studies~\cite{dawid2018agent}. Using the example of COVID-19, which has had a significant impact on the global economy, we incorporate it into our simulations and conduct comparative experiments.
+
+Modeling the impact of COVID-19 can be conveniently implemented by incorporating them into the prompt of a EconAgent. Specifically, we add the following statement to the prompt for simulations after March 2020:
+\begin{center}
+\begin{minipage}{0.92\linewidth}
+\begin{shaded}
+\textit{In response to the large-scale outbreak of COVID-19 in the United States, the federal government has declared a national emergency since March 2020.}
+\end{shaded}
+\end{minipage}
+\end{center}
+
+Figure \ref{fig::covid} shows the comparison of unemployment rates, where `Normal' and `COVID-19' denote the simulation results w/ and w/o the prompt above, respectively. This indicates that the simulation based on the EconAgent successfully replicated the surge in the unemployment rate in 2020 Q1 under the impact of COVID-19~\cite{organization_for_economic}. Although the numerical values do not match the real data exactly, this demonstrates that our proposed framework possesses the ability to qualitatively simulate human decision-making and macroeconomic phenomena in the real world. Furthermore, since we did not introduce government intervention measures, the unemployment rate after 2021 remains significantly higher than in the 'Normal' scenario, reflecting the lasting impact of COVID-19.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.8\linewidth]{figs/unemployment-covid.pdf}
+\caption{COVID-19 brings the surge of simulated unemployment rates.} \label{fig::covid}
+\end{figure}
+
+The following is an example of the agent's reflection during COVID-19, demonstrating its human-like decisions.
+\begin{center}
+\begin{minipage}{0.92\linewidth}
+\begin{shaded}
+\textit{\ldots However, the outbreak of COVID-19 and the subsequent national emergency declaration had a significant impact on the labor market. \ldots resulting in widespread unemployment and uncertainty. This situation has likely affected my willingness to work, as job security and health concerns become more prominent \ldots}
+\end{shaded}
+\end{minipage}
+\end{center}

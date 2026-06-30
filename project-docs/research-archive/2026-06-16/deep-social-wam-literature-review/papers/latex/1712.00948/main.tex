@@ -1,0 +1,806 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2019_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+% \input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{verbatim}
+\usepackage{algorithm}
+% \usepackage{algorithmic}
+\usepackage{algpseudocode}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[normalem]{ulem}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{problem}{Problem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{theorem}{Theorem}[section]
+
+
+\title{Learning Multi-Level Hierarchies with \enspace Hindsight}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\author{Andrew Levy\\
+Department of Computer Science\\
+Brown University\\
+Providence, RI, USA \\
+\texttt{andrew\_levy2@brown.edu} \\
+\And
+George Konidaris \\
+Department of Computer Science\\
+Brown University\\
+Providence, RI, USA \\
+\texttt{gdk@cs.brown.edu} \\
+\And
+Robert Platt \\
+College of Computer and Information Science \\
+Northeastern University \\
+Boston, MA, USA \\
+\texttt{rplatt@ccs.neu.edu} \\
+\And
+\enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace Kate Saenko \\
+\enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace Department of Computer Science \\
+\enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace Boston University \\
+\enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace \enspace Boston, MA, USA \\
+\enspace \enspace \enspace \enspace \enspace \texttt \enspace \enspace \enspace \enspace \enspace \enspace \texttt{saenko@bu.edu} \\
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\newcommand{\gdknote}[1]{\textcolor{blue}{\textbf{GDK: #1}}}
+\newcommand{\rpnote}[1]{\textcolor{red}{\textbf{RP: #1}}}
+\newcommand{\alnote}[1]{\textcolor{green}{\textbf{AL: #1}}}
+
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{comment}
+
+\begin{abstract}
+
+Multi-level hierarchies have the potential to accelerate learning in sparse reward tasks because they can divide a problem into a set of short horizon subproblems. In order to realize this potential, Hierarchical Reinforcement Learning (HRL) algorithms need to be able to learn the multiple levels within a hierarchy in parallel, so these simpler subproblems can be solved simultaneously.  Yet most existing HRL methods that can learn hierarchies are not able to efficiently learn multiple levels of policies at the same time, particularly in continuous domains.  To address this problem, we introduce a framework that can learn multiple levels of policies in parallel.  Our approach consists of two main components: (i) a particular hierarchical architecture and (ii) a method for jointly learning multiple levels of policies.  The hierarchies produced by our framework are comprised of a set of nested, goal-conditioned policies that use the state space to decompose a task into short subtasks.  All policies in the hierarchy are learned simultaneously using two types of hindsight transitions. We demonstrate experimentally in both grid world and simulated robotics domains that our approach can significantly accelerate learning relative to other non-hierarchical and hierarchical methods.  Indeed, our framework is the first to successfully learn 3-level hierarchies in parallel in tasks with continuous state and action spaces. We also present a \underline{\href{https://www.youtube.com/watch?v=DYcVTveeNK0}{video}} of our results and \underline{\href{https://github.com/andrew-j-levy/Hierarchical-Actor-Critc-HAC-}{software}} to implement our framework.            
+
+
+\end{abstract}
+
+\end{comment}
+
+\begin{abstract}
+Hierarchical agents have the potential to solve sequential decision making tasks with greater sample efficiency than their non-hierarchical counterparts because hierarchical agents can break down tasks into sets of subtasks that only require short sequences of decisions.  In order to realize this potential of faster learning, hierarchical agents need to be able to learn their multiple levels of policies in parallel so these simpler subproblems can be solved simultaneously.  Yet, learning multiple levels of policies in parallel is hard because it is inherently unstable: changes in a policy at one level of the hierarchy may cause changes in the transition and reward functions at higher levels in the hierarchy, making it difficult to jointly learn multiple levels of policies.  In this paper, we introduce a new Hierarchical Reinforcement Learning (HRL) framework, \textit{Hierarchical Actor-Critic (HAC)}, that can overcome the instability issues that arise when agents try to jointly learn multiple levels of policies.  The main idea behind HAC is to train each level of the hierarchy independently of the lower levels by training each level as if the lower level policies are already optimal.  We demonstrate experimentally in both grid world and simulated robotics domains that our approach can significantly accelerate learning relative to other non-hierarchical and hierarchical methods.  Indeed, our framework is the first to successfully learn 3-level hierarchies in parallel in tasks with continuous state and action spaces. We also present a \underline{\href{https://www.youtube.com/watch?v=DYcVTveeNK0}{video}} of our results and \underline{\href{https://github.com/andrew-j-levy/Hierarchical-Actor-Critc-HAC-}{software}} to implement our framework.
+
+\end{abstract}
+
+\section{Introduction}
+Hierarchy has the potential to accelerate learning in sequential decision making tasks because hierarchical agents can decompose problems into smaller subproblems.  In order to take advantage of these shorter horizon subproblems and realize the potential of HRL, an HRL algorithm must be able to learn the multiple levels within the hierarchy in parallel.  That is, at the same time one level in the hierarchy is learning the sequence of subtasks needed to solve a task, the level below should be learning the sequence of shorter time scale actions needed to solve each subtask.  Yet the existing HRL algorithms that are capable of automatically learning hierarchies in continuous domains \citep{schmid_early,Konidaris2009SkillC,DBLP:journals/corr/BaconHP16,DBLP:journals/corr/VezhnevetsOSHJS17,DBLP:journals/corr/abs-1805-08296} do not efficiently learn the multiple levels within the hierarchy in parallel. Instead, these algorithms often resort to learning the hierarchy one level at a time in a bottom-up fashion.  
+
+Learning multiple levels of policies in parallel is challenging due to non-stationary state transition functions. In nested, multi-level hierarchies, the transition function for any level above the ground level depends on the current policies below that level.  For instance, in a 2-level hierarchy, the high-level policy may output a subgoal state for the low level to achieve, and the state to which this subgoal state leads will depend on the current low-level policy.  When all policies within the hierarchy are trained simultaneously, the transition function at each level above ground level will continue to change as long as the policies below that level continue to be updated. In this setting of non-stationary transition functions, RL will likely struggle to learn the above ground level policies in the hierarchy because in order for RL methods to effectively value actions, the distribution of states to which those actions lead should be stable.  However, learning multiple policies in parallel is still possible because the transition function for each level above ground level will stabilize once all lower level policies have converged to optimal or near optimal policies. Thus, RL can be used to learn all policies in parallel if each level above ground level had a way to simulate a transition function that uses the optimal versions of lower level policies. Our framework is able to simulate a transition function that uses an optimal lower level policy hierarchy and thus can learn multiple levels of policies in parallel.
+
+We introduce a new HRL framework, Hierarchical Actor-Critic (HAC), that can significantly accelerate learning by enabling hierarchical agents to jointly learn a hierarchy of policies.  Our framework is primarily comprised of two components: (i) a particular hierarchical architecture and (ii) a method for learning the multiple levels of policies in parallel given sparse rewards.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth]{hierarchy_desc_thin.pdf}
+    % \vspace{-.5cm}
+    \caption{An ant agent uses a 3-level hierarchy to traverse though rooms to reach its goal, represented by the yellow cube. $\Pi_2$ uses as input the current state (joint positions $\theta$ and velocities $\dot{\theta}$) and goal state (yellow box) and outputs a subgoal state (green box) for $\Pi_1$ to achieve.  $\Pi_1$ takes in the current state and its goal state (green box) and outputs a subgoal state (purple box) for $\Pi_0$ to achieve.  $\Pi_0$ takes in the current state and goal state (purple box) and outputs a vector of joint torques.}
+    \label{fig:hierarchy_desc}
+\end{figure}
+
+
+The hierarchies produced by HAC have a specific architecture consisting of a set of nested, goal-conditioned policies that use the state space as the mechanism for breaking down a task into subtasks.  The hierarchy of nested policies works as follows.  The highest level policy takes as input the current state and goal state provided by the task and outputs a subgoal state.  This state is used as the goal state for the policy at the next level down.  The policy at that level takes as input the current state and the goal state provided by the level above and outputs its own subgoal state for the next level below to achieve.  This process continues until the lowest level is reached.  The lowest level then takes as input the current state and the goal state provided by the level above and outputs a primitive action. Further, each level has a certain number of attempts to achieve its goal state.  When the level either runs out of attempts or achieves its goal state, execution at that level ceases and the level above outputs another subgoal. 
+
+Figure~\ref{fig:hierarchy_desc} shows how an ant agent trained with HAC uses its 3-level policy hierarchy $(\pi_2, \pi_1, \pi_0)$ to move through rooms to reach its goal.  At the beginning of the episode, the ant's highest level policy, $\pi_2$, takes as input the current state, which in this case is a vector containing the ant's joint positions and velocities ($[\theta,\dot{\theta}]$), and its goal state, represented by the yellow box.  $\pi_2$ then outputs a subgoal state,  represented by the green box, for $\pi_1$ to achieve.  $\pi_1$ takes as input the current state and its goal state represented by the green box and outputs the subgoal state represented by the purple box. Finally, $\pi_0$ takes as input the current state and the goal state represented by purple box and outputs a primitive action, which in this case is a vector of joint torques. $\pi_0$ has a fixed number of attempts to move to the purple box before $\pi_1$ outputs another subgoal state.  Similarly, $\pi_1$ has a fixed number of subgoal states that it can output to try to move the agent to the green box before $\pi_2$ outputs another subgoal.
+
+
+In addition, HAC enables agents to learn multiple policies in parallel using only sparse reward functions as a result of two types of hindsight transitions.  \textit{Hindsight action} transitions help agents learn multiple levels of policies simultaneously by training each subgoal policy with respect to a transition function that simulates the optimal lower level policy hierarchy.  Hindsight action transitions are implemented by using the subgoal state achieved in hindsight instead of the original subgoal state as the action component in the transition.  For instance, when a subgoal level proposes subgoal state $A$, but the next level policy is unsuccessful and the agent ends in state $B$ after a certain number of attempts, the subgoal level receives a transition in which the state $B$ is the action component, not state $A$.  The key outcome is that now the action and next state components in the transition are the same, as if the optimal lower level policy hierarchy had been used to achieve subgoal state $B$.  Training with respect to a transition function that uses the optimal lower level policy hierarchy is critical to learning multiple policies in parallel, because the subgoal policies can be learned independently of the changing lower level policies.  With hindsight action transitions, a subgoal level can focus on learning the sequences of subgoal states that can reach a goal state, while the lower level policies focus on learning the sequences of actions to achieve those subgoal states.  The second type of hindsight transition, \textit{hindsight goal} transitions, helps each level learn a goal-conditioned policy in sparse reward tasks by extending the idea of \textit{Hindsight Experience Replay} (\cite{Andrychowicz2017HindsightER}) to the hierarchical setting.  In these transitions, one of the states achieved in hindsight is used as the goal state in the transition instead of the original goal state.   
+
+We evaluated our approach on both grid world tasks and more complex simulated robotics environments.  For each task, we evaluated agents with 1, 2, and 3 levels of hierarchy.  In all tasks, agents using multiple levels of hierarchy substantially outperformed agents that learned a single policy.  Further, in all tasks, agents using 3 levels of hierarchy outperformed agents using 2 levels of hierarchy.  Indeed, our framework is the first to show empirically that it can jointly learn 3-level hierarchical policies in tasks with continuous state and action spaces.  In addition, our approach outperformed another leading HRL algorithm, HIRO \citep{DBLP:journals/corr/abs-1805-08296}, on three simulated robotics tasks.
+
+
+\section{Related Work}
+
+Building agents that can learn hierarchical policies is a longstanding problem in Reinforcement Learning \citep{SuttonPrecupSingh:99,Dietterich98themaxq,mcgovern2001automatic,Kulkarni_nips16,Menache2002QCutD,DBLP:conf/icml/SimsekWB05,DBLP:conf/nci/BakkerS04,DBLP:journals/adb/WieringS97}.  However, most HRL approaches either only work in discrete domains, require pre-trained low-level controllers, or need a model of the environment.
+
+There are several other automated HRL techniques that can work in continuous domains.  \cite{schmid_early} proposed a HRL approach that can support multiple levels, as in our method.  However, the approach requires that the levels are trained one at a time, beginning with the bottom level, which can slow learning.  \cite{Konidaris2009SkillC} proposed Skill Chaining, a 2-level HRL method that incrementally chains options backwards from the end goal state to the start state.  Our key advantage  relative to Skill Chaining is that our approach can learn the options needed to bring the agent from the start state to the goal state in parallel rather than incrementally.  \cite{DBLP:journals/corr/abs-1805-08296} proposed HIRO, a 2-level HRL approach that can learn off-policy like our approach and outperforms two other popular HRL techniques used in continuous domains: Option-Critic (\cite{DBLP:journals/corr/BaconHP16}) and FeUdal Networks (FUN) (\cite{DBLP:journals/corr/VezhnevetsOSHJS17}).  
+HIRO, which was developed simultaneously and independently to our approach, uses the same hierarchical architecture, but does not use either form of hindsight and is therefore not as efficient at learning multiple levels of policies in sparse reward tasks.
+
+
+\begin{comment}
+
+There are also several non-hierarchical approaches for accelerating credit assignment, such as \textit{Monte Carlo} methods, \textit{n-step Bootstrapping}, \textit{TD($\lambda$)} \citep{Sutton98a}, and \textit{Tree-Backup} \citep{Precup:2000:ETO:645529.658134}.  However, these methods are designed for agents that use stochastic policies and finite action spaces.  Our approach accelerates credit assignment for agents needing to learn deterministic policies in tasks that involve either discrete or continuous action spaces.  \gdknote{I really think you can delete this para.}
+\end{comment}
+
+\begin{comment}
+
+
+However, these approaches are tailored for agents that learn on-policy (i.e., agents that both explore with and optimize the same stochastic policy).  The above approaches accelerate credit assignment by updating the estimated action-value function, $Q_{\pi}(s_t,a_t)$, with the sum of (i) the sequence of rewards $R_{t+1},R_{t+2}, \dots, R_{t+n}$ that were generated after action $a_t$ was executed in state $s_t$ and, in the case of \textit{n-step Bootstrapping} and \textit{TD($\lambda$)}, (ii) the estimate of the state-value function at state $s_{t+n}$, $V(s_{t+n})$.  However, these other approaches to credit assignment will be difficult to use when an agent learns off-policy because the sequence of rewards $R_{t+1},R_{t+2}, \dots, R_{t+n}$ are generated by some behavior policy $\pi_b$ that is likely different than the deterministic policy $\pi$ the agent is learning.  As a result, the reward sequence cannot be used to update the estimated action-value function $Q_{\pi}(s_t,a_t)$, which requires that policy $\pi$ is followed exactly after action $a_t$ is taken in state $s_t$.   
+\end{comment}
+ 
+\section{Background}
+\label{sect:background}
+
+We are interested in solving a Markov Decision Process (MDP) augmented with a set of goals $\mathcal{G}$ (each a state or set of states) that we would like an agent to learn.  We define an MDP augmented with a set of goals as a \textit{Universal MDP} (UMDP). A UMDP is a tuple $\mathcal{U} = (\mathcal{S}, \mathcal{G}, \mathcal{A}, T, R, \gamma)$, in which $\mathcal{S}$ is the set of states; $\mathcal{G}$ is the set of goals;  $\mathcal{A}$ is the set of actions; $T$ is the transition probability function in which $T(s,a,s')$ is the probability of transitioning to state $s'$ when action $a$ is taken in state $s$; $R$ is the reward function; $\gamma$ is the discount rate $\in [0,1)$.  At the beginning of each episode in a UMDP, a goal $g \in \mathcal{G}$ is selected for the entirety of the episode.  The solution to a UMDP is a control policy $\pi : \mathcal{S},\mathcal{G} \rightarrow \mathcal{A}$ that maximizes  the value function $v_{\pi}(s,g)=\mathbb{E}_{\pi}[\sum\nolimits_{n=0}^\infty \gamma^n R_{t+n+1}|s_t=s,g_t=g]$ for an initial state $s$ and goal $g$.    
+
+In order to implement hierarchical agents in tasks with continuous state and actions spaces, we will use two techniques from the RL literature: (i) the \textit{Universal Value Function Approximator} (UVFA) \citep{schaul15} and (ii) \textit{Hindsight Experience Replay} \citep{Andrychowicz2017HindsightER}. The UVFA  will be used to estimate the action-value function of a goal-conditioned policy $\pi$, $q_{\pi}(s,g,a)=\mathbb{E}_{\pi}[\sum\nolimits_{n=0}^\infty \gamma^n R_{t+n+1}|s_t=s,g_t=g,a_t=a]$.  In our experiments, the UVFAs used will be in the form of feedforward neural networks.  UVFAs are important for learning goal-conditioned policies because they can potentially generalize Q-values from certain regions of the \textit{(state, goal, action)} tuple space to other regions of the tuple space, which can accelerate learning.  However, UVFAs are less helpful in difficult tasks that use sparse reward functions.  In these tasks when the sparse reward is rarely achieved, the UVFA will not have large regions of the \textit{(state, goal, action)} tuple space with relatively high Q-values that it can generalize to other regions.  For this reason, we also use \textit{Hindsight Experience Replay} \citep{Andrychowicz2017HindsightER}.  HER is a data augmentation technique that can accelerate learning in sparse reward tasks.  HER first creates copies of the \textit{[state, action, reward, next state, goal]} transitions that are created in traditional off-policy RL.  In the copied transitions, the original goal element is replaced with a state that was actually achieved during the episode, which guarantees that at least one of the HER transitions will contain the sparse reward.  These HER transitions in turn help the UVFA learn about regions of the \textit{(state, goal, action)} tuple space that should have relatively high Q-values, which the UVFA can then potentially extrapolate to the other areas of the tuple space that may be more relevant for achieving the current set of goals.            
+
+
+\section{Hierarchical Actor-Critic (HAC)}
+
+We introduce a HRL framework, Hierarchical Actor-Critic, that can efficiently learn the levels in a multi-level hierarchy in parallel.  HAC contains two components: (i) a particular hierarchical architecture and (ii) a method for learning the levels of the hierarchy simultaneously and independently.  In this section, we will more formally present our proposed system as a UMDP transformation operation.  
+
+The purpose of our framework is to efficiently learn a $k$-level hierarchy $\Pi_{k-1}$ consisting of $k$ individual policies $\pi_0, \dots, \pi_{k-1}$, in which $k$ is a hyperparameter chosen by the user.  In order to learn $\pi_0, \dots, \pi_{k-1}$ in parallel our framework transforms the original UMDP, $\mathcal{U}_{original} = (\mathcal{S},\mathcal{G},\mathcal{A},T,R,\gamma)$, into a set of $k$ UMDPs $\mathcal{U}_0, \dots, \mathcal{U}_{k-1}$, in which $\mathcal{U}_i = (\mathcal{S}_i,\mathcal{G}_i,\mathcal{A}_i,T_i,R_i,\gamma_i)$.  In the remainder of the section, we will describe these tuples at a high-level.  See section \ref{UMDP} in the Appendix for the full definition of each UMDP tuple. 
+
+% Each of these components are described in detail next.
+
+\subsection{State, Goal, and Action Spaces}
+\begin{comment}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\textwidth]{upd_policy_desc.pdf}
+    % \vspace{-.5cm}
+    \caption{(Left) Policy architecture of an agent with $k$=2 levels of hierarchy that operates in a continuous domain. (Right) Maximum time scales for the actions of each policy within a 3-level hierarchy when $H$ = 3.  The time scale of each level's actions grows exponentially with each successive level. \gdknote{Now that the intro is explained better I think this figure can be deleted if necessary.}}
+    % \vspace{-.2cm}
+    \label{fig:policy_ex}
+\end{figure}
+\end{comment}
+
+
+
+% In order for a hierarchical policy to divide a task into increasingly short subtasks, higher levels must be able to act at larger time scales.  Our approach facilitates learning subgoals with time scales that can increase exponentially with the level of the hierarchy by nesting transition functions.  
+
+% Each individual policy $\pi_i$ within the hierarchy learns a deterministic mapping of states and goals to actions: $\pi_i: \mathcal{S}_i,\mathcal{G}_i \rightarrow \mathcal{A}_i, 0 \leq i \leq k-1$. 
+
+In our approach, each level of the UMDP hierarchy learns its own deterministic policy: $\pi_i: \mathcal{S}_i,\mathcal{G}_i \rightarrow \mathcal{A}_i, 0 \leq i \leq k-1$. The state space for every level $i$ is identical to the state space in the original problem: $\mathcal{S}_i = \mathcal{S}$. Since each level will learn to solve a shortest path problem with respect to a goal state, we set the goal space at each level $i$ to be identical to the state space: $\mathcal{G}_i = \mathcal{S}$. Finally, the action space at all levels except the bottom-most level is identical to the goal space of the next level down (i.e. the state space): $\mathcal{A}_i = \mathcal{S},i > 0$. These levels output subgoal states for the next lower level to achieve. The action space of the bottom-most level is identical to the set of primitive actions that are available to the agent: $\mathcal{A}_0 =\mathcal{A}$.
+
+% The goal space for each level $i$ is the state space, since each level will learn to move the agent to certain states or regions of states: $\mathcal{G}_i = \mathcal{S}$. 
+
+% The goal space for each level $i$ \sout{will be} \gdknote{is} the state space, since each level will learn to move the agent to certain states or regions of states: $\mathcal{G}_i = \mathcal{S}$.  
+
+
+\begin{comment}
+Defining the action space of the non-base levels of the hierarchy to be the state space makes it easier to learn multi-level hierarchies for multiple reasons.  First, it allows the subgoal action space to be as large as the goal space.  As a result, subgoal levels that need to learn to achieve a varity of goal state have a large action space with which to work.  Other HRL approaches that learn a policy over options are more limited as they often can only learn a limited number of options and need to determine the maximum number of options to be learned prior to training (\cite{Konidaris2009SkillC}, \cite{DBLP:journals/corr/BaconHP16}).  Second, in continuous domains, subgoal state actions become continous vectors, which enables levels to use actor-critic algorithms to learn a policy.  Actor-critic methods are can help each level be more data efficient as the UVFA can generaize Q-values across the \textit{\{state, goal, subgoal action\}} tuple space. Third, as we will soon describe, setting the high-level action space to be the state space makes it easier for agents to learn multiple policies in parallel and independently using \textit{hindsight action} transitions.
+\end{comment}
+
+\subsection{Nested Policies}
+
+
+
+% In order for a hierarchical policy to divide a task into increasingly short subtasks, higher levels must be able to act at larger time scales.  Our approach facilitates learning subgoals with time scales that can increase exponentially with the level of the hierarchy by nesting transition functions.  
+HAC learns hierarchies of nested policies.  Nesting is critical to decomposing problems because it enables agents to learn tasks requiring long sequences of primitive actions with policies that only need to learn short sequences of actions.  HAC nests policies by embedding the policy at level $i-1$, $\pi_{i-1}$, into the transition function at level $i$, $T_i$. The transition function at each subgoal level, $T_i, i>0$, will work as follows.  The subgoal action selected $a_i$ by level $i$ is assigned to be the goal of level $i-1$: $g_{i-1}=a_i$.  $\pi_{i-1}$ then has at most $H$ attempts to achieve $g_{i-1}$, in which $H$, or the maximum horizon of a subgoal action, is another parameter provided by the user.  When either $\pi_{i-1}$ runs out of $H$ attempts or a goal $g_n, n \geq i-1$, is achieved, the transition function terminates and the agent's current state is returned.  Level $i$'s state transition function $T_i$ thus depends on the full policy hierarchy below level $i$, $\Pi_{i-1}$, due to the hierarchy's nested architecture.  Each action from $\pi_{i-1}$ depends on $T_{i-1}$, which depends on $\pi_{i-2}$ and so on.  Consequently, we use the notation $T_{i|\Pi_{i-1}}$ for level $i$'s state transition function going forward as it depends on the full lower level policy hierarchy.  The full state transition function for level $i>0$ is provided in Algorithm \ref{alg:trans} in the Appendix.  The base transition function $T_0$ is assumed to be provided by the task: $T_0 = T$.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.75\linewidth]{robot_ex_updated.pdf}
+  \vspace{-.2cm}
+  \caption{\small An example episode trajectory for a simple toy example.  The tic marks along the trajectory show the next states for the robot after each primitive action is executed.  The pink circles show the original subgoal actions.  The gray circles show the subgoal states reached in hindsight after at most $H$ actions by the low-level policy.} 
+  \label{fig:robot_example}
+  \vspace{-.2cm}
+\end{figure}
+
+\subsection{Hindsight Action Transitions}
+
+There are two causes of non-stationary transition functions in our framework that will need to be overcome in order to learn multiple policies in parallel.  One cause of non-stationary transition functions is updates to lower level policies.  That is, whenever $\pi_i$ changes, the transition function at levels above $i$, $T_{j|\Pi_{j-1}}, j>i$, can change.  The second cause is exploring lower level policies.  Because all levels have a deterministic policy in our algorithm, all levels will need to explore with some behavior policy $\pi_{i_b}$ that is different than the policy it is learning $\pi_i$.  For instance, in continuous domains, the agent may add Gaussian noise to its greedy policy: $\pi_{i_b} = \pi_i + \mathcal{N}(0,\sigma^2)$ for some variance $\sigma^2$.  Yet whenever a lower level policy hierarchy uses some behavior policy $\Pi_{i-1_b}$ to achieve a subgoal, the transition function at level $i$, $T_{i|\Pi_{i-1_b}}$, will also vary over time.  RL methods will likely not be effective at learning subgoal policies in parallel if each subgoal policy at level $i$ is trained with respect to a transition function that uses the current lower level policy hierarchy $\Pi_{i-1}$ or the behavior lower level policy hierarchy $\Pi_{i-1_b}$.  RL methods need the distribution of states to which actions lead to be stable in order to effectively value actions and both $\Pi_{i-1}$ and $\Pi_{i-1_b}$ are continually changing.
+
+In order to overcome these non-stationary issues that hinder the joint learning of policies, HAC instead trains each subgoal policy assuming a transition function that uses the optimal lower level policy hierarchy, $\Pi_{i-1}^*$.  $T_{i|\Pi_{i-1}^*}$ is stationary because it is independent of the changing and exploring lower level policies, allowing an agent to learn a policy at level $i$ at the same time the agent learns policies below level $i$.  
+
+\begin{comment}
+
+
+we make certain changes to the UMDP tuple in order to generate hindsight action transitions.  The main idea of hindsight action transitions is that instead of valuing a subgoal with respect to a transition function that uses the current policy hierarchy below level $i$, $T_{i|\Pi_{i-1}}$, which likely will likely be ineffective because the lower level policy hierarchy $\Pi_{i-1}$ is constantly changing and exploring, evaluate subgoal state actions with respect to a transition function consisting of what the current lower level hierarchy is converging towards --- the optimal lower level policy hierarchy $\Pi_{i-1}^*$.  The optimal lower level policy hierarchy $\Pi_{i-1}^*$ is stationary, so RL methods can be used to learn the subgoal policy at level $i$ simultaneously with lower level policies.  This strategy can also help divide the work among the policies as the subgoal levels could focus on learning sequences of subgoal states that reach goal states and lower level policies can focus on learning the sequence of actions to achieve those subgoal states.  The challenge is how to train with a transition function that uses $\Pi_{i-1}^*$, $T_{i|\Pi_{i-1}^*}$, when the current lower level policy hierarchy $\Pi_{i-1}$ may not be near the optimal lower level policy hierarchy $\Pi_{i-1}^*$.  
+\end{comment}
+
+
+Hindsight action transitions use a simple technique to simulate the transition function that uses the optimal policy hierarchy below level $i$, $T_{i|\Pi_{i-1}^*}$.  In order to explain how hindsight actions transitions are implemented, we will use the example in Figure \ref{fig:robot_example}, in which a $k=2$-level robot is looking to move from its start state to the yellow flag. The robot begins in state $s_0$ when the high level policy $\pi_1$ outputs the subgoal state $g_0$ for the low level to achieve.  The low level policy $\pi_0$ then executes $H=5$ primitive actions using some behavior policy $\pi_{0_b}$ but is unable to achieve $g_0$, instead landing in $s_1$.  After executing $H=5$ primitive actions, the first action by $\pi_1$ is complete and a hindsight action transition can be created. 
+
+Hindsight action transitions have two key components.  The first is that the subgoal state achieved in hindsight is used as the action component in the transition, not the originally proposed subgoal state.  Thus, the hindsight action transition so far will look like: \textit{[initial state = $s_0$, action = $s_1$, reward = TBD, next state = $s_1$, goal = yellow flag, discount rate = gamma]}.  The second key component of the hindsight action transition is the reward function used at all subgoal levels.  The first requirement for this reward function is that it should incentivize short paths to the goal because shorter paths can be learned more quickly.  The second requirement for the reward function is that it should be independent of the path taken at lower levels.  The purpose of hindsight action transitions is to simulate a transition function that uses the optimal lower level policy hierarchy $\Pi_{i-1}^*$.  Yet without a model of the environment, the exact path $\Pi_{i-1}^*$ would have taken is unknown.  Thus, the reward  should only be a function of the state reached in hindsight and the goal state.  For each subgoal level, we use the reward function in which a reward of -1 is granted if the goal has not been achieved and a reward of 0 otherwise.  Thus, in the example above, the high level of the robot would receive the hindsight action transition \textit{[initial state = $s_0$, action = $s_1$, reward = -1, next state = $s_1$, goal = yellow flag, discount rate = gamma]}, which is the same transition that would have been created had the high level originally proposed state $s_1$ as a subgoal and the transition function used the optimal lower level policy hierarchy to achieve it.  Using the same process, the hindsight action transition created for the second action by $\pi_1$ would be \textit{[initial state = $s_1$, action = $s_2$, reward = -1, next state = $s_2$, goal = yellow flag, discount rate = $\gamma$]}.     
+
+
+Although none of the hindsight actions produced in the episode contained the sparse reward of 0, they are still helpful for the high level of the agent.  Through these transitions, the high level discovers on its own possible subgoals that fit the time scale of $H$ primitive actions per high level action, which is the time scale that it should be learning.  More importantly, these transitions are robust to a changing and exploring lower level policy $\pi_0$ because they assume a transition function that uses $\pi_0^*$ and not the current low level policy $\pi_0$ or low level behavior policy $\pi_{0_b}$.  
+
+\begin{comment}
+More formally, hindsight action transitions are implemented by defining the transition function $T_i$, reward function $R_i$, and discount rate $\gamma_i$ in all UMDPs $U_i, i> 0$ as follows: 
+\begin{itemize}
+    \item $T_{i|\Pi_{i-1}^*}(s,\Bar{a}), \Bar{a} = T_{i|\Pi_{i-1_b}}(s,\Pi_{i_b}(s))\}$
+    \item $R_i(s',g)=-1, \forall s': s' \notin g$, and $R_i(s',g)=0, \forall s': s' \in g$
+    \item $\gamma_i(s',g)=0, \forall s': s' \in g$ and $\gamma_i = \gamma, \forall s': s' \notin g$.
+\end{itemize}
+The transition function $T_i$ now uses the optimal lower level policy hierarchy and the action input to $T_i$ is the subgoal state achieved in hindsight by some $i$-level behavior hierarchical policy $\Pi_{i_b}$.  $R_i$ incentivizes short paths to the goal and is independent of that paths that were taken at levels below $i$.  The discount rate $\gamma_i = 0$ when the goal is achieved.
+\end{comment}
+
+
+\subsection{Hindsight Goal Transitions}
+
+We supplement all levels of the hierarchy with an additional set of transitions, which we refer to as hindsight goal transitions, that enable each level to learn more effectively in sparse reward tasks by extending the idea of \textit{Hindsight Experience Replay} \citep{Andrychowicz2017HindsightER} to the hierarchical setting.  As the toy robot example illustrates, it can be difficult for any level in our framework to receive the sparse reward.  A level needs to randomly reach its goal state in order to obtain the sparse reward.  Hindsight goal transitions use another simple use of hindsight to guarantee that after every sequence of actions by each level in the hierarchy, that level receives a transition containing the sparse reward.  
+
+Hindsight goal transitions would be created for each level in the toy robot example as follows.  Beginning with the low level, after each of the at most $H=5$ primitive actions executed by the low level policy $\pi_0$ per high level action, the low level will create two transitions.  The first transition is the typical transition non-hierarchical agents create evaluating the primitive action that was taken given the goal state.  For instance, assuming the same shortest path reward function described earlier, after the first primitive action in the episode, the low level will receive the transition \textit{[initial state = $s_0$, action = joint torques, reward = -1, next state = first tick mark, goal = $g_0$, discount rate = $\gamma$]}.  The second transition is a copy of the first transition, but the goal state and reward components are temporarily erased: \textit{[initial state = $s_0$, action = joint torques, reward = TBD, next state = first tick mark, goal = TBD, discount rate = $\gamma$]}.  After the sequence of at most $H=5$ primitive actions, the hindsight goal transitions will be created by filling in the TBD components in the extra transitions that were created.  First, one of the ``next state" elements in one of the transitions will be selected as the new goal state replacing the TBD component in each transition.  Second, the reward will be updated in each transition to reflect the new goal state.  For instance, after the first set of $H=5$ primitive actions, the state $s_1$ may be chosen as the hindsight goal.  The hindsight goal transition created by the fifth primitive action that achieved the hindsight goal would then be \textit{[initial state = 4th tick mark, action = joint torques, reward = 0, next state = $s_1$, goal = $s_1$, discount rate = 0]}.  Moreover, hindsight goal transitions would be created in the same way for the high level of the toy robot, except that the hindsight goal transitions would be made from copies of the hindsight action transitions.  Assuming the last state reached $s_5$ is used as the hindsight goal, the first hindsight goal transition for the high level would be \textit{[initial state = $s_0$, action = $s_1$, reward = -1, next state = $s_1$, goal = $s_5$, discount rate = $\gamma$]}.  The last hindsight goal transition for the high level would be \textit{[initial state = $s_4$, action = $s_5$, reward = 0, next state = $s_5$, goal = $s_5$, discount rate = 0]}.    
+
+\begin{comment}
+Hindsight goal transitions are integrated into our hierarchical framework as follows. When a level $i$ is given a goal from level $i+1$, level $i$ will create the usual hindsight action transition for each action executed.  Assuming that $H$ hindsight actions were executed, these transitions will be of the form \textit{[state = $s_{i_t}$, action = $s_{{hind}_t}$, reward = $r_{i_t}$, next state = $s_{i_t}$, goal = $g_{i_t}$]}, in which $t \in \{0,\dots, H-1\}$.  At the base level, the hindsight action transitions will just use the primitive action executed as the action component instead of $s_{hind}$.  To create hindsight goal transitions, one or more copies of these transitions will be created and the reward and goal components will be erased.  For each set of copies, a new goal will be selected from the set of \textit{next state} transition elements and inserted into the set of copied transitions as the goal component.  The reward $R_i(s',g)$ element will also be updated to reflect the new goal.  Thus each hindsight action transitions will be replayed with a goal state achieved in hindsight.  
+\end{comment}
+
+
+
+Hindsight goal transitions should significantly help each level learn an effective goal-conditioned policy because it guarantees that after every sequence of actions, at least one transition will be created that contains the sparse reward (in our case a reward and discount rate of 0).  These transitions containing the sparse reward will in turn incentivize the UVFA critic function to assign relatively high Q-values to the \textit{(state, action, goal)} tuples described by these transitions.  The UVFA can then potentially generalize these high Q-values to the other actions that could help the level solve its tasks. 
+
+\subsection{Subgoal Testing Transitions}
+
+Hindsight action and hindsight goal transitions give agents the potential to learn multiple policies in parallel with only sparse rewards, but some key issues remain.  The most serious flaw is that the strategy only enables a level to learn about a restricted set of subgoal states.  A level $i$ will only execute in hindsight subgoal actions that can be achieved with at most $H$ actions from level $i-1$.  For instance, when the toy robot is in state $s_2$, it will not be able to achieve a subgoal state on the yellow flag in $H=5$ primitive actions.  As a result, level $i$ in a hierarchical agent will only learn Q-values for subgoal actions that are relatively close to its current state and will ignore the Q-values for all subgoal actions that require more than $H$ actions.  This is problematic because the action space for all subgoal levels should be the full state space in order for the framework to be end-to-end.  If the action space is the full state space and the Q-function is ignoring large regions of the action space, significant problems will occur if the learned Q-function assigns higher Q-values to distant subgoals that the agent is ignoring than to feasible subgoals that can be achieved with at most $H$ actions from the level below.  $\pi_i$ may adjust its policy to output these distant subgoals that have relatively high Q-values.  Yet the lower level policy hierarchy $\Pi_{i-1}$ has not been trained to achieve distant subgoals, which may cause the agent to act erratically.
+
+A second, less significant shortcoming is that hindsight action and goal transitions do not incentivize a subgoal level to propose paths to the goal state that the lower levels can actually execute with its current policy hierarchy.  Hindsight action and goal transitions purposefully incentivize a subgoal level to ignore the current capabilities of lower level policies and propose the shortest path of subgoals that has been found.  But this strategy can be suboptimal because it may cause a subgoal level to prefer a path of subgoals that cannot yet be achieved by the lower level policy hierarchy over subgoal paths that both lead to the goal state and can be achieved by the lower level policy hierarchy.  
+
+Our framework addresses the above issues by supplying agents with a third set of transitions, which we will refer to as \textit{subgoal testing} transitions.  Subgoal testing transitions essentially play the opposite role of hindsight action transitions.  While hindsight actions transitions help a subgoal level learn the value of a subgoal state when lower level policies are optimal, subgoal testing transitions enable a level to understand whether a subgoal state can be achieved by the current set of lower level policies.  
+
+Subgoal testing transitions are implemented as follows.  After level $i$ proposes a subgoal $a_i$, a certain fraction of the time $\lambda$, the lower level behavior policy hierarchy, $\Pi_{i-1_b}$, used to achieve subgoal $a_i$ must be the current lower level policy hierarchy $\Pi_{i-1}$.  That is, instead of a level being able to explore with a noisy policy when trying to achieve its goal, the current lower level policy hierarchy must be followed exactly.  Then, if subgoal $a_i$ is not achieved in at most $H$ actions by level $i-1$, level $i$ will be penalized with a low reward, $penalty$.  In our experiments, we set $penalty = -H$, or the negative of the maximum horizon of a subgoal.  In addition, we use a discount rate of 0 in these transitions to avoid non-stationary transition function issues. 
+
+Using the robot example in Figure \ref{fig:robot_example}, after the robot proposes the ambitious subgoal $g_2$ when in state $s_2$, the robot may randomly decide to test that subgoal.  The low level policy then has at most $H=5$ primitive actions to achieve $g_2$.  These primitive actions must follow $\pi_0$ exactly.  Because the robot misses its subgoal, it would be penalized with following transition \textit{[initial state = $s_2$, action = $g_2$, reward = -5, next state = $s_3$, goal = Yellow Flag, discount rate = 0]}.     
+
+Subgoal testing transitions have three different effects on Q-values depending on the \textit{(state, goal, subgoal action)} tuple that is under consideration.  For this analysis, we use the notation $|s-a|$ to refer to the number of actions required by an optimal version of the policy at the level below, $\pi_{i-1}^*$, to move the agent from state $s$ to subgoal state $a$.
+\begin{enumerate}
+    \item $|s-a| > H$: For those \textit{(state, goal, subgoal action)} tuples in which the subgoal action could never be completed with $H$ actions by the optimal policy at the level below, the critic function will be incentivized to learn Q-values of $-H$ because the only transitions a subgoal level will receive for these tuples is the penalty transition.  Thus, subgoal testing transitions can overcome the major flaw of training only with hindsight action and goal transitions because now the more distant subgoal actions are no longer ignored. 
+    
+    \item $|s-a| \leq H$ and Achievable by $\Pi_{i-1}$:  For those \textit{(state, goal, subgoal action)} tuples in which the subgoal action can be achieved by the current lower level policy hierarchy $\Pi_{i-1}$, subgoal testing should have little to no effect.  Critic functions will be incentivized to learn Q-values close to the Q-value targets prescribed by the hindsight action and hindsight goal transitions.
+    
+    \item $|s-a| \leq H$ and Not Achievable by $\Pi_{i-1}$: The effects of subgoal testing are a bit more subtle for those \textit{(state, goal, subgoal action)} tuples in which the subgoal action can be achieved with at most $H$ actions by an optimal version of the policy below, $\pi_{i-1}^*$, but cannot yet be achieved with the current policy $\pi_{i-1}$.  For these tuples, critic functions are incentivized to assign a Q-value that is a weighted average of the target Q-values prescribed by the hindsight action/goal transitions and the penalty value of $-H$ prescribed by the subgoal testing transitions.  However, it is important to note that for any given tuple there are likely significantly fewer subgoal testing transitions than the total number of hindsight action and goal transitions.  Hindsight action transitions are created after every subgoal action, even during subgoal testing, whereas subgoal testing transitions are not created after each subgoal action.  Thus, the critic function is likely to assign Q-values closer to the target value prescribed by the hindsight action and hindsight goal transitions than the penalty value of $-H$ prescribed by the subgoal testing transition.
+    
+\end{enumerate}
+
+To summarize, subgoal testing transitions can overcome the issues caused by only training with hindsight goal and hindsight action transitions while still enabling all policies of the hierarchy to be learned in parallel.  With subgoal testing transitions, critic functions no longer ignore the Q-values of infeasible subgoals.  In addition, each subgoal level can still learn simultaneously with lower levels because Q-values are predominately decided by hindsight action and goal transitions, but each level will have a preference for paths of subgoals that can be achieved by the current lower level policy hierarchy. 
+
+\subsection{Algorithms}
+
+
+Algorithm \ref{alg:HAC} in the Appendix shows the full procedure for Hierarchical Actor-Critic (HAC).  Section \ref{HAC_deets} in the Appendix provides additional HAC implementation details.  We also provide the discrete version of our algorithm, \textit{Hierarchical Q-Learning} (HierQ), in Algorithm \ref{alg:HierQ} in the Appendix.      
+
+\section{Experiments}
+
+
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=1\linewidth]{ep_seq.pdf}
+  \vspace{-.2cm}
+  \caption{\small Episode sequences from the four rooms (top) and inverted pendulum tasks (bottom). In the four rooms task, the $k$=2 level agent is the blue square; the goal is the yellow square; the learned subgoal is the purple square.  In the inverted pendulum task, the goal is the yellow sphere and the subgoal is the purple sphere.} 
+  \label{fig:ep_seq}
+  \vspace{-.2cm}
+\end{figure}
+
+
+%\subsection{Environments}
+We evaluated our framework in several discrete state and action and continuous state and action tasks.  The discrete tasks consisted of grid world environments.  The continuous tasks consisted of the following simulated robotics environments developed in MuJoCo  \citep{Todorov2012MuJoCoAP}: (i) inverted pendulum, (ii) UR5 reacher, (iii) ant reacher, and (iv) ant four rooms.  A video showing our experiments is available at \url{https://www.youtube.com/watch?v=DYcVTveeNK0}.  Figure \ref{fig:ep_seq} shows some episode sequences from the grid world and inverted pendulum environments for a 2-level agent.      
+
+\begin{comment}
+\subsection{States, Actions, and Rewards}
+
+For the grid world tasks, the state space was an integer value representing which square the blue square agent was in.  The atomic actions available to the agent were $a_0 = \{\uparrow,\downarrow,\leftarrow,\rightarrow\}$.  Both the subgoal and end goal spaces were the same as the state space.  The rewards at all levels of the hierarchy were either \{-1,0\} depending on whether a policy's action achieved its goal.  For the grid world tasks, instead of testing subgoals, we simply used pessimistic Q-value initializations so subgoal state actions that are too far will always have poor Q-values.
+
+For the simulated robotics tasks, the state space was the concatenation of all joint angles and joint velocities.  The atomic actions available to the agent were vectors of joint torques.  The subgoal action space was equal to the state space.  The end goal space was either equal to the state space or a lower dimensional projection of the state space.  The rewards granted at all levels were either \{$-T$,-1,0\}. 
+\end{comment}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=1\linewidth]{iclr_results_no_repeat.pdf}
+  \vspace{-.3cm}
+  \caption{Average success rates for 3-level (red), 2-level agent (blue), and flat (green) agents in each task.  The error bars show 1 standard deviation.  }
+  \vspace{-.3cm}
+  \label{fig:results}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=1\linewidth]{hac_vs_hiro_no_repeat.pdf}
+  \vspace{-.3cm}
+  \caption{Figure compares the performance of HAC (2 Levels) and HIRO.  The charts show the average success rate and 1 standard deviation.}
+  \vspace{-.3cm}
+  \label{fig:comp_results}
+\end{figure}
+
+\subsection{Results}
+
+We compared the performance of agents using policy hierarchies with 1 (i.e., flat), 2, and 3 levels on each task.  The flat agents used Q-learning \citep{Watkins92q-learning} with HER in the discrete tasks and DDPG \citep{LillicrapHPHETS15} with HER in the continuous tasks.    
+
+Our approach significantly outperformed the flat agent in all tasks.  Figure \ref{fig:results} shows the average episode success rate for each type of agent in each task.  The discrete tasks average data from 50 trials.  The continuous tasks average data from at least 7 trials. 
+
+In addition, our empirical results show that our framework can benefit from additional levels of hierarchy likely because our framework can learn multiple levels of policies in parallel.  In all tasks, the 3-level agent outperformed the 2-level agent, and the 2-level agent outperformed the flat agent.
+
+\subsubsection{Baseline Comparison}
+
+We also directly compared our approach HAC to another HRL technique, HIRO \citep{DBLP:journals/corr/abs-1805-08296}, which outperforms the other leading HRL techniques that can work in continuous state and action spaces: FeUdal Networks \citep{DBLP:journals/corr/VezhnevetsOSHJS17} and Option-Critic \citep{DBLP:journals/corr/BaconHP16}.  HIRO enables agents to learn a 2-level hierarchical policy that like our approach can be trained off-policy and uses the state space to decompose a task.  Two of the key differences between the algorithms are that (i) HIRO does not use Hindsight Experience Replay at either of the 2 levels and (ii) HIRO uses a different approach for handling the non-stationary transition functions.  Instead of replacing the original proposed action with the hindsight action as in our approach, HIRO uses a subgoal action from a set of candidates that when provided to the current level 0 policy would most likely cause the sequence of \textit{(state, action)} tuples that originally occurred at level 0 when the level 0 policy was trying to achieve its original subgoal.  In other words, HIRO values subgoal actions with respect to a transition function that essentially uses the current lower level policy hierarchy, not the optimal lower level policy hierarchy as in our approach.  Consequently, HIRO may need to wait until the lower level policy converges before the higher level can learn a meaningful policy. 
+
+We compared the 2-level version of HAC to HIRO on the inverted pendulum, UR5 reacher, and ant reacher tasks.  In all experiments, the 2-level version of HAC significantly outperformed HIRO.  The results are shown in Figure \ref{fig:comp_results}.  
+
+\subsubsection{Subgoal Testing Ablation Studies}
+
+We also implemented some ablation studies examining our subgoal testing procedure.  We compared our method to (i) no subgoal testing and (ii) always penalizing missed subgoals even when the lower levels use noisy policies when attempting to achieve a subgoal.  Our implementation significantly outperformed both baselines.  The results and analysis of the ablation studies are given in section \ref{fig:subgoal_test} of the Appendix.  
+
+
+
+%\subsection{Empirical Results}
+
+%Kate: moved to theoretical.tex for now
+%\subsection{Theoretical Results}
+
+
+
+\vspace{-.2cm}
+\section{Conclusion}
+
+Hierarchy has the potential to accelerate learning but in order to realize this potential, hierarchical agents need to be able to learn their multiple levels of policies in parallel. We present a new HRL framework that can efficiently learn multiple levels of policies simultaneously. HAC can overcome the instability issues that arise when agents try to learn to make decisions at multiple time scales because the framework trains each level of the hierarchy as if the lower levels are already optimal. Our results in several discrete and continuous domains, which include the first 3-level agents in tasks with continuous state and action spaces, confirm that HAC can significantly improve sample efficiency.
+
+\begin{comment}
+
+Hierarchy has the potential to accelerate learning in sparse reward tasks because hierarchy can decompose tasks into short horizon subtasks.  We proposed a new HRL framework that can solve those simpler subtasks simultaneously.  Our approach significantly outperformed flat agents and a leading HRL algorithm and was the first to successfully learn 3-level hierarchies in parallel in tasks with continuous state and action spaces.  
+
+\end{comment}
+
+\section*{Acknowledgements}
+This work has been supported in part by the National Science Foundation 
+through IIS-1724237, IIS-1427081, IIS-1724191, and IIS-1724257, NASA through 
+NNX16AC48A and NNX13AQ85G, ONR through N000141410047, Amazon through an 
+ARA to Platt, Google through a FRA to Platt, and DARPA.
+
+\begin{comment}
+
+
+Although learning via hindsight actions does enable all policies $\pi_i \in \Pi_{k-1}$ to be trained in parallel, the strategy does have some significant shortcomings.  The most serious flaw is that the strategy only enables a level to learn about a restricted set of subgoal states.  A level $i$ will only execute in hindsight subgoal actions that can be achieved with at most $H$ actions from level $i-1$.  As a result, level $i$ will only learn Q-values for subgoal actions that are relatively close to its current state and will ignore the Q-values for all subgoal actions that require more than $H$ actions.  This is problematic because the action space for all subgoal levels should be the full state space in order for the framework to be end-to-end.  If the action space is the full state space and the Q-function is ignoring large regions of the action space, significant problems will occur if the learned Q-function assigns higher Q-values to distant subgoals that the agent is ignoring than to feasible subgoals that can be achieved with at most $H$ actions from the level below.  $\pi_i$ may adjust its policy to output these distant subgoals that have relatively high Q-values.  Yet the lower level policy hierarchy $\Pi_{i-1}$ has not been trained to achieve distant subgoals, which may cause the agent to act erratically.  
+
+
+
+
+A second, less serious shortcoming is that hindsight actions transitions do not necessarily incentivize a subgoal level to propose paths to the goal state that the lower levels can actually execute with its current policy hierarchy.  Consider a $k$ = 2 level agent attempting to learn a task that requires 16 primitive actions when $H$ = 8.  At some point in training, the higher level may have learned that its optimal action sequence contains 2 subgoals.  The first subgoal is halfway to the goal state.  Then when at the halfway point, the next subgoal is at the goal state.  However, it may be the case that the lower level has not yet learned the sequences of 8 primitive actions to each each of these subgoals.  Yet, the lower level may be able to achieve the sequence of 4 subgoals, each of which require 4 primitive actions, that leads to the end goal.  But a level that only learns with hindsight actions is not incentivized to propose this path of subgoals because it does not take into account the current capabilities of the current lower level policy hierarchy.  Instead, the agent will need to wait until the lower level learns its sequence of 8 primitive actions.    
+
+\subsubsection{Subgoal Testing Transitions}
+
+The second type of transition, subgoal testing transitions, will help agents overcome both of these challenges by enabling a level to value a subgoal action based on not only how close the subgoal brings the agent to the goal using some future, optimal policy hierarchy, but also whether that subgoal can actually be achieved by the current lower level policy hierarchy.   Subgoal testing transitions are created as follows.  After level $i$ proposes a subgoal $a_i$, a certain fraction of the time $\lambda$, the lower level behavior policy hierarchy, $\Pi_{i-1_b}$, used to achieve subgoal $a_i$ must be the current lower level policy hierarchy $\Pi_{i-1}$.  That is, instead of a level being able to explore when trying to achieve its goal, the current lower level policy hierarchy must be followed exactly.  Then, if subgoal $a_i$ is not achieved in at most $H$ actions, level $i$ will be penalized with a low reward.  
+
+In order to integrate subgoal testing transitions into each UMDP, we make the follow modifications to transition function $T_i$ and reward function $R_i$ for all UMDPs $\mathcal{U}_i, i > 0$.  The new transition function, $T_{i|\hat{\Pi}_{i-1}}$, will be now consist of two different transition functions: $T_{i|\hat{\Pi}_{i-1}} = \{(i) T_{i|\Pi_{i-1}^*}(s,a)$ (hindsight action) and $(ii) T_{i|\Pi_{i-1}}(s,a)$ (subgoal testing)$\}$.  In our experiments, we set $\lambda$ = 0.3.  However, the mix of transitions is even more weighted to hindsight action transitions because hindsight actions transitions are still created during subgoal testing.  Hindsight Experience Replay will increase the proportion of hindsight action transitions further as discussed later.  Moreover, we modify the reward function $R_i$ to now include a third term.  $R_i(a,s',g)$ will now issue a $penalty$ reward if the next state $s'$ does not map to the original subgoal action $a$ (i.e., subgoal action $a$ was not achieved by level $i-1$ in $H$ actions).  The updated reward function is now $R_i(a,s',g)=penalty, \forall s': s' \notin a$, $R_i(a,s',g)=-1, \forall s': (s' \in a) \land (s' \notin g$), and $R_i(a,s',g)=0, \forall s': (s' \in a) \land (s' \in g$).  In our experiments, we set the $penalty$ reward to $-H$.  In addition, in the situation in which a subgoal is tested and missed, we set the discount rate $\gamma_i$ = 0.  This will ensure that the Bellman target resulting from the transition describing the missed subgoal will be a fixed low value and will not depend on the next state term, which will vary as $\pi_{i-1}$ changes.
+
+As a result of the new transition and reward functions, the objective for levels $i > 0$ has changed.  The goal for a level $i$ is now to find the policy $\pi_i$ that maximizes the following weighted action-value function:   
+\[
+q_{\pi_i|\hat{\Pi}_{i-1}}(s,g,a) = 
+  \begin{cases} 
+   R_i(a,s' \gets T_{i|\Pi_{i-1}}(s,a),g) + \gamma_i(a,s',g) \cdot V_{\pi_i|\hat{\Pi}_{i-1}}(s',g)  &\text{if }\textit{subgoal test}\\
+   R_i(a,s' \gets T_{i|\Pi_{i-1}^*}(s,a),g) + \gamma_i(a,s',g) \cdot V_{\pi_i|\hat{\Pi}_{i-1}}(s',g) &\text{if }\textit{hindsight action}   
+  \end{cases}
+\]
+
+The action-value function is bifurcated as a result of the now stochastic transition function.  The bottom equation reflects the expected discounted reward when the transition function uses the optimal lower level policy hierarchy to execute subgoal $a$: $T_i = T_{i|\Pi_{i-1}^*}$.  The top equation reflects the expected discounted reward the transition function uses the current lower level policy hierarchy is used: $T_i = T_{i|\Pi_{i-1}}$.  The key difference that subgoal testing brings is that the Q-values for actions that cannot be achieved with at most $H$ actions using $\Pi_{i-1}$ will be lower as the penalty reward, $-H$, must now be factored in.
+
+However, the new approach still enables the agents to learn the policies within its hierarchy in parallel while also overcoming the two challenges discussed in the previous section.  Policies can still be learned in parallel because the estimated action-value function for level $i$, $Q_{\pi_i}$, is still incentivized to assign higher Q-values to subgoal actions that have proven in hindsight to be on shorter subgoal paths to the goal state than subgoal actions that are part of longer paths to the goal, except in the case in which the current lower level policy hierarchy can actually execute the longer subgoal paths to the goal but not the shorter paths.  This overcomes the second problem mentioned in the previous section as the modified approach incentivizes both short and achievable subgoal paths to the goal.  In addition, the first problem is also overcome as $Q_{\pi_i}$ will no longer ignore subgoal actions that cannot be achieved within $H$ actions.  For these too distant subgoal actions, $Q_{\pi_i}$ should assign a value near $-H$ because these actions will always receive the penalty reward during subgoal testing.
+
+
+
+
+\subsubsection{UMDP Hierarchy Definition}
+
+We now formally define the UMDPs tuples for all levels.
+
+\underline{$\mathcal{U}_0$:} This is the lowest level of the hierarchy. It has the same state set, action set, and state transition function as $\mathcal{U}_{original}$: $\mathcal{S}_0 = \mathcal{S}, \mathcal{A}_0 = \mathcal{A}$, and $T_0 = T$. The goal states for which $\mathcal{U}_0$ will be responsible for learning will be dictated by the UMDP one level higher, $\mathcal{U}_1$.  However, given that every state is potentially a goal, the goal space is defined to be the state space: $\mathcal{G}_0 = \mathcal{S}$. The framework is flexible as to the reward function used at level 0, but we will use the shortest path reward function, in which a reward of 0 is granted if the next state, $s'$, maps to the goal and -1 otherwise: $R_0(s',g) = 0, \forall s': s' \in g$ and $R_0(s',g) = -1, \forall s': s' \notin g$.  In addition, the discount rate is set to 0 if the goal has been achieved, but remains $\gamma$ otherwise: $\gamma_0(s',g) = 0, \forall s': s' \in g$, $\gamma_0(s',g) = \gamma, \forall s': s' \notin g$.  The objective in $\mathcal{U}_0$ is to find the policy $\pi_0: \mathcal{S}_0,\mathcal{G}_0 \rightarrow \mathcal{A}_0$ that maximizes the value function $v_{\pi_0}(s,g) = \mathbb{E}_{\pi_0}[\sum \nolimits_{n=0}^{\infty}\gamma_0^n R_{0_{t+n+1}}|s_{0_t}=s,g_{0_t}=g]$ for the initial state and goal combinations that the policy $\pi_1$ from $\mathcal{U}_1$ requires.
+
+\underline{$\mathcal{U}_i, 1 \leq i<k$:} These UMDPs represent the remainder of the hierarchy.  The state space is the same as the state space in $U_{original}$: $\mathcal{S}_i=\mathcal{S}$.  For all levels except for the top level, the set of goals is dictated by the level above.  These goals can potentially be any state: $G_i=\mathcal{S}, 1 \leq i < k-1$.  For the top level, the goal set is provided by the task: $\mathcal{G}_{k-1}=\mathcal{G}$.  The action space is the state space as these policies will output subgoal states for the next level to achieve: $\mathcal{A}_i=\mathcal{S}$.  The state transition function consists of two transition functions: $T_{i|\hat{\Pi}_{i-1}}(s,a)$ = \{(i) $T_{i|\Pi_{i-1}^*}(s,\Bar{a}), \Bar{a} = T_{i|\Pi_{i-1_b}}(s,\Pi_{i_b}(s))\}$, (ii) $T_{i|\Pi_{i-1}}(s,a)$.  The first transition function will be used to generate hindsight transitions. Note that the action $\Bar{a}$ passed to the first transition function must be generated by some hierarchical behavior policy $\Pi_{i_b}$.  The second transition function will be used for subgoal testing and will follow the current lower level policy hierarchy exactly.  The reward function is $R_i(a,s',g)=penalty, \forall s': s' \notin a$, $R_i(a,s',g)=-1, \forall s': (s' \in a) \land (s' \notin g)$, and $R_i(a,s',g)=0, \forall s': (s' \in a) \land (s' \in g)$.  The penalty reward is only issued during subgoal testing.  $\gamma_i$ is set to 0 if a subgoal is tested and missed or if an action achieves the goal, but is otherwise $\gamma$ from $\mathcal{U}_{original}: \gamma_i(a,s',g)=0, \forall s': (s' \notin a) \lor (s' \in g)$.  The objective in each $U_i$ is to learn a policy $\pi_i: \mathcal{S}_i,\mathcal{G}_i \rightarrow \mathcal{A}_i$ that maximizes the value function $v_{\pi_i|\hat{\Pi}_{i-1}}(s,g)=\mathbb{E}_{\pi_i|\hat{\Pi}_{i-1}}[\sum\nolimits_{n=0}^\infty \gamma^n R_{i_{t+n+1}}|s_{i_t}=s, g_{i_t}=g]$
+
+\end{comment}
+
+
+
+
+
+
+
+\begin{comment}
+
+
+
+\subsection{Example}\label{example}
+
+
+
+This section walks through a simple toy example showing how our framework helps agents learn hierarchical policies simultaneously using hindsight action, subgoal testing, and HER transitions.  The \sout{agent in this task is a robot and its goal is to} \gdknote{must} reach the yellow flag.  It has two levels in its hierarchy and a maximum subgoal horizon parameter $H = 5$ actions.  Thus, the agent's goal is to learn both a low and high-level policy that focus on action sequences containing no more than 5 actions.   
+
+
+Figure \ref{fig:robot_example} shows an example episode trajectory.  Note that all subscript numbers in the figure refer to the iteration number of the high-level policy.  The episode begins with the robot in state $s_0$ when the  high-level policy $\pi_1$ proposes its first subgoal state $g_0$.  The robot decides that during this iteration, subgoal $g_0$ will not be tested.  As a result, the low-level policy, $\pi_0$, is free to add exploration noise to the primitive actions it proposes. Level 0 then has at most $H = 5$ primitive actions (i.e., joint torques in this case) to achieve $g_0$.  After each action, a transition will be created evaluating how the action from $\pi_0$ performed given the goal state it was provided.  For instance, the first transition in this example may look like $[s = s_0, a = Joint$ $Torques, r = -1, s' = first$ $tick$ $mark, g = g_0]$.  In addition, a separate transition will be created and temporarily stored in order to be used for level 0's Hindsight Experience Replay.  This transition will be of the form $[s = s_0, a = Joint$ $Torques, r = TBD, s' = first$ $tick$ $mark, g = TBD]$. Per the example in Figure \ref{fig:robot_example}, the robot fails to achieve state $g_0$ after 5 attempts and lands in state $s_1$ instead.  After this sequence of primitive actions, HER is performed for layer 0.  The state $s_1$ can replace the $TBD$ goal component in the extra level 0 HER transitions that were created and the reward would then be replaced with its appropriate value.
+
+The completion of level 0's $for$ loop represents a single action by level 1's policy $\pi_1$.  Because its original subgoal $g_0$ was not achieved, $\pi_1$ will then record the hindsight state $s_1$ as the actual action that was taken.  The hindsight action transition $[s=s_0, a = s_1, r = -1, s' = s_1, g = Yellow$ $Flag]$ will be added to level 1's replay buffer.  The additional transition $[s=s_0, a = s_1, r = TBD, s' = s_1, g = TBD]$ will be stored until HER is performed for level 1.    
+
+Skipping ahead to when the robot is in state $s_2$, the high-level policy proposes subgoal $g_2$ and then decides to test the subgoal.  The low-level policy then has $H = 5$ attempts without exploration noise to try to achieve $g_2$.  In this scenario, the robot fails to achieve $g_2$.  Indeed, state $g_2$ is too far away from $s_2$ to ever be achieved in 5 attempts.  Because the subgoal was tested and the robot failed to achieve it, a penalty transition is created and passed to the replay buffer for level 1.  Assuming the penalty is $-H = -5$, the subgoal testing transition would be of the form $[s=s_2, a = g_2, r = -5, s' = s_3, g = Yellow$ $Flag]$.  The robot will also create the hindsight action transition and HER transitions showing that state $s_3$ is a possible subgoal state from $s_2$.  The hindsight action transition is again of the form $[s = s_2, a = s_3, r = -1, s' = s_3, g = Yellow$ $Flag]$.  The episode then finishes with the agent achieving its goal.  After the episode, HER is performed for level 1.  The state $s_4$ can be used as the goal state for the level 1 HER transitions. After level 1 is finished, all actor-critic networks are then updated using an off-policy RL algorithm.
+
+From this single episode, both levels have learned important information.  Using HER, level 0 has learned the joint torques that can achieve a variety of states.  Similarly, by replacing the original proposed subgoals with the subgoal actions achieved in hindsight and by using HER, level 1 has learned a sequence of subgoal states $(s_1 \rightarrow s_2 \rightarrow s_3 \rightarrow s_4)$ that fits its time scale and can lead the robot to a certain area in the goal space.  The sequences of actions that each level is provided is short and thus can potentially be learned more quickly than a flat policy trying to learn a long sequence of atomic actions.  Moreover, through subgoal testing, level 1 has also learned about subgoals that may be too ambitious.  Using its UVFA, each level should be able to use this new information to better generalize to different goal states.  
+
+\end{comment}
+
+% \bibliography{iclr2019_conference}
+\begin{thebibliography}{18}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Andrychowicz et~al.(2017)Andrychowicz, Wolski, Ray, Schneider, Fong,
+  Welinder, McGrew, Tobin, Abbeel, and Zaremba]{Andrychowicz2017HindsightER}
+M.~Andrychowicz, F.~Wolski, A.~Ray, J.~Schneider, R.~Fong, P.~Welinder,
+  B.~McGrew, J.~Tobin, P.~Abbeel, and W.~Zaremba.
+\newblock Hindsight experience replay.
+\newblock In \emph{Advances in Neural Information Processing Systems 30}, pp.\
+  5048--5058. 2017.
+
+\bibitem[Bacon et~al.(2017)Bacon, Harb, and
+  Precup]{DBLP:journals/corr/BaconHP16}
+P-L Bacon, J.~Harb, and D.~Precup.
+\newblock The option-critic architecture.
+\newblock In \emph{Proceedings of the Thirty-First {AAAI} Conference on
+  Artificial Intelligence}, pp.\  1726--1734, 2017.
+
+\bibitem[Bakker \& Schmidhuber(2004)Bakker and
+  Schmidhuber]{DBLP:conf/nci/BakkerS04}
+Bram Bakker and J{\"{u}}rgen Schmidhuber.
+\newblock Hierarchical reinforcement learning with subpolicies specializing for
+  learned subgoals.
+\newblock In \emph{Neural Networks and Computational Intelligence}, pp.\
+  125--130, 2004.
+
+\bibitem[Dietterich(2000)]{Dietterich98themaxq}
+T.G. Dietterich.
+\newblock Hierarchical reinforcement learning with the {MAXQ} value function
+  decomposition.
+\newblock \emph{Journal of Artificial Intelligence Research}, 13:\penalty0
+  227--303, 2000.
+
+\bibitem[Konidaris \& Barto(2009)Konidaris and Barto]{Konidaris2009SkillC}
+G.D. Konidaris and A.G. Barto.
+\newblock Skill discovery in continuous reinforcement learning domains using
+  skill chaining.
+\newblock In \emph{Advances in Neural Information Processing Systems 22}, pp.\
+  1015--1023, 2009.
+
+\bibitem[Kulkarni et~al.(2016)Kulkarni, Narasimhan, Saeedi, and
+  Tenenbaum]{Kulkarni_nips16}
+T.D. Kulkarni, K.~Narasimhan, A.~Saeedi, and J.~Tenenbaum.
+\newblock Hierarchical deep reinforcement learning: Integrating temporal
+  abstraction and intrinsic motivation.
+\newblock In \emph{Advances in Neural Information Processing Systems 29}, pp.\
+  3675--3683. 2016.
+
+\bibitem[Lillicrap et~al.(2015)Lillicrap, Hunt, Pritzel, Heess, Erez, Tassa,
+  Silver, and Wierstra]{LillicrapHPHETS15}
+T.P. Lillicrap, J.J. Hunt, A.~Pritzel, N.~Heess, T.~Erez, Y.~Tassa, D.~Silver,
+  and D.~Wierstra.
+\newblock Continuous control with deep reinforcement learning.
+\newblock \emph{CoRR}, abs/1509.02971, 2015.
+\newblock URL \url{http://arxiv.org/abs/1509.02971}.
+
+\bibitem[McGovern \& Barto(2001)McGovern and Barto]{mcgovern2001automatic}
+A.~McGovern and A.G. Barto.
+\newblock Automatic discovery of subgoals in reinforcement learning using
+  diverse density.
+\newblock In \emph{Proceedings of the Eighteenth International Conference on
+  Machine Learning}, pp.\  361--368, 2001.
+
+\bibitem[Menache et~al.(2002)Menache, Mannor, and Shimkin]{Menache2002QCutD}
+I.~Menache, S.~Mannor, and N.~Shimkin.
+\newblock {Q}-cut---dynamic discovery of sub-goals in reinforcement learning.
+\newblock In \emph{Proceedings of the Thirteenth European Conference on Machine
+  Learning}, pp.\  295--306, 2002.
+
+\bibitem[Nachum et~al.(2018)Nachum, Gu, Lee, and
+  Levine]{DBLP:journals/corr/abs-1805-08296}
+O.~Nachum, S.~Gu, H.~Lee, and S.~Levine.
+\newblock Data-efficient hierarchical reinforcement learning.
+\newblock In \emph{Advances in Neural Information Processing Systems 31}, pp.\
+  3303--3313. 2018.
+
+\bibitem[Schaul et~al.(2015)Schaul, Horgan, Gregor, and Silver]{schaul15}
+T.~Schaul, D.~Horgan, K.~Gregor, and D.~Silver.
+\newblock Universal value function approximators.
+\newblock In \emph{Proceedings of the 32nd International Conference on Machine
+  Learning}, volume~37, pp.\  1312--1320, 2015.
+
+\bibitem[Schmidhuber(1991)]{schmid_early}
+J{\"{u}}rgen Schmidhuber.
+\newblock Learning to generate sub-goals for action sequences.
+\newblock \emph{Artificial Neural Networks}, pp.\  967--972, 1991.
+
+\bibitem[{\c S}im{\c s}ek et~al.(2005){\c S}im{\c s}ek, Wolfe, and
+  Barto]{DBLP:conf/icml/SimsekWB05}
+{\"O}.~{\c S}im{\c s}ek, A.P. Wolfe, and A.G. Barto.
+\newblock Identifying useful subgoals in reinforcement learning by local graph
+  partitioning.
+\newblock In \emph{Proceedings of the Twenty-Second International Conference on
+  Machine Learning}, pp.\  816-- 823, 2005.
+
+\bibitem[Sutton et~al.(1999)Sutton, Precup, and Singh]{SuttonPrecupSingh:99}
+{R. S.} Sutton, D.~Precup, and S.~Singh.
+\newblock Between {MDPs} and semi-{MDPs}: a framework for temporal abstraction
+  in reinforcement learning.
+\newblock \emph{Artificial Intelligence Journal}, 112:\penalty0 181--211, 1999.
+
+\bibitem[Todorov et~al.(2012)Todorov, Erez, and Tassa]{Todorov2012MuJoCoAP}
+E.~Todorov, T.~Erez, and Y.~Tassa.
+\newblock {MuJoCo}: A physics engine for model-based control.
+\newblock \emph{Proceedings of the 2012 IEEE/RSJ International Conference on
+  Intelligent Robots and Systems}, pp.\  5026--5033, 2012.
+
+\bibitem[Vezhnevets et~al.(2017)Vezhnevets, Osindero, Schaul, Heess, Jaderberg,
+  Silver, and Kavukcuoglu]{DBLP:journals/corr/VezhnevetsOSHJS17}
+A.~Vezhnevets, S.~Osindero, T.~Schaul, N.~Heess, M.~Jaderberg, D.~Silver, and
+  K.~Kavukcuoglu.
+\newblock Fe{U}dal networks for hierarchical reinforcement learning.
+\newblock In \emph{Proceedings of the 34th International Conference on Machine
+  Learning}, pp.\  3540--3549, 2017.
+
+\bibitem[Watkins \& Dayan(1992)Watkins and Dayan]{Watkins92q-learning}
+Christopher J. C.~H. Watkins and Peter Dayan.
+\newblock Q-learning.
+\newblock In \emph{Machine Learning}, pp.\  279--292, 1992.
+
+\bibitem[Wiering \& Schmidhuber(1997)Wiering and
+  Schmidhuber]{DBLP:journals/adb/WieringS97}
+Marco Wiering and J{\"{u}}rgen Schmidhuber.
+\newblock {HQ}-learning.
+\newblock \emph{Adaptive Behaviour}, 6\penalty0 (2):\penalty0 219--246, 1997.
+
+\end{thebibliography}
+\bibliographystyle{iclr2019_conference}
+
+% \newpage
+\section{Appendix}
+
+\subsection{Hierarchical Actor-Critic (HAC) Algorithm}
+
+\begin{algorithm}
+\caption{Hierarchical Actor-Critic (HAC)}\label{alg:HAC}
+\begin{algorithmic}
+
+
+
+\State \textbf{Input:}
+    \begin{itemize}
+    \item Key agent parameters: number of levels in hierarchy $k$, maximum subgoal horizon $H$, and subgoal testing frequency $\lambda$. 
+    % \item Task design: $S_{init} \gets$ Initial state space, $G_{k-1} \gets$ task goal space 
+    \end{itemize}
+\State \textbf{Output:}
+    \begin{itemize}
+    \item $k$ trained actor and critic functions $\pi_0, ..., \pi_{k-1}, Q_0, ... , Q_{k-1}$
+    \end{itemize}
+
+    
+% \State initialize $level[i].actor$, $level[i].critic$, $level[i].buffer$ for 0 $\leq$ $i$ $<$ $k$ 
+\State
+\For{$M$ episodes} \Comment{Train for M episodes}
+% \Loop
+    \State $s \leftarrow$ $S_{init}$, $g$ $\leftarrow$ $G_{k-1}$ \Comment{Sample initial state and task goal}
+    \State $train-level$($k-1$, $s$, $g$) \Comment{Begin training}
+    \State Update all actor and critic networks
+% \EndLoop
+\EndFor
+\State
+\Function{train-level}{$i::level, s::state, g::goal$}
+% \State \textbf{Method} \textit{train} ($s, g$)
+\State $s_i \gets s$, $g_i \gets g$ \Comment{Set current state and goal for level $i$}
+\For{$H$ attempts or until $g_n$, $i \leq n < k$ achieved}
+    \State $a_i$ $\gets$ $\pi_i(s_i, g_i)$ + $noise$ (if not subgoal testing) \Comment{Sample (noisy) action from policy}
+    \If{$i > 0$} 
+        \State Determine whether to test subgoal $a_i$
+        \State $s_{i}^{'} \gets$ $train-level$($i-1, s_i, a_i$) \Comment{Train level $i-1$ using subgoal $a_i$}
+    \Else
+        \State Execute primitive action $a_0$ and observe next state $s_{0}^{'}$
+    \EndIf
+    \State  \Comment{Create replay transitions}
+    \If{$i > 0$ and $a_i$ missed} 
+        \If{$a_i$ was tested} \Comment{Penalize subgoal $a_i$}
+            \State $Replay\_Buffer_i \gets [s = s_i, a = a_i, r = Penalty, s^{'} = s_{i}^{'}, g = g_{i}, \gamma = 0]$
+        \EndIf
+        \State $a_i \gets s_i^{'}$ \Comment{Replace original action with action executed in hindsight}
+    \EndIf
+
+    \State \Comment{Evaluate executed action on current goal and hindsight goals}
+    \State $Replay\_Buffer_i \gets [s = s_i, a = a_i, r \in \{-1,0\}, s^{'} = s_{i}^{'}, g = g_{i}, \gamma \in \{\gamma, 0\}]$
+    \State $HER\_Storage_i \gets [s = s_i, a = a_i, r = TBD, s^{'} = s_{i}^{'}, g = TBD, \gamma = TBD]$
+    \State $s_i \gets s_i^{'}$
+\EndFor
+\State $Replay\_Buffer_i \gets$ Perform HER using $HER\_Storage_i$ transitions
+
+\State \textbf{return} $s_i^{'}$\Comment{Output current state}
+\EndFunction
+% \State \textbf{End Method}
+
+\end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+\subsection{Hierarchical Q-Learning (HierQ) Algorithm}\label{HierQ}
+
+HierQ is the version of our algorithm designed for domains with discrete state and action spaces.  Note that HierQ does not use subgoal testing.  Instead, the algorithm uses pessimistic Q-value initializations to prevent agents from learning to propose subgoal states that are too distant.
+
+\begin{algorithm}
+\caption{Hierarchical Q-Learning (HierQ)}\label{alg:HierQ}
+\begin{algorithmic}
+
+\State \textbf{Input:}
+    \begin{itemize}
+    \item Key agent parameters: number of levels in hierarchy $k > 1$, maximum subgoal horizon $H$, learning rate $\alpha$
+    % \item Task design: $S_{init} \gets$ Initial state space, $G_{k-1} \gets$ task goal space 
+    \end{itemize}
+\State \textbf{Output:}
+    \begin{itemize}
+    \item $k$ trained Q-tables $Q_0(s,g,a), ... , Q_{k-1}(s,g,a)$
+    \end{itemize}
+
+\\
+
+
+\State Use pessimistic Q-value initialization: $Q_i(s,g,a) \leq -H^{i+1}$
+\For{$M$ episodes} \Comment{Train for M episodes}
+% \Loop
+    \State $s_{k-1} \leftarrow$ $S_{init}$, $g_{k-1}$ $\leftarrow$ $G_{k-1}$ \Comment{Sample initial state and task goal}
+    \State \Comment{Initialize previous state arrays for levels $i, 0 < i < k$}
+    \State $Prev\_States_i \gets Array[H^i]$ \Comment{Length of level $i$ array is $H^i$}
+    
+    \State
+    \While{$g_{k-1}$ not achieved} \Comment{Begin Training}
+        \State $a_{k-1}$ $\gets$ $\pi_{k-1_b}(s_{k-1}, g_{k-1})$ \Comment{Sample action using $\epsilon$-greedy policy $\pi_{k-1_b}$}
+        \State $s_{k-1} \gets train-level$($k-2$, $s_{k-1}$, $a_{k-1}$) 
+        \Comment{Train next level}
+    \EndWhile
+    % \State $train-level$($k-1$, $s$, $g$) \Comment{Begin training}
+    % \State Update all actor and critic networks
+% \EndLoop
+\EndFor
+\State
+\Function{train-level}{$i::level, s::state, g::goal$}
+% \State \textbf{Method} \textit{train} ($s, g$)
+\State $s_i \gets s$, $g_i \gets g$ \Comment{Set current state and goal for level $i$}
+\For{$H$ attempts or until $g_n$, $i \leq n < k$ achieved}
+    \State $a_i$ $\gets$ $\pi_{i_b}(s_i, g_i)$ \Comment{Sample action using $\epsilon$-greedy policy $\pi_{i_b}$}
+    \If{$i > 0$} 
+        \State $s_{i}^{'} \gets$ $train-level$($i-1, s_i, a_i$) \Comment{Train level $i-1$ using subgoal $a_i$}
+    \Else
+        \State Execute primitive action $a_0$ and observe next state $s_{0}^{'}$
+        
+        \State \Comment{Update $Q_0(s,g,a)$ table for all possible subgoal states}
+            	\For{each state $s_{goal} \in S$}
+                	\State $Q_0(s_0,s_{goal},a_0) \gets (1-\alpha) \cdot Q_0(s_0,s_{goal},a_0) + \alpha \cdot [R_0 + \gamma max_a Q_0(s_0',s_{goal},a_0)$]
+                \EndFor  
+                
+        \State \Comment{Add state $s_0$ to all previous state arrays}
+        \State $Prev\_States_i \gets s_0, 0 < i < k$ 
+        
+        \State \Comment{Update $Q_i(s,g,a), 0 < i < k$, tables}
+        \For{each level $i, 0 < i < k$}
+            \For{each state $s \in Prev\_States_i$}
+                \For{each goal $s_{goal} \in S$}
+                    	\State $Q_i(s,s_{goal},s_0') \gets (1-\alpha) \cdot Q_i(s,s_{goal},s_0') + \alpha \cdot [R_i + \gamma max_a Q_i(s_0',s_{goal},a)$
+            	\EndFor
+            \EndFor
+        \EndFor
+    \EndIf
+    
+    \State $s_i \gets s_i^{'}$
+\EndFor
+
+\State \textbf{return} $s_i^{'}$\Comment{Output current state}
+\EndFunction
+
+
+
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{UMDP Tuple Definitions} \label{UMDP}
+
+We now formally define the UMDPs tuples for all levels.
+
+\underline{$\mathcal{U}_0$:} This is the lowest level of the hierarchy. It has the same state set, action set, and state transition function as $\mathcal{U}_{original}$: $\mathcal{S}_0 = \mathcal{S}, \mathcal{A}_0 = \mathcal{A}$, and $T_0 = T$. The goal states for which $\mathcal{U}_0$ will be responsible for learning will be dictated by the UMDP one level higher, $\mathcal{U}_1$.  However, given that every state is potentially a goal, the goal space is defined to be the state space: $\mathcal{G}_0 = \mathcal{S}$. The framework is flexible as to the reward function used at level 0, but we will use the shortest path reward function, in which a reward of 0 is granted if the next state, $s'$, maps to the goal and -1 otherwise: $R_0(s',g) = 0, \forall s': s' \in g$ and $R_0(s',g) = -1, \forall s': s' \notin g$.  In addition, the discount rate is set to 0 if the goal has been achieved, but remains $\gamma$ otherwise: $\gamma_0(s',g) = 0, \forall s': s' \in g$, $\gamma_0(s',g) = \gamma, \forall s': s' \notin g$.  The objective in $\mathcal{U}_0$ is to find the policy $\pi_0: \mathcal{S}_0,\mathcal{G}_0 \rightarrow \mathcal{A}_0$ that maximizes the value function $v_{\pi_0}(s,g) = \mathbb{E}_{\pi_0}[\sum \nolimits_{n=0}^{\infty}\gamma_0^n R_{0_{t+n+1}}|s_{0_t}=s,g_{0_t}=g]$ for the initial state and goal combinations that the policy $\pi_1$ from $\mathcal{U}_1$ requires.
+
+\underline{$\mathcal{U}_i, 1 \leq i<k$:} These UMDPs represent the remainder of the hierarchy.  The state space is the same as the state space in $U_{original}$: $\mathcal{S}_i=\mathcal{S}$.  For all levels except for the top level, the set of goals is dictated by the level above.  These goals can potentially be any state: $G_i=\mathcal{S}, 1 \leq i < k-1$.  For the top level, the goal set is provided by the task: $\mathcal{G}_{k-1}=\mathcal{G}$.  The action space is the state space as these policies will output subgoal states for the next level to achieve: $\mathcal{A}_i=\mathcal{S}$.  The state transition function consists of two transition functions: $T_{i|\hat{\Pi}_{i-1}}(s,a)$ = \{(i) $T_{i|\Pi_{i-1}^*}(s,\Bar{a}), \Bar{a} = T_{i|\Pi_{i-1_b}}(s,\pi_{i_b}(s,g_i))$, (ii) $T_{i|\Pi_{i-1}}(s,a)\}$.  The first transition function will be used to generate hindsight transitions. Note that the action $\Bar{a}$ passed to the first transition function must be generated by some hierarchical behavior policy $\Pi_{i_b}$.  The second transition function will be used for subgoal testing and will follow the current lower level policy hierarchy exactly.  The reward function is $R_i(a,s',g)=penalty, \forall s': s' \notin a$, $R_i(a,s',g)=-1, \forall s': (s' \in a) \land (s' \notin g)$, and $R_i(a,s',g)=0, \forall s': (s' \in a) \land (s' \in g)$.  The penalty reward is only issued during subgoal testing.  $\gamma_i$ is set to 0 if a subgoal is tested and missed or if an action achieves the goal, but is otherwise $\gamma$ from $\mathcal{U}_{original}: \gamma_i(a,s',g)=0, \forall s': (s' \notin a) \lor (s' \in g)$.  The objective in each $U_i$ is to learn a policy $\pi_i: \mathcal{S}_i,\mathcal{G}_i \rightarrow \mathcal{A}_i$ that maximizes the value function $v_{\pi_i|\hat{\Pi}_{i-1}}(s,g)=\mathbb{E}_{\pi_i|\hat{\Pi}_{i-1}}[\sum\nolimits_{n=0}^\infty \gamma^n R_{i_{t+n+1}}|s_{i_t}=s, g_{i_t}=g]$.
+
+\subsection{UMDP State Transition Function}
+\begin{algorithm}
+\caption{UMDP $\mathcal{U}_i$ Transition Function: $T_{i|\Pi_{i-1}}(state, action)$}\label{alg:trans}
+\begin{algorithmic}
+
+\State \textbf{Input:} state $s$, action $a$, 
+\State \textbf{Output:} next state
+\State
+\State \textbf{return} $Execute-H-Actions(s, a, i-1, H)$ \Comment{Execute $\leq H$ actions using policy $\pi_{i-1}$}
+\State    
+
+\Function{Execute-H-Actions}{$s::state, a::action, i::level, itr::iteration$}
+\State $s'$ = $T_{i|\Pi_{i-1}}(s,\pi_{i}(s,a))$ \Comment{Execute 1 action using policy $\pi_{i}$}
+\State itr -= 1 \Comment{Decrement iteration counter}
+
+% \If{$itr == 0$ or goal from level $\geq i$ achieved} 
+\If{$itr == 0$ or $s' \in g, \forall g \in \{g_i, ..., g_{k-1}\}$} 
+    \State \textbf{return} $s'$ \Comment{Return next state if out of iterations or goal achieved}
+\Else
+    \State \textbf{return} $Execute-H-Actions(s', a, i, itr)$ \Comment{Execute another action from $\pi_{i}$}
+\EndIf
+\EndFunction
+% \State \textbf{End Method}
+
+\end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Subgoal Testing Ablation Studies} \label{ablation}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{subgoal_ablation.pdf}
+  \vspace{-.2cm}
+  \caption{\small Results from the ablation studies examining our subgoal testing procedure.  We compare our implementation to two other options: (i) no subgoal testing and (ii) an implementation in which all missed subgoals are penalized even when lower levels use noisy policies to try to achieve the subgoal state that is being tested.  3-level agents were used in all options.} 
+  \label{fig:subgoal_test}
+  \vspace{-.2cm}
+\end{figure}
+
+Both the qualitative and quantitative results of the subgoal testing ablation studies support our implementation.  When no subgoal testing was used, the results were as expected.  The subgoal policies would always learn to set unrealistic subgoals that could not be achieved within $H$ actions by the level below.  This led to certain levels of the hierarchy needing to learn very long sequences of actions that the level was not trained to do.  When the Q-values of these unrealistic subgoal states were examined, they were high, likely because there were no transitions indicating that these should have low Q-values.  
+
+The implementation of always penalizing subgoals even when a noisy lower level policy hierarchy was used also performed significantly worse than our implementation.  One likely reason for this outcome is that always penalizing strategy incentivizes subgoal levels to output overly conservative subgoals, which means a subgoal level needs to learn longer sequences of subgoals that in turn take longer to learn.  Subgoal levels are incentivized to set nearby subgoals because more distant ones are less likely to be achieved when noise is added to actions.  
+
+\subsection{Hierarchical Actor-Critic Implementation Details}\label{HAC_deets}
+Below we provide some of the important details of our implementation of HAC.  For further detail, see the GitHub repository available at \url{https://github.com/andrew-j-levy/Hierarchical-Actor-Critc-HAC-}.
+\begin{itemize}
+    \item DDPG Parameters:
+    \begin{itemize}
+        \item Bounded Q-Values: We bound the output of each critic function to the range $[-H,0]$ using a negative sigmoid function.  An upper bound of 0 was chosen because all rewards in HAC are nonpositive so positive Q-values are illegal.  We believe the lower bound of $-H$ is helpful for learning Q-values as the critic function does not need to learn precise Q-values for the large space of irrelevant actions in which the current stat is far from the goal state.  The bound of $-H$ also ensures that subgoal states that were reached in hindsight should have higher Q-values than any subgoal state that is too distant and penalized during subgoal testing.
+        \item DDPG Target Networks: For the 2- and 3-level agents, we removed the target networks used in DDPG because we saw in some of our early MuJoCo experiments that these hierarchical agents performed at least as well without target networks.  We evaluated the flat agents with and without target networks.  The flat agent generally performed better with target networks, but our results show the better result of the two.
+        \item Exploration: Each level uses the following exploration strategy when a level is not involved in subgoal testing.  
+            \begin{itemize}
+                \item 20\% of actions are sampled uniformly at random from the level's action space
+                \item 80\% of actions are the sum of actions sampled from the level's policy and Gaussian noise 
+            \end{itemize}
+        \item Neural Network Architectures: All actor and critic neural networks had 3 hidden layers, with 64 nodes in each hidden layer.  ReLU activation functions were used.
+    \end{itemize}
+    \item HAC Parameters:
+    \begin{itemize}
+        \item Maximum horizon of a subgoal, $H$:
+            \begin{enumerate}
+                \item For $k$=3-level agents in MuJoCo tasks, $H=10$
+                \item For $k$=2-level agents in MuJoCo tasks, $H$ was generally in the range [20,30] 
+            \end{enumerate}
+        \item Subgoal testing rate $\lambda = 0.3$
+        \item Goal and subgoal achievement thresholds were hand-crafted.
+    \end{itemize}
+    
+\end{itemize}
+
+
+% \subsection{Sample Episode Sequences}
+\begin{comment}
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\linewidth]{ep_seq.pdf}
+  \vspace{-.2cm}
+  \caption{\small Episode sequences from the four rooms (Top) and inverted pendulum tasks (Bottom). In the four rooms task, the agent is the blue square, the goal is the yellow square, and the learned subgoal is the purple square.  In the inverted pendulum task, the goal is the yellow sphere and the subgoal is the purple sphere.} 
+  \label{fig:ep_seq}
+  \vspace{-.2cm}
+\end{figure}
+\end{comment}
+
+\end{document}
+
+

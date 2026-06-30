@@ -1,0 +1,76 @@
+\definecolor{autoencodercolor}{rgb}{0.067,0.466,0.2}
+\definecolor{gptcolor}{rgb}{0.2, 0.133, 0.533}
+\definecolor{policycolor}{rgb}{0.667,0.266,0.6}
+
+\begin{figure}[t]
+\center
+\begin{tikzpicture}[font=\scriptsize, scale=1.15]
+
+  \node (z0) at (0, 0) {$z^1_0, \dots, z^K_0$};
+  \node (a0) [right=3pt of z0] {$a_0$};
+  \node (x0) [above=1.25cm of z0] {$x_0$};
+  \node (xh0) [below=1.25cm of z0] {$\hat{x}_0$};
+
+  \node[draw, inner sep=0pt, very thin, densely dashed, fit=(z0)] (bz0) {};
+  \node[draw, inner sep=4pt, very thin, fit=(bz0) (a0)] (az0) {};
+
+  \node (z1) at (3.65, 0) {$\hat{z}^1_1, \dots, \hat{z}^K_1$};
+  \node (a1) [right=3pt of z1] {$a_1$};
+  \node (xh1) [below=1.25cm of z1] {$\hat{x}_1$};
+  \node (dh1) [above=1.0cm of z1.west,xshift=8pt] {$\hat{d}_0$};
+  \node (rh1) [above=0pt of dh1] {$\hat{r}_0$};
+  \node[draw, inner sep=0pt, very thin, densely dashed, fit=(z1)] (bz1) {};
+  \node[draw, inner sep=4pt, very thin, fit=(az0) (bz1) (a1)] (az1) {};
+
+  \node[minimum width=0.5cm] (dots) at (6.75, 0) {$\ \dots$};
+  \node[draw, inner sep=4pt, very thin, fit=(az1) (dots)] (azd) {};
+  \node (dh2) [above=1.0cm of dots.west,xshift=8pt] {${\hat{d}_1}$};
+  \node (rh2) [above=0pt of dh2] {${\hat{r}_1}$};
+
+  \node (zt) at (9.2, 0) {$\hat{z}^1_s, \dots, \hat{z}^K_s$};
+  \node (at) [right=3pt of zt] {$a_s$};
+  \node (xht) [below=1.25cm of zt] {$\hat{x}_s$};
+  \node (dht) [above=1.0cm of zt.west,xshift=8pt] {$\hat{d}_{s-1}$};
+  \node (rht) [above=0pt of dht] {$\hat{r}_{s-1}$};
+  \node[draw, inner sep=0pt, very thin, densely dashed, fit=(zt)] (bzt) {};
+
+  \coordinate (az01) at ($(az0.east)!0.6!(bz1.west)$);
+  \draw[very thick,gptcolor] (az0) -- (az01) node[midway,above] {$G$};
+  \draw[->,very thick,gptcolor] (az01) -- (bz1);
+  \draw[->,very thick,gptcolor] (az01) |- (rh1);
+  \draw[->,very thick,gptcolor] (az01 |- dh1) -- (dh1);
+
+  \coordinate (az02) at ($(az1.east)!0.6!(dots.west)$);
+  \draw[very thick,gptcolor] (az1) -- (az02) node[midway,above] {$G$};
+  \draw[->,very thick,gptcolor] (az02) -- (dots);
+  \draw[->,very thick,gptcolor] (az02) |- (rh2);
+  \draw[->,very thick,gptcolor] (az02 |- dh2) -- (dh2);
+
+  \coordinate (az0t) at ($(azd.east)!0.6!(bzt.west)$);
+  \draw[very thick,gptcolor] (azd) -- (az0t) node[midway,above] {$G$};
+  \draw[->,very thick,gptcolor] (az0t) -- (bzt);
+  \draw[->,very thick,gptcolor] (az0t) |- (rht);
+  \draw[->,very thick,gptcolor] (az0t |- dht) -- (dht);
+
+  %% \draw[->,thick] (azd) -- (bzt) node[midway,above] {$G$};
+
+  \draw[->,very thick,autoencodercolor] (x0) -- (bz0) node[midway,right,yshift=5pt] {$E$};
+  \draw[->,very thick,autoencodercolor] (bz0) -- (xh0) node[midway,right,yshift=-5pt] {$D$};
+  \draw[->,very thick,policycolor] (xh0) -- (xh0 -| a0) node[midway,below] {$\pi$} -- (a0);
+  \draw[->,very thick,autoencodercolor] (bz1) -- (xh1) node[midway,right,yshift=-5pt] {$D$};
+  \draw[->,very thick,policycolor] (xh1) -- (xh1 -| a1) node[midway,below] {$\pi$} -- (a1);
+  \draw[->,very thick,autoencodercolor] (bzt) -- (xht) node[midway,right,yshift=0pt] {$D$};
+  \draw[->,very thick,policycolor] (xht) -- (xht -| at) node[midway,below] {$\pi$} -- (at);
+
+  \draw[thick,decoration={brace,mirror,amplitude=0.25cm},decorate] ($(z0)-(0.8, 2)$) -- ++(2.3, 0) node[midway,below,yshift=-8pt] {$t=0$};
+  \draw[thick,decoration={brace,mirror,amplitude=0.25cm},decorate] ($(z1)-(0.8, 2)$) -- ++(2.3, 0) node[midway,below,yshift=-8pt] {$t=1$};
+  \node[minimum width=1.5cm] (dots2) at ($(z1)!0.5!(zt)+(0.25, -2.1)$) {$\dots$};
+  \draw[thick,decoration={brace,mirror,amplitude=0.25cm},decorate] ($(zt)-(0.8, 2)$) -- ++(2.3, 0) node[midway,below,yshift=-8pt] {$t=s$};
+
+\end{tikzpicture}
+
+\caption[Unrolling imagination over time.]{Unrolling imagination over time. This figure shows the policy $\pi$, depicted with purple arrows, taking a sequence of actions in imagination. The green arrows correspond to the encoder $E$ and the decoder $D$ of a discrete autoencoder, whose task is to represent frames in its learnt symbolic language. The backbone $G$ of the world model is a GPT-like Transformer, illustrated with blue arrows. For each action that the policy $\pi$ takes, $G$ simulates the environment dynamics, by autoregressively unfolding new frame tokens that $D$ can decode. $G$ also predicts a reward and a potential episode termination. More specifically, an initial frame $x_0$ is encoded with $E$ into tokens $z_0 = (z_0^1, \dots, z_0^K) = E(x_0)$. The decoder $D$ reconstructs an image $\hat{x}_0 = D(z_0)$, from which the policy $\pi$ predicts the action $a_0$. From $z_0$ and $a_0$, $G$ predicts the reward $\hat{r}_0$, episode termination $\hat{d}_0 \in \{0, 1\}$, and in an autoregressive manner $\hat{z}_1 = (\hat{z}_1^1, \dots, \hat{z}_1^K)$, the tokens for the next frame. A dashed box indicates image tokens for a given time step, whereas a solid box represents the input sequence of $G$, \textit{i.e.} $(z_0, a_0)$ at $t = 0$,  $(z_0, a_0, \hat{z}_1, a_1)$ at $t = 1$, etc. The policy $\pi$ is purely trained with imagined trajectories, and is only deployed in the real environment to improve the world model $(E, D, G)$.} 
+
+\vspace{-0.025\linewidth}
+\label{fig:method}
+\end{figure}

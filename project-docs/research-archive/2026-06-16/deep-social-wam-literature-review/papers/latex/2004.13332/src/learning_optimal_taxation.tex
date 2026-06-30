@@ -1,0 +1,155 @@
+We now introduce a \emph{social planner} who uses economic policy to improve social outcomes, in particular taxation together with  redistribution. The challenge is that taxation can reduce productivity. Workers may choose to forgo labor as a result of paying tax on income, and thus gaining less utility for labor effort. This may have a particularly strong effect on the higher skilled and thus more productive workers. Thus, there is a trade-off between equality and productivity: the same interventions that allow wealth to be redistributed also result in there being less wealth to redistribute in the first place.
+As a result of this coupling between taxation and labor, determining an optimal tax policy poses a difficult, constrained optimization problem.
+
+\begin{figure}
+ \begin{small}
+ \begin{center}
+  \includegraphics[width=\textwidth]{figures/postprocessed/equality-productivity-trade-off}
+ \end{center}
+ \caption{A conceptual view of how taxes can impact social outcomes. Left: Taxes can improve equality by transferring wealth. However, taxes can also decrease productivity, because they can discourage work. The AI Economist seeks a tax policy that optimizes this trade-off. The Pareto boundary is the set of maximal trade-offs. Right: Taxes impact productivity (total income, represented by the area of the big squares), and equality (the relative difference in sizes of the smaller squares). The AI Economist achieves the best trade-off (measured in equality times productivity).
+ }
+ \label{fig:eq_prod_tradeoff}
+\end{small}
+\end{figure}
+
+
+A conceptual view of the trade-off between productivity and equality for different tax policies is illustrated in Figure~\ref{fig:eq_prod_tradeoff}.
+The spectrum of tax policies has two extremes: the free market, which only considers productivity and does not raise any taxes; and pure redistribution, which divides all incomes equally amongst all workers and thus achieves equality but at the potential cost of a large drop in productivity.
+Here, the notion of optimality implies that a tax policy realizes a trade-off between equality and productivity along the Pareto boundary linking these two extremes.
+The optimal tax literature has proposed several solutions, including the tax formula proposed by \cite{saez_using_2001} (shown here, together with the AI Economist, with  purely illustrative tradeoffs).
+But the results from optimal tax policy are limited to simple economic models, and require various simplifying assumptions, for example about the effect of higher taxes on labor choices.
+
+
+The remainder of this section describes our approach for studying optimal taxation.
+We describe the kind of tax policy learned by the AI Economist, define the types of social objectives that can be adopted, and describe how we use reinforcement learning to jointly optimize agent behavior as well as the tax policy used in the economy.
+
+
+\subsection{Periodic Taxes with Bracketed Schedules}
+\label{sect:brackettax}
+
+\paragraph{Income Taxes.}
+There are many possible choices for tax policies.
+In this work, we focus on periodic income taxes with lump-sum redistribution.
+Each {\em tax period} lasts $\taxperiodlen$ steps (we use $\taxperiodlen=H/10$, so that there are ten tax periods per episode).
+The taxes in period $p$, beginning at time step $t$ and ending at time step $t+\taxperiodlen$, are applied to the income $\income^p_i$ earned by an agent $i$ within that tax period.
+
+At the start of each tax period, the planner chooses a {\em tax schedule} $\incometax(\income)$ that specifies the amount of taxes an agent will owe as a function of the income it earns during the period.
+At the end of each tax period the total tax revenue is evenly redistributed back to the agents, so that the adjusted, post-tax income to agent $i$ in period $p$ is given by
+\eq{
+ \posttax{\income}^p_i = \income^p_i - \incometax(\income^p_i) + \fr{1}{N} \sum_{j=1}^N \incometax(\income^p_j).
+ \label{eq:posttaxincome}
+}
+
+At the end of an episode, each agent's coin endowment is the sum of its post-tax incomes in each period:
+$\money_{i,H} = \ \sum_p \posttax{\income}^p_i$.
+
+\paragraph{Bracketed Tax Schedules.}
+To allow comparison across different schemes, we adopt income brackets for describing a tax schedule, imitating the US federal taxation scheme.
+A bracketed schedule defines a set of {\em cut-off income levels} $\bracketcutoff_b$, where $b = 0, \ldots B$, for $B$ income brackets.
+The edges of bracket $b$ are $[\bracketcutoff_b, \bracketcutoff_{b+1}]$, and, by definition, $\bracketcutoff_0 = 0$ and $\bracketcutoff_B = \infty$.
+The social planner sets the tax schedule $\incometax(\income)$ by choosing the \textit{marginal tax rate} $\mtaxrate \in [0, 1]^B$ to be applied within each bracket.
+
+Given this, the total tax payment $\incometax(\income)$ for an agent earning $z$ in a tax period is determined by taking the sum of the amount of income within each bracket $[\bracketcutoff_b, \bracketcutoff_{b+1}]$ times that bracket's marginal rate $\mtaxrate_b$:
+\eq{
+ \incometax(\income) = \sum_{b=0}^{B-1} \mtaxrate_b \cdot \brck{
+ \brck{ \bracketcutoff_{b+1} - \bracketcutoff_b } \bm{1}[ \income > \bracketcutoff_{b+1} ]
+ + \brck{ \income - \bracketcutoff_b } \bm{1}[ \bracketcutoff_b < \income \leq \bracketcutoff_{b+1} ]
+ },
+}
+where $\bm{1}[ \income > \bracketcutoff_{b+1} ]\in \{0,1\}$ is an indicator function for whether $\income$ saturates bracket $b$ and $\bm{1}[ \bracketcutoff_b < \income \leq \bracketcutoff_{b+1} ]\in \{0,1\}$ is an indicator function for whether $\income$ falls within bracket $b$.
+\subsection{Optimal Taxation}
+\label{sect:socialwelfarefunctions}
+\paragraph{Social Welfare Functions.}
+The objective of optimal tax theory is described through a \emph{social welfare function} $\socialwelfare{}$.
+Social welfare can be expressed in many ways. One approach considers the trade-off between income equality and productivity.
+For this, the {\em equality} in an economy at some point in time can be defined as the complement of the {\em normalized Gini index } on the distribution on wealth, this wealth defined as the cumulative number of coins owned by an agent after taxation and redistribution.
+
+For an agent population with monetary endowments $\Money=(\money_1,\ldots,\money_{N})$, we define equality $\equality(\Money)$ as:
+\begin{align}
+ \equality(\Money) = 1 - \gini(\Money) \fr{N}{N-1},& \quad 0 \leq \equality(\Money) \leq 1,
+\end{align}
+where the Gini index is defined as,
+\begin{align}
+\gini(\Money) = \fr{\sum_{i=1}^N \sum_{j=1}^N |\money_i - \money_j|}{ 2N \sum_{i=1}^N \money_i},& \quad 0 \leq \gini(\Money) \leq \fr{N-1}{N}.
+\end{align}
+
+Given this, $\equality = 1$ implies perfect equality (all endowments of money are identical), while $\equality = 0$ means perfect inequality (one agent owns all money).
+The {\em productivity} in an economy at some point in time is defined as the sum of all wealth over all agents:
+\begin{align}
+ \productivity(\Money) = \sum_{i=1}^N \money_i.
+\end{align}
+We write $\equality_t(\Money_t)$ and $\productivity_t(\Money_t)$ to denote the equality and productivity, respectively, based on the cumulative endowment $\Money_t$ up to  time $t$.
+
+The primary social welfare function that we consider in this work  optimizes a trade-off between equality and productivity, defined as the product of equality and productivity:
+\begin{align}
+ \label{eq:eqprodswf}
+ \socialwelfare_t(\Money_t) = \equality_t(\Money_t) \cdot \productivity_t(\Money_t).
+\end{align}
+
+Another family of social welfare functions, and one that receives attention in the  optimal taxation theory, is the family of linear-weighted sums of agent utilities, defined for  weights $\socialwelfareweight_i\geq 0$:
+\eq{\label{eq:inv_income_weighted_utility}
+\socialwelfare_t(\Money_t,\vlabor_t) = \sum_{i=1}^N \socialwelfareweight_i \cdot \util_i\brck{ \money_{i,t}, \labor_{i,t} }.
+}
+
+
+ Some illustrative choices for the weights adopted in this social welfare function include:
+\begin{itemize}
+ \item Utilitarian: $\socialwelfareweight_i=1$, indicating no preference for any agent
+ \item Rawlsian: $\socialwelfareweight_i=\bm{1}[\money_{i,t} = \min_{j\in\mathcal{J}}\money_{j,t}]$, which  focuses on the poorest agents
+ \item Inverse income-weighted: $\socialwelfareweight_i=1/\money_{i,t}$, which preferences the agents with lower endowments over those with higher endowments.
+\end{itemize}
+
+In this work, we will  mainly make use of the product of equality and productivity as the social welfare function, and it is this that the AI Economist is configured to optimize for. But many other choices are possible.
+A key benefit of our framework is that it is compatible with any social welfare function.
+
+For the purposes of comparing the performance of the AI Economist and other tax frameworks, we also adopt a variation on the second family of social welfare functions, where we adopt inverse income-weighted  weights and consider agents' cumulative endowment at the end of an episode.
+
+
+
+
+\paragraph{The Planner's Problem.}
+The planner can observe agent endowments, $\vendow_{i,t}$, as well as the global state of the world, including agent positions, available resources, and market states. The planner cannot directly observe agent skills or other endogenous values such as labor or utility functions. The planner does not personalize taxes, but adopts a single tax schedule for all agents.
+
+Similar to the agent policies, the planner can make use of the entire history of observations, via a learned hidden state, to implement its tax policy.
+Based on the information available, it adopts a {\em tax policy} $\plannerpolicy$ to set tax rates $\mtaxrate$ in any given tax period.
+The planner's objective is to optimize social welfare,
+\eq{\label{eq:plannerproblem}
+ \max_{\plannerpolicy}
+ \E_{
+ \mtaxrate \sim \plannerpolicy,
+ \Ac \sim \bm{\policy},
+ \st' \sim \trans
+ }
+ \brcksq{
+ \sum_{t=1}^H \df^t \underbrace{
+ \brck{\socialwelfare_t - \socialwelfare_{t-1}}}_{=\hspace{1pt}\rew_{p,t}}
+ + \socialwelfare_0
+ },
+}
+where $\socialwelfare_t$ is used to denote the social welfare at time $t$, based on cumulative endowment and labor up until that time, and the planner's instantaneous reward $\rew_{p,t}$ is the change in social welfare at time $t$.
+Without discounting, this objective reduces to the total social welfare at the end of an episode.
+
+This planning problem includes the effect of agents' behavior, encoded through agent policies $\bm{\pol}$, and this behavior of agents depends on the tax policy.
+As such,~\eqref{eq:plannerproblem} encodes a difficult optimization problem; because taxes affect agents' income and thus utilities, the planner is effectively changing the agents' MDP.\footnote{The problem has the flavor of a Stackelberg game in which  the planner is a first-mover (Stackelberg leader), announcing a tax schedule, and where the agents responding to this tax schedule (Stackelberg followers).}
+
+
+
+
+\if 0
+In this work, all tax models $\incometax$ use the same taxation mechanism, which imitates the US federal income taxation scheme. The main idea is that the \emph{tax} on a worker's income $\income$ is computed by using a \emph{schedule} of different \emph{rates} for specific parts of the income.
+This works as follows: rather than $\incometax$, we model \emph{marginal tax rates} $\mtaxrate$, which are applied using a schedule:
+\begin{itemize}
+ \item \textbf{Income brackets}: the schedule defines a set of cut-off income levels $\bracketcutoff_b$, where $b = 0, \ldots B$, for $B$ income brackets.
+ The lowest bracket always has $\bracketcutoff_0 = 0$ and the top bracket always has $\bracketcutoff_B = \infty$.
+ \item \textbf{Bracket tax rates}: for each income bracket, the tax model sets a bracket tax rate $\mtaxrate_k$.
+ \item An agent's total income $\income$ is taxed at different rates: the first portion $[\bracketcutoff_0, \bracketcutoff_1]$ is taxed at rate $\mtaxrate_0$, and so on. Given the $B$ bracket cutoffs $[\bracketcutoff_b, \bracketcutoff_{b+1}]$ and marginal tax rate $\mtaxrate_b$ the total tax collected on an income $\income$ is
+ \eq{
+ \incometax(\income) = \sum_{b=0}^{B-1} \mtaxrate_b \cdot \brck{
+  \brck{ \bracketcutoff_{b+1} - \bracketcutoff_b } \bm{1}[ \income > \bracketcutoff_{b+1} ]
+  + \brck{ \income - \bracketcutoff_b } \bm{1}[ \bracketcutoff_b \leq \income < \bracketcutoff_{b+1} ]
+ },
+ } where the indicator function is 1 if $\income$ surpasses the bracket's lower threshold.
+ \end{itemize}
+\fi
+
+

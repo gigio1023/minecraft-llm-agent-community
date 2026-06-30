@@ -1,0 +1,613 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2025_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{lineno}
+% \linenumbers
+
+\title{Diffusion Models Are Real-Time Game Engines}
+
+\author{Dani Valevski\thanks{Equal contribution.} \\
+Google Research \\
+daniv@google.com \\
+\And
+Yaniv Leviathan\footnotemark[1] \\
+Google Research \\
+leviathan@google.com \\
+\And
+Moab Arar\footnotemark[1] \\
+Tel Aviv University\thanks{Work done while at Google Research.} \\
+moab.arar@gmail.com \\
+\And
+Shlomi Fruchter\footnotemark[1] \\
+Google DeepMind \\
+shlomif@google.com \\
+}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+\maketitle
+
+
+\begin{abstract}
+\vspace{-0.05in}
+We present \emph{GameNGen}, the first game engine powered entirely by a neural model
+that also enables real-time interaction with a complex environment over long trajectories at high quality. 
+When trained on the classic game DOOM, GameNGen extracts gameplay and uses it to generate a playable environment that can interactively simulate new trajectories.
+\emph{GameNGen} runs at 20 frames per second on a single TPU and remains stable over extended multi-minute play sessions.
+Next frame prediction achieves a PSNR of 29.4, comparable to lossy JPEG compression.
+Human raters are only slightly better than random chance at distinguishing short clips of the game from clips of the simulation, even after 5 minutes of auto-regressive generation.
+\emph{GameNGen} is trained in two phases: (1) an RL-agent learns to play the game and the training sessions are recorded, and
+(2) a diffusion model is trained to produce the next frame, conditioned on the sequence of past frames and actions.
+ Conditioning augmentations help ensure stable auto-regressive generation over long trajectories, and decoder fine-tuning improves the fidelity of visual details and text.
+\end{abstract}
+
+
+\begin{figure}[ht]
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width={\textwidth}]{figures/teaser.png}
+    \caption{
+    A human player is playing DOOM on \textbf{GameNGen} at 20 FPS. See \url{https://gamengen.github.io} for multi-minute real-time videos of people playing with GameNGen.
+    }
+    \label{fig:teaser}
+    \vspace{-0.05in}
+\end{figure}
+
+
+\section{Introduction}
+
+Computer games are manually crafted software systems centered around the following \emph{game loop}: (1) update the game state based on user input, and (2) render the game state to screen pixels.
+This game loop, running at high frame rates, creates the illusion of an interactive virtual world for the player.
+Such game loops are classically run on standard computers, and while there have been many impressive attempts at running games on bespoke hardware (e.g. the iconic game DOOM has been run on kitchen appliances, a treadmill, a camera, and within the game of Minecraft\footnote{See \url{https://www.reddit.com/r/itrunsdoom/}}), in all of these cases the hardware is still emulating the manually written game software as-is. Furthermore, while vastly different game engines exist, the game state updates and rendering logic in all are composed of a set of manual rules, programmed or configured by hand.
+
+In recent years, generative models made significant progress in producing images and videos conditioned on multi-modal inputs, such as text or images. At the forefront of this wave, diffusion models became the de-facto standard in media (i.e. non-language) generation, with works like Dall-E \citep{ramesh2022hierarchical}, Stable Diffusion \citep{rombach2022high} and Sora \citep{videoworldsimulators2024}. At a glance, simulating the interactive worlds of video games may seem similar to video generation. However, \textit{interactive} world simulation is more than just very fast video generation. The requirement to condition on a stream of input actions that is only available throughout the generation breaks some assumptions of existing diffusion model architectures. Notably, it requires generating frames autoregressively which tends to be unstable and leads to sampling divergence (see Section \ref{sec:mitigating ar noise}).
+
+Several important works \citep{ha2018worldmodels,Kim2020_GameGan,bruce2024genie} (see Section \ref{related_work}) simulate interactive video games with neural models. Nevertheless, most of these approaches are limited in respect to the complexity of the simulated games, simulation speed, stability over long time periods, or visual quality (see Figure \ref{fig:comp_with_prev_sota}).
+It is therefore natural to ask:
+
+\textit{Can a neural model running in real-time simulate a complex game at high quality?}
+
+In this work we demonstrate that the answer is yes. Specifically, we show that a complex video game, the iconic game DOOM, can be run  on a neural network, an augmented version of the open Stable Diffusion v1.4 \citep{rombach2022high},
+in real-time, while achieving a visual quality comparable to that of the original game.
+While not an exact simulation (see limitations in Section \ref{sec:discussion}), the neural model is able to perform complex game state updates, such as tallying health and ammo, attacking enemies, damaging objects, opening doors, and more generally persist the game state over long trajectories.
+
+Our key contribution is a demonstration that a complex video game (DOOM) can be simulated by a neural network in real time with high quality on a single TPU. We provide concrete architecture and technical insights on how to (1) adapt a text-to-image diffusion model in a stable auto-regressive setup via noise augmentation, (2) achieve visual quality comparable to the original via fine-tuning the latent decoder, and (3) collect training data from an existing game at scale via an RL agent.
+
+More broadly, demonstrating that real-time simulation of complex games on existing hardware is possible addresses one important question on the path towards a new paradigm for game engines -- one where games are automatically generated, much like how images and videos have been generated by neural models in recent years. While bigger questions remain, such as how to use human input to create entirely new games instead of simulating existing ones, we are nevertheless excited for the possibilities of this new
+paradigm (see Section \ref{appendix:new paradigm} for further discussion).
+
+\begin{figure}[ht]
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=\textwidth]{figures/compare_to_sota.pdf}
+    \caption{
+    \textbf{GameNGen compared to prior simulations of DOOM}: World Models  \cite{ha2018worldmodels} and GameGAN \cite{Kim2020_GameGan}. Note that prior models are trained on different data.} 
+    % }
+    \label{fig:comp_with_prev_sota}
+    \vspace{-0.05in}
+\end{figure}
+
+\section{Interactive World Simulation}
+\label{sec:interactive world sim}
+
+An \emph{Interactive Environment} $\mathcal{E}$ consists of a space of latent states $\mathcal{S}$, a space of observations of the latent space $\mathcal{O}$, a partial projection function $V:\mathcal{S} \to \mathcal{O}$, a set of actions $\mathcal{A}$, and a transition probability function $p(s| a, s')$ such that $s, s' \in \mathcal{S}, a \in \mathcal{A}$.
+
+For example, in the case of the game DOOM, $\mathcal{S}$ is the program's dynamic memory contents, $\mathcal{O}$ is the rendered screen pixels, $V$ is the game's rendering logic, $\mathcal{A}$ is the set of key presses, and $p$ is the program's logic given the player's input (including any potential non-determinism).
+
+Given an input interactive environment $\mathcal{E}$, and an initial state $s_0 \in \mathcal{S}$, an \emph{Interactive World Simulation} is a \emph{simulation distribution function} $q(o_n| o_{<n}, a_{\le n}), o_i \in \mathcal{O}, a_i \in \mathcal{A}$.
+Given a distance metric between observations $D:\mathcal{O}\times\mathcal{O} \to \mathbb{R}$, a \emph{policy}, i.e. a distribution on agent actions given past actions and observations $\pi(a_n|o_{<n}, a_{<n})$, a distribution $S_0$ on initial states, and a distribution $N_0$ on episode lengths, the \emph{Interactive World Simulation} objective consists of minimizing $E(D(o_q^i, o_p^i))$ where $n \sim N_0$, $0 \le i \le n$, and $o_q^i \sim q, o_p^i \sim V(p)$ are sampled observations from the environment and the simulation when enacting the agent's policy $\pi$. Importantly, the conditioning actions for these samples are always obtained by the agent interacting with the environment $\mathcal{E}$, while the conditioning observations can either be obtained from $\mathcal{E}$ (the \emph{teacher forcing objective}) or from the simulation (the \emph{auto-regressive objective}).
+
+We always train our generative model with the teacher forcing objective. Given a simulation distribution function $q$, the environment $\mathcal{E}$ can be simulated by auto-regressively sampling observations.
+
+
+\section{GameNGen}
+\label{sec:method}
+
+GameNGen (pronounced ``game engine'') is a generative diffusion model that learns to simulate the game under the settings of Section \ref{sec:interactive world sim}. In order to collect training data for this model at scale, with the teacher forcing objective, we first train a separate model to interact with the environment. The two models (agent and generative) are trained in sequence. The entirety of the agent's actions and observations corpus $\mathcal{T}_{agent}$ during training is maintained and becomes the training dataset for the generative model in a second stage. See Figure \ref{fig:Overview}.
+
+\input{figures/overview/fig}
+
+\subsection{Data Collection via Agent Play}
+\label{agent-play}
+
+Our end goal is to have human players interact with our simulation. To that end, the policy $\pi$ as in Section \ref{sec:interactive world sim} is that of \emph{human gameplay}. Since we cannot sample from that directly at scale, we start by approximating it via teaching an automatic agent to play. Unlike a typical RL setup which attempts to maximize game score, our goal is to generate training data which resembles human play, or at least contains enough diverse examples, in a variety of scenarios, to maximize training data efficiency.
+To that end, we design a simple reward function, which is the only part of our method that is environment-specific (see Appendix \ref{appendix:reward}).
+
+We record the agent's training trajectories throughout the entire training process, which includes different skill levels of play, starting with a random policy when the agent is untrained.
+This set of recorded trajectories is our $\mathcal{T}_{agent}$ dataset, used for training the generative model (see Section \ref{training-diffusion-model}).
+
+\subsection{Training the Generative Diffusion Model}
+\label{training-diffusion-model}
+
+We now train a generative diffusion model conditioned on the agent's trajectories $\mathcal{T}_{agent}$ (actions and observations) collected during the previous stage.
+
+We re-purpose a pre-trained text-to-image diffusion model, Stable Diffusion v1.4 \citep{rombach2022high} to predict the next frame in the game.
+We condition the model $f_{\theta}$ on trajectories $T \sim \mathcal{T}_{agent}$, i.e. on a sequence of previous actions $a_{<n}$ and observations (frames) $o_{<n}$ and remove all text conditioning.
+Specifically, to condition on actions (i.e. key presses), we simply learn an embedding $A_{emb}$ from each action into a single token and replace the cross attention from the text into this encoded actions sequence.
+In order to condition on observations (i.e. previous frames) we encode them into latent space using the auto-encoder $\phi$ and concatenate them in the latent channels dimension to the noised latents (see Figure \ref{fig:Overview}). We also experimented with conditioning on these past observations via cross-attention but observed no meaningful improvements.
+
+We train the model to minimize the diffusion loss with velocity parameterization \citep{salimans2022progressivedistillationfastsampling}:
+
+\begin{equation}
+    \mathcal{L} = \mathbb{E}_{t,\epsilon,T} \left[ \| v(\epsilon, x_0, t) - v_{\theta'}(x_t, t, \{\phi(o_{i < n})\}, \{A_{emb}(a_{i < n})\}) \|_2^2 \right]
+\end{equation}
+
+where $T = \{{o_{i \leq n}, a_{i \leq n}}\} \sim \mathcal{T}_{agent}$, $t \sim \mathcal{U}(0, 1)$, $\epsilon \sim \mathcal{N}(0, \mathbf{I})$, \mbox{$x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$}, \mbox{$x_0 = \phi(o_n)$}, 
+$v(\epsilon, x_0, t) = \sqrt{\bar{\alpha}_t} \epsilon - \sqrt{1 - \bar{\alpha}_t} x_0$,
+and $v_{\theta'}$ is the v-prediction output of the model $f_{\theta}$. The noise schedule $\bar{\alpha}_t$ is linear, similarly to \cite{rombach2022high}.
+
+\subsubsection{Mitigating Auto-Regressive Drift Using Noise Augmentation}
+\label{sec:mitigating ar noise}
+
+The domain shift between training with teacher-forcing and auto-regressive sampling leads to error accumulation and fast degradation in sample quality, as demonstrated in Figure~\ref{fig:noise_aug} (top). To avoid this divergence due to auto-regressive application of the model, we corrupt context frames by adding a varying amount of Gaussian noise to encoded frames in training time, while providing the noise level as input to the model, following \cite{ho2021cascaded}. To that effect, we sample a noise level $\alpha$ uniformly up to a maximal value, discretize it and learn an embedding for each bucket (see Figure \ref{fig:Overview}). This allows the network to correct information sampled in previous frames, and is critical for preserving frame quality over time. During inference, the added noise level can be controlled to maximize quality, although we find that even with no added noise the results are significantly improved. We ablate the impact of this method in Section \ref{noise-aug-abalation}.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/noise_aug_ablation_new.png}
+    \caption{\textbf{Auto-regressive drift.} Top: we present every 10th frame of a simple trajectory with 50 frames in which the player is not moving. Quality degrades fast after 20-30 steps. Bottom: the same trajectory with noise augmentation does not suffer from quality degradation.}
+    \label{fig:noise_aug}
+\end{figure}
+
+\subsubsection{Latent Decoder Fine-tuning}
+\label{sec:autoencoder fine tuning}
+
+The pre-trained auto-encoder of Stable Diffusion v1.4, which compresses 8x8 pixel patches into 4 latent channels, results in meaningful artifacts when predicting game frames, which affect small details and particularly the bottom bar HUD (``heads up display'').
+To hopefully leverage some of the pre-trained knowledge while improving image quality, we train just the decoder of the latent auto-encoder using an MSE loss computed against the target frame pixels.
+Importantly, note that this fine tuning process happens completely separately from the U-Net fine-tuning, and that notably the auto-regressive generation isn't affected by it (we only condition auto-regressively on the latents, not the pixels).
+Appendix \ref{appendix:fine-tune-vae} shows examples of generations with and without fine-tuning the auto-encoder.
+
+\subsection{Inference}
+\label{sec:inference}
+
+\subsubsection{Setup}
+
+We use DDIM sampling \citep{song2022denoisingdiffusionimplicitmodels}.
+We employ Classifier-Free Guidance \citep{ho2022classifierfreediffusionguidance} only for the past observations condition $o_{<n}$.
+We didn't find guidance for the past actions condition $a_{<n}$ to improve quality. The weight we use is relatively small (1.5) as larger weights create artifacts which increase due to our auto-regressive sampling. 
+
+\subsubsection{Denoiser Sampling Steps}
+During inference, we need to run both the U-Net denoiser (for a number of steps) and the auto-encoder.
+On our hardware configuration (a single TPU-v5), a single denoiser step and an evaluation of the auto-encoder both takes 10ms.
+If we ran our model with a single denoiser step, the minimum total latency possible in our setup would therefore be 20ms per frame, or 50 frames per second.
+Usually, generative diffusion models, such as Stable Diffusion, don't produce high quality results with a single denoising step, and instead require dozens of sampling steps to generate a high quality image.
+Surprisingly, we found that we can robustly simulate DOOM,
+with only 4 DDIM sampling steps \citep{song2020denoising}.
+In fact, we observe no degradation in simulation quality when using 4 sampling steps vs 20 steps or more (see Table \ref{table:diffusion_steps_quality} and Appendix \ref{appendix:ablate num sampling steps}).
+\begin{table}[h]
+\caption{\textbf{Generation with Varying Sampling Steps.} We evaluate the generation quality of a GameNGen model with an increasing number of steps using PSNR and LPIPS metrics. ``D'' marks a 1-step distilled model. See Appendix \ref{appendix:distillation} for more details.}
+\label{table:diffusion_steps_quality}
+\centering
+\vspace{0.05in}
+\resizebox{0.40\textwidth}{!}{
+\begin{tabular}{ccc}
+\toprule
+Steps & PSNR $\uparrow$ & LPIPS $\downarrow$ \\
+\midrule
+D   &  $31.10 \pm 0.098$  &  $0.208 \pm 0.002$ \\ % SD: 2.27, 0.049
+1   &  $25.47 \pm 0.098$  &  $0.255 \pm 0.002$ \\ % SD: 2.26, 0.043
+2   &  $31.91 \pm 0.104$  &  $0.205 \pm 0.002$ \\ % SD: 2.39, 0.050
+4   &  $32.58 \pm 0.108$  &  $0.198 \pm 0.002$ \\ % SD: 2.49, 0.049
+8   &  $32.55 \pm 0.110$  &  $0.196 \pm 0.002$ \\ % SD: 2.53, 0.049
+16  &  $32.44 \pm 0.110$  &  $0.196 \pm 0.002$ \\ % SD: 2.54, 0.048
+32  &  $32.32 \pm 0.110$  &  $0.196 \pm 0.002$ \\ % SD: 2.54, 0.048
+64  &  $32.19 \pm 0.110$  &  $0.197 \pm 0.002$ \\ % SD: 2.53, 0.048
+\bottomrule
+\end{tabular}
+}
+\end{table}
+Using just 4 denoising steps leads to a total U-Net cost of 40ms (and total inference cost of 50ms, including the auto encoder) or 20 frames per second.
+We hypothesize that the negligible impact to quality with few steps in our case stems from a combination of: (1) a constrained images space, and (2) strong conditioning by the previous frames.
+
+Since we do observe degradation when using just a single sampling step, we also experimented with model distillation similarly to \citep{yin2024onestep,wang2023prolificdreamer} in the single-step setting.
+Distillation does help substantially there (allowing us to reach 50 FPS as above), but still comes at a some cost to simulation quality, so we opt to use the 4-step version without distillation for our method (see Appendix \ref{appendix:distillation}). %This is an interesting area for further research.
+
+
+\section{Experimental Setup}
+\label{experimental_setup}
+
+\subsection{Agent Training}
+The agent model is trained using PPO \citep{SchulmanWDRK17ppo}, with a simple CNN as the feature network, following \cite{Mnih2015HumanlevelCT}. It is trained on CPU using the Stable Baselines 3 infrastructure \citep{stable-baselines3}.
+The agent is provided with downscaled versions of the frame images and in-game map, each at resolution 160x120.
+The agent also has access to the last 32 actions it performed.
+The feature network computes a representation of size 512 for each image.
+PPO's actor and critic are 2-layer MLP heads on top of a concatenation of the outputs of the image feature network and the sequence of past actions.
+We train the agent to play the game using the ViZDoom environment \citep{Wydmuch2019ViZdoom}.
+We run 8 games in parallel, each with a replay buffer size of 512, a discount factor $\gamma=0.99$, and an entropy coefficient of $0.1$. In each iteration, the network is trained using a batch size of 64 for 10 epochs, with a learning rate of 1e-4.
+We perform a total of 50M environment steps.
+
+\subsection{Generative Model Training}
+We train all simulation models from a pretrained checkpoint of Stable Diffusion 1.4, unfreezing all U-Net parameters. We use a batch size of 128 and a constant learning rate of 2e-5, with the Adafactor optimizer without weight decay \citep{Shazeer2018adafactor} and gradient clipping of 1.0. The context frames condition is dropped with probability 0.1 to allow CFG during inference. We train using 128 TPU-v5e devices with data parallelization. Unless noted otherwise, all results in the paper are after 700,000 training steps.
+For noise augmentation (Section \ref{sec:mitigating ar noise}), we use a maximal noise level of 0.7, with 10 embedding buckets.
+We use a batch size of 2,048 for optimizing the latent decoder, other training parameters are identical to those of the denoiser.
+For training data, we use a random subset of 70M examples from the recorded trajectories played by the agent during RL training and evaluation (see Appendix \ref{appendix-dataset-size} for results with smaller datasets). All image frames (during training, inference, and conditioning) are at a resolution of 320x240 padded to 320x256. We use a context length of 64 (i.e. the model is provided its own last 64 predictions as well as the last 64 actions).
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Simulation Quality}
+\label{sec:sim quality}
+
+Overall, our method achieves a simulation quality comparable to the original game over long trajectories in terms of image quality. Human raters are only slightly better than random chance at distinguishing between short clips of the simulation and the actual game.
+
+\textbf{Image Quality.} We measure LPIPS \citep{zhang2018perceptual} and PSNR using the teacher-forcing setup described in Section \ref{sec:interactive world sim}, where we sample an initial state and predict a single frame based on a trajectory of ground-truth past observations.
+When evaluated over a random holdout of 2048 trajectories taken in 5 different levels, our model achieves a PSNR of $29.43$ and an LPIPS of $0.249$. % SD: 4.03, 0.06
+The PSNR value is similar to lossy JPEG compression with quality settings of 20-30 \citep{petric2018comparisoncsjpegterms}.
+Figure \ref{fig:predcition_samples} shows examples of model predictions and the corresponding ground truth samples.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/image_quality.pdf}
+    \caption{\textbf{Model predictions vs. ground truth.} Only the last 4 frames of the past observations context are shown.}
+    \label{fig:predcition_samples}
+\end{figure}
+
+\textbf{Video Quality.} We use the auto-regressive setup described in Section \ref{sec:interactive world sim}, where we iteratively sample frames following the sequences of actions defined by the ground-truth trajectory, while conditioning the model on its own past predictions. When sampled auto-regressively, the predicted and ground-truth trajectories often diverge after a few steps, mostly due to the accumulation of small amounts of different movement velocities between frames in each trajectory. For that reason, per-frame PSNR and LPIPS values gradually decrease and increase respectively, as can be seen in Figure~\ref{fig:ar_eval}. The predicted trajectory is still similar to the actual game in terms of content and image quality, but per-frame metrics are limited in their ability to capture this (see Appendix \ref{appendix-samples} for samples of auto-regressively generated trajectories).
+
+We therefore measure the FVD \citep{UnterthinerSKMM19FVD} computed over a random holdout of 512 trajectories, measuring the distance between the predicted and ground truth trajectory distributions, for simulations of length 16 frames (0.8 seconds) and 32 frames (1.6 seconds). For 16 frames our model obtains an FVD of $114.02$. For 32 frames our model obtains an FVD of $186.23$.
+
+\textbf{Human Evaluation.} As another measurement of simulation quality, we provided 10 human raters with 130 random short clips (of lengths 1.6 seconds and 3.2 seconds) of our simulation side by side with the real game. The raters were tasked with recognizing the real game (see Figure \ref{fig:eval tool} in Appendix \ref{appendix:human eval}). The raters only choose the actual game over the simulation in 58\% or 60\% of the time (for the 1.6 seconds and 3.2 seconds clips, respectively).
+To evaluate the impact of accumulated errors from auto-regressive generation, we generated 150 additional side-by-side comparisons using clips of 3 seconds in length after 5 to 10 minutes of gameplay. Despite the extended period of auto-regressive generation, raters still performed at chance level, identifying the real game only 50\% of the time.
+While human raters struggled to distinguish between the simulation and real gameplay in short clips, it is important to note that the authors, who are familiar with the specific limitations of the simulation, could often identify the real game after just a few seconds of play. For qualitative assessment of longer multi-minute clips, refer to the videos in the  supplementary material.
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/psnr_step_700k_08212004.png}
+    \includegraphics[width=0.4\textwidth]{figures/lpips_step_700k_08212004.png}
+    \caption{\textbf{Auto-regressive evaluation.} PSNR and LPIPS metrics over 64 auto-regressive steps.}
+    \label{fig:ar_eval}
+\end{figure}
+
+
+\subsection{Ablations}
+
+To evaluate the importance of the different components of our methods, we sample trajectories from the evaluation dataset and compute LPIPS and PSNR metrics between the ground truth and the predicted frames.
+
+\subsubsection{Context Length}
+\label{sec:context length}
+
+We evaluate the impact of changing the number $N$ of past observations in the conditioning context by training models with $N \in \{1, 2, 4, 8, 16, 32, 64\}$ (recall that our method uses $N=64$).
+This affects both the number of historical frames and actions. We train the models for 200,000 steps keeping the decoder frozen and evaluate on test-set trajectories from 5 levels.
+See the results in Table~\ref{table:number_of_frames_ablation}.
+As expected, we observe that generation quality improves with the length of the context.
+Interestingly, we observe that while the improvement is large at first (e.g. between 1 and 2 frames), we quickly approach an asymptote and further increasing the context size provides only small improvements in quality.
+This is somewhat surprising as even with our maximal context length, the model only has access to a little over 3 seconds of history.
+Notably, we observe that much of the game state is persisted for much longer periods (see Section \ref{sec:discussion}).
+While the length of the conditioning context is an important limitation, Table \ref{table:number_of_frames_ablation} hints that we'd likely need to change the architecture or training scheme of our model to efficiently support longer contexts, and employ better selection of the past frames to condition on, which we leave for future work.
+
+\begin{table}[h]
+\caption{\textbf{Number of history frames.} We ablate the number of history frames used as context using 8912 test-set examples from 5 levels. More frames generally improve both PSNR and LPIPS metrics.
+\label{table:number_of_frames_ablation}}
+\centering
+\vspace{0.05in}
+\resizebox{0.5\textwidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+History Context Length & PSNR $\uparrow$ & LPIPS $\downarrow$ \\
+\midrule
+    64  &  $22.36 \pm 0.033$  &  $0.295 \pm 0.001$ \\ % SD: 1.59, 0.048
+    32  &  $22.31 \pm 0.033$  &  $0.296 \pm 0.001$ \\ % SD: 1.58, 0.049
+    16  &  $22.28 \pm 0.033$  &  $0.296 \pm 0.001$ \\ % SD: 1.59, 0.049
+8  &  $22.26 \pm 0.033$  &  $0.296 \pm 0.001$ \\ % SD: 1.59, 0.049
+4  &  $22.26 \pm 0.034$  &  $0.298 \pm 0.001$ \\ % SD: 1.64, 0.048
+2  &  $22.03 \pm 0.037$  &  $0.304 \pm 0.001$ \\ % SD: 1.77, 0.050
+1  &  $20.94 \pm 0.044$  &  $0.358 \pm 0.001$ \\ % SD: 2.14, 0.062
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsubsection{Noise Augmentation}
+\label{noise-aug-abalation}
+
+To ablate the impact of noise augmentation we train a model without added noise.
+We evaluate both our standard model with noise augmentation and the model without added noise (after 200k training steps) auto-regressively and compute PSNR and LPIPS metrics between the predicted frames and the ground-truth over a random holdout of 512 trajectories.
+We report average metric values for each auto-regressive step up to a total of 64 frames in Figure \ref{fig:noise_aug_abalation}.
+
+Without noise augmentation, LPIPS distance from the ground truth increases rapidly compared to our standard noise-augmented model, while PSNR drops, indicating a divergence of the simulation from ground truth.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/noise_aug_ablation_lpips_step_200k_08212024.png}
+    \includegraphics[width=0.45\textwidth]{figures/noise_aug_ablation_psnr_step_200k_08212024.png}
+    \caption{\textbf{Impact of Noise Augmentation.} The plots show average LPIPS (lower is better) and PSNR (higher is better) values for each auto-regressive step. When noise augmentation is not used quality degrades quickly after 10-20 frames. This is prevented by noise augmentation.}
+    \label{fig:noise_aug_abalation}
+\end{figure}
+
+\subsubsection{Agent Play}
+\label{agent-play-ablation}
+
+We compare training on agent-generated data to training on data generated using a random policy. For the random policy, we sample actions following a uniform categorical distribution that doesn't depend on the observations. We compare the random and agent datasets by training 2 models for 700k steps along with their decoder. The models are evaluated on a dataset of 2048 human-play trajectories from 5 levels. We compare the first frame of generation, conditioned on a history context of 64 ground-truth frames, as well as a frame after 3 seconds of auto-regressive generation.
+
+Overall, we observe that training the model on random trajectories works surprisingly well, but is limited by the exploration ability of the random policy.
+When comparing the single frame generation the agent works only slightly better, achieving a PNSR of 25.06 vs 24.42 for the random policy.
+When comparing a frame after 3 seconds of auto-regressive generation, the difference increases to 19.02 vs 16.84.
+When playing with the model manually, we observe that some areas are very easy for both, some areas are very hard for both, and in some the agent performs much better. With that, we manually split 456 examples into 3 buckets: easy, medium, and hard, manually, based on their distance from the starting position in the game.
+We observe that on the easy and hard sets, the agent performs only slightly better than random, while on the medium set the difference is much larger in favor of the agent as expected (see Table \ref{table:difficulty_split_performance}). See Figure \ref{fig:agent v random} in Appendix \ref{appendix:agent v random} for an example of the scores during a single session of human play.
+
+\begin{table}[t]
+\caption{\textbf{Performance on Different Difficulty Levels.} We compare the performance of models trained using Agent-generated and Random-generated data across easy, medium, and hard splits of the dataset. Easy and medium have 112 items, hard has 232 items. Metrics are computed for each trajectory on a single frame after 3 seconds.
+\label{table:difficulty_split_performance}}
+\centering
+\vspace{0.05in}
+\resizebox{0.75\textwidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+Difficulty Level & Data Generation Policy & PSNR $\uparrow$ & LPIPS $\downarrow$ \\
+\midrule
+Easy    & Agent  & $20.94 \pm 0.76$  & $0.48 \pm 0.01$ \\
+        & Random & $20.20 \pm 0.83$  & $0.48 \pm 0.01$ \\
+\midrule
+Medium  & Agent  & $20.21 \pm 0.36$  & $0.50 \pm 0.01$ \\
+        & Random & $16.50 \pm 0.41$  & $0.59 \pm 0.01$ \\
+\midrule
+Hard    & Agent  & $17.51 \pm 0.35$  & $0.60 \pm 0.01$ \\
+        & Random & $15.39 \pm 0.43$  & $0.61 \pm 0.00$ \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+% \section{Societal Impact}
+
+\section{Related Work}
+\label{related_work}
+
+\textbf{Game Simulation and World Models.} Several works attempted to train models for game simulation with actions inputs. \cite{yang2023learning} build a diverse dataset of real-world and simulated videos and train a diffusion model to predict a continuation video given a previous video segment and a textual description of an action. \cite{menapace2021playablevideogeneration} and \cite{bruce2024genie} focus on unsupervised learning of actions from videos. \cite{Menapace_2024} converts textual prompts to game states, which are later converted to a 3D representation using NeRF.
+
+Another line of work explored learning a predictive model of the environment and using it for training an RL agent. \cite{ha2018worldmodels} train a Variational Auto-Encoder \citep{Kingma2014} to encode game frames into a latent vector, and then use an RNN to mimic the ViZDoom game environment, training on random rollouts from a random policy (i.e. selecting an action at random). Then controller policy is learned by playing within the ``hallucinated'' environment. \cite{hafner2020dreamer} demonstrate that an RL agent can be trained entirely on episodes generated by a learned world model in latent space.
+
+Also close to our work is \cite{Kim2020_GameGan}, that use an LSTM architecture for modeling the world state, coupled with a convolutional decoder for producing output frames and jointly trained under an adversarial objective. 
+
+\cite{yan2021videogpt} apply a decoder-only transformer architecture to video generation using a discrete latent space learned by a VQ-VAE, and show that it can be used for action-conditioned video generation on the VizDoom simulator. 
+
+\cite{gaia2023} focuses on the problem of action-conditioned world modeling in the domain of driving. A multi-modal auto-regressive transformer acts as the world model and predicts the latent-space image token based on past image, text and action tokens. Then a diffusion video decoder translates the image tokens into a pixel-space video. The models are trained on large corpus of real-work driving data (420M unique images). 
+
+Finally, concurrently with our work, \cite{alonso2024diffusion} train a diffusion world model to predict the next observation given observation history, and iteratively train the world model and an RL model on Atari games. More recent version of their work also included a high-res simulation of Counter-Strike, trained on 95 hours of human game play recording. 
+
+\textbf{Auto-regressive Diffusion Models}. Some recent work explored auto-regressive architectures of diffusion models. \cite{chen2024diffusionforcingnexttokenprediction} diverge from traditional diffusion architectures by allowing each token to have its own level of noise in each time step, reporting this approach to improve stability of video generation beyond the training horizon, when using a convolutional RNN backbone. \cite{rollingdiffusion2024} also allow variable levels of noise for different tokens, using a sliding window denoising process. Such approaches are interesting to explore for real-time game simulation, and we leave this to future work.
+
+\textbf{DOOM.} When DOOM was released in 1993 it revolutionized the gaming industry.
+Introducing groundbreaking 3D graphics technology, it became a cornerstone of the first-person shooter genre, influencing countless other games.
+DOOM was studied by numerous research works.
+It provides an open-source implementation and a native resolution that is low enough for small sized models to simulate, while being complex enough to be a challenging test case.
+Finally, the authors have spent countless youth hours with the game.
+It was a trivial choice to use it in this work.
+
+
+\section{Discussion}
+\label{sec:discussion}
+
+\textbf{Summary.} We introduced \emph{GameNGen}, and demonstrated that high-quality real-time gameplay at 20 frames per second is possible on a neural model.
+
+\textbf{Limitations.} (1) GameNGen suffers from a limited amount of memory.
+The model only has access to a little over 3 seconds of history, so it's remarkable that much of the game logic is persisted for drastically longer time horizons (see the supplementary for multi-minute gameplay).
+While some of the game state is persisted through screen pixels  (e.g. ammo and health tallies, available weapons, etc.), the model likely learns strong heuristics that allow meaningful generalizations.
+For example, the model infers the current location from the rendered view, and can guess if enemies in an area are defeated from the ammo and health tallies.
+That said, it's easy to create situations where this context length is not enough (see video in the supplementary).
+Also, these heuristics might be wrong, for example, if the player repeatedly shoots, GameNGen might decide to spawn an enemy, as the agent would usually shoot when enemies are present.
+Continuing to increase the context size with our existing architecture yields only marginal benefits (Section \ref{sec:context length}), and the model's short context length remains an important limitation.
+(2) The second important limitation are the remaining differences between the agent's behavior and those of human players. For example, our agent, even at the end of training, still does not explore all of the game's locations and interactions, leading to erroneous behavior in those cases (see video in the supplementary).
+(3) Another important limitation, is that we are not able to easily produce new games with GameNGen. Like traditional game engines, GameNGen interactively runs the game-loop (update state based on input and render it to the screen). However, most game engines offer another important feature which is the ability to \emph{easily} create new games, which GameNGen currently lacks.
+
+\textbf{Future Work.} We demonstrate GameNGen on the classic game DOOM.
+It would be interesting to test it on other games or more generally on other interactive software systems;
+We note that nothing in our technique is DOOM specific except for the reward function for the RL-agent. We plan on addressing that in a future work;
+While GameNGen manages to maintain game state accurately, it isn't perfect, as per the discussion above. A more sophisticated architecture and training scheme might be needed to mitigate these;
+GameNGen currently has a limited capability to leverage more than a minimal amount of memory. Experimenting with further expanding the memory effectively could be critical for more complex games/software;
+GameNGen runs at 20 or 50 FPS\footnote{Faster than the original game DOOM ran on the some of the authors' 80386 machines at the time!} on a TPUv5. It would be interesting to experiment with further optimization techniques to get it to run at higher frame rates and on consumer hardware.
+
+\textbf{Towards a New Paradigm for Interactive Video Games.}
+\label{appendix:new paradigm}
+Today, video games are \emph{programmed} by humans.
+GameNGen is a proof-of-concept for one part of a new paradigm where games are weights of a neural model, not lines of code.
+GameNGen shows that an architecture and model weights exist such that a neural model can effectively run a complex game (DOOM) interactively on existing hardware.
+While many important questions remain, we are hopeful that this paradigm could have important benefits.
+For example, the development process for video games under this new paradigm might be less costly and more accessible, whereby games could be developed and edited via textual descriptions or examples images.
+A small part of this vision, namely creating modifications or novel behaviors for existing games, might be achievable in the shorter term. 
+For example, we might be able to convert a set of frames into a new playable level or create a new character just based on example images, without having to author code (see Appendix \ref{appendix-out-of-distribution}).
+Other advantages of this new paradigm include strong guarantees on frame rates and memory footprints.
+We have not experimented with these directions yet and much more work is required here, but we are excited to try!
+Hopefully this small step will someday contribute to a meaningful improvement in people’s experience with video games, or maybe even more generally, in day-to-day interactions with interactive software systems.
+
+\section*{Broader Impact}
+\textbf{Societal impact.} GameNGen demonstrates that it is possible to simulate interactive games in real-time using neural networks, opening up new possibilities for game development. Similarly to other generative technologies like LLMs, text-to-image and text-to-video models, it will be important to explore how to empower users and game developers to build new experiences responsibly.
+
+\textbf{Reproducibility.} We prioritized reproducibility in our implementation choices. We opt to use a relatively small open-source and open-weights foundation model (Stable Diffusion 1.4) which is widely accessible for fine-tuning. The game environment we use, VizDoom, is well-documented and open-source. Finally, we include detailed descriptions of training parameters and data generation configurations, and share performance metrics as a baseline for future work.
+
+\section*{Acknowledgements}
+
+We'd like to extend a huge thank you to Eyal Segalis, Eyal Molad, Matan Kalman, Nataniel Ruiz, Amir Hertz, Matan Cohen, Yossi Matias, Yael Pritch, Danny Lumen, Valerie Nygaard, Michelle Tadmor Ramanovich, the Theta Labs and Google Research teams, and our families for insightful feedback, ideas, suggestions, and support.
+
+\section*{Contribution}
+Shlomi and Yaniv proposed the project, method, and architecture, developed the initial implementation, and made key contributions to implementation and writing. Dani developed much of the final codebase, tuned parameters and details across the system, added autoencoder fine-tuning, agent training, and distillation. Moab led auto-regressive stabilization with noise-augmentation, many of the ablations, and created the dataset of human-play data.
+
+\bibliography{iclr2025_conference}
+\bibliographystyle{iclr2025_conference}
+
+\clearpage
+
+\newpage
+
+\appendix
+\section{Appendix}
+
+\subsection{Samples}
+\label{appendix-samples}
+Figs. \ref{fig:samples_1},\ref{fig:samples_2},\ref{fig:samples_3},\ref{fig:samples_4} provide selected samples from GameNGen.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/samples/context_1.png}
+    \includegraphics[width=1.0\textwidth]{figures/samples/gt_vs_predicted_1.png}
+    \caption{\textbf{Auto-regressive evaluation of the simulation model: Sample \#1.} Top row: Context frames. Middle row: Ground truth frames. Bottom row: Model predictions.}
+    \label{fig:samples_1}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/samples/context_3.png}
+    \includegraphics[width=1.0\textwidth]{figures/samples/gt_vs_predicted_3.png}
+    \caption{\textbf{Auto-regressive evaluation of the simulation model: Sample \#2.} Top row: Context frames. Middle row: Ground truth frames. Bottom row: Model predictions.}
+    \label{fig:samples_2}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/samples/context_5.png}
+    \includegraphics[width=1.0\textwidth]{figures/samples/gt_vs_prediction_5.png}
+    \caption{\textbf{Auto-regressive evaluation of the simulation model: Sample \#3.} Top row: Context frames. Middle row: Ground truth frames. Bottom row: Model predictions.}
+    \label{fig:samples_3}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/samples/context_7.png}
+    \includegraphics[width=1.0\textwidth]{figures/samples/gt_vs_pred_7.png}
+    \caption{\textbf{Auto-regressive evaluation of the simulation model: Sample \#4.} Top row: Context frames. Middle row: Ground truth frames. Bottom row: Model predictions.}
+    \label{fig:samples_4}
+\end{figure}
+
+\clearpage
+
+\subsection{Fine-Tuning Latent Decoder Examples}
+\label{appendix:fine-tune-vae}
+Fig. \ref{fig:vae-ft-ablation} demonstrates the effect of fine-tuning the vae decoder.
+\begin{figure}[h]
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=\textwidth]{figures/fine_tuning_autoencoder.png}
+    \caption{A comparison of generations with the standard latent decoder from Stable Diffusion v1.4 (Left), our fine-tuned decoder (Middle), and ground truth (Right). Artifacts in the frozen decoder are noticeable (e.g. in the numbers in the bottom HUD).}
+    \label{fig:vae-ft-ablation}
+    \vspace{-0.05in}
+\end{figure}
+
+
+\clearpage
+
+\subsection{Dataset Size Analysis}
+\label{appendix-dataset-size}
+To evaluate the performance of GameNGen on datasets of different sizes, we trained three additional models with only 1M, 5M, and 10M examples. Fig. \ref{fig:dataset_size_psnr} shows the PSNR curves of models trained on these different datasets. PSNR for next frame prediction is evaluated on 2048 unseen trajectories from the test set. We observe that, as expected, for smaller datasets the test-set performance peaks earlier. For the 70M dataset, the performance continues to improve beyond 700k steps. As a qualitative measure, we also recorded human gameplay in models with 1M and 10M examples. For each model, we used the checkpoint with the lowest test-set loss  (see files \texttt{condition\{1,2\}\_\{1M,10M\}\_examples.mp4} in the supplementary material). The model trained on 1M examples can render novel viewpoints well but struggles with consistency and game logic (it cannot kill monsters). With 10M examples, we observe improvements in detail and consistency.
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/psnr_train_step_curves.png}
+    \caption{\textbf{Impact of dataset size.} PSNR vs. training step curves across different dataset sizes (1M, 5M, 10M, 70M examples), evaluated on 2048 unseen test trajectories. Note that given our batch size of 128, 10K steps correspond to a little over 1M examples.}
+    \label{fig:dataset_size_psnr}
+\end{figure}
+
+\subsection{Out-of-Distribution Sampling}
+\label{appendix-out-of-distribution}
+To further explore GameNGen's ability to generate behaviors not present in the training data, we performed initial experiments by taking frames from the game, editing them with a graphical picture editor, and starting the generation from the edited frames.
+Specifically, we replicate the same frame for the entirety of the history buffer, with the ``no key pressed'' action.
+To encourage further generalization, in this setup we train a new GameNGen model where we randomize the agent's starting location.
+Due to the noise augmentation (Section \ref{sec:mitigating ar noise}), small local changes get ignored. When performing more substantial changes, the model usually generates unseen levels and situations.
+For example, Fig. \ref{fig:gamengen_edit_monsters} shows examples of pasting a game character into areas where they do not appear in the training data (e.g., inserting a monster from an advanced level into an early one).
+We observe that the model often consistently integrates the added characters into the new location, and they move, shoot at the player, and cause damage.
+Figure \ref{fig:gamengen_edit_structure} demonstrates modifying a level's layout by inserting features such as walls, doors, or pools from other areas. The model successfully integrates these into the environment, rendering new viewpoints as the player navigates.
+We hope to further explore these preliminary results in future work.
+
+
+\begin{figure}[t] \centering \includegraphics[width=1.0\textwidth]{figures/gamengen_edit_monsters.pdf} \caption{\textbf{Adding Characters.} Frames generated by GameNGen when starting generation from a manually edited state which includes characters from a different area.}
+\label{fig:gamengen_edit_monsters}
+\end{figure}
+
+\begin{figure}[t] \centering \includegraphics[width=1.0\textwidth]{figures/gamengen_edit_structure.pdf} \caption{\textbf{Changing Structures.} Frames generated by GameNGen when starting generation from a manually edited state that combine level layout features from different levels not present in the training data.} \label{fig:gamengen_edit_structure}
+\end{figure}
+
+
+\newpage
+\clearpage
+\subsection{Reward Function}
+\label{appendix:reward}
+
+The RL-agent's reward function, the only part of our method which is specific to the game DOOM, is a sum of the following conditions:
+
+\begin{enumerate}
+    \item Player hit: -100 points.
+    \item Player death: -5,000 points.
+    \item Enemy hit: 300 points.
+    \item Enemy kill: 1,000 points.
+    \item Item/weapon pick up: 100 points.
+    \item Secret found: 500 points.
+    \item New area: 20 * (1 + 0.5 * $L_1$ distance) points.
+    \item Health delta: 10 * delta points.
+    \item Armor delta: 10 * delta points.
+    \item Ammo delta: 10 * max(0, delta) + min(0, delta) points.
+\end{enumerate}
+
+Further, to encourage the agent to simulate smooth human play, we apply each agent action for 4 frames and additionally artificially increase the probability of repeating the previous action.
+
+\subsection{Reducing Inference Steps}
+\label{appendix:distillation}
+We evaluated the performance of a GameNGen model with varying amounts of sampling steps when generating 2048 frames using teacher-forced trajectories on 35FPS data (the maximal sampling rate allowed by ViZDoom, lower than the maximal rate our model achieves with distillation, see below). Surprisingly, we observe that quality does not deteriorate when decreasing the number of steps to 4, but does deteriorate when using just a single sampling step (see Table \ref{table:diffusion_steps_quality}).
+
+As a potential remedy, we experimented with distilling our model, following \cite{wang2023prolificdreamer} and \cite{yin2024onestep}. During distillation training we use 3 U-Nets, all initialized with a GameNGen model: generator, teacher, and fake-score model. The teacher remains frozen throughout the training. The fake-score model is continuously trained to predict the outputs of the generator with the standard diffusion loss. To train the generator, we use the teacher and the fake-score model to predict the noise added to an input image - $\epsilon_{\text{real}}$ and $\epsilon_{\text{fake}}$. We optimize the weights of the generator to minimize the generator gradient value at each pixel weighted by $\epsilon_{\text{real}} - \epsilon_{\text{fake}}$. When distilling we use a CFG of 1.5 to generate $\epsilon_{\text{real}}$. We train for 1000 steps with a batch size of 128. Note that unlike \cite{yin2024onestep} we train with varying amounts of noise and do not use a regularization loss (we hope to explore other distillation variants in future work). With distillation we are able to significantly improve the quality of a 1-step model (see ``D'' in Table \ref{table:diffusion_steps_quality}), enabling running the game at 50FPS, albeit with a small impact to quality.
+
+\label{appendix:ablate num sampling steps}
+
+\pagebreak
+
+\subsection{Agent vs Random Policy}
+\label{appendix:agent v random}
+
+Figure \ref{fig:agent v random} shows the PSNR values compared to ground truth for a model train on the RL-agent's data and a model trained on the data from a random policy, after 3 second of auto-regressive generation, for a short session of human play. We observe that the agent is sometimes comparable to and sometime much better than the random policy.
+
+\begin{figure}[ht]
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=\textwidth]{figures/psnr_over_trajectory.png}
+    \caption{\textbf{RL-Agent vs. random policy over a short human play session.} Comparison of PSNR values between generated frame and ground truth for the agent (orange) and random policy (blue) after 3 second of auto-regressive generation. The values are smoothed with an EMA factor of 0.05.}
+    \label{fig:agent v random}
+    \vspace{-0.05in}
+\end{figure}
+
+\subsection{Human Eval Tool}
+\label{appendix:human eval}
+
+Figure \ref{fig:eval tool} depicts a screenshot of the tool used for the human evaluations (Section \ref{sec:sim quality}).
+\begin{figure}[ht]
+    \centering
+    \vspace{-0.1in}
+    \includegraphics[width=\textwidth]{figures/eval_tool.png}
+    \caption{A screenshot of the tool used for human evaluations (see Section \ref{sec:sim quality}).}
+    \label{fig:eval tool}
+    \vspace{-0.05in}
+\end{figure}
+
+\pagebreak
+
+
+\subsection{Additional related work}
+\textbf{Interactive 3D Simulation.} Interactive 2D and 3D simulations are well-developed in computer graphics \citep{realtimerendering}. Game engines like Unreal and Unity a stream of images based on user input, tracking world state (e.g., player position, objects, lighting) and game logic (e.g., score). While film productions uses computationally intensive ray tracing \citep{shirley2008realistic}, game engines prioritize speed (30-60 FPS) with optimized polygon rasterization via GPUs. Physical effects, such as shadows and lighting, are approximated for efficiency rather than simulated with full accuracy.
+
+\textbf{Neural 3D Simulation.} Neural methods for reconstructing 3D representations have made significant advances over the last years. NeRFs \citep{mildenhall2020nerf}
+parameterize radiance fields using a deep neural network that is specifically optimized for a given scene from a set of images taken from various camera poses. Once trained, novel point of views of the scene can be sampled using volume rendering methods. Gaussian Splatting \citep{kerbl3Dgaussians} approaches build on NeRFs but represent scenes using 3D Gaussians and adapted rasterization methods, unlocking faster training and rendering times. While demonstrating impressive reconstruction results and real-time interactivity, these methods are often limited to static scenes.
+
+\textbf{Video Diffusion Models.} Diffusion models achieved state-of-the-art results in text-to-image generation \citep{saharia2022photorealistic, rombach2022high, ramesh2022hierarchical, podell2023sdxl}, a line of work that has also been applied for text-to-video generation tasks \citep{Ho2022ImagenVH, blattmann2023alignlatentshighresolutionvideo, blattmann2023stablevideodiffusionscaling, gupta2023photorealisticvideogenerationdiffusion, girdhar2023emuvideofactorizingtexttovideo, bartal2024lumierespacetimediffusionmodel}. Despite impressive advancement in realism, text adherence and temporal consistency, video diffusion models remain too slow for real-time applications. Our work extends this line of work and adapts it for real-time generation conditioned autoregressively on a history of past observations and actions. 
+
+\subsection{Simulating a platform game}
+
+We experimented with the simple platform game "Chrome Dino" to demonstrate GameNGen's ability to simulate a different game type (see Fig. \ref{fig:chrome_dino}). For data gathering, we train an RL-Agent utilizing the Deep Q-Network (DQN~\cite{DQN}) algorithm with experience replay, where the reward function is derived from the in-game score. The agent selects actions based on an epsilon greedy policy, with a decaying factor of 0.9995. During training, we recorded 2K episodes and used them to train the diffusion model using the same settings detailed in the main paper, with the following modifications: (1) we used a 32-frame context, (2) a resolution of 256x512, and (3) performed only 3,000 training steps. Similar to the results with DOOM, the simulation generated by GameNGen is fully playable over long trajectories in real-time, with visual quality comparable to the source game (see example video in the supplementary). 
+
+In addition, GameNGen supports simulating game-session management actions, such as game termination and automatic game replay. To achieve this, we concatenated two randomly selected episodes and sampled 32 frames from the combined sequence. This approach allows transitions between sessions to be represented when the sampled context spans both episodes.
+
+\begin{figure}[ht] \centering \includegraphics[width=1.0\textwidth]{figures/samples/dino-3.png} \caption{\textbf{Simulation of "Chrome Dino".} GameNGen automatically restarts the game session upon termination.} \label{fig:chrome_dino}
+\end{figure}
+
+
+
+
+\end{document}

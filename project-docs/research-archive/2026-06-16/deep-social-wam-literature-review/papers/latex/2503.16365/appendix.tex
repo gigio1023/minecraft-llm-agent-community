@@ -1,0 +1,505 @@
+\section{Observation and Action Space}\label{app:action_space}
+We rely solely on visual images for observation, without any symbolic information, similar to VPT~\citep{vpt}. Notably, we increase the image resolution to 644×364, providing significantly more visual detail than VPT (128×128), which helps \model better perceive the environment.
+
+To closely mimic human behavior, our action space includes all possible player actions except for arbitrary text input. We allocate reserved tokens outside the original VLM vocabulary to represent keypress and click actions. For mouse movements, we follow VPT~\citep{vpt}, using $\mu$-law encoding to discretize X and Y axes separately into 21 bins (42 tokens total), each mapped to a reserved token. Although Qwen2-VL~\citep{qwen2vl} does not explicitly support reserved tokens like Llama3~\citep{llama3.2}, we can add special tokens by expanding the vocabulary, since its embedding table is underutilized. \autoref{tab:minecraft_action_space} shows the action space \model uses. During inference, the model predicts actions token by token: key/button actions first, followed by camera movements (Pitch and Yaw).
+
+
+\begin{table}[htbp] % htbp 尝试将表格放置在此处、顶部、底部或单独一页
+\centering % 使表格居中
+\caption{The action space we use in Minecraft.} 
+\label{tab:minecraft_action_space} 
+\begin{tabularx}{\linewidth}{r l l X} 
+\toprule
+\textbf{Index} & \textbf{Action} & \textbf{Human Action} & \textbf{Description} \\
+\midrule
+1 & Forward & key W & Move forward. \\
+2 & Back & key S & Move backward. \\
+3 & Left & key A & Strafe left. \\
+4 & Right & key D & Strafe right. \\
+5 & Jump & key Space & Jump. When swimming, keeps the player afloat. \\
+6 & Sneak & key left Shift & Slowly move in the current direction of movement. \\
+7 & Sprint & key left Ctrl & Move quickly in the direction of current motion. \\
+8 & Attack & left Button & Destroy blocks (hold down); Attack entity (click once). \\
+9 & Use & right Button & Interact with the block. \\
+10 & hotbar:[1-9] & keys 1 - 9 & Selects the appropriate hotbar item. \\
+11 & Inventory & key E & Open/Close the inventory. \\
+12 & Yaw & move Mouse X & Turning; aiming; camera movement. \\
+13 & Pitch & move Mouse Y & Turning; aiming; camera movement.  \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+\section{Training Configurations}\label{app:training_configs}
+
+
+The training configurations for both Visual-Language Post-Training and Action Post-Training are largely 
+consistent. All experiment were conducted on NVIDIA A800-SXM4-80GB GPUs, utilizing CUDA version 12.1 and Hugging Face Transformers version 4.47.0. %我们在第一个phase上训练了
+Both training stages utilized the AdamW optimizer with $\beta_1 = 0.9$, $\beta_2 = 0.95$, weight decay were set to 0, and $\epsilon = 1\times10^{-8}$. A cosine learning rate schedule was adopted with the learning rate of $5\times10^{-6}$ and a warmup of 200 steps. The training used \texttt{bfloat16} precision, a maximum gradient norm of 1.0, and a fixed random seed of 42. To accelerate training, DeepSpeed with ZeRO-1~\citep{deepspeed}optimization was employed. For \textbf{Visual-Language Post-Training}, the maximum token length was set to 3584, and we set 
+a batch size per device of 2 and a gradient accumulation of 4
+. For \textbf{Action Post-Training}, the maximum token length was set to 512, which allowed a batch size per device of 8 and a gradient accumulation of 1 step per update. Ensuring that the total batch size remained 256. Both stages were trained using 32 A800 GPUs, with the Visual-Language Post-Training phase running for 128 GPU hours and the Action Post-Training phase running for 512 GPU hours.
+
+
+To enhance generalization, distinct data augmentation strategies were adopted for different training phases. In the \textbf{Visual-Language Post-Training} phase, modifications included adjustments to hue, saturation, brightness, contrast, as well as random translation, rotation, slight scaling variations, shearing, and occasional flipping. These adjustments extended to bounding box and pointing annotations, with necessary masking of instruction-following prompts. In contrast, the \textbf{Action Post-Training} phase focused on adjusting hue, saturation, brightness, contrast, and translation, applied only on images.
+
+
+
+\section{Details of Inference}
+During inference, \model is expected to output actions in a format consistent with the gameplay dataset, as illustrated below:
+
+% User said not to change the prompt environment, so it's kept as is.
+\begin{prompt}[title={Example of \model Interaction for One Turn of Iteration}, label=] 
+\begin{center}
+\begin{minipage}{\dimexpr0.95\linewidth}
+\vspace{5pt}
+
+\textbf{Instruction}: Craft a bread so I can use it.
+
+Arrange the materials in the crafting grid according to the following pattern:
+
+ wheat | wheat | wheat 
+
+ wheat | wheat | wheat 
+
+ and get 1 bread. 
+
+\textbf{Observation}: 
+
+\vspace{5pt}
+\begin{minipage}{\linewidth}
+  \includegraphics[width=0.6\linewidth]{figures/app/vlpt-inference.pdf}
+  \label{fig:app vlpt inference} % Consider making labels more standard, e.g., fig:app_vlpt_inference
+\end{minipage}
+\vspace{5pt}
+
+\textbf{Action}: 
+
+\textless|action\_begin|\textgreater \textless|cam\_w\_13|\textgreater \textless|cam\_h\_5|\textgreater \textless|action\_end|\textgreater
+
+\textless|action\_begin|\textgreater\textless|use|\textgreater \textless|cam\_w\_3|\textgreater \textless|cam\_h\_2|\textgreater \textless|action\_end|\textgreater
+
+
+\vspace{3pt}
+\end{minipage}
+\end{center}
+\end{prompt}
+
+\subsection*{Action Chunking Strategy}
+To optimize both inference speed and predictive performance, we designed an adaptive action chunking strategy that varies the number of predicted actions per observation across different operational phases. The strategy begins with a chunk size of one action per observation during Action Post-Training to ensure precise policy alignment. In the subsequent fine-tuning stages, the chunk size is increased to three to accelerate learning. Finally, during inference, the model generates two actions per prediction step, balancing stability and efficiency.
+
+To validate this multi-phase chunking approach, we conducted experiments on the MCU~\citep{mcu} tasks using Qwen2-VL-2B~\citep{qwen2vl} as the base model. The results are presented in ~\autoref{tab:action_chunk_ablation}. This ablation study suggests that employing longer action chunks during advanced training stages and a moderate chunk size for inference can improve both success rates and FPS.
+
+\begin{table}[htbp]
+\centering
+\caption{Ablation study on action chunk sizes. "APT Chunks" denotes Action Post-Training chunks, and "FT Chunks" denotes Subsequent Fine-tuning chunks.}
+\label{tab:action_chunk_ablation}
+\begin{tabular}{ccccc}
+\toprule
+APT Chunks & FT Chunks & Inference Chunks & FPS & Success Rate \\
+\midrule
+1 & 1 & 1 & 8  & 0.47 \\
+1 & 3 & 1 & 8  & 0.53 \\
+1 & 3 & 2 & 15 & \textbf{0.67} \\
+1 & 3 & 3 & \textbf{21} & 0.20 \\
+3 & 3 & 1 & 8  & 0.03 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+As shown in \autoref{tab:action_chunk_ablation}, the chunking strategy of using one action per observation during Action Post-Training, three during Further Fine-tuning, and two during Inference (1 $\rightarrow$ 3 $\rightarrow$ 2) achieved the highest success rate (0.67) and a solid frame rate (15 FPS) in this specific ablation. We did not explore chunk sizes larger than three, as the Minecraft environment changes rapidly with each discrete action. Predicting multiple future actions in such a dynamic setting poses a significant challenge.
+
+It is also important to clarify the choice of inference chunk size in our main results. To ensure a rigorous and fair comparison with baseline models such as Qwen2-VL (raw) and Qwen2-VL (IL)—which both operate with a single predicted action—we configured \model to use an inference chunk size of one in our primary experiments. While this setting facilitates direct comparison, our ablation results~\ref{tab:action_chunk_ablation} suggest that a chunk size of two at inference may further improve both efficiency and task success under alternative evaluation criteria.
+
+\subsection*{Infrastructure for Efficient Inference}
+To facilitate efficient inference, \model was served using the vLLM~\citep{vllm} in \texttt{bfloat16} precision. This setup was typically deployed on four A800 GPUs. Compared to a standard Hugging Face Transformers implementation, vLLM increased the inference throughput of \model by up to 1.7 times, without introducing any significant degradation in task performance.
+
+\subsection*{Achieved Inference Performance}
+The final inference speed reflects both the action chunking strategy and infrastructure optimizations. In our main results, which use single-action inference for fair comparison, \model-Qwen2-VL-7B runs at 5.5 FPS, while \model-Qwen2-VL-2B achieves 8 FPS—consistent with the results in rows 1 and 2 of \autoref{tab:action_chunk_ablation}. Notably, \model-Qwen2-VL-2B can reach 15 FPS with a chunk size of two, highlighting a trade-off we made in favor of direct benchmarking with baseline models.
+
+\section{Datasets}\label{app:training_datasets}
+
+In this section, we will introduce the collection methods and specific forms of the visual language post-training datasets we used, including the world knowledge dataset, visual language alignment dataset, and visual grounding dataset.
+
+
+\subsection{World Knowledge Dataset}
+
+% 从 wiki，使用 self-instrct 生成大量的问题
+% For World Knowledge Dataset, 我们采用self-instruction的方式获取数据。
+We sourced content from Wikipedia and the DigMinecraft website, and generating 202K question answering entries using the GPT-3.5-turbo model. The dataset have been adjusted to a uniform format. To increase training efficiency, we randomly merged the original one-question-one-answer data to organize multi-turn dialogue dataset with lengths of approximately 1500-2000 tokens each. Below is the specific format of the world knowledge dataset.
+
+
+\begin{prompt}[title={Example of World Knowledge Dataset}, label=World Knowledge Post Training Datasets]
+
+\begin{center}
+\begin{minipage}{\dimexpr0.95\linewidth}
+\vspace{5pt}
+
+\textbf{Question}: "What are the different items that can be made using dark oak planks in Minecraft?"
+
+\textbf{Answer}: "In Minecraft, you can use dark oak planks to craft various items and blocks. Here are some of the items and blocks you can make with dark oak planks:
+
+1. Dark Oak Wood Slabs: Used for flooring, roofs, and other building elements.
+
+2. Dark Oak Wood Stairs: Ideal for creating inclined pathways or staircases.
+
+3. Dark Oak Wood Fence: Useful for creating boundaries or enclosures around structures.
+
+4. Dark Oak Wood Fence Gate: Allows for openings in your fences for easy access.
+
+5. Dark Oak Wood Door: Adds entrances to your buildings.
+
+6. Dark Oak Wood Trapdoor: Can serve as hidden entrances or functional hatches.
+
+7. Dark Oak Wood Button: Can be placed on surfaces and used to activate various redstone mechanisms.
+
+8. Dark Oak Wood Pressure Plate: Activates redstone contraptions when stepped on.
+
+9. Dark Oak Wood Sign: Useful for displaying text and providing information in your world.
+
+10. Dark Oak Wood Bed: Used to craft the frame of a bed, combined with wool blocks for a complete bed.
+
+11. Dark Oak Wood Boat: Useful for water transportation.
+
+12. Dark Oak Wood Chest: Can be used to craft storage chests.
+
+13. Dark Oak Wood Bookshelf: Decorative and enhances enchantment tables.
+
+14. Petrified Oak Slab: Made from dark oak logs submerged in water and then crafted into planks and slabs. These items enhance functionality and aesthetics in your Minecraft builds."
+
+\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\textbf{Question}: "How can players build and use automatic farms in Minecraft, and what are some efficient designs?"
+
+\textbf{Answer}: "In Minecraft, automatic farms are structures designed to automatically harvest resources without requiring constant player intervention. These farms can be extremely useful for gathering various resources efficiently. Here, I'll provide a general overview of how to build and use automatic farms, along with examples of efficient designs for different types of farms:
+
+1. Crop Farms:
+Automated crop farms are used to grow and harvest crops like wheat, carrots, potatoes, and more.
+Efficient design:
+- Create a water-based system to hydrate the farmland. A water source in the middle with canals leading to the farmland is a common approach.
+- Use a dispenser to plant seeds or crops onto the farmland.
+- Attach a redstone clock to the dispenser to periodically activate it.
+- Collect the harvested items using hoppers and chests.
+
+2. Mob Farms:
+These farms are used to automatically collect drops from hostile mobs, such as zombies, skeletons, and creepers.
+Efficient design:
+- Build a dark room where mobs will spawn naturally. Use trapdoors, pressure plates, or a combination to restrict mob movement.
+- Use water currents to funnel mobs into a kill chamber.
+- Create a killing mechanism using either lava blades, suffocation, or other methods.
+- Use water currents again to collect drops and funnel them into hoppers for collection.
+
+3. Animal Farms:
+Automated animal farms can help you gather resources from passive mobs like cows, pigs, and chickens.
+Efficient design:
+- Create separate pens for each type of animal.
+- Use a breeding mechanism to maintain a stable population. Dispensers with food (like wheat for cows) can automatically breed animals.
+- Include a killing mechanism for excess animals, providing a steady supply of drops.
+- Use water currents and hoppers to collect drops into chests.
+
+4. Tree Farms:
+Automated tree farms allow you to grow and harvest trees without manual effort.
+Efficient design:
+- Plant saplings in rows using dispensers and bone meal.
+- Use a mechanism to cut down the trees. This can be achieved using flying machines or TNT-based contraptions.
+- Use water currents to collect the dropped wood and saplings into hoppers and chests.
+
+5. Fishing Farms:
+Automated fishing farms simulate fishing to gather loot and experience points.
+Efficient design:
+- Build a platform with water sources, a fishing rod dispenser, and a mechanism to reel in the fishing rod.
+- Create a hopper system to collect items caught from the fishing process.
+
+% 6. XP Farms:
+% These farms are designed to automatically generate experience points for enchanting and other uses.
+% Efficient design:
+% - Create a spawning platform for mobs like zombies or pigmen.
+% - Use water currents to funnel mobs into a kill chamber.
+% - Build a mechanism to damage the mobs, making it easier to finish them off for XP.
+% - Use water currents and hoppers to collect drops and experience orbs.
+
+Remember that the efficiency of these designs can vary depending on your Minecraft version and specific game settings. Additionally, always consider ethical and environmental factors when designing and using automated farms in your gameplay."
+\vspace{3pt}
+\end{minipage}
+\end{center}
+
+\end{prompt}
+
+\subsection{Vision Language Alignment Dataset}
+
+For the construction of Vision Language Alignment Dataset, we employed a multi-step approach to gather and process data. Initially, we sourced images from a variety of online platforms, including YouTube gameplay videos, contractor-provided screenshots \citep{vpt}, and other internet resources. We carefully selected 35,000 keyframes from these sources based on criteria such as brightness and visual complexity to ensure the quality of the dataset. Subsequently, we utilized advanced Vision-Language Models—such as GPT-4o \citep{chatgpt}, Claude 3.5 Sonnet \citep{claude}, and Molmo \citep{molmo}—to generate contextual image question-answer pairs, critical in creating a rich, semantically detailed dataset that bridges visual content and linguistic annotations. To enhance the reliability of the generated data, we implemented a robust query-validation pipeline. This pipeline employed Llama-3.1-70B \citep{llama-3.1} to systematically filter out ambiguous questions and validate the accuracy of the generated answers. Additionally, it included a validation step to ensure that the question-answer pairs were relevant to the associated images. To further diversify our dataset, we specifically allocated nearly half of the vision-question-answer pairs for caption generation, employing the advanced capabilities of GPT-4o. Through the implementation of our comprehensive pipeline, we successfully generated a Vision Language Alignment Dataset comprising 15,000 captions and 20,000 visual question answering dataset.
+
+
+
+\begin{prompt}[title={Example of Vision Language Alignment Datasets}, label=Vision Language Alignment Datasets]
+
+\vspace{5pt}
+
+\begin{minipage}{\linewidth}
+  \centering
+  \includegraphics[width=0.6\linewidth]{figures/app/dataset-visual.pdf}
+  \label{fig:app vl}
+\end{minipage}
+\vspace{15pt}
+
+% Adjust the following part to control the width of the text lines
+
+\begin{center}
+\begin{minipage}{\dimexpr0.95\linewidth} % Adjust the total width by subtracting 4em
+
+\textbf{Question}: "What tool is the player holding?"
+
+\vspace{5pt}
+
+\textbf{Answer}: "The player is holding a pickaxe with an enchantment glow, likely a diamond pickaxe due to its color."
+
+%\rule{\linewidth}{0.4pt}
+
+%\vspace{4pt}
+
+%\textbf{Question}: "How many hearts of health does the player have?""
+
+%\vspace{5pt}
+
+%\textbf{Answer}: "The player has 9 hearts of health visible, indicating they are missing 1 heart."
+
+\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\textbf{Question}: "What type of block is being mined by the player?"
+
+\vspace{5pt}
+
+\textbf{Answer}: "The player is mining a stone block."
+
+\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\textbf{Question}: "What color is the liquid at the top of the image?"
+
+\vspace{5pt}
+
+\textbf{Answer}: "The liquid at the top of the image is orange, indicating it is lava."
+
+\rule{\linewidth}{0.4pt}
+
+\vspace{4pt}
+
+\textbf{Question}: "How many inventory slots does the player have in total (visible on the hotbar)?"
+
+\vspace{5pt}
+
+\textbf{Answer}: "The player has 9 inventory slots visible on the hotbar."
+
+\end{minipage} % Close the adjusted minipage
+%\hspace*{1pt}
+\end{center} % 结束 center 环境
+
+\vspace{5pt}
+
+\end{prompt}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Visual Grounding dataset}
+
+For Visual Grounding Dataset, we adopted different collection methods for 3D environments and GUI interactions within Minecraft. 
+
+In 3D environment, we sample images from the contractor data. We initially identify objects that are interacting with the player at a specific moment in the video. Then implementing Backward Trajectory Relabeling~\citep{rocket1} by sam2~\citep{sam2} to accurately trace the positions of objects up to $t$ frames backward, which tend to be in more random positions.
+
+For 2D GUI interactions, we directly utilized inventory messages provided by Minecraft in rollouts to determine the positions of items within the inventory. Given that each slot in the inventory has a fixed position, we can directly ascertain the points of items. To enhance the randomness of the data distribution, we performed cropping on the data to make the point distribution more uniformly distributed.
+
+In total, we have collected 404K point data from these efforts, mapping real-time entity and object positions during scripted tasks effectively.
+
+\begin{prompt}[title={Example of Vision Grounding Datasets}, label=Vision Language Grounding Datasets]
+
+\begin{center}
+\begin{minipage}{\dimexpr0.95\linewidth}
+\vspace{5pt}
+
+\textbf{Question}: "Show the location of torch in the provided image by outlining it with a bbox."
+\vspace{5pt}
+
+\begin{minipage}{\linewidth}
+
+  \includegraphics[width=0.6\linewidth]{figures/app/bbox1.jpg}
+  \label{fig:app-ground1}
+\end{minipage}
+\vspace{7pt}
+
+\textbf{Answer}: "\textless|object\_ref\_start|\textgreater torch\textless|object\_ref\_end|\textgreater\textless|bbox\_start|\textgreater(453,333),(563,528)\textless|bbox\_end|\textgreater"
+
+\vspace{5pt}
+
+\rule{\linewidth}{0.4pt}
+
+\vspace{5pt}
+
+\textbf{Question}: "Illustrate the precise position of the iron boots in this image, returning the location in points."
+\vspace{5pt}
+
+\begin{minipage}{\linewidth}
+
+    \includegraphics[width=0.6\linewidth]{figures/app/bbox2.jpg}
+    \label{fig:app-ground2}
+\end{minipage}
+\vspace{7pt}
+
+\textbf{Answer}: "\textless|object\_ref\_start|\textgreater iron boots\textless|object\_ref\_end|\textgreater\textless|point\_start|\textgreater(356,446),(386,494)\textless|point\_end|\textgreater"
+
+\end{minipage}
+\end{center}
+
+\end{prompt}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+\section{Benchmarks}\label{app:benchmarks}
+
+In this section, we will introduce our benchmark to test the capability of the Visual Language Models. We also divide the benchmarks into three sections: world knowledge evaluation, visual recognition evaluation, and spatial grounding evaluation. For the first two datasets, we wrote most of them ourselves, while others were obtained from freely available examples on the Internet. We organized them into open question and answer formats. For the spatial grounding evaluation tasks, we adopted the same method to collect data as for the Visual Grounding Dataset~\ref{app:training_datasets}, ensuring that the test set does not overlap with the training dataset. Below is a detailed introduction:
+
+\subsection{World Knowledge Evaluation}
+
+For World Knowledge Evaluation, we divided it into eight subcategories: craft, plant, mobs, kill, enchant, potion, biomes, and architecture, with a total of 47 test questions. For each entry, we provided the correct answer. A detailed description is shown in \autoref{table:knowledge-evaluation}.
+
+
+
+\begin{table}[ht]
+\centering
+\caption{Summary of Minecraft knowledge questions and answers evaluation.}
+\label{table:knowledge-evaluation}
+{\linespread{1.0}\selectfont
+\resizebox{0.98\linewidth}{!}{
+\begin{tabular}{c c p{6.2cm} p{6.2cm}}
+\toprule
+\textbf{Category} & \textbf{Quantity} & \textbf{Example Question} & \textbf{Example Answer} \\
+\midrule
+Craft        & 9  & What materials are needed to craft a jukebox in Minecraft? & 8 Planks and 1 Diamond. \\
+Plant        & 5  & What is the maximum height sugarcane can reach in Minecraft? & 3. \\
+Mobs         & 12 & What happens when a creeper gets struck by lightning in Minecraft? & A creeper becomes a charged creeper. \\
+Kill         & 3  & Can shield block crossbow attack in Minecraft? & No. \\
+Enchant      & 3  & What happens if the player puts on an item with the Curse of Binding enchantment in Minecraft? & It cannot be removed until the item breaks or the player dies. \\
+Potion       & 4  & What materials are needed to craft a potion of poison in Minecraft? & Water bottle, Nether wart, blaze powder, spider eye. \\
+Biomes       & 4  & Which biome is the only place you can find blue orchids in Minecraft? & Swamp. \\
+Architecture & 7  & How many chests are typically found in a shipwreck in Minecraft? & 1 to 3. \\
+\bottomrule
+\end{tabular}
+}
+}
+\end{table}
+
+
+\begin{prompt}[title={Knowledge Evaluation}, label=Knowledge Evaluation]
+\textbf{Question:} In Minecraft, what type of tool is best suited for digging Mycelium?
+
+\textbf{GPT-4o:} A shovel is the best tool for digging Mycelium. [Explanation: In Minecraft, Mycelium is a block that can be quickly and efficiently broken using a shovel. Like other dirt-based blocks, using a shovel will speed up the process, making it much faster than breaking it by hand or with other tools. Additionally, enchantments like Efficiency on your shovel can further increase the speed at which you can dig Mycelium.]
+
+\textbf{Qwen2-VL:} A Pickaxe. [Explanation: Mycelium is a special type of grass block in Minecraft that can only be found in The Nether, a dimension that can only be entered after the player has crafted the Nether Portal. To dig Mycelium, you will need to have a Pickaxe in your inventory. The Pickaxe is a tool that is used for digging, breaking, and mining blocks. It is the most efficient and effective tool for digging Mycelium because it has a higher efficiency for breaking blocks than other tools.]
+
+\textbf{\model-Qwen2-VL:}A shovel is the best tool for digging Mycelium in Minecraft.
+\end{prompt}
+
+
+\subsection{Vision Understanding Evaluation}
+% 2
+For Vision Understanding Evaluation, we divided it into five subcategories: scene, object, info, inventory, and OCR, comprising a total of 43 test questions. For each entry, we provided an image along with the correct answer. A detailed description can be found in \autoref{table:vision-evaluation}. Specifically, the Scene category involves the game environment, including biomes, time, and weather; the Object category relates to objects within the player’s view; and the Info category includes aspects of the player’s experience, health, hunger, and hotbar status.
+
+\begin{table}[htbp]
+\centering
+
+\caption{Summary of Vision Understanding Evaluation.}
+\label{table:vision-evaluation}
+\begin{tabular}{@{} >{\raggedright\arraybackslash}p{2cm} >{\centering\arraybackslash}p{1cm} >{\centering\arraybackslash}p{3cm} >{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}p{3cm} @{}}
+\toprule
+\textbf{Category} & \textbf{Quantity} &  \textbf{Image} & \textbf{Example Question} & \textbf{Example Answer} \\
+\midrule
+Scene & 11 &\multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-understanding1.pdf}} & What biome you think is the player currently in? & Mushroom Fields biome. \\ \midrule
+Object & 13 & \multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-understanding2.pdf}} & Are there any hostile mobs in the picture? & No, there are only 4 pigs in the picture.  \\ \midrule
+Info & 7 & \multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-understanding3.pdf}} & Is the player's hunger bar currently full? & No. \\ \midrule
+Inventory & 6 &  \multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-understanding4.pdf}} & Is there any oak wood in the inventory? & Yes, there are oak wood planks in the inventory. \\ \midrule
+OCR & 6  & \multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-understanding5.pdf}} & What instructions are visible on the screen? & Open your inventory Press e. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{prompt}[title={Vision Understanding Evaluation Examples}, label=Vision Understanding Evaluation]
+
+\begin{center}
+\begin{minipage}{\dimexpr0.95\linewidth}
+
+\begin{minipage}{\linewidth}
+  \centering
+  \includegraphics[width=0.5\linewidth]{figures/app/visual-understanding6.pdf}
+  \label{fig:app2}
+\end{minipage}
+
+\vspace{5pt}
+
+\textbf{Question:} What time of day is it in the game?
+
+\vspace{2pt}
+
+\textbf{GPT-4o:} It is difficult to determine the exact time of day in the game due to the rainy weather, which can create a darkened sky. However, based on the darkness of the surroundings, it appears to be night or close to night. Rain in Minecraft makes it harder to see the exact position of the sun or the moon, but the overall dim lighting suggests it is either late evening or night time.
+
+\vspace{2pt}
+
+\textbf{Qwen2-VL:} It is daytime in the game. The bright light and the visible sky indicate that it is daytime.
+
+\vspace{2pt}
+
+\textbf{\model-Qwen2-VL:} The time of day in the game is night. This can be determined by the dark sky and the presence of rain in the screenshot. In Minecraft, night begins when the sun sets and the moon rises. During nighttime, the sky darkens, and if it's raining, you'll see rain particles falling from the sky. Additionally, night is a more dangerous time in Minecraft as hostile mobs spawn more frequently.
+
+\vspace{5pt}
+
+\end{minipage}
+\end{center}
+\end{prompt}
+
+
+\subsection{Spatial Grounding Evaluation}
+%3
+For Spatial Grounding Evaluation, we used 100 GUI data entries and 236 embodied data entries, as seen in \autoref{table:spatial-grounding evaluation}. We required the model to output the points location of a specified object in the image. If there were no points, the bounding box would be used as a substitute. The output results will be normalized to the range [0, 1000).
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{2}
+\caption{Summary of spatial grounding evaluation results for visual grounding tasks.}
+\label{table:spatial-grounding evaluation}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2cm} 
+                >{\centering\arraybackslash}p{1cm} 
+                >{\centering\arraybackslash}p{2cm} 
+                >{\raggedright\arraybackslash}p{4cm} 
+                >{\raggedright\arraybackslash}p{4cm}}
+\toprule
+\textbf{Category} & \textbf{Quantity} & \textbf{Image} & \textbf{Example Question} & \textbf{Example Answer} \\ 
+\midrule
+GUI & 100 & \multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-grounding1.pdf}} & Point the wheat\_seeds  & [284,206]  \\ \midrule
+
+Embodied & 236 & \multirow{1}{*}{\includegraphics[width=0.1\textwidth]{figures/app/visual-grounding2.pdf}} & Point the oak\_leaves.&  [315,174] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Metric and Result}
+    We designed a customized evaluation method to assess the performance of models in answering the questions. For World Knowledge Questions and Visual Understanding Questions, we explore the utilization of LLMs as judges. We selected GPT-4o~\citep{chatgpt}, a state-of-the-art LLM to serve as the judge. The judge model first reviews the responses and compares them to a set of expertly crafted reference answers. Subsequently, the judge assigns a score of correct or incorrect. For visual grounding tasks, we directly score the responses of the evaluated model based on a rule-based approach. Below are the performances of some models we are interested in under our benchmark: \autoref{tab:benchmark}.
+    
+    
+\input{tables/benchmark}
+
+
+\section{Ablation with different Pre-trained VLMs}\label{sec:experiments_vlm_ablation}
+
+In this section, we examine the impact of prior training on a VLMs regarding the robustness of the model's backbone. VLMs vary in their decision-making capabilities due to differences in training data. We highlight this and emphasize the influence of the VLM training architecture on the VLA.
+
+We compare two models, Llava-Next~\citep{llavanext} and Qwen2-VL~\citep{qwen2vl}, which utilize different pretraining datasets and image processing techniques. Their raw VLM performances and post-training results on various auxiliary tasks, along with downstream imitation learning outcomes, are presented in \autoref{tab:model_ablation}.
+
+Both Llava-Next and Qwen2-VL demonstrated more than a 30\% increase in downstream task success rates after undergoing \method post-training. Indicating that improving model performance through visual language post-training is robust across different models.
+
+\input{tables/model_ablation}

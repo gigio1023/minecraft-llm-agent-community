@@ -1,0 +1,122 @@
+\section{Pre-Training Datasets}
+\label{sec:datasets}
+
+%
+We structure our pre-training corpus into three main categories: real-robot datasets (Sec.~\ref{datasets:real-world-datasets}), synthetic datasets (Sec.~\ref{datasets:synthetic-datasets}), and human video datasets (Sec.~\ref{datasets:human-video-datasets}).
+%
+These roughly correspond to the peak, middle, and base of the data pyramid (\FIGREF{fig:data_pyramid}), respectively. The synthetic datasets consist of both simulation trajectories and neural trajectories. Table~\ref{tab:synthesized_datasets} summarizes our training data generation strategies in Sec.~\ref{sec:training_data_generation} and their applicable data sources correspondingly. We provide the full statistics (\# of frames, hours, and camera views) of our pretraining datasets in Table \ref{tab:dataset_stats}.
+%
+%Each category plays a distinct role in providing the diverse, high-quality data necessary to build a generalist agent.
+
+
+%This structure naturally aligns with the data pyramid concept (Fig.~\ref{fig:data_pyramid}): latent pre-training datasets form the broad base, consisting of the largest volume of data without action labels; action-based pre-training datasets occupy the middle layer, incorporating structured robotic demonstrations and human data with pseudo-actions; and post-training datasets sit at the peak, comprising high-quality robotic data in both simulation and real-world settings. This organization ensures a strategic balance between data quantity, generalization, and task specificity.
+
+\begin{table}[htb]
+    \centering
+    \caption{\textbf{Training Data Generation.} Our data generation strategies leverage different data sources. The latent-action learning technique is broadly applied to diverse video datasets. Neural trajectories can be generated from datasets containing robot actions, while simulation trajectories rely on a physics simulator and utilize our DexMimicGen-based automated data generation system.}
+    \label{tab:synthesized_datasets}
+    \begin{tabular}{lccc}
+    \toprule
+         & Latent Actions & Neural Trajectories & Simulation Trajectories \\ \midrule
+       Real-Robot Datasets & \checkmark & \checkmark
+ & \checkmark
+\\
+       Simulated Robot Datasets & \checkmark
+ & \checkmark
+ & 
+\\
+       Human Video Datasets & \checkmark  & & 
+\\
+    \bottomrule
+    \end{tabular}
+
+\end{table}
+
+
+\subsection{Real-World Datasets}
+\label{datasets:real-world-datasets}
+
+We use the following real-world robot datasets:
+%
+\begin{enumerate}
+    \item \textbf{\modelname{} Humanoid Pre-Training Dataset.} Our internally collected dataset covers a broad range of general manipulation tasks, focused on Fourier GR1 through teleoperation. We leverage the VIVE Ultimate Tracker to capture the teleoperator’s wrist poses while Xsens Metagloves track finger movements. We also explored other teleoperation hardware options, including Apple Vision Pro and Leap Motion (see \FIGREF{fig:teleop}).   
+    The recorded human movements are then retargeted to humanoid actions via inverse kinematics. The real-time teleoperation operates at a control frequency of 20Hz. Alongside the robot's actions, we capture images from a head-mounted camera at each step, as well as the human’s low-dimensional proprioception and actions. The dataset includes fine-grained annotations, which detail atomic actions such as grasping, moving, and placing, and coarse-grained annotations, which aggregate sequences of fine-grained actions into higher-level task representations. This hierarchical structure supports learning both precise motion control and high-level task reasoning.
+    
+    \item \textbf{Open X-Embodiment.} \citet{open_x_embodiment_rt_x_2023} is a widely used cross-embodiment dataset for robot manipulation. 
+    %
+    We include the RT-1~\citep{rt1-2022}, Bridge-v2~\citep{walke2023bridgedata}, Language Table~\citep{lynch2022interactivelanguagetalkingrobots}, DROID~\citep{khazatsky2024droid}, MUTEX~\citep{shah2023mutex}, RoboSet~\citep{roboset} and Plex~\citep{thomas2023plex}, providing diverse datasets covering various manipulation tasks, language-conditioned control, and robot-environment interactions.
+    
+    \item \textbf{AgiBot-Alpha.} \citet{contributors2025agibotworld} is a large-scale dataset of trajectories from 100 robots. We used the 140,000 trajectories available at the time of launching our training run. The dataset covers fine-grained manipulation, tool usage, and multi-robot collaboration.
+\end{enumerate}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=1.0\textwidth]{assets/groot-teleop.pdf}
+\caption{\textbf{Data Collection via Teleoperation.} Our teleoperation infrastructure supports multiple devices to capture human hand motion, including 6-DoF wrist poses and hand skeletons. Robot actions are produced through retargeting and executed on robots in real and simulation environments.}
+\label{fig:teleop}
+% https://docs.google.com/drawings/d/1e0JUrXRBu7AnG3yvGNXQK6XGfxZFf9_9RgF2eVlx5TA/edit?usp=sharing
+\end{figure}
+
+\subsection{Synthetic Datasets}
+\label{datasets:synthetic-datasets}
+Our synthetic datasets include 1) simulation trajectories automatically multiplied from a small number of human demonstrations within physics simulators and 2) neural trajectories derived from videos produced by off-the-shelf neural generation models. 
+
+\paragraph{Simulation Trajectories}
+%\checkthis{@Yu and @Soroush, describe 54DC digital cousins and how we collect human demonstrations and use DexMG to generate the trajectories}
+In addition to real-world datasets, we feature large-scale synthetic datasets generated in simulation as described in Sec.~\ref{sec:training_data_generation}.
+%
+Our simulation tasks comprise humanoid robots performing a broad range of tabletop rearrangement tasks and feature a large array of realistic 3D assets.
+We build these tasks under the RoboCasa simulation framework~\citep{robocasa2024}.
+Broadly, our tasks follow the behavior ``rearrange A from B to C'', where A corresponds to an object, and B and C represent the source and target locations in the environment.
+% We feature dozens of object categories spanning everyday food items.
+The source and target locations are receptacles such as plates, baskets, placemats, and shelves, and the robot must rearrange objects across different combinations of source and target receptacles.
+Overall, our pre-training simulation datasets feature 54 unique combinations of source and target receptacle categories.
+We place the objects and receptacles in randomized locations throughout the table and additionally incorporate distractor objects and receptacles in the scene.
+The distractors require the model to pay attention to the task language to perform the desired behavior.
+
+We generate diverse, high-quality training datasets at a massive scale using DexMimicGen.
+%
+Our datasets feature the GR-1 humanoid robot, but we can adopt the system for a wide range of robots.
+We begin by collecting a few dozen source demonstrations via teleoperation using the Leap Motion device.
+The Leap Motion device tracks the 6-DoF wrist poses and finger poses, and we retarget these values and send them to the whole-body IK controller based on mink~\citep{Zakka_Mink_Python_inverse_2024}.
+%
+Given human demonstrations, DexMimicGen processes the demonstrations into object-centric segments and then transforms and combines these segments to generate new demonstrations.
+%
+Using this system, we generate 10,000 new demonstrations for each (source, target) receptacle pair in our pre-training task regime, resulting in 540k total demonstrations.
+
+
+\paragraph{Neural Trajectories}
+%
+To generate neural trajectories, we fine-tune open-source image-to-video models on our real-world \modelname{} Humanoid Pre-Training dataset, as described in Sec.~\ref{sec:training_data_generation}. 
+%
+We trained the models for 100 epochs on a dataset comprising 3,000 real-world robot data samples with language annotations, each recorded at 480P resolution and consisting of 81 frames.
+%
+As illustrated in \FIGREF{fig:dream_sample}, our model can generate high-quality counterfactual trajectories given novel language prompts. 
+%
+Moreover, the model, trained on Internet-scale video data, demonstrates strong generalization capabilities in handling unseen initial frames, novel objects, and new motion patterns.
+%
+These videos are further labeled with latent actions and IDM-based pseudo-actions for model training.
+%
+We generate a total of around 827 hours of videos; it takes 2 minutes to generate a one-second video on an L40 GPU, and required approximately 105k L40 GPU hours ($\sim$1.5 days) on 3,600 L40 GPUs. 
+
+% \textbf{@Zhenjia Xu (PIC)}: We also collect a large amount of data on Fourier GR1 using teleoperation. Specifically, we use the VIVE Ultimate Tracker to capture the teleoperator's wrist pose. Additionally, Xsens Metagloves are worn to track finger poses. The tracked data is then retargeted to humanoid actions via inverse kinematics. The control frequency of this real-time teleoperation is 20Hz. In addition to the robot's actions, images from a head-mounted camera are recorded at each step, along with the human's low-dimensional proprioception and actions.
+
+
+\subsection{Human Video Datasets}
+\label{datasets:human-video-datasets}
+%
+We include a diverse set of human video datasets.
+%
+These do not include explicit action labels but contain extensive sequences of human-object interactions, capturing affordances, task semantics, and natural motion patterns.
+%
+These datasets cover a wide range of real-world human behaviors, including grasping, tool use, cooking, assembly, and other task-oriented activities performed in natural environments, and provide detailed first-person perspectives of hand-object interactions (examples shown in Figure \ref{fig:human_sample}). Our video datasets include the following:
+
+\begin{itemize}
+    \item \textbf{Ego4D} is a large-scale egocentric video dataset that includes diverse recordings of everyday  activities~\citep{grauman2022ego4d};
+    \item \textbf{Ego-Exo4D} adds complementary exocentric (third-person) views alongside first-person recordings~\citep{grauman2024ego};
+    \item \textbf{Assembly-101} focuses on complex assembly tasks by providing detailed videos of step-by-step object assembly~\citep{sener2022assembly101};
+    \item \textbf{EPIC-KITCHENS} includes first-person footage of culinary activities~\citep{damen2018scaling};
+    \item \textbf{HOI4D} captures human-object interactions with frame-wise annotations for segmentation, hand and object poses, and actions~\citep{liu2022hoi4d};
+    \item \textbf{HoloAssist} captures collaborative and assistive tasks within augmented reality environments~\citep{wang2023holoassist};
+    \item \textbf{RH20T-Human} includes recordings of fine-grained manipulation tasks with an emphasis on natural hand-object interactions across diverse real-world scenarios~\citep{fang2023rh20t}.
+\end{itemize}

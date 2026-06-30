@@ -1,0 +1,44 @@
+\section{Introduction}
+Large generative models trained on web-scale data have driven rapid improvement in natural language processing~\citep{brown2020language, touvron2023llama, achiam2023gpt}, image generation~\citep{rombach2022high}, and video generation~\citep{sora}. 
+%
+The potential for scaling to unlock progress in sequential-decision making domains, such as robotics, gaming, and virtual agents, has invoked a surge of interest in foundation models for decision-making agents~\citep{reed2022generalist}, particularly for robotics~\citep{brohan2022rt, brohan2023rt}. However, the quantity of action-labelled data in these domains remains a significant bottleneck~\citep{padalkar2023open}. This raises  the question of to how to utilize widely-available unlabelled videos to bootstrap learning~\citep{baker2022video, bruce2024genie}. 
+%
+One promising approach is to use video data to learn a~\textit{world model}~\citep{ha2018world}, a model the predicts the consequences of actions and acts as a learned simulator.
+%
+Such a model can be used to optimize decision-making for downstream tasks~\citep{hafner2021mastering}.
+
+% To enable unlabelled data to be used for world modelling, one approach is implicitly encode the effect of actions by learning latent actions~\citep{bruce2024genie, schmidt2024learning}. 
+% %
+% However, there already exists performant video-diffusion models and so injecting action-condition
+%
+Current image and video diffusion models are highly adept at generating text-conditioned synthetic data~\citep{podell2023sdxl, zhang2023i2vgen, blattmann2023stable}. If actions can be expressed as natural language, these models have the potential to be used out-of-the-box for decision-making~\citep{kapelyukh2023dall, zhu2024sora}.
+%
+However, in many real-world domains the core challenge is optimizing low-level actions, such as joint angles in robotics, and therefore using natural language as the only interface is insufficient.
+%
+To overcome this limitation, one option is to finetune a pre-trained model to condition on low-level actions for a domain-specific dataset~\citep{seo2022reinforcement}. 
+%
+Another possibility is to apply existing adapter architectures such as ControlNet~\citep{zhang2023adding}, to add action-conditioning by modifying the activations inside the original model.
+%
+However, the parameters for state-of-the-art video diffusion models are usually not available publicly~\citep{LumaAI, sora, runwaymlRunwayResearch}, which rules out these approaches.
+%
+
+In this work we address the problem of exploiting a pretrained video diffusion model to generate action-conditioned predictions~\textit{without access to the parameters of the pretrained model}.
+%
+Inspired by the recent work from \citet{yang2024probabilistic}, we instead assume that we only have access to the noise predictions of the pretrained diffusion model.
+%
+We propose AVID, a domain-specific adapter that conditions on actions and modifies the noise predictions of the pretrained model to generate accurate action-conditioned predictions.
+%
+To train the adapter, we assume that we have access to a domain-specific dataset of action-labelled videos.
+%
+The core contributions of our work are:
+\vspace{-1mm}
+\begin{itemize}[leftmargin=*]
+    \item Proposing to adapt pretrained video diffusion models to action-conditioned world models, without access to the parameters of the pretrained model.
+    \item Analyzing the limitations of the adaptation approach proposed by \citet{yang2024probabilistic}.
+    \item AVID, a novel approach to adding conditioning to pretrained diffusion models. AVID applies a learned mask to the outputs of of a pretrained model, and combines them with conditional outputs learned by a domain-specific adapter.
+\end{itemize}
+We evaluate AVID on video game data, as well as real-world robotics data where we use a 1.4B parameter model trained on internet-scale data as the pretrained model~\citep{xing2023dynamicrafter}.
+%
+Our results show that our  approach outperforms existing baselines, and demonstrates that AVID obtains a considerable benefit from using the pretrained model, even with limited access to the model.
+%
+We advocate for providers of closed-source video models to provide access to intermediate model outputs in their APIs to facilitate more flexible use of these models.

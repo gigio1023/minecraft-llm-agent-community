@@ -1,0 +1,86 @@
+\begin{abstract}
+Evaluating large language model (LLM) based chat assistants is challenging due to their broad capabilities and the inadequacy of existing benchmarks in measuring human preferences.
+To address this, we explore using strong LLMs as judges to evaluate these models on more open-ended questions.
+We examine the usage and limitations of LLM-as-a-judge, including position, verbosity, and self-enhancement biases, as well as limited reasoning ability, and propose solutions to mitigate some of them.
+We then verify the agreement between LLM judges and human preferences by introducing two benchmarks: MT-bench, a multi-turn question set; and Chatbot Arena, a crowdsourced battle platform.
+Our results reveal that strong LLM judges like GPT-4 can match both controlled and crowdsourced human preferences well, achieving over 80\% agreement, the same level of agreement between humans.
+Hence, LLM-as-a-judge is a scalable and explainable way to approximate human preferences, which are otherwise very expensive to obtain.
+Additionally, we show our benchmark and traditional benchmarks complement each other by evaluating several variants of LLaMA and Vicuna.
+The MT-bench questions, 3K expert votes, and 30K conversations with human preferences are publicly available at \url{https://github.com/lm-sys/FastChat/tree/main/fastchat/llm\_judge}.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+There has been a proliferation of LLM-based chat assistants (chatbots) that leverage supervised instruction fine-tuning and reinforcement learning with human feedback (RLHF) to unlock new instruction following and conversational abilities~\cite{ouyang2022training,bai2022training,openai2023gpt4,vicuna2023,zhou2023lima,xu2023wizardlm,dubois2023alpacafarm}.
+Once aligned with humans, these chat models are strongly preferred by human users over the original, unaligned models on which they are built.
+However, the heightened user preference does not always correspond to improved scores on traditional LLM benchmarks -- benchmarks like MMLU~\cite{hendrycks2020measuring} and HELM~\cite{liang2022holistic} cannot effectively tell the difference between these aligned models and the base models.
+This phenomenon suggests that there is a fundamental discrepancy between user perceptions of the usefulness of chatbots and the criteria adopted by conventional benchmarks.
+
+We argue that this discrepancy primarily arises due to  
+existing evaluation that only measures LLMs' core capability on a confined set of tasks (e.g., multi-choice knowledge or retrieval questions), without adequately assessing its alignment with human preference in open-ended tasks, such as the ability to accurately adhere to instructions in multi-turn dialogues.
+As a demonstration, we show conversation histories with two models on an MMLU question in \Cref{fig:intro-figure}.
+The two models are LLaMA-13B~\cite{touvron2023llama}, a pre-trained base model without fine-tuning, and Vicuna-13B, our fine-tuned model from LLaMA-13B on high-quality conversations (the training details are in \Cref{sec:training-details}).
+Despite the base LLaMA models showing competitive performance on conventional benchmarks (\Cref{table:dataset_composition}), its answers to open-ended questions are often not preferred by humans.
+This misalignment of conventional benchmarks underscores the core problem driving this paper:
+\emph{the need for a robust and scalable automated method to evaluate LLM alignment with human preferences.}
+
+\begin{figure}[t]
+    \centering
+    \vspace{-1em}
+    \includegraphics[width=0.95\linewidth]{figures/intro_fed.pdf}
+    \vspace{-0.5em}
+    \caption{Multi-turn dialogues between a user and two AI assistants—LLaMA-13B (Assistant A) and Vicuna-13B (Assistant B)—initiated by a question from the MMLU benchmark and a follow-up instruction. GPT-4 is then presented with the context to determine which assistant answers better.}
+    \label{fig:intro-figure}
+    \vspace{-1.5em}
+\end{figure}
+
+To study this, we introduce two benchmarks with human ratings as the primary evaluation metric: MT-bench and Chatbot Arena.
+MT-bench is a series of open-ended questions that evaluate a chatbot's multi-turn conversational and instruction-following ability -- two critical elements for human preference. MT-bench is also carefully constructed to differentiate chatbots based on their core capabilities, such as reasoning and math.
+In addition, we develop Chatbot Arena, a crowdsourced platform featuring anonymous battles between chatbots in real-world scenarios -- Users engage in conversations with two chatbots at the same time and rate their responses based on personal preferences. 
+
+
+
+While human evaluation is the gold standard for assessing human preferences, it is exceptionally slow and costly.
+To automate the evaluation, we explore the use of state-of-the-art LLMs, such as GPT-4, as a surrogate for humans. 
+Because these models are often trained with RLHF, they already exhibit strong human alignment.
+We call this approach \emph{``LLM-as-a-judge''}. 
+This approach has been tried in our earlier blog post~\cite{vicuna2023} and other concurrent or follow-up work~\cite{bubeck2023sparks, openaievals, dubois2023alpacafarm, dettmers2023qlora, zhou2023lima,gudibande2023false,peng2023instruction,wang2023large,chiang2023can,wang2023far}.
+However, there has not been a systematic study of this approach. %
+
+
+In this paper, we study the LLM-as-a-judge approach by comparing it to the gold standard of human evaluation. 
+We examine several potential limitations of the LLM-as-a-judge approach including position bias, verbosity bias, self-enhancement bias, and limited reasoning ability.
+We show that some of the biases are minor or can be mitigated. 
+Once addressed, our results from 3K controlled expert votes and 3K crowdsourced human votes in the wild verify that GPT-4 judge match human evaluations at an agreement rate exceeding 80\%, achieving the same level of human-human agreement (\S\ref{sec:agreement}, Table~\ref{tab:failure_rate_math}).
+Consequently, this suggests LLM-as-a-judge is a scalable method to swiftly evaluate human preference, serving as a promising alternative to traditional human evaluations.  \\
+
+This paper makes two contributions: (1) a systematic study of LLM-as-a-judge; and (2) human preference datasets with high-quality questions and diverse user interactions from MT-bench and Chatbot Arena.
+In addition, we argue for the adoption of a hybrid evaluation framework for future LLM benchmarks: by combining the existing capability-based benchmarks and the new preference-based benchmarks with LLM-as-a-judge, one can swiftly and automatically evaluate both the core capabilities and human alignment of models.
+We publicly release 80 MT-bench questions, 3K expert votes, and 30K conversations with human preferences for future study.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

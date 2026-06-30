@@ -1,0 +1,460 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2026_conference,times}
+\iclrfinalcopy
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{caption}
+
+\usepackage{booktabs}
+\usepackage{longtable}
+
+\usepackage{subcaption}
+\usepackage{makecell}
+\usepackage{wrapfig}
+\usepackage[dvipsnames]{xcolor}
+
+
+
+\title{Object-Centric World Models from \\
+Few-Shot Annotations \\
+for Sample-Efficient Reinforcement Learning
+}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+\setcounter{footnote}{1} % let /thnstart from 1
+\author{Weipu Zhang$^{\diamond\dagger}$\footnotemark[1]
+\quad
+Adam Jelley$^{\dagger}$
+\quad
+Trevor McInroe$^{\dagger}$
+\quad
+Amos Storkey$^{\dagger}$
+\quad Gang Wang$^{\diamond}$\footnotemark[3]\\
+$^{\diamond}$National Key Lab of Autonomous Intelligent Unmanned Systems, Beijing Institute of Technology\\
+$^{\dagger}$University of Edinburgh\\
+\texttt{weipuzhang.academic@gmail.com}\\
+\texttt{\{adam.jelley,t.mcinroe,a.storkey\}@ed.ac.uk} \\
+\texttt{gangwang@bit.edu.cn}
+}
+
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+
+\begin{document}
+
+\maketitle
+
+% Replace /thanks for symbol consistency
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+\footnotetext[1]{Work was initiated at the University of Edinburgh and completed at the Beijing Institute of Technology.}
+\footnotetext[3]{Corresponding author.}
+
+\begin{abstract}
+
+While deep reinforcement learning (RL) from pixels has achieved remarkable success, its sample inefficiency remains a critical limitation for real-world applications. Model-based RL (MBRL) addresses this by learning a world model to generate simulated experience, but standard approaches that rely on pixel-level reconstruction losses often fail to capture small, task-critical objects in complex, dynamic scenes. We posit that an object-centric (OC) representation can direct model capacity toward semantically meaningful entities, improving dynamics prediction and sample efficiency. In this work, we introduce \textbf{OC-STORM}, an object-centric MBRL framework that enhances a learned world model with object representations extracted by a pretrained segmentation network. By conditioning on a minimal number of annotated frames, OC-STORM learns to track decision-relevant object dynamics and inter-object interactions without extensive labeling or access to privileged information. Empirical results demonstrate that OC-STORM significantly outperforms the STORM baseline on the Atari 100k benchmark and achieves state-of-the-art sample efficiency on challenging boss fights in the visually complex game \textbf{Hollow Knight}. Our findings underscore the potential of integrating OC priors into MBRL for complex visual domains.
+
+Project page: \textbf{\textcolor{magenta}{\url{https://oc-storm.weipuzhang.com}}}
+\end{abstract}
+
+\section{Introduction} \label{sec:intro}
+
+Deep reinforcement learning (RL) has achieved landmark successes in domains ranging from board games to robotic control \citep{silver_mastering_2016, mnih_human-level_2015, hafner_mastering_2023,feng2025multiagent}. However, a fundamental limitation persists: Deep RL agents are notoriously sample-inefficient, often requiring orders of magnitude more experience than humans to master a task. This inefficiency is particularly pronounced in pixel-based environments, where the agent must learn both visual representations and control policies from high-dimensional observations.
+
+Model-based RL (MBRL) offers a promising path toward greater sample efficiency by learning a predictive model of the environment dynamics \citep{sutton_reinforcement_2018, ha_world_2018}. Contemporary MBRL methods typically learn this world model in a self-supervised manner, using autoregressive prediction trained with pixel-wise reconstruction losses (e.g., the $\ell_2$-loss) \citep{hafner_mastering_2023, zhang_storm_2023, micheli_transformers_2022}. While effective in many cases, this approach has a critical weakness: the reconstruction objective is dominated by large, static background elements, often at the expense of neglecting small, sparse, yet decision-critical objects. As illustrated in Figure~\ref{fig:main-combined}, standard world models like STORM can accurately reconstruct the background of a visually complex game like Hollow Knight but fail to capture essential elements such as the boss character, which is key for successful policy learning, leading to poor performance.
+
+A natural solution is to incorporate object-level inductive biases, guiding the world model to represent the environment in terms of discrete, interacting entities. Historically, this required extensive task-specific labeling, limiting its practicality. Recent advances in open-set segmentation and tracking models, including SAM \citep{kirillov_segment_2023, ravi_sam_2024}, Cutie \citep{cheng_putting_2023}, and GroundingDINO \citep{liu_grounding_2023}, have changed this landscape. These foundation models can now generate high-quality object segmentations for novel domains with only a handful of annotations, making OCRL a viable and powerful approach.
+
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{0.4\textwidth}
+        \centering
+        \begin{subfigure}{0.96\linewidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/hornet.png}
+            \caption{A high-resolution sample observation from Hollow Knight.}
+        \end{subfigure}
+        \vspace{0.5em}
+        \begin{subfigure}{\linewidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/hornet-recon-storm.png}
+            \caption{
+            Reconstruction generated by a trained STORM agent.}
+        \end{subfigure}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.55\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/pipeline.pdf}
+        \caption{The proposed OC-STORM framework. A frozen, pretrained segmentation model extracts object feature vectors from a few annotated frames. These features are combined with downsampled pixels to train an OC world model, which is then used for policy learning via imagined trajectories.}
+        \label{fig:pipeline}
+    \end{subfigure}
+    \caption{
+        Left: STORM \citep{zhang_storm_2023} accurately reconstructs large background areas (blue) but overlooks the small, critical player and boss characters (orange), hindering policy learning.
+        Right: Overview of the proposed OC-STORM framework. See Appendix~\ref{sec:model-structure} for network details.
+    }
+    \label{fig:main-combined}
+\end{figure}
+
+In this work, we introduce \textbf{OC-STORM}, an object-centric MBRL framework that enhances world models with object representations extracted by a pretrained segmentation network (Figure~\ref{fig:pipeline}). Our approach begins by annotating key objects in a handful of (e.g., $6-12$) frames. A frozen, pretrained video segmentation network (e.g., Cutie \citep{cheng_putting_2023}) then extracts compact feature vectors for these objects, which are fused with raw pixel observations to train a world model that explicitly reasons about object dynamics and inter-object interactions. The policy is subsequently trained on imagined trajectories from the world model. By focusing model capacity on task-relevant entities, OC-STORM improves sample efficiency without requiring extensive labeling or access to internal environment states.
+
+Our main contributions are summarized as follows.
+\begin{enumerate}
+    \item[c1)] 
+    We propose OC-STORM, a novel MBRL framework which, to our knowledge, is \textbf{the first to successfully integrate few-shot, pretrained object segmentation models into world models for both the Atari $100$k benchmark and the visually complex game Hollow Knight}. This general applicability is achieved without extensive labeling or access to internal state information.
+    \item[c2)] We provide a comprehensive empirical evaluation across diverse domains (Atari, Hollow Knight), model backbones (STORM, DreamerV3), and segmentation methods (Cutie, SAM2). Our results show that OC-STORM achieves state-of-the-art sample efficiency, particularly in environments where key information is localized in objects.
+    \item[c3)] We conduct an extensive ablation study that yields practical insights for future OCRL methods, including comparisons between vector-based and mask-based object representations and an analysis of robustness to segmentation errors.
+\end{enumerate}
+
+\section{Preliminaries}
+We formulate the game control problem as a finite-horizon Markov decision process (MDP) $\mathcal{M} = \langle \mathcal{S},\mathcal{A},p,r,\gamma\rangle$, with latent state space $\mathcal{S}$, action space $\mathcal{A}$, transition kernel $p(s_{t+1}| s_t,a_t)$, reward function $r:\mathcal{S}\times\mathcal{A}\to\mathbb{R}$, and discount factor $\gamma\in[0,1)$. Our objective is to learn a policy $\pi_\theta(a_t | s_t)$ parameterized by $\theta$ that maximizes the expected return $\mathbb{E}_{\pi_\theta,p} \big[ \sum_{t=0}^{T-1}\gamma^t r_t \big]$. We adopt a standard MBRL paradigm: first, learn a world model $p_\phi$ via self-supervised learning on environment interactions $\{o_t, a_t, r_t\}$; then, train the policy $\pi_\theta$ using trajectories generated by the model.
+
+To extract object information from out-of-domain environments (e.g., Atari) with minimal human effort, we evaluated several state-of-the-art object segmentation, detection, and tracking methods \citep{cheng_xmem_2022, cheng_putting_2023, kirillov_segment_2023, zhang_personalize_2023, ravi_sam_2024, redmon_you_2016, jocher_ultralytics_2023, liu_grounding_2023, locatello_object-centric_2020, kipf_conditional_2022, elsayed_savi_2022, wang_tracking_2023, xu_unifying_2023}; see Appendix~\ref{sec:review-segmentation} for a detailed review. Among these, we selected Cutie \citep{cheng_putting_2023} and SAM2 \citep{ravi_sam_2024} as our object feature extractors due to their suitability for our setting. These methods exhibit four key properties that are critical for our task:
+\begin{itemize}
+    \item \textbf{Temporal consistency and efficiency.} As video-based segmentation methods, they produce consistent object representations across frames and support real-time processing of high-resolution inputs on a single consumer-grade GPU.
+    \item \textbf{Retrieval-based flexibility.} They effectively utilize few-shot annotations through retrieval from a memory bank, which is crucial in complex environments where a single frame or natural language description may not capture all object states.
+    \item \textbf{Compact object representations.} They provide compact vector embeddings that preserve sufficient semantic and visual information necessary for decision-making. 
+    \item \textbf{Out-of-domain robustness.} Despite being trained on natural images without exposure to Hollow Knight or
+Atari frames, they generalize effectively to Atari and Hollow Knight frames, as demonstrated in our experiments.
+\end{itemize}
+
+Both SAM2 and Cutie employ an \textbf{object-attention} mechanism that facilitates object-level and visual-level information interaction. This design leverages high-level semantic information to improve segmentation performance. We harness this mechanism to extract compact object-level feature representations for our world model.
+
+
+\section{Method} \label{sec:method}
+
+Our method consists of two stages: (1) self-supervised learning of an OC world model that captures environment dynamics, and (2) training an actor-critic policy using trajectories imagined by the model. We denote the world model parameters as $\phi$, the critic network parameters as $\psi$, and the actor network parameters as $\theta$. We use $L$ to represent the batch length of trajectory segments and $T$ for the episode length. The model architecture is detailed in Appendix~\ref{sec:model-structure}.
+
+
+\subsection{Object Feature and Visual Input}
+
+We extract object feature representations using the object-attention outputs from SAM2 or Cutie. The dimension of these object features is denoted as $\text{obj\_dim}$ ($256$ for SAM2 and $2,048$ for Cutie). For visual input, we resize the original observation to $64 \times 64$ resolution, consistent with prior work \citep{hafner_mastering_2023, zhang_storm_2023}. Formally, at each timestep $t$, we define:
+\begin{equation} \label{eq:input-state}
+\begin{aligned}
+&\text{Observation:} & o_t & \in \mathbb{R}^{3\times H \times W}, \\
+&\text{Object features:} & s^{\mathrm{obj}}_t &= \mathrm{SegModel}(o_t) \in \mathbb{R}^{K\times \mathrm{obj\_dim}}, \\
+&\text{Visual input:} & s^{\mathrm{vis}}_t &= \mathrm{Resize}(o_t) \in \mathbb{R}^{3 \times 64 \times 64},
+\end{aligned}
+\end{equation}
+where $K$ is the number of objects, which is environment-specific and set by the user (e.g., $K=3$ for Pong: two paddles and one ball). The segmentation model (SAM2 or Cutie) maintains internal states across frames to ensure tracking consistency, which we reset at the start of each episode.
+
+\subsection{Latent State Discretization via Categorical VAE}
+
+Autoregressive sequence models operating directly on high-dimensional inputs are susceptible to compounding prediction errors \citep{hafner_mastering_2023, zhang_storm_2023}. To mitigate this, we employ a categorical VAE \citep{kingma_auto-encoding_2022, hafner_mastering_2023} that encodes inputs into discrete latent representations. The encoder $q_\phi$ maps input states $s_t$ to discrete latent variables $z_t$, while the decoder $p_\phi$ reconstructs the inputs from these latents:
+\begin{equation} \label{eq:world-model-enc-dec}
+\begin{aligned}
+&\text{Encoder:} & z_t &\sim q_\phi(z_t | s_t), \\
+&\text{Decoder:} & \hat{s}_t &= p_\phi(z_t).
+\end{aligned}
+\end{equation}
+
+We use distinct architectures for different input modalities: multi-layer perceptron (MLP) encoders/decoders for object feature vectors ($\mathbb{R}^{K \times d_{\mathrm{obj}}} \leftrightarrow \mathbb{R}^{K \times 16 \times 16}$) and convolutional neural network (CNN)-based ones for visual observations ($\mathbb{R}^{3 \times 64 \times 64} \leftrightarrow \mathbb{R}^{32 \times 32}$). The object latents use $16$ categorical distributions with $16$ classes each, while visual latents use $32$ distributions with $32$ classes, following established configurations \citep{hafner_mastering_2023, zhang_storm_2023}. The decoder architectures are symmetric to the encoders. The reduced dimensionality for objects reflects their lower information content compared to full scenes. We use the straight-through gradient estimator \citep{bengio_estimating_2013} to enable differentiable sampling from the categorical distributions.
+
+\subsection{Spatial-Temporal Object-Centric Dynamics} \label{sec:spatial-temporal}
+
+Our framework supports both transformer-based (STORM) and recurrent neural network (RNN)-based (DreamerV3) world model backbones. The core innovation is a spatial-temporal architecture that separately models object and visual dynamics while enabling interaction between them.
+
+For the \textbf{STORM} backbone, we employ a transformer architecture with alternating spatial and temporal attention blocks. Spatial attention operates across the $K$ object tokens and one visual token at each timestep $t$: $(z_t^1, z_t^2, \ldots, z_t^K, z_t^{\mathrm{vis}})$, capturing inter-object relationships and object-scene interactions. Temporal attention then processes each token type independently across the sequence $(z_1^i, z_2^i, \ldots, z_L^i)$ to model dynamics. Actions are incorporated via concatenation with the latent representations.
+For \textbf{DreamerV3}, we augment the RNN with spatial attention mechanisms at each timestep to achieve similar object-scene interaction. 
+
+The sequence model $f_\phi$ takes as input the sequence of object latents $z^{\mathrm{obj}}_{1:L}$, visual latents $z^{\mathrm{vis}}_{1:L}$, and actions $a_{1:L}$, and outputs hidden states $h_{1:L} \in \mathbb{R}^{(K+1) \times L \times 256}$, as  
+\begin{equation} \label{eq:world-model-sequence}
+h_{1:L} = f_\phi(z^{\mathrm{obj}}_{1:L}, z^{\mathrm{vis}}_{1:L}, a_{1:L}) \in \mathbb{R}^{(K+1) \times L \times d_h}
+\end{equation}
+where $d_h = 256$ denotes the hidden dimension, and $K+1$ accounts for the $K$ object tokens plus one visual token.
+
+\subsection{Prediction Heads}
+We use the hidden states $h_t$ of the transformer to predict the next latent state, reward, and termination signal. The dynamics predictor $g^{\mathrm{Dyn}}_\phi$ is an MLP that predicts the distribution of the next latent state $\hat{z}_{t+1}$. For reward and termination prediction, we use a self-attention mechanism that aggregates information from all objects and visual tokens, with structures detailed in Appendix~\ref{sec:model-structure}. Specifically, we introduce a special query token (similar to the [CLS] token in BERT \citep{devlin_bert_2019}) that attends to all tokens in $h_t$ and then passes the resulting representation through an MLP to predict the reward $\hat{r}_t$ and termination probability $\hat{\tau}_t$. These predictors are given as follows:
+\begin{equation} \label{eq:predictors}
+\begin{aligned}
+&\text{Dynamics predictor:} & \hat{z}_{t+1} &\sim g^{\mathrm{dyn}}_\phi(\hat{z}_{t+1}|h_t),\\
+&\text{Reward predictor:} & \hat{r}_t &= g^{\mathrm{rew}}_\phi(h_t),\\
+&\text{Termination predictor:} &  \hat{\tau}_t &= g^{\mathrm{term}}_\phi(h_t).
+\end{aligned}
+\end{equation}
+
+\subsection{Training the World Model and Policy}
+
+We train the world model end-to-end using a combination of reconstruction and prediction losses. The world model is trained to maximize the likelihood of the observed data, including the reconstructed inputs, rewards, and terminations. The policy $\pi_\theta$ and value function $V_\psi$ are trained using imagined trajectories generated by the world model. We use the actor-critic algorithm from DreamerV3 \citep{hafner_mastering_2023, zhang_storm_2023, micheli_transformers_2022, robine_transformer-based_2022}, which involves policy gradient updates with value function baselines. Detailed loss functions and training procedures are provided in Appendix~\ref{sec:loss-func}.
+
+
+\section{Experiments} \label{sec:exps}
+
+We evaluate OC-STORM on two challenging benchmarks: the standard Atari $100$k sample-efficiency benchmark \citep{bellemare_arcade_2013} and complex boss fights from Hollow Knight \citep{teamcherry_hollow_2017}, a highly acclaimed game released in 2017. This dual evaluation tests our method across diverse visual complexities—from the relatively simple but well-established Atari environments to the rich, dynamic visuals of modern games where OC reasoning provides maximum benefit.
+
+\begin{table*}[h]  
+  \caption{Game scores and overall human-normalized scores on the Atari $100$k benchmark. We compare OC approaches (vector-based OC and mask-based FOCUS \citep{ferraro_focus_2023}) against baseline world models.
+  Bold indicates scores within $5\%$ of best.
+  The highlighting is computed separately with respect to the Dreamer and STORM baselines, shown in \textcolor{Blue}{\textbf{blue}} and \textcolor{BrickRed}{\textbf{red}}, respectively.
+  The last column `\#obj' denotes manually annotated objects per game. All experiments use identical lightweight configurations suitable for high-resolution environments. STORM serves as the primary baseline due to its computational efficiency.}
+
+  \label{table:atari-100k-results}
+  \centering
+  \resizebox{1.0\textwidth}{!}{\begin{tabular}{lrr|rr|rrrr|r}
+    \toprule
+    Game & Random & Human & DreamerV3 & \makecell[br]{Vector \\ Cutie-OC \\ DreamerV3} & STORM & \makecell[br]{Mask \\ FOCUS \\ STORM} & \makecell[br]{Vector \\ SAM2-OC \\ STORM} & \makecell[br]{Vector \\ Cutie-OC \\ STORM} & \#obj\\
+    \midrule
+    Alien & 228 & 7128 & 789 & \textcolor{Blue}{\textbf{1234}} & 748 & 1039 & 591 & \textcolor{BrickRed}{\textbf{1101}} & 4\\
+    Amidar & 6 & 1720 & 107 & \textcolor{Blue}{\textbf{123}} & 144 & 110 & 150 & \textcolor{BrickRed}{\textbf{163}} & 2\\
+    Assault & 222 & 742 & 928 & \textcolor{Blue}{\textbf{1201}} & \textcolor{BrickRed}{\textbf{1377}} & 986 & 1086 & 1270 & 4\\
+    Asterix & 210 & 8503 & 916 & \textcolor{Blue}{\textbf{1293}} & 1318 & 1552 & 1408 & \textcolor{BrickRed}{\textbf{1754}} & 3\\
+    BankHeist & 14 & 753 & \textcolor{Blue}{\textbf{812}} & \textcolor{Blue}{\textbf{849}} & 990 & 702 & 840 & \textcolor{BrickRed}{\textbf{1075}} & 3\\
+    BattleZone & 2360 & 37188 & 7500 & \textcolor{Blue}{\textbf{9550}} & 5830 & \textcolor{BrickRed}{\textbf{12870}} & \textcolor{BrickRed}{\textbf{12950}} & 4590 & 3\\
+    Boxing & 0 & 12 & 78 & \textcolor{Blue}{\textbf{88}} & 81 & 78 & 81 & \textcolor{BrickRed}{\textbf{92}} & 2\\
+    Breakout & 2 & 30 & 39 & \textcolor{Blue}{\textbf{44}} & 41 & 57 & \textcolor{BrickRed}{\textbf{61}} & 52 & 3\\
+    ChopperCommand & 811 & 7388 & 1926 & \textcolor{Blue}{\textbf{2130}} & 1644 & 1751 & \textcolor{BrickRed}{\textbf{2580}} & 2090 & 4\\
+    CrazyClimber & 10780 & 35829 & 83635 & \textcolor{Blue}{\textbf{89671}} & 79196 & 65753 & 76039 & \textcolor{BrickRed}{\textbf{84111}} & 2\\
+    DemonAttack & 152 & 1971 & 379 & \textcolor{Blue}{\textbf{540}} & 325 & 360 & \textcolor{BrickRed}{\textbf{491}} & 411 & 4\\
+    Freeway & 0 & 30 & 0 & 0 & 0 & 0 & 0 & 0 & 2\\
+    Frostbite & 65 & 4335 & \textcolor{Blue}{\textbf{272}} & \textcolor{Blue}{\textbf{275}} & \textcolor{BrickRed}{\textbf{366}} & 277 & 294 & 260 & 3\\
+    Gopher & 258 & 2412 & \textcolor{Blue}{\textbf{4752}} & 4244 & \textcolor{BrickRed}{\textbf{5307}} & 4453 & 2690 & 4457 & 2\\
+    Hero & 1027 & 30826 & \textcolor{Blue}{\textbf{6777}} & 3712 & \textcolor{BrickRed}{\textbf{11434}} & 9632 & 7913 & 6441 & 2\\
+    Jamesbond & 29 & 303 & \textcolor{Blue}{\textbf{544}} & 470 & \textcolor{BrickRed}{\textbf{408}} & \textcolor{BrickRed}{\textbf{418}} & 383 & 347 & 4\\
+    Kangaroo & 52 & 3035 & 1322 & \textcolor{Blue}{\textbf{3300}} & 3512 & 2418 & 3141 & \textcolor{BrickRed}{\textbf{4218}} & 4\\
+    Krull & 1598 & 2666 & \textcolor{Blue}{\textbf{7111}} & \textcolor{Blue}{\textbf{7060}} & 6522 & 6927 & \textcolor{BrickRed}{\textbf{10410}} & 9715 & 2\\
+    KungFuMaster & 258 & 22736 & 11055 & \textcolor{Blue}{\textbf{22863}} & 20046 & 20489 & 23036 & \textcolor{BrickRed}{\textbf{24988}} & 3\\
+    MsPacman & 307 & 6952 & 1720 & \textcolor{Blue}{\textbf{1822}} & 1490 & 1557 & \textcolor{BrickRed}{\textbf{2464}} & \textcolor{BrickRed}{\textbf{2401}} & 2\\
+    Pong & -21 & 15 & 8 & \textcolor{Blue}{\textbf{13}} & 18 & 18 & 14 & \textcolor{BrickRed}{\textbf{21}} & 3\\
+    PrivateEye & 25 & 69571 & \textcolor{Blue}{\textbf{100}} & 88 & 100 & 216 & \textcolor{BrickRed}{\textbf{364}} & 85 & 3\\
+    Qbert & 164 & 13455 & \textcolor{Blue}{\textbf{3652}} & 2974 & 2910 & 3220 & 4256 & \textcolor{BrickRed}{\textbf{4546}} & 3\\
+    RoadRunner & 12 & 7845 & 15075 & \textcolor{Blue}{\textbf{18014}} & 14841 & 12841 & 16853 & \textcolor{BrickRed}{\textbf{20482}} & 4\\
+    Seaquest & 68 & 42055 & 566 & \textcolor{Blue}{\textbf{653}} & 557 & 495 & 615 & \textcolor{BrickRed}{\textbf{712}} & 3\\
+    UpNDown & 533 & 11693 & 5009 & \textcolor{Blue}{\textbf{7486}} & 6128 & 5098 & 4717 & \textcolor{BrickRed}{\textbf{6623}} & 3\\
+    \midrule
+    HNS mean & 0\% & 100\%  & 106.6\% & \textcolor{Blue}{\textbf{119.4\%}} & 114.2\% & 107.2\% & 124.6\% & \textcolor{BrickRed}{\textbf{134.8\%}} \\ 
+    HNS median & 0\% & 100\%  & 33.2\% & \textcolor{Blue}{\textbf{42.6\%}} & \textcolor{BrickRed}{\textbf{42.5\%}} & 35.5\% & 35.0\% & \textcolor{BrickRed}{\textbf{43.8\%}} \\
+    \midrule
+    Obj-detectable & & & 144.0\% & \textcolor{Blue}{\textbf{160.8\%}} & 147.7\% & 142.4\% & 175.9\% & \textcolor{BrickRed}{\textbf{186.2\%}} & \\
+    Otherwise & & & \textcolor{Blue}{\textbf{69.2\%}} & \textcolor{Blue}{\textbf{78.0\%}} & \textcolor{BrickRed}{\textbf{80.8\%}} & 72.0\% & 73.3\% & \textcolor{BrickRed}{\textbf{83.4\%}} & \\
+    \bottomrule
+    \end{tabular}}
+\end{table*}
+
+\subsection{Atari 100k} \label{sec:atari-results}
+We evaluate our method under the standard Atari $100$k protocol \citep{kaiser_model_2019}, which limits training to $100,000$ environment frames. For each game, we report average performance across $5$ random seeds, with each seed evaluated over $20$ episodes. Performance is measured using human-normalized scores (HNS):  $\text{HNS} = (\text{agent} - \text{random}) / (\text{human} - \text{random})$. 
+To isolate the impact of OC representations, we focus here on ablations within our framework. External benchmarks against other MBRL approaches are presented in Appendix \ref{sec:full-compare}.
+
+We conduct experiments with two typical world modeling backbones: DreamerV3 \citep{hafner_mastering_2023} and STORM \citep{zhang_storm_2023}; two object extraction vision models: SAM2 \citep{hafner_mastering_2023} and Cutie \citep{cheng_putting_2023}; and two object representation methods: vector-based and mask-based.
+The mask-based representation follows the idea proposed in FOCUS \citep{ferraro_focus_2023}; in our implementation, it is realized by feeding Cutie’s segmentation masks into STORM.
+The results are shown in Table \ref{table:atari-100k-results}.
+Overall, OC methods clearly outperform the baseline.
+Cutie-based variants achieve higher scores than SAM2-based ones, while the mask-based representations underperform vector-based ones and are only on par with baselines.
+\textbf{We therefore select the best performing variant, Cutie-OC-STORM, in terms of HNS mean and median as our proposed algorithm, OC-STORM.}
+
+
+To further examine the effectiveness of our method, we categorize the $26$ games into two groups: those where all decision-relevant objects can be consistently identified by SAM2 or Cutie, and those where detection is incomplete.\footnote{The first category (``Obj-detectable") includes Asterix, BankHeist, BattleZone, Boxing, ChopperCommand, DemonAttack, Jamesbond, Kangaroo, Krull, Pong, RoadRunner, Seaquest, and UpNDown. The second category includes Alien, Amidar, Assault, Breakout, CrazyClimber, Freeway, Frostbite, Gopher, Hero, KungFuMaster, MsPacman, PrivateEye, and Qbert.}
+For the second group, we further discuss the limitations of current vision models in Section~\ref{sec:limitations}.
+The results, reported at the bottom of Table~\ref{table:atari-100k-results}, show that vector-based OC methods substantially outperform the baseline in the first category, while in the second category they still achieve performance comparable to the baseline.
+These findings highlight both the benefits of OC learning and the robustness of our framework.
+
+
+\paragraph{Interpretation of the results}
+Although SAM2 achieves stronger results than Cutie on video segmentation benchmarks, our OC agents benefit more from Cutie's features.
+This discrepancy arises from their object-feature design: Cutie aggregates visual features within masked regions, whereas SAM2 produces a prototype vector intended for classification.
+Consequently, SAM2 features may lose positional and global context, providing weaker guidance for policy learning.
+
+FOCUS-like mask-based methods mainly suffer from resolution issues: low-resolution inputs (e.g., $64 \times 64$ in world models) discard crucial object details, while high-resolution masks incur quadratic memory and computation costs.
+Moreover, raw masks are noisy, and thus their dynamics are difficult to predict.
+In contrast, the vector representation is semantically summarized from high-resolution input, which is more consistent and computationally efficient.
+Additional training curves comparing different representations are provided in Figure~\ref{fig:module-ablation}.
+
+\subsection{Hollow Knight}  \label{sec:hollow-knight-results}
+\begin{wrapfigure}[18]{r}{0.475\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/hollowknight-curve.pdf}
+    \caption{
+        The training episode returns on Hollow Knight.
+        We use a solid line to represent the mean of $3$ seeds and use a semi-transparent background to represent the standard deviation.
+    }
+    \label{fig:hollow-knight-curves}
+\end{wrapfigure}
+
+While the Atari benchmark is widely used in the RL community, it is not sufficient to verify the robustness of our proposed method.
+Atari's visual simplicity, where object pixels can often be separated from the background by well-defined pixel-value boundaries, allows methods like DreamerV3 and STORM to capture the environment dynamics almost perfectly in raw visual space.
+Such simplicity would be rarely seen in real-world scenarios.
+In contrast, the boss fights in Hollow Knight offer a more suitable testbed, where the visuals are much more complex, including many dynamic and distracting elements \footnote{Please refer to the evaluation videos in the supplementary materials.}.
+
+For Hollow Knight, we similarly limit the number of samples to $100$k, equivalent to approximately $3.1$ hours of real-time gameplay at $9$Hz. 
+For each boss, we conduct three experiments with different random seeds.
+
+As seen in Figure~\ref{fig:hollow-knight-curves}, though the original STORM can also learn a good policy, our proposed OC method converges significantly faster and yields stronger performance in most cases, especially when the environment is more challenging, such as for Mage Lord and Pure Vessel.
+Numerical results are shown in Appendix~\ref{sec:hollow-knight-numerical-results}.
+
+Since Hollow Knight is not yet an established benchmark, existing methods differ significantly in sample step limits, environment wrapping, reward functions, boss selection, among others.
+This makes direct comparisons with existing methods challenging.
+As the primary goal of this work is to improve MBRL through the use of OC representations, we therefore compare our results with the equivalent baseline algorithm STORM.
+Nevertheless, we include the results from \citet{yang_seermerhollowknight_rl_2023} on the boss Hornet Protector for a rough comparison in Appendix \ref{sec:model-free-comparison}.
+
+
+\section{Analysis} \label{sec:analysis}
+
+
+\subsection{Completeness of the Object Representation} \label{sec:vector-decode-to-img}
+
+We utilize the output feature of the object transformer in the video model. 
+While this feature theoretically contains all the state and positional information of an object, it is uncertain whether it fully captures these details in practice. 
+Specifically, we need to determine if the masked pooling could potentially obscure positional information.
+The agent's performance, as demonstrated in Section \ref{sec:exps}, provides general quantitative evidence.
+Here, we present qualitative evidence to support this claim.
+
+We trained a 4-layer ConvTranspose2d \citep{zeiler_deconvolutional_2010} decoder on the Atari Boxing game. 
+It takes two vector-based object features as inputs, corresponding to the white and black players, respectively, to reconstruct the observation.
+The dataset was collected using a random policy, with $10,000$ frames for training and $1,000$ frames for validation. 
+Sample reconstructions result from the validation set are shown in Figure~\ref{fig:obj-decoder}. 
+This indicates that these features effectively capture the state and position of the objects.
+Both SAM2 and Cutie features can provide similar outcomes in this test, but the model takes a larger number of update steps to converge when using the SAM2 feature compared using the Cutie feature.
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[c]{0.7\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/boxing-reconstrunction.pdf}
+        \caption{
+            Reconstructions with object features.
+        }
+        \label{fig:obj-decoder}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/robustness-ablation.pdf}
+        \caption{
+            Robustness analysis.
+        }
+        \label{fig:robustness-ablation}
+    \end{subfigure}
+    \caption{
+        Analysis of the object feature.
+        (a) Observation reconstructions on Atari Boxing with two object feature vectors as inputs.
+        The object mask row highlights the relevant objects. (see Section~\ref{sec:vector-decode-to-img} for details). 
+        (b) Training episode returns for Atari Boxing and Pong with $4$ different zeroing probabilities (see Section~\ref{sec:robustness}).
+    }
+    \label{fig:recon-robustness}
+\end{figure}
+
+\subsection{Analysis of Segmentation Model Failures} \label{sec:robustness}
+To mimic segmentation model failures, we randomly set the object feature vector to $0$.
+This operation is identical to how we process the feature when the video model detects nothing, as described in Appendix \ref{sec:video-model-modification}.
+We conduct experiments on Atari Boxing and Pong with different zeroing probabilities.
+To avoid interference from visual inputs, we only use the object module in these experiments.
+
+The results are presented in Figure~\ref{fig:robustness-ablation}.
+As the detection accuracy of the vision model increases, the agent's performance improves accordingly.
+This also demonstrates the robustness of OC-STORM in handling unstable detection results.
+Additionally, since the zeroing process is purely random and the agent is trained only after the termination of each episode, every new episode during training serves as an indicator of test-time failure performance.
+
+\subsection{Additional Experiments with Continuous Control} \label{sec:metaworld}
+
+To evaluate the potential of OC-STORM on continuous control tasks, we conduct four experiments on the Meta-world \citep{yu_metaworld_2020} benchmark.
+We compare our results with MWM \citep{seo_masked_2022}, which is also designed to help the world model focus on small dynamic objects.
+We choose one easy, two medium, and one hard tasks according to the MWM paper (see \citet{seo_masked_2022} Appendix F, Experiments Details).
+These tasks are randomly selected to cover different objects and policies.
+
+As shown in Figure~\ref{fig:meta-world}, OC-STORM generally exhibits higher sample efficiency than STORM.
+In some tasks, it also outperforms MWM in terms of efficiency and performance.
+This provides evidence that this approach can also perform well on continuous tasks out-of-the-box, without significant adaptation of the pipeline or extensive tuning for these very different continuous control environments.
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[c]{0.495\textwidth}
+        \centering
+        \includegraphics[height=5.8cm]{figures/module-ablation.pdf}
+        \caption{
+            Module ablation training curves.
+        }
+        \label{fig:module-ablation}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{0.495\textwidth}
+        \centering
+        \includegraphics[height=5.8cm]{figures/metaworld.pdf}
+        \caption{
+            Metaworld training curves.
+        }
+        \label{fig:meta-world}
+    \end{subfigure}
+    
+    \caption{
+        (a) Training episode returns under different input module configurations. 
+        STORM utilizes only the visual module, ``No-visual'' relies solely on the object module, and OC-STORM incorporates both, as described in Appendix~\ref{sec:model-structure}. 
+        FOCUS employs mask-based representations.
+        The top two tasks are from Atari, while the bottom two are from Hollow Knight.
+        See numerical results in Section~\ref{sec:atari-results}
+        (b) Training success rates on $4$ Meta-world tasks.
+        The results of MWM \citep{seo_masked_2022} and DreamerV2 \citep {hafner_mastering_2020} are from the MWM paper.
+        See details in Section~\ref{sec:metaworld}.
+    }
+    \label{fig:module-metaworld}
+\end{figure}
+
+\subsection{Extra Analysis}
+
+We provide additional ablations in Appendix~\ref{sec:additional-analysis}, examining the policy design choices, the number of annotations, and the computational overhead of introducing pretrained vision models.
+
+\section{Related Work}
+
+\paragraph{Model-based RL}
+\citet{ha_world_2018} first demonstrated the feasibility of learning by imagination in pixel-based environments.
+SimPLe \citep{kaiser_model_2019} further extended this idea to Atari games \citep{bellemare_arcade_2013}, though with limited efficiency.
+The Dreamer series \citep{hafner_learning_2019, hafner_mastering_2020, hafner_mastering_2023} employs categorical VAEs and RNNs, to achieve robust performance across diverse domains.
+Dreamer introduces both a stable discretization method and a set of techniques for robust optimization across domains with diverse observations, dynamics, rewards, and goals.
+TWM \citep{robine_transformer-based_2022} and STORM \citep{zhang_storm_2023} replace the RNN sequence model in Dreamer with transformers, enhancing parallelism during training.
+TWM encodes the observation, reward, and termination as three input tokens for the transformer, while STORM encodes them as a single token, demonstrating better efficiency.
+IRIS \citep{micheli_transformers_2022}, and improved efficiency variants $\Delta$-IRIS \citep{micheli_efficient_2024} and REM \citep{cohen_improving_2024}, utilize VQ-VAE \citep{van_den_oord_neural_2017} for multi-token latent representations.
+DIAMOND \citep{alonso_diffusion_2024} employs a diffusion process as the world model, further improving the final performance.
+All of these methods predominantly use an $L_2$ reconstruction loss for self-supervised learning.
+
+
+\paragraph{Object-centric RL}
+Many attempts have been made to introduce OC learning to RL systems.
+However, to our knowledge, no existing methods have been directly applied to Atari games or Hollow Knight without leveraging internal game states or an extensive number of annotations.
+These OC learning methods broadly follow two main trends: two-stage and end-to-end.
+
+\paragraph{Two-stage} methods usually first employ computer vision techniques to detect objects, then train the policy based on this object-level information.
+Current approaches often require labour-heavy task-specific fine-tuning \citep{devin_deep_2017, liu_semantic_2021}, access to game memories \citep{delfosse_ocatari_2024, jain_adityajain1030hkrl_2024}, or leverage game-specific observation structures \citep{stanic_learning_2022}.
+FOCUS \citep{ferraro_focus_2023}, the most similar work to ours, is a model-based method that uses TrackingAnything \citep{yang_track_2023} to generate segmentation masks, which are then fed into DreamerV2 \citep{hafner_mastering_2020} for policy training.
+Using binary masks for object representation limits efficiency, which was discussed in Section \ref{sec:exps}.
+Moreover, FOCUS has only been tested on six clean-background fixed-camera robotics manipulation tasks, and hasn’t been fully explored in more visually complex environments.
+
+\paragraph{End-to-end} methods jointly learn the object perception and policy, often using unsupervised slot-based approaches \citep{locatello_object-centric_2020} to discover and represent objects.
+While these methods allow the visual module to be trained alongside the world model or policy network, their unsupervised learning nature leads to poor object detection quality, especially in noisy, real-world scenes.
+As a result, they are typically limited to visually simple OC benchmarks \citep{watters_google-deepmindspriteworld_2024, ahmed_causalworld_2020} and struggle to be adapted to visually complex tasks.
+Several model-based \citep{veerapaneni_entity_2020, lin_improving_2020, van_bergen_object-based_2023} and model-free \citep{yoon_investigation_2023, haramati_entity-centric_2024} algorithms have used these ideas.
+\citet{nakano_learning_2024} added slot attention to STORM, achieving stronger performance on the OCRL benchmark \citep{yoon_investigation_2023}.
+
+\section{Limitations} \label{sec:limitations}
+
+Our method has two main limitations, each of which corresponds to a potential future direction.
+
+\textbf{Duplicated instances} Current video object segmentation algorithms are primarily developed and trained to track a single object.
+When a scene contains two or more identical objects, approaches like SAM2 or Cutie may fail to segment each object correctly and thus may affect performance.
+
+\textbf{Geometric map representation} Our object representations are not well-suited for encoding geometric structures such as walls, boundaries, and navigable spaces.
+This limitation necessitates retaining raw visual inputs in our pipeline and reflects a broader challenge for current OC approaches in the visual domain.
+
+These limitations are further illustrated and explained in Appendix~\ref{sec:illustration-of-limitations}.
+
+\section{Conclusions} 
+In this work, we introduced OC-STORM, an MBRL pipeline designed to improve sample efficiency in visually complex environments.
+By integrating recent advances in object segmentation and detection, we mitigate the limitations of traditional reconstruction-based MBRL methods, which may be dominated by large background areas and overlook decision-relevant details.
+Through experiments across various domains and model configurations, we demonstrated that OC learning could be successfully implemented without relying on internal game states or extensive labelling, highlighting the adaptability of our method to complex, visually rich environments.
+OC-STORM represents a meaningful step toward combining modern computer vision with RL, offering an efficient framework for training agents in visually complex settings.
+
+\section*{Acknowledgements}
+The work of W.Z. and G.W. in this paper was supported by the National Natural Science Foundation of China under Grant U23B2059. The work of A.S. is part of a project of the European Union’s Horizon Europe research and innovation programme under Grant Agreement No. 101120726, funded by UK Research and Innovation (UKRI) under the UK government’s Horizon Europe funding guarantee 10085198.
+
+\bibliography{references}
+\bibliographystyle{iclr2026_conference}
+
+\appendix
+\input{appendix}
+
+
+\end{document}

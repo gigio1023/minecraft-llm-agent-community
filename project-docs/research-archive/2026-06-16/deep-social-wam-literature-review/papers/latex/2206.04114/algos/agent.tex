@@ -1,0 +1,45 @@
+\begin{algorithm}[h]
+%\small
+\SetEndCharOfAlgoLine{}
+\SetKwComment{Comment}{// }{}
+Initialize replay buffer and neural networks. \;
+\While{not converged}{
+
+  \BlankLine\Comment{Acting}
+  Update model state $s_t \sim \operatorname{repr}(s_t \mid s_{t-1},a_{t-1},x_t)$. \;
+  
+  \BlankLine
+  \If{$t \operatorname{mod} K = 0$} {
+    \Comment{Update internal goal}
+    Sample abstract action $z\sim\mgr(z|s_t)$. \;
+    Decode into model state $g=\dec(z)$. \;
+  }
+  \BlankLine
+  
+  Sample action $a_t\sim\wkr(a_t|s_t,g)$. \;
+  Send action to environment and observe $r_t$ and $x_{t+1}$. \;
+  Add transition $(x_t,a_t,r_t)$ to replay buffer. \;
+  
+  \BlankLine\Comment{Learning}
+  \If{$t \operatorname{mod} E = 0$} {
+  
+    \BlankLine\Comment{World Model}
+    Draw sequence batch $\{(x,a,r)\}$ from replay buffer. \;
+    Update world model on batch (\Cref{eq:wmloss}) and get states $\{s\}$. \;
+    
+    \BlankLine\Comment{Goal Autoencoder}
+    Update goal autoencoder on $\{s\}$ (\Cref{eq:aeloss}). \;
+    
+    \BlankLine\Comment{Policies}
+    Imagine trajectory $\{(\hat{s},\hat{a},\hat{g},\hat{z})\}$ under model and policies starting from $\{s\}$. \;
+    Predict extrinsic rewards $\{\operatorname{rew}(s)\}$. \;
+    Compute exploration rewards $\smash{\{r^{\mathrm{expl}}\}}$ (\Cref{eq:explrew}). \; 
+    Compute goal rewards $\smash{\{r^{\mathrm{goal}}\}}$ (\Cref{eq:goalrew}). \;
+    Abstract trajectory to update manager (\Cref{eq:vloss,eq:aloss}). \;
+    Split trajectory to update worker (\Cref{eq:vloss,eq:aloss}). \;
+    
+  }
+}
+\caption{Director}
+\label{alg:agent}
+\end{algorithm}

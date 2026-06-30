@@ -1,0 +1,207 @@
+\section{WoW-World-Eval: A Multi-faceted Benchmark for Embodied World Models}
+In this section, we introduce \textbf{WoW-World-Eval}, a novel benchmark designed to evaluate embodied world models rigorously. We formulate the core evaluation task as \textbf{conditional video generation from an initial image and a text instruction (Image-Text-to-Video)}, a setting that directly probes a model's ability to understand a given state and execute a specified action. Moving beyond metrics of visual appeal, \textbf{WoW-World-Eval} specifically assessed a model's instruction understanding, planning, observation perception abilities, and understanding of physically grounded dynamics in embodied settings. 
+% The overall design of our benchmark, which systematically connects core abilities, a principled data construction pipeline, and a multi-faceted evaluation protocol. 
+For introducing our benchmark, we structure our presentation by first outlining the five core capabilities that a competent embodied world model must possess (Section~\ref{ssec:core_abilities}), then detailing our data curation pipeline (Section~\ref{ssec:data_curation}), followed by our comprehensive evaluation metrics (Section~\ref{ssec:metrics}).
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figs/data_statistics.pdf} 
+  \caption{\textbf{Overview of WoW-World-Eval Data Construction Pipeline and Data Statistics.} \textbf{(Left)} Public and in-house data are cleaned sequentially by GPT and human annotators to produce high-quality samples consisting of an initial image, prompt, ground-truth video, and annotated keypoints. \textbf{(Right)} Data distribution across five different dimensions from overall to fine-grained.}
+  \label{fig:data_statistic}
+\end{figure*}
+
+
+\subsection{Core Evaluation Dimensions}
+\label{ssec:core_abilities}
+We posit that a truly effective embodied world model must demonstrate mastery across five fundamental and orthogonal dimensions, as outlined in our benchmark design (Figure~\ref{fig:WoWbench_overall_design}, Top-center).
+
+\textbf{Perception Understanding.}
+A world model must first accurately perceive and represent the environment to enable more reliable subsequent prediction and planning. We assess this through tasks requiring fine-grained \textbf{object recognition}~\cite{cheng2024egothinkevaluatingfirstpersonperspective, cheng2024videgothinkassessingegocentricvideo, 10654928, chow2025physbench}(attributes like color, shape, number, and size), \textbf{spatial understanding}~\cite{yang2025thinkingspacemultimodallarge, cheng2025embodiedevalevaluatemultimodalllms, song2025robospatialteachingspatialunderstanding, du2024embspatialbenchbenchmarkingspatialunderstanding} (relative positions and arrangements), and \textbf{affordance recognition}~\cite{gibson2014theory, nasiriany2025rt, cheng2025embodiedevalevaluatemultimodalllms} (identifying interactive parts of objects). 
+
+% Each dimension contains a different amount of data. In the object sub-dimension, we included approximately 143 samples, with around 20 samples allocated to each attribute category (color, number, shape, size, type) and 50 samples to the function category. In the spatial sub-dimension, we assigned 46 samples, while the affordance sub-dimension was filled with 60 samples.
+
+\textbf{Decision-making and Planning.}
+Embodied agents must execute long-horizon tasks~\cite{chen2024egoplanbenchbenchmarkingmultimodallarge, sermanet2023robovqamultimodallonghorizonreasoning, li2024mmromultimodalllmseligible, cheng2024videgothinkassessingegocentricvideo, yang2025embodiedbenchcomprehensivebenchmarkingmultimodal}. Therefore, we assess a model's planning ability by challenging it to generate coherent video sequences for complex instructions. This requires implicitly understanding \textbf{task decomposition}~\cite{chi2024eva, tian2025seea} into key sub-goals and respecting their \textbf{causal dependencies}. Hence, we collect 25 samples to fill in this long-term planning task, and transform the text instruction into a suitable description for the world model to plan. In order to evaluate the planning ability in the world model, we refer to the metric from RoboBench~\cite{luo2025robobench}. The detailed metric will be elaborated in section~\ref{ssec:metrics}. 
+
+% For example, first, we extract the key steps from the predicted video using Gemini-2.5-flash~\cite{comanici2025gemini}, for instance, 1-grasp(green block), 2-pick up(green block), 3-place(green block, yellow block), and so on, then transform them into a Directed Acyclic Graph(DAG) for further key action extraction and comparison with groundtruth DAG. 
+
+\textbf{Predictive Reasoning.}
+This dimension evaluates the model's internal physics engine. Given an initial state and an action, the model must generate a future that respects core physical principles such as \textbf{object permanence}~\cite{bansal2024videophy, chow2025physbench}, \textbf{collision dynamics}~\cite{meng2024towards, chow2025physbench, bansal2024videophy, motamed2025generative}, and \textbf{trajectory plausibility}~\cite{qin2024worldsimbenchvideogenerationmodels, li2025worldmodelbench, duan2025worldscoreunifiedevaluationbenchmark, zheng2025vbench, yue2025ewmbench}. This directly probes the model's capacity to function as a world simulator~\cite{sora2024}. Therefore, we design several sub-dimensions that focus on these principles, as illustrated by the pie chart in the right of Figure~\ref{fig:data_statistic}. 
+
+% We select both objects with no occlusion, 107 samples, and objects with semi-occlusion, 54 samples, as our different camera views for evaluating varying levels of object visibility. Also, for collision dynamics, we further subdivide the dimension into single-object operation, multi-object interaction, and dual-arm cooperation. The single-object operation data has 83 samples, which are distributed in the ratio of 30, 30, 30, 10 for rigid, deformable, articulated, and fluid. The multi-object interaction part has 63 samples, covering the interaction between rigid body-rigid body, rigid body-deformable object, and rigid body-fluid. For dual-arm cooperation, now we have 3 samples, but we will continue to collect more data.
+
+\textbf{Interactive Execution.} Interacting with the real world and executing on a real robot is the ultimate goal of an embodied world model. To examine this, we collect 9 different tasks from our in-house data that are compatible with the real robot experiments, for the model to generate. Furthermore, we will have the model generate videos based on this in-house data and use the Gripper-Centric Inverse Dynamics Model(GC-IDM)~\cite{chi2025wow}, to interpret generated videos into actions that can be executed for a real robot, finding out the \textbf{execution ability} in the world model. The detailed task names and the implementation will be described in the Appendix~\ref{ssec:IDM}.
+
+\textbf{Generative Generalization.}
+A universal world model should not only perform well on the In-Distribution data, but it should also generalize beyond the data it has seen before to demonstrate its generalization ability. For this reason, we test generalization on the in-house robot data that we collected, by using GPT-5~\cite{hurst2024gpt} to perform style transfer or image editing on it, and generating images that the world model had never seen before. We also collected some world-famous masterpiece paintings, such as \textit{"Girl with a Pearl Earring"}, and asked the world model to execute the task instructions that humans created. These two types of images constitute our \textbf{In-house Data} and \textbf{Out-of-Distribution (OOD)} dimension. 
+
+% Here, in total, we provide 20 data samples, and demonstrate some cases in Figure~\ref{fig:data_statistic}.
+
+\subsection{Data Curation Pipeline}
+\label{ssec:data_curation}
+To systematically evaluate these capabilities, we build a principled, semi-automated data curation pipeline (Figure~\ref{fig:data_statistic} Left). Our dataset combines open-source robotics data (e.g., RoboMIND~\cite{wu2025robomind}, DROID~\cite{khazatsky2024droid}), in-house trajectories, and AI-generated OOD samples to ensure coverage and diversity. GPT-4o~\cite{hurst2024gpt} is initially used as an intelligent annotator, scoring the matching level of video–instruction pairs based on our five capability dimensions and their subdivisions, specifically examining which instructions match which dimensions, thereby achieving large-scale filtering and coarse categorization. Human experts then verify all samples to guarantee category accuracy and resolve edge cases. Five additional annotators selected the best initial frames for generation (both the robotic arm and the manipulated object were in the same frame) and key point annotations (the robotic arm gripper, joints, and the manipulated object) on the initial frame for evaluation metrics.
+
+Each benchmark entry contains: (1) a natural-language instruction, (2) an initial image, (3) a ground-truth video, and (4) annotated keypoints (in Prediction). In total, the dataset comprises 609 samples across all dimensions (Figure~\ref{fig:data_statistic} Right). Prediction (50.57\%) and Perception (40.89\%) dominate the ability distribution. The perception subdivisions includes object attribute, object affordance, object function, and spatial-relation tasks (249 samples). Physical interaction covers single-object manipulation (56.08\%), multi-object interaction (41.89\%), and dual-arm cooperation (2.03\%). We further include 107 non-occluded views and 54 semi-occluded views in the initial frames to test robustness. With execution data, we choose 9 real-world tasks from easy to hard for the settings.
+
+% To rigorously evaluate these capabilities, we developed the principled, semi-automated data curation pipeline shown in Figure~\ref{fig:data_statistic} (Left). Our dataset is built from a mixture of open-source robotics data (e.g., RoboMIND~\cite{wu2025robomind}, DROID~\cite{khazatsky2024droid}), in-house collected trajectories, and AI-generated OOD data to ensure diversity.
+
+% Our process begins by leveraging GPT-4o~\cite{hurst2024gpt} as an intelligent annotator for preliminary data filled in our dimensions. For each candidate video-instruction pair, GPT-4o scores its relevance against the definitions of our four core capability dimensions. This allows for efficient, large-scale sorting of data into targeted evaluation buckets. Following this automated stage, human experts perform a verification step to ensure gold-standard quality, resolving ambiguities and filtering out misclassifications. This human-in-the-loop approach ensures both scalability and accuracy.
+
+% Finally, we ask 5 expert annotators identify the optimal initial frame for each task and provide crucial annotations in Prediction task. The final benchmark consists of tuples, each containing: 1) a natural language \textbf{instruction}, 2) an initial \textbf{image}, 3) the ground-truth \textbf{video}, and 4) annotated \textbf{keypoints} for consistency and tracking.
+
+% Our dataset contains 606 samples spanning abilities, perception, physical interaction, object categories, and execution settings (Figure~\ref{fig:data_statistic} (Right)). The ability distribution is dominated by Prediction (41.62\%) and Perception (33.65\%), with smaller portions in Execution, Planning, and Generalization. The perception subset covers attribute, affordance, function, and spatial relation tasks, totaling 249 samples.
+% Physical interaction includes single-object (56.08\%), multi-object (41.89\%), and dual-arm cooperation (2.03\%), with single-object cases further divided among rigid, deformable, articulated, and fluid objects. We additionally include 107 non-occluded and 54 semi-occluded samples to evaluate robustness under varying visibility. Execution data is evenly split between simulation (50\%) and real-world (50\%) settings. 
+
+
+
+
+% \begin{figure*}[t]
+%   \centering
+%   \includegraphics[width=\textwidth]{figs/metric.pdf} 
+%   \caption{\textbf{WoWBench Metrics.} }
+%   \label{fig:metric}
+% \end{figure*}
+
+\subsection{Multi-faceted Evaluation Metrics}
+\label{ssec:metrics}
+Our evaluation protocol is a suite of metrics designed to be as comprehensive as the capabilities we measure. We introduce several novel metrics alongside standard ones, grouped by the property they assess. For detailed information of all the metrics, see Appendix~\ref{sec:more_metrics}.
+
+\textbf{Visual Fidelity.}
+To fully evaluate visual fidelity, we report standard video quality metrics spanning pixel-, perceptual-, and distribution-level quality perspectively: \textbf{PSNR}\cite{fardo2016formalevaluationpsnrquality} measures pixel-level fidelity via the log ratio between the maximum signal value and the mean-squared error. To capture higher-level content consistency beyond pixel statistics, we compute \textbf{SSIM}\cite{1284395} for a structural measure and \textbf{DINO}~\cite{Oquab2023DINOv2} as a semantic/instance-alignment signal, combine with \textbf{Dreamsim}~\cite{fu2023dreamsim}, a human-aligned perceptual similarity metric trained from human triplet judgments. \textbf{FVD}\cite{unterthiner2018towards} compares the distributions of real and generated videos by computing a Fréchet distance, which reflecting overall realism and temporal dynamics at the dataset level. 
+% Prior work, such as EWMBench~\cite{ewmbench}, uses global features (e.g., DINOv2\cite{Oquab2023DINOv2}), which cannot disentangle inconsistencies in the background, robot arm, or manipulated object. 
+
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.9\linewidth]{placeholder.png} % 替换为你的示意图文件
+%   \caption{Illustration of our Mask-guided Regional Consistency metric. We segment the frame into three regions (robot, object, background) and compute consistency scores for each, providing superior diagnostic capability over global metrics.}
+%   \label{fig:mask_consistency}
+% \end{figure}
+
+\textbf{Instruction Semantic Alignment.}
+% We employ GPT-4o~\cite{openai2024gpt4ocard} as a scalable evaluator to assess semantic alignment with the given instruction. We design two schemes:
+% \begin{itemize}
+%     \item \textbf{With Ground-Truth:} We prompt GPT-4o to extract structured descriptions (Initial, Processing, Final states) from both the generated and ground-truth videos. A Vision-Language Model then scores the consistency between these structured descriptions.
+%     \item \textbf{Without Ground-Truth (OOD):} GPT-4o directly analyzes the generated video against the instruction, outputting a \textit{Sequence Match Score} (evaluating the order of actions) and an \textit{Execution Quality Score} on a 1-5 scale.
+% \end{itemize}
+We use GPT-4o~\cite{hurst2024gpt} as a scalable evaluator to assess semantic alignment between the given instruction and the generated videos. Depending on whether ground-truth (GT) video is available, we adopt two methods:
+
+\begin{itemize}
+    \item \textbf{With Ground-Truth:} We first prompt GPT-4o to extract structured descriptions (Initial-, Processing-, Final-state) from both the generated and GT videos. A vision–language model then scores their \textbf{Caption Score}, which scales from 1-to-5. In addition, GPT-4o also evaluates the generated video action-object pairs against the instruction to produce a \textbf{Sequence Match Score} (0–1 scale), which stands for the correctness of the order of the action-object pairs, and an \textbf{Execution Quality Score} (1–5 scale) for the correctness of the action-object pairs. \emph{We report all three metrics in this setting.}
+    \item \textbf{Without Ground-Truth (in Generalization):} When GT video is unavailable, we only assess instruction adherence: GPT-4o directly analyzes the generated video and the instruction to output the \textbf{Sequence Match Score} and the \textbf{Execution Quality Score}. \emph{For this setting, only these two metrics are reported.}
+\end{itemize}
+
+\textbf{Physical Consistency and Causal Reasoning.}
+To quantify the physical plausibility of generated videos, we compute three kinds of metrics as follows:
+\begin{itemize}
+    \item \textbf{Mask-guided Regional Consistency.}
+    To better disentangle inconsistencies in the background, robot arm, and manipulated object, we propose \textbf{Mask-guided Regional Consistency}. We first use the GroundedSAM2~\cite{ren2024grounded} with human annotation to obtain masks for the robot arm, the manipulated object(s), and the background in each frame. We then compute region-specific embeddings using a vision foundation model (e.g., DINOv3~\cite{siméoni2025dinov3}) and measure cosine similarity across time for each region separately. This allows us to pinpoint the source of temporal flaws—for instance, identifying a "jittery" robot arm even when the object and background are stable.
+
+    \item \textbf{Trajectory Consistency:} For comparing the trajectory between generated videos and ground-truth counterparts, we track both the end-effector and object trajectories. In our benchmark, we leverage SAM2  ~\cite{ravi2024sam}, given a few representative key points in the initial frame that humans annotated, to follow the motion of objects in both videos. 
+    % To address disparities in spatial and temporal resolution, we normalize coordinate values and uniformly sample the ground-truth videos to match the length of the generated ones. 
+    Trajectory similarity is then evaluated using a complementary set of metrics: \textbf{Mean Euclidean Distance (MED)}~\cite{Dokmanic_2015} to capture average deviation, \textbf{Dynamic Time Warping (DTW)}~\cite{Müller2007} to assess temporal alignment, and \textbf{Fréchet Distance}~\cite{Eiter1994ComputingDF} to measure worst-case path similarity.
+    
+    \item \textbf{Physical common sense:} Physical common sense covers dimensions ranging from object interaction and properties to temporal consistency, lighting, fluid dynamics, and local anomalies. To automatically score these six distinct dimensions, we fine-tuned Qwen-2.5-VL~\cite{bai2025qwen25vltechnicalreport} using a two-stage GRPO~\cite{shao2024deepseekmath} process. First, we used several physical and temporal datasets~\cite{krojer2025shortcutawarevideoqabenchmarkphysical, chow2025physbench, bansal2025videophy, cores2025losttimenewtemporal, liu2024tempcompassvideollmsreally, zhang2024unveiling} for an initial GRPO fine-tuning to enhance the model's understanding of video content, temporal causality, and physical laws. Second, we used a human-annotated dataset of 1,297 ratings (a mix of synthetic and real videos) for further training, aligning the model to human preferences. The fine-tuned model was finally used to score these dimensions on a 1-to-5 scale.
+
+    % We conducted a targeted fine-tuning initiative to develop a model capable of automating the assessment of physical realism in videos. Utilizing the GRPO (Group Relative Policy Optimization) algorithm on a dataset of 50,000 samples, the fine-tuned VLM achieved a significantly enhanced understanding of video temporality, causality, and physical principles. This model is now deployed within a rigorous, multi-dimensional framework that strictly judges physical realism, employing a 1-to-5 scoring scale across six distinct categories. These categories comprehensively cover key physical dimensions ranging from object interaction and core physical properties to temporal consistency, lighting, fluid dynamics, and local anomalies.
+\end{itemize}
+
+\textbf{Planning and Task Decomposition.}
+\label{ssec:dag}
+To evaluate long-horizon planning, we refer to the metric of RoboBench~\cite{luo2025robobench} based on Directed Acyclic Graphs (DAGs). We first parse the natural language instruction and ground-truth video into a ground-truth plan DAG, where nodes are atomic actions parameterized by \(\langle \text{skill}, \text{object}, \text{args} \rangle\) and edges represent dependencies. This representation flexibly handles non-unique but valid action orderings. We then compare the model-generated plan (which also uses the same approach from the video) to the ground-truth DAG using two scores:
+\begin{enumerate}
+    \item \textbf{Node Correctness:} The fraction of correctly predicted nodes aligns with the ground-truth nodes.
+    \item \textbf{Task Completion:} Using the MLLM to conduct a lightweight world-simulation rollout using: (i) first-frame image, (ii) reference action list, and (iii) reference DAG, and record the stage changes that model-predicted DAGs have correctly executed.
+\end{enumerate}
+The final planning score \textbf{LongHorizon} integrates these aspects to reward both correctness and completeness:
+\[
+S_{\text{LongHorizon}} = (S_{\text{NodeCorrectness}} + S_{\text{TaskCompletion}})*50.
+\]
+
+\subsection{Overall Benchmark Score}
+% To provide a single, comprehensive measure of a model's capabilities, we aggregate the scores. We report both a \textbf{Weighted Average Accuracy (Avg.)}, which reflects performance proportional to the number of samples in each dimension, and an \textbf{Unweighted Average Accuracy (Avg.-C)}, which gives equal weight to each of the four core capabilities. This dual reporting provides a holistic yet balanced view of a model's strengths and weaknesses.
+\textbf{Setup.}
+For each model $i$ and metric $m$, we map the raw measurement $x_{i,m}$ to a common desirability score
+$s_{i,m}\in(0,100)$ via a monotone parametric mapping applied after an absolute pre-scaling to $[0,1]$.
+We then aggregate desirability scores by weighted arithmetic means at both metric-group and overall levels.
+
+\textbf{Pre-scale to $[0,1]$ with absolute anchors.}
+Let $L_m<U_m$ be fixed anchors for metric $m$ (documented per-metric).
+Define the clipping operator $\mathrm{clip}(u;a,b)=\min\{\max\{u,a\},\,b\}$.
+We first clamp raw values to $[L_m,U_m]$, then linearly map to $[0,1]$; for “higher-is-better” (HIB) metrics:
+\[
+\hat x_{i,m}^{\mathrm{HIB}}
+=\frac{\mathrm{clip}(x_{i,m};L_m,U_m)-L_m}{U_m-L_m}\in[0,1],
+\]
+And for “lower-is-better” (LIB) metrics:
+\[
+\hat x_{i,m}^{\mathrm{LIB}}
+=1-\hat x_{i,m}^{\mathrm{HIB}}\in[0,1].
+\]
+We use absolute anchors for two common metrics:
+\[
+\textbf{PSNR (HIB):}\quad L_{\text{PSNR}}=0,\ U_{\text{PSNR}}=50\
+\]
+\[
+\textbf{FVD (LIB):}\quad L_{\text{FVD}}=0,\ U_{\text{FVD}}=2000\ .
+\]
+For other metrics, $(L_m,U_m)$ are fixed per protocol (e.g., theoretical bounds for bounded scales, task-specific absolute targets for unbounded ones).
+
+\textbf{Monotone parametric mappings.}
+After pre-scaling, we apply a single-parameter monotone transform $f_m(\cdot;\theta_m)$ and then rescale to $(0,100)$:
+\[
+s_{i,m}=100\,f_m\!\big(\hat x_{i,m};\theta_m\big),\qquad s_{i,m}\in(0,100).
+\]
+We consider the following families (all are strictly increasing on $[0,1]$):
+\[
+\begin{aligned}
+\textbf{Simple:} &\quad f_(x) = x,\\[3pt]
+\textbf{Power (Gamma):} &\quad f_\gamma(x) = x^\gamma,\ \gamma>0,\\[3pt]
+\textbf{Logit temperature:} &\quad
+f_T(x) = \sigma(\mathrm{logit}(x)/T),\ T>0,\\
+&\quad \sigma(t)=\tfrac{1}{1+e^{-t}},\\[3pt]
+\textbf{Tanh slope:} &\quad
+f_\kappa(x)=\tfrac12(\tanh(\kappa(2x-1))+1),\\ 
+&\quad \kappa>0.
+\end{aligned}
+\]
+Particularly detailed information can be found in the Appendix~\ref{ssec:mappings}
+.
+% In practice, $\gamma>1$ accentuates the high end, while $T<1$ or $\kappa>1$ expands the mid-range and compresses extremes.
+% For numerical stability with logit we use a small $\varepsilon$ (e.g., $10^{-6}$) and replace $x$ by $\mathrm{clip}(x;\varepsilon,1-\varepsilon)$ only inside $\mathrm{logit}(\cdot)$.
+
+% \textbf{Parameter selection and freezing.}
+% For each metric $m$, $\theta_m\in\{\gamma,T,\kappa\}$ is selected on a fixed development set by maximizing
+% the Fisher-$z$ averaged Pearson correlation between $f_m(\hat x;\theta)$ and human ratings across $K$-fold CV;
+% Spearman correlation is used as a tie-breaker. The chosen $\theta_m$ is then \emph{frozen} and applied to all evaluations.
+
+% \textbf{Intra-group averaging (uniform).}
+% Metrics are organized into groups $g$ (e.g., \emph{quality}, \emph{instruction}, \emph{physical}, \emph{planning}).
+% For model $i$, let $\mathcal{M}_g$ be the set of metrics in group $g$ that are available for $i$, and $N_{i,g}=|\mathcal{M}_g|>0$.
+% We compute the group score as the simple arithmetic mean:
+% \[
+% G_{i,g}=\frac{1}{N_{i,g}}\sum_{m\in\mathcal{M}_g} s_{i,m}.
+% \]
+
+\textbf{Aggregation (weighted arithmetic mean).}
+Metrics are grouped into categories $g$ (e.g., \emph{quality}, \emph{instruction}, \emph{physical}, \emph{planning}).
+For each model $i$, let $\mathcal{M}_g$ denote the set of metrics available in group $g$, and
+$|\mathcal{M}_g|=N_{i,g}>0$ be its cardinality.
+We aggregate first within each group by averaging and then across groups with normalized weights.
+
+Let nonnegative group weights $\{W_g\}$ sum to one over the groups available for model $i$.
+The overall score is
+% \[
+% O_i=\sum_{g} \widetilde W_{i,g}\, G_{i,g},\qquad
+% \widetilde W_{i,g}=\frac{W_g}{\sum_{h\in\mathcal{G}_i} W_h},
+% \]
+\[
+O_i=\sum_{g\in\mathcal{G}_i}
+\frac{W_g}{\sum_{h\in\mathcal{G}_i} W_h}
+\left(
+    \frac{1}{|\mathcal{M}_g|}
+    \sum_{m\in\mathcal{M}_g} s_{i,m}
+\right).
+\]
+where $\mathcal{G}_i=\{g:\,N_{i,g}>0\}$ is the set of groups for which model $i$ has at least one valid metric.
+Setting $W_g\equiv 1$ yields an unweighted overall mean across all available groups.
+

@@ -1,0 +1,324 @@
+\subsubsection{Scenario Extraction}\label{app:data_source}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Episodes Division]
+You are very good at reading scripts and extracting key information. According to discernible shifts in temporal settings, spatial locations, character dynamics and narrative progressions, divide the following script into multiple episodes. Do not delete or modify script content.
+
+###Script: {script}
+
+Please return the results according to the following JSON structure:
+
+```json
+[{"episode1": "xxx", "episode2": "xxx", "episode3": "xxx", ...}]
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Scenes Division]
+You are very good at reading scripts and extracting key information. According to the variations in the dialogue content, divide the following episode into multiple scenes. Do not delete or modify episode content.
+
+###Episode: {episode}
+
+Please return the results according to the following JSON structure:
+```json
+[{"scene1": "xxx", "scene2": "xxx", "scene3": "xxx", ...}]
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Descriptive Background Generation]
+You are an excellent writer good at analyzing story backgrounds.
+
+You are given some information of a specific scenario in a story. More specifically:
+
+- The story is split into scenes, and you are given the background of each scene until the current one;
+- The current scene is also split into scenarios, and you are given the background of each scenario until the current one;
+- Finally, you are given the current scenario's description and dialog.
+
+Write ONE paragraph to provide a DESCRIPTIVE background of the given scenario. A good background should cover the information that sets up the scenario, but does NOT reveal too many details from the scenario, or include irrelevant details.
+
+Output a JSON document like `{"background": "..."}`.
+
+{scenario_json_string}
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsubsection{Social Goal Extraction}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Original Social Goal Extraction]
+You are an excellent psychologist good at understanding social goals and needs.
+
+You are given a social scenario with its background, description, and dialog. For the specific character of **{character}**, identify their social goals. Social goals typically fall into one of these categories:
+
+- Exchange information with others;
+- Build relationship with others;
+- Maintain relationship or provide emotional support;
+- Identify themselves with a group;
+- Co-operate with others;
+- Compete with others;
+- Resolve conflicts.
+
+Social goals should be objective, specific and clear; whether the character has achieved them should be observable.
+
+The character can have one single goal or multiple independent goals in the scenario; find and list all of them. For each goal, write a sentence to describe the goal. Use infinitive verbs and third person pronouns.
+
+Output a JSON document like `{"name": "...", "goals": ["...", ...]}`.
+
+{scenario_json_string}
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Scenario Rewriting]
+You are an excellent psychologist good at designing social scenarios.
+
+You are given a social scenario with background, description, and dialog. You are also given the social goals of several major characters.
+
+Set up a new social scenario involving only these **major characters**. Each character's new social goals should appear **before** the scenario starts.
+
+First, filter out contents from the background and description that describes the detail of the scenario; however, details of the beginning of the scenario can be kept. Second, rewrite each character's social goals so that it:
+
+- DOES NOT rely on other character's goals;
+- DOES NOT include potential action the character will take;
+- Uses infinitive verbs and third person pronouns.
+
+Filter out social goals that cannot obey these criteria. Modify the background/description to include more information if necessary.
+
+Describe the background and description of the new scenario, and list the new social goals of each major character.
+
+Output a JSON document like `{"background": "...", "description": "...", "characters": [{"name": "...", "goals": ["...", ...]}, ...]}`.
+
+{scenario_json_string}
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Social Goal Filtering]
+You are an excellent psychologist good at analyzing social goals.
+
+You are given the social goals of a character in a designed social scenario. You are provided the background, description and character lists.
+
+Now, for the specified goal, check if it needs to be rewritten or removed due to any of these reasons:
+
+1. The goal directly involves characters not participating in the scenario,
+   e.g. 'deal with the client' (if 'client' is not in the list of characters);
+2. The goal requires information not provided in the background or description,
+   e.g. 'describe the plan' (if the plan already exists but not provided);
+3. The goal is a physical action, e.g. 'fix the television';
+4. The goal is too abstract to evaluate, e.g. 'navigate professional challenges';
+5. The goal is too subjective to evaluate, e.g. 'maintain dignity';
+6. The goal is meaningless to evaluate, e.g. 'join the conversation'.
+
+Write a detailed paragraph to examine the social goal. Compare it with each of the criteria above. If the goal matches one or more criteria above, check if you can rewrite the goal to avoid them. You should still remove the goal if this is not possible.
+
+Based on your examination, write an updated version of the goal:
+- If the goal is valid, return the original goal.
+- If the goal can be rewritten, return the rewritten goal.
+- If the goal needs to be removed, return an empty string.
+
+Finally, any returned goal (if any) should be formatted into 'To xxx.', e.g. 'To share his/her discovery.' (including the final period).
+
+Output a JSON document like `{"examination": "...", "update": "..."}`.
+
+{scenario_with_current_character_goal_json_string}
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsubsection{Private Information Extraction}\label{app:info_extract_prompt}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Case Validation]
+You are an excellent psychologist who is good at analyzing the private information of each character in a social scenario. Private information refers to information that only the character knows and no one else knows. 
+
+To determine whether there is private information, we need to check whether a specific character has information known to him/her, and whether the information exists in the background and description. Because the information in the background and description will be obtained by all characters, only when a specific character can obtain this information through its own goal and this information does not exist in the background and description, it indicates that the scene is a scene involving private information reasoning.
+
+You only need to return *Yes* or *No* to confirm whether there is any private information. The following is the background information, description, main characters and corresponding social goals:
+
+###Background: {background}
+###Description: {description}
+###Characters: {characters}
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Private Info Generation]
+You are good at writing questions for specific roles based on a social scenario. Below you will be provided with background information, a description of the current scene, and the goals of each of the main characters.
+
+###Background: {background}
+###Description: {description}
+###Characters: {characters}
+
+Please try to give some questions that the target character (in the following JSON format content, 'role' is used to refer to) can answer, but other characters will have difficulty answering before the interaction. These questions should strictly contain information that the target character knows, but is beyond the knowledge of other characters, so other characters cannot answer them at first. Specifically, the information required for these questions cannot appear in the background and description, because other characters will obtain this part as information. Questions cannot be expressed in the second person because the questions will eventually be used to ask other characters. For example, when the target character of a question is Rose, "Rose, why did you ..." is not a good question, but should be written as "Why did Rose ..."
+
+Please provide a statement (in the following JSON format content, 'explanation' is used to refer to) that explains why the target character can answer the question, but other characters cannot. The statement should be objective factual information presented in the script, and should not mention the question, so it cannot appear in a sentence structure like "This question is ...".
+
+Please provide the correct answer to the question, and the answer can be found in the information given.
+
+Please use casual language as much as possible, and try to ask questions in the third person, such as "What is Jason's true identity?". Please answer in English. Please return the results according to the following JSON structure:
+
+```json
+[{"role": str, "question": str, "explanation": str, "answer": str}, {"role": str, "question": str, "explanation": str, "answer": str}]
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Negative Option Generation]
+You are a multiple-choice generator. Given a description of social scenario, a question and an answer, you need to generate 3 additional incorrect options. Incorrect options should be expressed in a similar way to the answer, but need to have completely different actual meanings so that they are sufficiently distinguishable from the answer.
+
+###Description: {description}
+###Question: {question}
+###Answer: {answer}
+
+Please return the results according to the following JSON structure:
+
+```json
+[{"option1": "xxx", "option2": "xxx", "option3": "xxx"}]
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Negative Options Rephrasing]
+The following is information and a corresponding quiz for a social simulation scenario.
+
+### background: {}
+### description: {}
+### characters: {}
+### social goals: {}
+### private infomation: {}
+### question: {}
+### negative options: {}
+### answer: {}
+
+When I put myself in the role of {} to do the question, I thought the options were too easy. The problem was that the negative options were not closely related to the given scenario or the character's motivation. 
+
+The criterion for a good negative option is that it is impossible to determine which option is correct based on the above information only. Now I want to rewrite these negative options to make them more similar to the correct answers and make the questions as difficult as possible.
+
+The returned negative options should be in the same format as provided, both in list format. Make sure the new negative options also have 3 options. The return should be given in json format, for example:
+
+```json
+{"negative_options": ["xx", "xx", "xx"]}
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsubsection{Leakage Mitigation and Template Generation}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Entity Word Extraction]
+Your task is to extract key elements from the scene background and description, including location and characters.
+
+## background:
+{background}
+
+## description:
+{description}
+
+Output in the following JSON format:
+{{"characters":[str,str...], "location":[str,str...], }}
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Entity Word Replacement]
+Please replace the provided scene background and description with a new location, and record the location before and after the modification.
+
+## background:
+{background}
+
+## description:
+{description}
+
+## location involved:
+{location_involved}
+
+Output in the following JSON format:
+{{"background_replace_location":str, "description_replace_location":str, "replace_location_list":[{{"original_name":str,"revised_name":str}}]}}
+
+\end{lstlisting}
+\end{tcolorbox}
+
+\subsubsection{Agent Synthesizing}\label{app:profile_prompt}
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Attribute Extraction of Original Characters]
+Template Example: !<INPUT 0>!
+Description Information: !<INPUT 1>!
+Characters: !<INPUT 2>!
+Instruction: Generate user profile for each character in the Characters according to to the Template Example profile attribute and the Description Information. Try your best to fill in each attribute and NEVER respond with 'Unknown'. The secret attribute should be consistent with the private info given in the Information. You should response in JSON format list with each character as dict and within each character, use attribute as a key and corresponding content as the value.
+Answer format:
+```json
+[
+    {
+       # charcater_1 profile 
+    },
+    {
+        # character_2 profile
+    }
+]
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Relationship Extraction of Original Characters]
+Description Information: !<INPUT 0>!
+Characters: !<INPUT 1>!
+Relationship choice: [family, friend, romantic, acquaintance, stranger]
+Instruction: Choose the relationship among the Characters according to the Description Information. The relationship cane only be chosn from [family, friend, romantic, acquaintance, stranger]. Do not respond with Unkown or any other labels beyond the choices.
+
+When all the characters have the same relationship, just reply with one key "relationship":
+Answer format 1:
+```json
+{
+    "relationship": # your_choice
+}
+```
+When there exist multiple relationships among characters, reply with the following format:
+Answer format 2:
+```json
+{
+    "relationship": {"A_and_B": "#your_choice_1", "A_and_C": "# your_choice_2"}
+}
+```
+
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Characters Attribute Replace-ability Assessment]
+[Descrpition Info]: !<INPUT 0>!
+[Relationship]: !<INPUT 1>!
+[Characters]: !<INPUT 2>!
+[Instructions]: According to the [Description Info] of a script and [Relationship] among characters, determine whether each attribute of the [Characters] is replaceable with different settings without influencing the overall script. 
+Choose from [almost, maybe, no]. For example, if the Age attribute is almost replacebale, then the character's age has no impact on the background description; if the gender is not replaceable, then the character has to be a certain gender in the script.
+Rules that help you choose: Family members usually have fixed ages and genders (if daughter or son appeared in the script); Romantic require exactly the same gender as script. Firends are usually similar ages, etc.
+Answer with the following JSON format, where # is your output:
+```json
+[
+    {
+        "name": #character_1, "age": "#your_choice", "occupation": "#your_choice", "gender": "#your_choice"
+    }
+    {
+        "name": #character_2, ...
+    }
+]
+```
+\end{lstlisting}
+\end{tcolorbox}
+
+\begin{tcolorbox}[width=\linewidth]
+\begin{lstlisting}[caption=Agent Synthesizing]
+Please generate {num} diverse user profiles that meet following requirements:\\
+
+Gender: {cand_gender}
+Age: {cand_age}
+Occupation: {cand_occupation}
+
+Please return your response in the following format of JSON:
+[{{"name":agent1, "gender":gender, "age":age, "occupation":occupation}},{{"name":agent2, ...}}]
+\end{lstlisting}
+\end{tcolorbox}

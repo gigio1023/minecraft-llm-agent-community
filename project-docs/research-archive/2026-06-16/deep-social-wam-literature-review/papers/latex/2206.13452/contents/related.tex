@@ -1,0 +1,24 @@
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Model-based Reinforcement Learning}
+
+Model-based RL typically involves learning a dynamics model of the environment (including a reward predictor) by maximizing the likelihood of collected trajectories. Then the dynamics model and reward predictor are used for planning \cite{williams2017information, chua2018deep, nagabandi2018neural}, providing synthetic data \cite{kurutach2018model, janner2019trust}, or improving $Q$-value estimates \cite{feinberg2018model, amos2021model}. However, most existing approaches model the dynamics in the dense form, where each state variable at the next time step depends on all current state variables and the action, e.g., as shown in Fig. \ref{fig:method_comparison} (a). This non-causal formulation suffers from spurious correlations and generalizes poorly for out-of-distribution states. Moreover, the reward predictor typically also has the same dense architecture, thus exacerbating the generalization issue.
+
+In dynamics learning, there are models that explicitly consider modularity and sparsity \cite{goyal2019recurrent, goyal2020object, alias2021neural}. However, without modelling the causal relationships, the sparse dependencies learned by those methods could still be spurious correlations and thus lead to poor generalization (see details in appendix Sec. \ref{app:additional_related}).
+
+\subsection{State Abstraction}
+\label{subsec:state_abstraction}
+
+Aiming at improving sample efficiency, state abstractions aggregate many states into a single abstract state (e.g., by omitting state variables that are irrelevant to the current task) while preserving policy optimality, thus enabling the agent to learn in a potentially much smaller state space. 
+For example, bisimulation \cite{even2003approximate, ravindran2004algebraic, li2009unifying} aggregates states that generate equivalent reward sequences given any action sequence originating from the states. 
+Bisimulation is also closely tied to causality: work from \citet{zhang2020invariant} shows that state variables kept by the bisimulation abstraction consist of only the causal ancestors of the reward variable. However, it still learns a dense model for those variables, as shown in Fig. \ref{fig:method_comparison} (b), and is subject to the same generalization issue mentioned earlier.
+
+Furthermore, as the bisimulation abstraction is derived from the reward function, it is often limited to a small range of tasks. Specifically, the abstraction can only generalize to tasks where the new reward function is defined on the same or a subset of causal ancestors. 
+For example, in the environment shown in Fig. \ref{fig:method_comparison}, the abstraction learned from opening door A will only include door A, thus is unable to solve tasks like opening door B.
+In the real world, one generally wants a robot to be able to learn to perform a wide range of tasks (e.g., manipulating different objects); training this bisimulation abstraction for each task (object) is impractical. In contrast, \textsc{cdl} derives a state abstraction which includes all controllable state variables from the learned dynamics. As a result, it can be applied to a wider range of tasks than bisimulation.
+
+\subsection{Causality in Reinforcement Learning}
+\label{subsec:reglarization_based_learning}
+
+Incorporating causality into reinforcement learning has received widespread interest recently, due to its generalization and transferability benefits, in directions that include but are not limited to representation learning \cite{zhang2019learning, zhang2020invariant, sontakke2021causal, volodin2020resolving, tomar2021model, fu2021learning}, policy learning \cite{buesing2018woulda, nair2019causal, mozifian2020intervention, lyle2021resolving, seitzer2021causal, lu2020sample}, and dynamics learning \cite{li2020causal}. Among the literature, the work closest to ours is \citet{wang2021task} which also explicitly learns the causal dependencies but by regularizing the number of variables used when predicting each state variable. However, there is no theoretical guarantee that dynamics models learned by those methods are causal. Moreover, it is found to be difficult for the method from \citet{wang2021task} to balance between prediction performance and regularization. A large regularization penalty often sacrifices the prediction accuracy of rare events whereas a small regularization penalty fails to suppress spurious correlations related to frequent events. In contrast, our method is theoretically sound and does not have a regularization parameter to tune.

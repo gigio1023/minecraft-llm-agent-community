@@ -1,0 +1,1745 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2025_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage[many]{tcolorbox}
+\usepackage{float}
+\usepackage{booktabs} 
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+
+\title{Hypothetical Minds: Scaffolding Theory of Mind for Multi-Agent Tasks with Large Language Models}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+% \author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
+% about author (webpage, alternative address)---\emph{not} for acknowledging
+% funding agencies.  Funding acknowledgements go at the end of the paper.} \\
+% Department of Computer Science\\
+% Cranberry-Lemon University\\
+% Pittsburgh, PA 15213, USA \\
+% \texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
+% \And
+% Ji Q. Ren \& Yevgeny LeNet \\
+% Department of Computational Neuroscience \\
+% University of the Witwatersrand \\
+% Joburg, South Africa \\
+% \texttt{\{robot,net\}@wits.ac.za} \\
+% \AND
+% Coauthor \\
+% Affiliation \\
+% Address \\
+% \texttt{email}
+% }
+
+\author{%
+  Logan Cross$^1$\thanks{Corresponding author: \texttt{\href{mailto:locross@stanford.edu}{\textcolor{black}{locross@stanford.edu}}} \\
+  Code: \href{https://github.com/locross93/Hypothetical-Minds/}{https://github.com/locross93/Hypothetical-Minds/}}
+  \quad Violet Xiang$^2$
+  \quad Agam Bhatia$^1$
+  \quad Daniel L.K. Yamins$^{1,2}$
+  \quad Nick Haber$^3$ \\
+  \\
+  Stanford University \\
+  $^1$Department of Computer Science \\
+  $^2$Department of Psychology \\
+  $^3$Graduate School of Education
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Multi-agent reinforcement learning methods struggle with the nonstationarity of multi-agent systems and fail to learn online when tested with novel agents. Here, we leverage large language models (LLMs) to create an autonomous agent that can handle these challenges. Our agent, Hypothetical Minds, consists of a cognitively-inspired architecture, featuring modular components for perception, memory, and hierarchical planning over two levels of abstraction. We introduce the Theory of Mind module that scaffolds the high-level planning process by generating hypotheses about other agents' strategies in natural language. It then evaluates and iteratively refines these hypotheses by reinforcing hypotheses that make correct predictions about the other agents' behavior. Hypothetical Minds significantly improves performance over previous LLM-agent and RL baselines on a range of competitive, mixed motive, and collaborative domains in the Melting Pot benchmark, including both dyadic and population-based environments. Additionally, comparisons against LLM-agent baselines and ablations reveal the importance of hypothesis evaluation and refinement for succeeding on complex scenarios.
+\end{abstract}
+
+\section{Introduction}
+
+A fundamental challenge in artificial intelligence is creating agents that can rapidly adapt to others in multi-agent environments. Whether in competitive settings like games, collaborative tasks like team projects, or mixed-motive scenarios like negotiation, success requires building predictive models of another agent's behavior by inferring their hidden strategies and latent capabilities. One approach involves training reinforcement learning models that can learn adaptive policies. However, multi-agent reinforcement learning (MARL) methods suffer from various drawbacks, including high sample complexity, poor generalization to agents not seen in training, and limited reasoning capabilities \citep{wong2023deep}.
+
+% A goal of AI research is to create autonomous agents that act adaptively in rich embodied social worlds. One approach involves training reinforcement learning models that can learn adaptive policies. However, multi-agent reinforcement learning (MARL) methods suffer from various drawbacks, including high sample complexity, poor generalization to agents not seen in training, and limited reasoning capabilities \citep{wong2023deep}.
+
+Another approach deploys foundation models as the backbone to agents, with specialized modules that mediate the decomposition of long horizon planning \citep{wang2024survey,wang2023voyager,brohan2023rt,park2023generative}. LLMs are not only powerful reasoners and in-context learners, but they are also particularly suited for social tasks given the utility of language for scaffolding Theory of Mind (ToM) \citep{astington2005language,de2007interface,de2021role, kosinski2023evaluating, gandhi2024understanding}. Thus, we introduce Hypothetical Minds (HM), a LLM agent that produces adaptive policies in competitive, cooperative, and mixed-motive multi-agent scenarios. At its core, HM addresses the challenge of interacting with agents whose behavior is driven by latent features - first inferring these features through a natural language approximation of Bayesian inference, then conditioning its policy on these inferences.
+
+% HM builds on the generative agents architecture that integrates cognitive modules for perception, memory, and hierarchical planning and introduces novel ToM machinery inspired by cognitive science and MARL methods \citep{park2023generative,o2021and, vezhnevets2020options}. High-level planning is performed by the Theory of Mind module, which generates hypotheses about other agents' strategies and capabilities to facilitate effective coordination or counter-strategies. High-level plans are subsequently passed to a subgoal module to sequence together embodied action plans. The ToM module evaluates multiple hypotheses in parallel until a hypothesis provides a sufficient explanation of an agent's behavior, approximating Bayesian inference over latent variables. This hypothesis evaluation mechanism queries the LLM to make counterfactual predictions about what other agents' next actions will be conditional on each hypothesis and scores each hypothesis based on the accuracy of these predictions. Additionally, a hypothesis refinement mechanism displays the highest-valued hypotheses in the prompt, giving the LLM the ability to self-improve its reasoning based on previously generated hypotheses. Thus, our agent finds useful explanations of other agents' behaviors in-context, affording it the ability to adapt to the inferred strategies and achieve high rewards.
+
+HM builds on the generative agents architecture, integrating modules for perception, memory, and hierarchical planning with novel ToM machinery \citep{park2023generative}. The Theory of Mind module generates and evaluates hypotheses about other agents' strategies, scoring them based on their ability to predict future actions. Thus, our agent finds useful explanations of other agents' behaviors in-context, affording it the ability to adapt to the inferred strategies and achieve high rewards.
+
+% thereby representing multiple modes in the distribution of possible explanations and weighing the uncertainty over these modes in a principled way. This hypothesis evaluation mechanism queries the LLM to make counterfactual predictions about what other agents' next actions will be conditional on each hypothesis. Hypotheses can then be scored based on the accuracy of these predictions, approximating Bayesian inference over latent variables.
+
+% The ToM module handles the uncertainty of estimating other agents' latent states in a principled way by evaluating multiple hypotheses in parallel until a hypothesis provides a sufficient explanation of the agent's behavior \citep{o2021and,tenenbaum2006theory,gershman2015discovering}. This machinery queries the LLM to make counterfactual predictions about what the agent's future behavior would be like conditional on each hypothesis. Hypotheses can then be evaluated based on the accuracy of these predictions, approximating Bayesian inference over latent variables.
+
+% The ToM module simultaneously evaluates multiple hypotheses until a hypothesis provides a sufficient explanation of the data \citep{o2021and,tenenbaum2006theory,gershman2015discovering}. Hypotheses are evaluated by assessing the quality of the predictions the LLM makes about other agents' behavior conditional on each hypothesis. Additionally, by displaying the highest-valued hypotheses in the prompt, the LLM is able to self-improve its reasoning based on previously generated hypotheses. Thus, our agent finds useful explanations of other agents' behaviors in-context, affording it the ability to adapt to inferred strategies and achieve high rewards.
+
+
+\begin{figure*}[t]
+\vskip 0.2in    
+\begin{center}
+\includegraphics[width=0.85\textwidth]{figures/figure_1_neurips_rebuttal_vertical.pdf}
+\caption{A. \textbf{Hypothetical Minds} architecture and model workflow.  B. \textbf{ToM module} generates hypotheses about agent strategies. Previously generated hypotheses and values are shown for refinement. Top k hypotheses predict agent's next behavior $\hat{\phi(\tau)}$, considering counterfactual scenarios. Highest-valued hypothesis informs high-level planning. Later, hypotheses are evaluated against observed behavior $\phi(\tau)$, updating values with intrinsic reward. Hypotheses are validated at a threshold.}
+\vspace{-10pt}
+\label{fig:fig1}
+\end{center}
+%\vskip -0.2in
+\end{figure*}
+
+We evaluate our model on the Melting Pot MARL benchmark that encompasses diverse challenges and social dynamics \citep{agapiou2022melting}. Collaborative Cooking Asymmetric requires effective coordination and division of labor among agents. Running With Scissors necessitates strategic reasoning about opponents' policies and the ability to exploit predictable patterns in a competitive setting, with the eight-player version offering a unique challenge to the model's scalability. Moreover, the mixed-motive environment Prisoner's Dilemma involves a tension between individual and collective interests. Diverse evaluation scenarios stress test playing with a wide array of agents with fixed or adaptive policies, necessitating contextual adaption. Hypothetical Minds surpasses LLM agent baselines on a majority of evaluation scenarios in every environment, and performs better than MARL baselines on 3/4 environments despite the fact that those methods are trained on upwards of a billion steps. To our knowledge, Hypothetical Minds is the first LLM agent for diverse multiagent environments, with strong performance across collaborative, competitive, and mixed-motive domains, unlike previous works limited to collaborative settings. Our contributions are as follows:
+\vspace{-10pt}
+\begin{itemize}
+    \item We propose the Hypothetical Minds model (HM), an embodied LLM agent for multi-agent environments that integrates modular components for perception, memory, and hierarchical planning conditioned on ToM inferences. 
+    \item HM incorporates a novel Theory of Mind (ToM) module, which generates, evaluates, and refines hypotheses about other agents' strategies or goals in natural language. Through ablations and comparisons against LLM-agent baselines, we identify the critical role of hypothesis evaluation and refinement within the ToM Module.
+    \item We demonstrate the effectiveness of Hypothetical Minds across multiple multi-agent environments in the Melting Pot benchmark, including competitive, collaborative, and mixed-motive domains, and 30 distinct evaluation scenarios. Our agent significantly outperforms LLM-agent and RL baselines in every environment and in a large majority of evaluation scenarios, showcasing its generalizability.
+\end{itemize}
+
+% # Introduction
+
+% A fundamental challenge in artificial intelligence is creating agents that can rapidly adapt to others in multi-agent environments. Whether in competitive settings like games, collaborative tasks like team robotics, or mixed-motive scenarios like negotiation, success requires building predictive models of other agents' strategies and updating these models based on observed behavior. However, current approaches face key limitations:
+
+% 1. Multi-agent reinforcement learning (MARL) methods require extensive training data to learn policies for each possible interaction scenario. This makes them brittle to novel agent behaviors not seen during training.
+
+% 2. Recent large language model (LLM) agents show promise in zero-shot coordination but typically employ fixed strategies rather than adapting to their partners' or opponents' behavior in real-time.
+
+% 3. Both approaches struggle with the inherent nonstationarity of multi-agent systems - other agents may change their strategies over time, requiring continuous adaptation rather than static policies.
+
+% We introduce Hypothetical Minds (HM), an LLM-based framework that addresses these challenges through a cognitively-inspired Theory of Mind (ToM) module. Just as humans construct and test hypotheses about others' goals and strategies, our ToM module:
+% - Generates natural language hypotheses about other agents' behavior patterns
+% - Makes concrete predictions based on these hypotheses
+% - Updates hypothesis values based on prediction accuracy
+% - Uses validated hypotheses to inform action selection
+
+% This approach enables rapid adaptation to novel agents without extensive training, while maintaining flexibility to revise incorrect hypotheses when strategies change. We demonstrate HM's effectiveness across competitive, collaborative, and mixed-motive scenarios in the Melting Pot benchmark, significantly outperforming both MARL and LLM baselines.
+
+% Our key contributions are:
+% [rest of contributions section]
+
+\vspace{-15pt}
+\section{Related Work}
+\vspace{-5pt}
+
+\subsection{LLM-based Agents}
+
+A burgeoning area of research involves building autonomous agents rooted in large language models \cite{wang2024survey,sumers2023cognitive}. This involves deploying LLMs as central controllers across many different domains by leveraging their extensive background knowledge from training. Applications span a wide range from equipping LLMs with external tools to interface with databases and APIs \citep{schick2024toolformer,shen2023hugginggpt,qin2023toolllm} to using them for high-level planning and control in robotics \citep{huang2022inner,brohan2023can,rana2023sayplan, brohan2023rt}. The most relevant branch of this research direction includes works where LLMs are used as planners in embodied virtual environments. Voyager autonomously builds complex skills in Minecraft by storing and retrieving behaviors in a skill library of executable code and uses the skill library to solve progressively harder tasks \citep{wang2023voyager, wang2024survey}. In this work, we use an LLM for long horizon high-level planning and predicting the future states of other agents in multi-agent environments. Previous papers have also incorporated LLM-based agents into embodied multi-agent environments \citep{liu2023improving}. \cite{park2023generative} introduce a interactive simulation of a rich social environment, where each agent autonomously selects goals and builds relationships with others. We extend the cognitive module framework developed in this work for multi-agent environments of varied dynamics by introducing the novel Theory of Mind module. SAMA uses an LLM to plan out sequences of subgoals for language-based goal-conditioned RL policies in environments requiring multi-agent coordination \cite{li2023semantically}. Another study builds cooperative embodied agents, by using an LLM for planning and communication between agents \cite{zhang2023building}. ProAgent develops a method for improving zero-shot coordination in Overcooked by using an LLM to infer the intentions of teammates based on the present state \cite{zhang2023proagent}. As these works have focused solely on collaborative domains, here we present a generalizable and scalable method that addresses the challenge of inferring other agents intentions' across a wide spectrum of social dynamics.
+
+% Recent work has explored using LLMs to simulate social interactions and improve communication. Liu et al. (2023) propose an Explore-Generate-Simulate framework that uses LLM simulations to improve communication outcomes. However, while their focus is on optimizing single messages for general interpersonal communication, our work specifically addresses theory of mind modeling and adaptation in multi-agent settings. Park et al. (2023) demonstrate LLMs' ability to simulate social computing systems and rollout agent interactions. Recently, this capacity has been used to generate public opinion (Chu et al., 2023), and produce individualized subjective experience descriptions (Argyle et al., 2023). However, there are uncertainties when using LLM simulations because of their unpredictability (Salganik et al., 2006). Current LLMs exhibit higher homogeneity of opinions than humans (Argyle et al., 2023; Santurkar et al., 2023), and combining LLMs with true human samples is essential to avoid an algorithmic monoculture leading to collapsed generations that constitute only limited perspectives (Kleinberg & Raghavan, 2021; Bommasani et al., 2021).
+
+\vspace{-5pt}
+\subsection{Reasoning and Hypothesis Search with LLMs}
+
+% LLMs have shown impressive reasoning abilities, augmented by Chain-of-Thought methods that scaffold the thought process \citep{wei2022chain,zhang2023igniting}. Our hypothesis generation approach builds on this work by implementing structured reasoning steps for theory of mind inference. Tree-of-Thoughts \citep{yao2023tree} extends chain-of-thought by maintaining and evaluating multiple reasoning paths in parallel, similar to our parallel evaluation of multiple hypotheses about opponent strategies. Graph-of-Thoughts \citep{besta2023got} further structures LLM reasoning by representing thoughts as graph nodes with explicit relationships, while Program-of-Thoughts \citep{chen2023pot} decomposes reasoning into programmatic modules. Our approach combines elements of these frameworks - parallel evaluation from ToT, structured relationships between hypotheses similar to GoT, and modular decomposition inspired by PoT. The structured prompting in our ToM module draws on broader findings about effective prompt engineering for complex reasoning \citep{zhang2023igniting}. For example, our separation between reasoning and action in our prompts draws inspiration from the ReAct framework \citep{yao2022react}.
+
+LLMs have shown impressive reasoning abilities, augmented by Chain-of-Thought methods that scaffold the thought process \citep{wei2022chain,zhang2023igniting}. Our hypothesis generation approach builds on this work by implementing structured reasoning steps for theory of mind inference and decision-making. Tree-of-Thoughts \citep{yao2024tree} extends chain-of-thought by maintaining and evaluating multiple reasoning paths in parallel, similar to our parallel evaluation of multiple hypotheses about opponent strategies. ToT evaluates different solution paths of a reasoning trajectory with an external verifier or LLM as judge, whereas we score hypotheses about an agent based on the quality of predictions they make about that agent's behavior. The structured prompting in our ToM module draws on broader findings about effective prompt engineering for complex reasoning \citep{zhang2023igniting}. For example, our separation between reasoning and action in our prompts draws inspiration from the ReAct framework \citep{yao2022react}.
+
+% \subsection{Reasoning and Hypothesis Search with LLMs}
+
+% LLMs have shown impressive reasoning abilities, augmented by Chain-of-Thought methods that scaffold the thought process \citep{wei2022chain,zhang2023igniting}. Our hypothesis generation approach builds on this work by implementing structured reasoning steps for theory of mind inference. Tree-of-Thoughts \citep{yao2023tree} extends chain-of-thought by maintaining and evaluating multiple reasoning paths in parallel, similar to our parallel evaluation of multiple hypotheses about opponent strategies. However, while ToT uses value functions to evaluate intermediate thoughts for problem-solving, we evaluate hypotheses through their predictive accuracy about other agents' behavior.
+
+Recent work has specifically investigated LLMs' capabilities for hypothesis generation and testing. \citet{wang2023hypothesis} explores LLMs' inductive reasoning by generating and evaluating hypotheses on the Abstraction and Reasoning Corpus (ARC), while \citet{qiu2023phenomenal} refines LLM-generated hypotheses using task-specific symbolic interpreters. Similarly, we generate, evaluate, and refine hypotheses based on feedback, though in our case computing values for each hypothesis by predicting another agent's goals. STaR \citep{zelikman2022star} also learns from feedback by finetuning language models on rationales that produced correct answers.
+
+% LLMs have shown impressive reasoning abilities, augmented by Chain-of-Thought methods that scaffold the thought process \citep{wei2022chain,zhang2023igniting}. Our hypothesis generation approach builds on this work by implementing structured reasoning steps for theory of mind inference. Tree-of-Thoughts \citep{yao2023tree} extends chain-of-thought by maintaining and evaluating multiple reasoning paths in parallel, similar to our parallel evaluation of multiple hypotheses about opponent strategies. However, while ToT uses value functions to evaluate intermediate thoughts for problem-solving, we evaluate hypotheses through their predictive accuracy about other agents' behavior.
+
+% Recent work has specifically investigated LLMs' capabilities for hypothesis generation and testing. \citet{wang2023hypothesis} explores LLMs' inductive reasoning by generating and evaluating hypotheses on the Abstraction and Reasoning Corpus (ARC), while \citet{qiu2023phenomenal} refines LLM-generated hypotheses using task-specific symbolic interpreters. Similarly, we generate, evaluate, and refine hypotheses based on feedback, though in our case computing values for each hypothesis by predicting another agent's goals. STaR \citep{zelikman2022star} also learns from feedback by finetuning language models on rationales that produced correct answers.
+
+% \citep{wang2023hypothesis} investigates LLMs' inductive reasoning by generating and evaluating hypotheses on the Abstraction and Reasoning Corpus (ARC), while \citep{qiu2023phenomenal} refines LLM-generated hypotheses using task-specific symbolic interpreters. Similarly, we generate, evaluate, and refine hypotheses based on feedback, computing values for each hypothesis by predicting another agent's goals. STaR \citep{zelikman2022star} also learns from feedback by finetuning language models on rationales that produced correct answers. \citep{akata2023playing} assessed LLMs' ability to reason in matrix games requiring ToM, showing mixed results. We demonstrate that asking the LLM to predict the opponent's actions improves results, highlighting the importance of ToM reasoning in game-theoretic tasks.
+
+\subsection{Multi-agent Decision-Making and Theory of Mind}
+\vspace{-5pt}
+
+Decision-making in multi-agent settings has been extensively studied through multi-agent reinforcement learning (MARL), with benchmarks like Melting Pot providing diverse social interaction scenarios to evaluate agents \citep{agapiou2022melting}. While algorithms like MADDPG \citep{lowe2017multi} and MAPPO \citep{yu2022surprising} have advanced MARL through centralized training approaches, specialized models incorporating Theory of Mind principles \citep{rabinowitz2018machine,wang2021tom2c,yu2022model,huh2024representation,vezhnevets2020options,sclar2022symmetric} have shown promise in modeling other agents' intentions. However, even sophisticated approaches like OPRE \citep{vezhnevets2020options} struggle to generalize in complex environments like Melting Pot's Running With Scissors \citep{agapiou2022melting}, highlighting MARL's limitations in compute requirements and training stability. In cognitive science, the Rational Speech Act framework \citep{goodman2016pragmatic} and Bayesian inverse planning \citep{baker2009action} model how humans infer others' goals and beliefs through Bayesian inference, providing inspiration for our ToM module.
+
+% Decision-making in multi-agent settings has been thoroughly explored in the field of multi-agent RL (MARL). To systematically evaluate and benchmark MARL agents in diverse social interactions, the Melting Pot multi-agent benchmark was introduced \citep{agapiou2022melting}. Melting Pot provides a comprehensive suite of environments that test agents across a spectrum of social dynamics, including cooperative, competitive, and mixed-motive scenarios. Each environment consists of several evaluation scenarios with background agents that employ strategies unseen during training, thereby assessing generalization.
+
+% MARL methods have made significant strides in addressing the complexities inherent in multi-agent interactions. Algorithms such as MADDPG \citep{lowe2017multi} and MAPPO \citep{yu2022surprising} extend traditional RL methods to multi-agent settings by using centralized training with decentralized execution, allowing agents to learn policies from a shared critic that has access to comprehensive state information during training.
+
+% Specialized models incorporate Theory of Mind principles by explicitly modeling the intentions of other agents \citep{rabinowitz2018machine,wang2021tom2c,yu2022model,huh2024representation,vezhnevets2020options,sclar2022symmetric}. For example, OPRE learns a latent representation of another agent’s goals from local observations, which informs high-level strategy in games like Running With Scissors (spatially and temporally extended rock, paper, scissors) by conditioning the policy on this latent representation \citep{vezhnevets2020options}. Hypothetical Minds similarly uses natural language to represent other agent’s strategies and generates high-level plans conditioned on these inferred strategies. However, OPRE's performance didn't generalize to the newer version of Running With Scissors in the Melting Pot benchmark, even after a billion steps of training \citep{agapiou2022melting}. This underscores the difficulties in MARL. Performance of MARL algorithms are often hindered by limited compute, extensive hyperparameter tuning, and instability due to the nonstationarity of optimizing multiple agents simultaneously. LLM-based agents provide a useful alternative, leveraging pre-trained knowledge and rapid in-context learning.
+
+% \subsection{Cognitive models in partially-observable environments}
+
+% Our method has analogs in the computational modeling of animal and human decision-making, and our work adds to emerging promising evidence that LLMs can operate as cognitive models \citep{binz2023turning}. Numerous methods have been proposed for generating hypotheses about hidden or latent states in partially-observable settings. Methods from Bayesian nonparametric stats, such as the Chinese restaurant process, suggest that when animals and humans are learning they generate an unbounded number of possible latent causes of the observed data, until a satisfactory explanation is found \citep{gershman2015discovering}. This framework explains a wealth of behavioral phenomena from categorization \citep{anderson1991adaptive,sanborn2010rational,gershman2013perceptual,gershman2015discovering}, Pavlovian conditioning, and more. Our LLM-based agent similarly iteratively generates and refines hypotheses about the opponent's strategy, until a explanation aligns with the observed data's likelihood. Mixture models and mixture of experts models are similarly useful for modeling the human decision-making process under uncertainty, by arbitrating between multiple hypotheses in proportion to the reliability of their predictions \citep{frank2012mechanisms,o2021and,archambeau2023non}. Researchers have extended this POMDP modeling framework to multi-agent settings by constructing models that explicitly model other agents' beliefs and goals when interacting with them, handling uncertainty over this hidden information with a Bayesian framework \citep{baker2017rational,rusch2020theory}. Our framework also explicitly prompts a LLM to infer its opponent's goals/strategy and weighs the uncertainty over these inferences with a hypothesis evaluation mechanism. This mechanism is also inspired by cognitive models and employs a Rescorla-Wagner learning rule, a method commonly use for modeling the decision-making process \citep{rescorla1972theory,daw2014value}.
+
+\vspace{-5pt}
+\section{Method}
+\vspace{-5pt}
+
+\subsection{Partially-observable Markov games}
+
+Our method is directly applicable to any multi-agent environment where states are partially observable and agent(s)' policies are hidden. We formally define this as a Markov game for \( N \) players in a partially observable setting. Let the finite set \( S \) represent the possible states of the game. Each player \( i \) receives observations given an observation function \( \chi^i: S \rightarrow \mathcal{O} \), representing their limited point of view. Additionally, each player \( i \) can take actions from their action space \( A^i \), and when all players choose actions \( (a^1, \dots, a^N) \in A^1 \times \dots \times A^N := A\), the state transitions according to a probability distribution \( T: S \times A \rightarrow \mathcal D (S)\). The reward function for each player \( i \) is represented as \( r^i: S \times A \rightarrow \mathbb{R} \), mapping the current state and joint actions to a real-valued reward.
+
+\subsection{Hypothetical Minds Model}
+
+The Hypothetical Minds model consists of several cognitive modules that altogether form an embodied LLM agent (\autoref{fig:fig1}). The egocentric observations are represented by a textual map/state representation, which is added to a memory system after every step. The memory system also logs rewards and other important state information like the inventories from previous interactions in Running With Scissors. Two cognitive modules depend on an LLM, a Theory of Mind module and a Subgoal module, which output high-level goals and action plans respectively. An action planner takes an action plan (i.e. "move to coordinate (13, 5)") and creates a sequence of actions that achieves that action plan with a pathfinding algorithm. Each cognitive module is explained in more detail in the Appendix. Below we describe the key novel contributions of our method that implement hierarchical planning.
+
+\paragraph{Theory of Mind Module}
+In multi-agent environments, other agents' behavior can be influenced by various latent variables, such as their strategies (e.g., "always defect"), goals (e.g., "trying to pick up an object"), competence levels (e.g., "highly skilled" vs. "negligent") and locations in an environment. These latent variables are often not directly observable and must be inferred from partially-observable information from your perspective as the ego agent. We represent these latent variables as a multidimensional space $\Theta = {\theta_1, \theta_2, \ldots, \theta_m}$, where each dimension $\theta_i$ corresponds to a specific latent variable in an embedding. The ToM module generates hypotheses about these latent variables in natural language. It then maintains  a set of hypotheses $\mathcal{H} = {h_1, h_2, \ldots, h_n}$ in its working memory, where each hypothesis $h_t$ represents a belief about the latent variables $h_i=p(\Theta)$. A hypothesis at time $t$ is generated by asking an LLM to infer another agent's strategy, conditioned on HM's memory $\mathcal{M}$ of important past observations $\mathcal{O}$. Additionally, the LLM is shown the top k valued previously generated hypotheses, such that it can perform \textbf{hypothesis refinement} (see Appendix and code for more details and prompts):
+\begin{equation}
+h_t = \text{LLM}(\mathcal{M}, h_<t)
+\end{equation}
+where $\mathcal{M}$ is a memory buffer storing an agent's past actions, observations, and rewards.
+
+Each hypothesis $h_i$ is scored based on how well it predicts the other agent's future behavior, noted here formally as a distribution of trajectories $p(\tau)$. We formalize this scoring mechanism using a likelihood function $p(\tau | h_i)$ representing the probability of an agent exhibiting trajectory $\tau$ given the hypothesis $h_i$. The best hypothesis $h^*$ is selected using the Maximum a Posteriori (MAP) estimate:
+\vspace{-5pt}
+\begin{equation}
+h^* = \argmax_{h_i \in \mathcal{H}} p(h_i | \tau) = \argmax_{h_i \in \mathcal{H}} \frac{p(\tau | h_i) p(h_i)}{p(\tau)}
+\end{equation}
+
+where $p(h_i)$ is the prior probability of hypothesis $h_i$ and $p(\tau)$ is the marginal probability of the observed action $a$ and has no effect on the argmax. The likelihood is approximated by a hypothesis evaluation mechanism described below. The LLM predicts the other agent's future behavior conditioned on each hypothesis separately. Hypotheses leading to correct predictions will have higher values reflecting higher likelihoods. The prior $p(h_i)$ corresponds both to the background knowledge embedded in the weights of an LLM from pretraining and to the refinement mechanism that shows the top valued hypotheses to the LLM when the LLM generates a hypothesis. By continuously updating and selecting the best hypothesis based on observed information, the ToM module can effectively infer the latent variables governing the other agents' behavior and adapt its own strategies accordingly. When the environment has more than one other agent, the ToM module maintains separate hypothesis streams for each other agent, with unique hypotheses and values tracked per agent.
+
+\paragraph{Hypothesis Evaluation}
+
+Drawing on cognitive modeling approaches \citep{rescorla1972theory,daw2014value}, multiple hypotheses are scored with a value system $V_{h_i} = \mathbb{E}[r]$ where $r$ reflects intrinsic reward based on the accuracy of the predictions the hypothesis generates. We compute self-supervised intrinsic rewards bootstrapped from the LLM's own predictions. Let \( \phi(\tau) \) be a particular behavior, a feature from an observed trajectory, and \( \hat{\phi(\tau)} \) be the predicted behavior by the LLM, such as the inventory played by an agent in Melting Pot environments. The intrinsic reward function \( r_i \) can then be defined as:
+\vspace{-5pt}
+\[
+r_i = 
+\begin{cases} 
+c & \text{if } \hat{\phi(\tau)} = \phi(\tau) \\
+-c & \text{if } \hat{\phi(\tau)} \neq \phi(\tau)
+\end{cases}
+\]
+
+where \( c \) is a hyperparameter. \(V_{h_i}\) is then dynamically updated with a Rescorla Wagner update rule \citep{rescorla1972theory} , expressed as:
+\[
+\delta = r_i - V_{h_i}
+\]
+\[
+V_{h_i} \leftarrow V_{h_i} + \alpha \cdot \delta
+\]
+
+modulated by learning rate \( \alpha \) via a prediction error \( \delta \). The learning rate dictates how much to weigh recent interactions, a useful property when playing against evaluation scenarios where agents change their strategy within an episode. When the value of a hypothesis meets a threshold \( V_{\text{thr}} \), the ToM module marks the hypothesis as validated and uses this hypothesis to condition high-level plans (using the highest-valued one if multiple pass the threshold). This hypothesis will then continue to be used for planning until it no longer makes good predictions and its value subsequently falls below the threshold. If no hypothesis meets the threshold, by default the latest generated hypothesis (with the most updated information) is used for conditioning high-level plans. The highest value hypothesis could also be used in our code. We set the validation threshold Vthr = 0.7 apriori based on analysis of the Rescorla-Wagner dynamics. With reward values of c = 1 and learning rate  = 0.3, a hypothesis requires consistent predictive accuracy to reach and maintain this threshold. The top\_k hyperparameter mediates cost trade-offs, representing how many of the top\_k old hypotheses are continually evaluated in parallel. Each ToM module call uses (3 + top\_k) LLM calls if no hypothesis is validated yet and only 2 calls after validation, thus scaling linearly at the step in computational cost when hypotheses are not validated and sublinearly when they are frequently validated. (See Table 4 in Appendix for all hyperparameters and Table 5 and Appendix Section B for information about computational costs). The default value as reported in the results use top\_k = 5. 
+
+\paragraph{Conditioning High-Level Plans}
+The ToM module then conditions its high-level plans on the inferred latent variables represented by the hypotheses. A high-level plan $z$ is a natural language description of HM's overall strategy, goal, or intention, conditioned on the best hypothesis $h^*$ and memory of past events:
+\begin{equation}
+z = \text{LLM}(\mathcal{M}, h^*)
+\end{equation}
+By conditioning the high-level plans on the hypotheses, HM can adapt its strategy based on its understanding of the other agents' latent states.
+
+\noindent \textbf{Subgoal Module} Finally, the Subgoal module selects a sequence of subgoals. Let $\mathbf{g} = {g_{1}, g_{2}, \ldots, g_{k}}$ be a sequence of subgoals, where each subgoal $g_{i}$ is an action or short sequence of actions that the agent needs to take to achieve the high-level plan $z$:
+\begin{equation}
+\mathbf{g} = \text{LLM}(\mathcal{O}, \mathcal{M}, z)
+\end{equation}
+The sequence is generated by conditioning the LLM on the high-level plan, observations, and memory, and prompt to achieve the high-level plans. The LLM outputs a sequence of specified subgoal function calls, which are then parsed and mapped to the corresponding actions in the environment by a hardcoded Action Planner (see Appendix).
+
+\begin{figure}[t] 
+\begin{center}
+\centerline{\includegraphics[width=1.0\columnwidth]{figures/results_by_model_all_envs6.png}}
+\vspace{-.1in}
+\caption{Results for all models. Average reward per episode (with normalized steps for variable length episodes) for each environment and scenario. 5 seeds are generating for each model, with errorbars reflecting the SEM across those 5 episodes.}
+\vspace{-30pt}
+\label{fig:fig2}
+\end{center}
+\end{figure}
+
+\vspace{-5pt}
+\section{Experiments}
+
+\vspace{-5pt}
+Here we investigate the following to analyze the generalizability and scalability of our method:
+
+Q1. How does Hypothetical Minds perform compared to LLM agent and RL baselines in embodied competitive zero-sum environments?
+
+Q2. How does Hypothetical Minds perform compared to LLM agent and RL baselines in a collaborative domain that requires adaptation to a partner's role and competence?
+
+Q3. How does Hypothetical Minds perform compared to LLM agent and RL baselines in a mixed-motive setting?
+
+Q4. Does the Hypothetical Minds agent scale effectively to environments with larger populations of agents?
+
+Q5. How do the different components of the Hypothetical Minds agent and the Theory of Mind module contribute to its overall performance?
+
+We directly test our LLM-based agent on the evaluation scenarios in four Melting Pot environments (\autoref{fig:fig2}). The key evaluation method is to test agents against different bots with various policies. Across environments, this consists of 30 distinct evaluation scenarios. Crucially, our agent has no knowledge about which strategies they may be playing in the prompts given. Strategies have to be ascertained online within an episode via in-context learning.  
+
+\textbf{Baselines}
+
+\textbf{ReAct} synergizes reasoning and acting in language models, allowing them to generate both reasoning traces and task-specific actions in an interleaved manner \citep{yao2022react}. \textbf{Reflexion} includes three main components: an Actor module that generates actions and text, an Evaluator that scores these actions, and a Self-Reflection module that uses the evaluations to provide constructive feedback stored for subsequent use \citep{shinn2024reflexion}. \textbf{PlanReAct} To provide a hierarchical baseline to test against our hierarchical model, we include the PlanReAct architecture introduced in \citep{liu2023bolaa}. This structure allows the agent to plan before interacting with the environment. \textbf{PPO} is a model-free RL baseline \citep{schulman2017proximal} and we train agents in a population of models with the same parameters. \textbf{OPRE} is a hierarchical MARL method where agents learn high-level options as strategic responses to other agents' behaviors \citep{vezhnevets2020options}. The high-level controller selects options based on observations of other agents, and the low-level controller executes actions conditioned on these options. We include the OPRE results from the Melting Pot 2.0 paper \citep{agapiou2022melting} as a baseline to compare against a hierarchical MARL approach that, like our model, aims to adapt dynamically to other agents' strategies.
+
+Prompts and architectures are shared across baselines to provide a fair comparison and natural ablations of our model. The Subgoal module provides a baseline actor shared between LLM baselines, and the only difference between PlanReAct and Hypothetical Minds is that high-level planning is mediated by the Theory of Mind module, including hypothesis generation, evaluation, and refinement.
+
+%figure
+\begin{figure}[t]
+%\vskip 0.2in    
+\begin{center}
+\centerline{\includegraphics[width=0.7\columnwidth]{figures/reward_by_good_hypothesis.png}}
+\vspace{-.1in}
+% \caption{HM's reward per number of interactions before or after a hypothesis meets the validation threshold and is used for high-level strategy selection in RWS. Vertical green line indicates the average reward at the point where a hypothesis is validated, and positive and negative numbers on the x-axis indicate how many interactions before or after this point. Shaded region represents the range where the good hypothesis is typically first generated with a 95\% confidence interval.}
+\caption{HM's reward per number of interactions before or after a hypothesis meets the validation threshold and is used for high-level strategy selection in RWS. Vertical green line indicates the average reward at the point where a hypothesis is validated, and positive and negative numbers on the x-axis indicate how many interactions before or after this point. Shaded region represents the range where the good hypothesis is typically first generated with a 95\% confidence interval.}
+\label{fig:fig3}
+\end{center}
+%\vskip -0.2in
+\vspace{-30pt}
+\end{figure}
+
+\vspace{-10pt}
+\subsection{How does Hypothetical Minds perform in competitive environments?}
+
+\noindent \textbf{Running With Scissors in the Matrix Repeated (RWS)} is a zero-sum competitive environment with two players moving around a map and collecting yellow, purple, or blue resources that correspond to rock, paper, and scissors respectively. Zapping your opponent causes an interaction, with one agent getting positive reward and the other agent getting an opposite negative reward according to the inventories of resources picked up by each player, mirroring the rock, paper, scissors matrix game.
+
+RWS presents nine distinct evaluation scenarios, which range in complexity. These include three straightforward strategies where opponents consistently play rock, paper, or scissors. The remaining scenarios introduce more dynamic and adaptive strategies (see Appendix for details and full list). Therefore in order to succeed on the scenarios, an agent needs to correctly infer the strategy and exploit it. Against the simple policies, the agent should play the same type of inventory every round rather than playing randomly or anticipating a change in its opponent's policy. In contrast, success against the adaptive strategies demands not only the anticipation of the opponent's next move based on personal previous plays but also selecting the most advantageous counter. 
+
+\autoref{fig:fig2} and Appendix Table 1 demonstrate how Hypothetical Minds model consistently achieves large magnitude rewards and performs reliably better than the baselines on every single scenario. Hypothetical Minds performs the best on the static strategies, scenarios 0, 6, 7, 8 representing fixed policies that play for the same inventory on every interaction (6: rock, 7: paper, 8: scissors, 0: random sample from 6-8). Therefore it is able to exploit the static strategy reliably once it correctly infers it. The agent is also able to consistently return positive rewards against the difficult scenario 1, the adaptive bot that plays the best response to your last round. In contrast, baselines are failing to achieve consistent positive rewards. OPRE, a method designed specifically for a earlier version of this task, gets rewards near zero for every scenario. PlanReAct is the only other model to achieve positive rewards on the difficult best response bot, illustrating the usefulness of a hierarchical structure for this evaluation in particular. Reflexion performs second best overall, underscoring the value of evaluative reflection for this environment.
+
+\autoref{fig:fig3} showcases HM's dynamics, depicting the agent's reward per interaction before and after hypothesis validation. Upon validation, the agent consistently achieves high positive returns, while rewards are near zero or negative during the information-gathering phase. The upward trajectory in reward after generating a good hypothesis and the significant increase just before the validation threshold demonstrate the agent's ability to exploit accurate hypotheses effectively.
+
+% %figure
+% \begin{figure}[t]
+% %\vskip 0.2in    
+% \begin{center}
+% \centerline{\includegraphics[width=0.8\columnwidth]{figures/reward_by_good_hypothesis.png}}
+% \vspace{-.1in}
+% \caption{HM's reward per number of interactions before or after a hypothesis meets the validation threshold and is used for high-level strategy selection in RWS. Vertical green line indicates the average reward at the point where a hypothesis is validated, and positive and negative numbers on the x-axis indicate how many interactions before or after this point. Shaded region represents the range where the good hypothesis is typically first generated with a 95\% confidence interval.}
+% \label{fig:architecture}
+% \end{center}
+% %\vskip -0.2in
+% \vspace{-30pt}
+% \end{figure}
+
+\vspace{-6pt}
+\subsection{How does Hypothetical Minds perform in collaborative environments?}
+
+In the \textbf{Collaborative Cooking: Asymmetric} environment, two players on distinct sides of a divided kitchen must collaborate to efficiently cook tomato soup. The layout provides distinct advantages to each side—one side is closer to the goal delivery but farther from the tomato dispenser, and vice versa for the other side.  To maximize rewards, the two players should specialize based on their proximity to resources: one handles tomato dispensing and delivery, and the other manages dish retrieval and soup delivery. Evaluation scenarios challenge the focal agent to demonstrate dual forms of adaptation: adjusting to the specialized role dictated by their side of the kitchen and to the varying competence of their partner, from skilled and specialized to entirely unresponsive.
+
+Again, Hypothetical Minds achieves higher rewards than the baselines on every scenario (\autoref{fig:fig2}). Interestingly, HM performs significantly better than the baselines on the scenarios where there is a functional partner (Appendix Table 1). This suggests that if there is value in a partner, HM can take advantage of this and adapt its behavior accordingly, highlighting the model's usefulness for complex, dynamic environments where  cooperative interaction is crucial. The LLM baselines perform relatively well with the negligent partner, where success hinges on repeatedly executing an intuitive sequence of actions — filling and delivering pots — without the need to take into account the actions of another mind. For instance, baseline LLM agents struggled when encountering a pot already at capacity while attempting to add tomatoes. PPO showed the opposite relative weakness, performing moderately with the skilled partner but has a dramatic lack of generalization to the unhelpful partner scenario, as it is used to role specialization from self play. OPRE performs poorly on every scenario.
+
+\vspace{-6pt}
+\subsection{How does Hypothetical Minds perform in mixed-motive environments?}
+
+In the Prisoner's Dilemma in the Matrix Repeated (PD) environment, agents navigate a similar grid world to RWS and collect resources corresponding to cooperation or defection in the iterated prisoner's dilemma game. The payoff matrix incentivizes mutual defection in a single interaction, but the highest total welfare is achieved through mutual cooperation across an episode.
+
+Hypothetical Minds achieves the highest reward among LLM agents and in 5/10 scenarios (\autoref{fig:fig2}, Appendix Table 1). This highlights its ability to perceive the background agent's strategy and adapt accordingly. HM outperforms the LLM baselines relatively more with dynamic partners. With tit-for-tat for example (scenarios 5 and 6), Hypothetical Minds achieves the highest score among all models, by engaging in more consistent cooperation while demonstrating some forgiveness to avoid cycles of alternating defection, a pattern that plagues LLM baselines. In scenarios 8 and 9, Hypothetical Minds showcases a capacity for "corrective punishment." By defecting against these partners that initially defect, it persuades them to switch to conditional cooperation. The agent then shifts to a forgiving cooperation strategy to maintain a mutually beneficial equilibrium.
+
+However, OPRE achieves the highest rewards overall on Prisoner’s Dilemma. Fixed heuristic policies such as always defecting, playing tit-for-tat, etc. can achieve high rewards without needing to correctly infer the policy it is playing against. One explanation is that advanced RL methods like OPRE collect resources more efficiently than Hypothetical Minds in Prisoner’s Dilemma, due to the limited spatial reasoning abilities of ungrounded LLMs like GPT4. One limitation of HM is that the agent frequently travels across the environment to pick up resources that were closer to its original location. On the other hand, HM demonstrates good reasoning about the strategies it is playing against, and good hypotheses are frequently found and validated. This illustrates the tradeoffs between these two methods. LLM agents provide better abstract reasoning about things like other agent’s goals right out of the box due to their extensive training data, but lack the low-level control necessary to maximize performance in a dense reward embodied environment (which RL excels at).
+
+% Relative to the other three environments tested, HM performs comparably to the baselines in PD, and all LLM baselines perform similarly in the majority of the scenarios. This similarity likely arises from their convergence on simple heuristic strategies, such as consistently defecting against static bots (the optimal approach) and employing a tit-for-tat strategy against adaptive bots. Again, this highlights the importance of focusing on the more dynamic strategies as previously discussed. All models struggle with the grim reciprocators, as testing defection is needed to perform well on the task overall, but is not tolerated by these bots.
+
+\vspace{-10pt}
+
+\subsection{How does Hypothetical Minds scale to environments with larger populations of agents?}
+\vspace{-5pt}
+
+\noindent \textbf{Running With Scissors in the Matrix Arena (RWS Arena)} is an eight-player extension of RWS, where the agent controls one player against a population of 7 strategies. This adds additional complexity to the decision-making process and tests the scalability of models, as agents now must infer the strategies of separate agents and maintain this information in memory. Hypothetical Minds is set up for this by maintaining separate hypothesis evaluation streams for every agent. Additionally, in order to maximize reward, agents should only interact with opponents that it knows it can beat with its current inventory. Models are therefore tasked with integrating uncertainty and seeking out opponents for which they have high confidence about their strategy.
+
+Hypothetical Minds achieves higher rewards than the baselines in RWS Arena (\autoref{fig:fig2}) and is the best model on 6/8 scenarios (Appendix Table 1). HM performs particularly well on homogeneous populations of rock, paper, or scissors (scenarios 5-7). Scenarios 2-4 consist of heterogeneous populations where 2/3rds of the population are one pure strategy and the remaining 1/3rd represents the pure strategy that would beat the best response to the majority strategy (e.g., scenario 2 is 2/3 rock and 1/3 scissors). HM performs the best on 2 out of 3 of these difficult scenarios, and performance for scenario 4 is dragged down by one highly negative episode in which the agent was exploited by the minority strategy. In contrast, all baseline models struggle to achieve rewards of more than 10 on average in nearly every scenario. This highlights the difficulty of the environment, for which proper coordination between high-level plans, the embodiment, and memory is crucial for success. These results also suggest that Hypothetical Minds scales well to population-based environments in which you need to either handle distinct agents differently or make population-level inferences.
+
+% \begin{figure*}[t]   
+% \begin{center}
+% \includegraphics[width=0.9\textwidth]{figures/results_by_model_all_envs.png}
+% \caption{Results across scenarios. Average reward per episode (with normalized steps for variable length episodes) for each environment. 5 seeds are generating for each model, with errorbars reflecting the SEM across those 5 episodes.}
+% \label{fig:architecture}
+% \end{center}
+% \end{figure*}
+
+%figure
+\begin{figure}[t]
+\vskip 0.2in    
+\begin{center}
+\centerline{\includegraphics[width=0.8\columnwidth]{figures/ablations_major_scenarios_new.png}}
+\caption{Comparing different versions of HM. Errorbars reflect SEM across 5 episodes.}
+\vspace{-13pt}
+\label{fig:fig5}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+% \vspace{-10pt}
+% \subsection{Ablations}
+% \vspace{-5pt}
+
+% As previously discussed, we compared baseline LLM agents with our models to perform natural ablations, maintaining similar prompts but varying information flows. We also compare base LLMs between GPT4 (default), GPT 3.5, and Llama-3-70B-Instruct (\autoref{fig:fig4}). GPT4 performs by far the best across environments, and GPT 3.5 performs poorly. Llama3's performance lies in between these two on RWS Repeated and Collaborative Cooking, and slightly below GPT 3.5 on Prisoner's Dilemma. Due to input context limitations, we could not run Llama-3 on RWS Arena.
+
+% We also conducted detailed ablation analysis on the ToM module for the challenging environment, RWS Repeated. \textbf{Vanilla Mind Prompting (VMP)}: Utilizes a single API call for all ToM module steps, excluding hypothesis evaluation and refinement (see Appendix and code for more details). \textbf{Modular Mind Prompting (MMP)}: Ablates hypothesis evaluation and refinement, while introducing a more modular approach where the LLM is queried separately for each step. \textbf{Hypothesis Evaluation and Refinement w/o Mind Prompting (HE + HR)}: Ablates ToM prompting and isolates hypothesis evaluation and refinement. Prompts do not include opponent strategy predictions but ask for a high-level strategy, treated as a hypothesis and evaluated based on rewards (see Appendix for details). Full \textbf{Hypothetical Minds} model, adding hypothesis refinement to MMP + HE.
+
+% \autoref{fig:fig5} shows key scenario results and \autoref{fig:fig8} (Appendix) shows all scenarios, with MMP outperforming VMP in most cases. MMP + HE and MMP + HE + HR achieved positive returns of 10+ in every scenario, with the full model performing well against the challenging best response bot (SC 1). This suggests that modular structures and hypothesis evaluation enhance reasoning stability and strategy optimization. GPT4 could identify correct hypotheses through reasoning about its previous interactions, though it does not do so consistently, highlighting the importance of hypothesis evaluation in maintaining multiple potential strategies. See \autoref{fig:fig6} and \autoref{fig:fig7} in Appendix for examples of HM finding a good hypothesis.
+
+% The HE + HR model, which lacks ToM prompts, excelled against adaptive opponents but struggled with fixed strategies. This indicates that without explicit modeling of the opponent's strategy, the LLM agent fails to recognize it's facing a static strategy, instead expecting an adaptive opponent like itself. Being able to represent another agent's beliefs and preferences as being different than your own is a hallmark of Theory of Mind \citep{rakoczy2022foundations}. Additionally, HE + HR produced longer, disorganized responses with irrelevant guidelines, resulting in less effective hypotheses (see \autoref{fig:fig9} in Appendix).
+
+\subsection{Ablations}
+
+Our ablation studies focused on three key aspects: (1) comparing performance across different base LLMs, (2) analyzing the components of the ToM module, and (3) analyzing the sensitivity of the ToM module's hyperparameters.
+
+First, we compared GPT-4, GPT-3.5, and Llama-3-70B-Instruct across environments (\autoref{fig:fig4}). GPT-4 significantly outperformed the other models across all tasks. Llama-3 performed moderately well on RWS Repeated and Collaborative Cooking, placing between GPT-4 and GPT-3.5, but fell below GPT-3.5 on Prisoner's Dilemma. Due to context length limitations, we could not evaluate Llama-3 on RWS Arena.
+
+Second, we conducted a detailed ablation analysis of the ToM module using RWS Repeated as our test environment. We evaluated five variants: 1. \textbf{Vanilla Mind Prompting (VMP)}: A simplified version using a single API call for all ToM steps, without hypothesis evaluation or refinement. 2. \textbf{Modular Mind Prompting (MMP)}: Removes hypothesis evaluation and refinement but queries the LLM separately for each reasoning step (ie. hypothesis generation and planning the next strategy are separate). 3. \textbf{Modular Mind Prompting + Hypothesis Evaluation (MMP + HE)}: This version introduces hypothesis evaluation in comparison to the previous model. 4. \textbf{Hypothesis Evaluation and Refinement w/o Mind Prompting (HE + HR)}: Focuses only on hypothesis evaluation and refinement, removing ToM-specific prompting. 5. \textbf{Full Hypothetical Minds}: The complete model combining MMP + HE with hypothesis refinement.
+
+Results show MMP consistently outperformed VMP (\autoref{fig:fig5}, \autoref{fig:fig8}). Adding hypothesis evaluation (MMP + HE) and refinement (full HM) improved performance, with both variants achieving positive returns above 10 across all scenarios. The full model showed particular strength against the challenging best response bot (SC 1). This demonstrates that valuation and refinement may be most beneficial for complex strategies that are difficult to generate or reason about from scratch.
+
+While GPT-4 could sometimes identify correct hypotheses through reasoning alone, it did so inconsistently, highlighting the value of systematic hypothesis evaluation. The HE + HR variant excelled with adaptive opponents but struggled against fixed strategies, suggesting that explicit theory of mind modeling is crucial for recognizing static opponent behaviors \citep{rakoczy2022foundations}. Additionally, removing ToM prompting led to verbose, less focused hypotheses (see \autoref{fig:fig9}).
+
+Third, we examined key hyperparameters in the ToM module. The `top\_k` parameter controlling how many top hypotheses to evaluate (default=5) trades off computational costs. Performance improves most dramatically when maintaining any hypotheses beyond just the last generated one (`top\_k = 0` is equivalent to the MMP model), particularly for challenging scenarios like scenario 1 (\autoref{fig:fig11}, \autoref{fig:fig12}). This reflects a categorical difference when the best hypothesis is kept around, giving the agent some memory of past guesses, while poor hypotheses naturally fall out of the top `k`. Increasing `top\_k` beyond 3 shows diminishing returns for RWS Repeated and may become detrimental past 5. The relationship between `top\_k` and computational cost is plotted in \autoref{fig:fig13} and \autoref{fig:fig14}. Once top\_k $>$ 0, most cost variance stems from other factors, and higher costs ($>$ \$10 per episode) actually correlate with decreased performance. This occurs primarily because hypothesis validation reduces subsequent LLM calls, leading to both lower costs and better performance. Tests with Llama3 showed performance is relatively robust to learning rate $\alpha$ (which weights recent predictions) and the validation threshold (\autoref{fig:fig15}, \autoref{fig:fig16}). While smaller learning rates performed better, the model achieved above-chance performance across all parameter values tested. This robustness makes sense: a good hypothesis will eventually be validated across a reasonable range of these parameters, leading to high rewards for the remainder of the episode.
+
+% We in \autoref{fig:fig3} and \autoref{fig:fig14} see that using hypothesis evaluation does increase the cost of the episodes in monetary dollars and tokens, but scaling very sublinearly and relatively flat as top\_k increases. The scatterplot demonstrates that once top\_k \> 0, most of the variance in cost is driven by other factors. In fact, as cost increases past \$10 per episode, performance decreases due to multiple factors. Primarily, once a hypothesis is validated, this reduces the amount of LLM calls in the theory of mind module, such that both the cost is lower and performance is higher. Potentially a more subtle effect is that more concise and parsimonious hypotheses will use less tokens and potentially perform better. We also performed sweeps with Llama3 on the learning rate $\alpha$ and validation threshold parameters in the ToM module. Alpha mediates how much to weigh recent predictions in the value of a hypothesis and the validation threshold trades off how confident we want to be before validating a hypothesis. Although smaller learning rates seem to perform better, getting good performance seems to be relatively insensitive to these two hyperparameters, as performance is significantly above 0 for every value and most values are within error of each other. This makes sense as if a good hypothesis is generated, it will eventually be validated with these values and HM will achieve high rewards for the remainder of the episode.}
+
+\vspace{-14pt}
+
+% Here we evaluate the Hypothetical Minds model on challenging multi-agent environments with varied dynamics. One limitation of our method is the human in the loop component necessary to set up the scaffolding and prompting for the agent. Additionally, knowledge of the game rules and mechanics are listed in the prompts. An avenue for future research is learning these concepts and the appropriate types of scaffolding within the cognitive modules autonomously from environmental feedback.
+
+\section{Conclusion}
+\vspace{-12pt}
+
+We have presented Hypothetical Minds, a model that demonstrates strong performance across diverse multi-agent environments through its novel approach to theory of mind modeling and hypothesis evaluation. Our work has several limitations that suggest promising directions for future research. The current implementation requires human intervention to establish scaffolding and prompting for the agent. Additionally, knowledge of game rules and mechanics must be explicitly encoded in the prompts rather than learned from the environment. An important avenue for future research is developing methods for agents to learn these concepts and appropriate types of scaffolding autonomously from environmental feedback. This could enable more general-purpose agents that can flexibly adapt to novel multi-agent scenarios without manual configuration.
+
+The success of our approach in structured game environments suggests broader applications to real-world multi-agent systems where understanding and adapting to people is crucial. Future work should investigate how the principles of the ToM module demonstrated here could extend to more complex social interactions such as adaptive tutoring or personalizing chat bot responses to users with hidden preferences. Such advances would represent important progress toward autonomous agents that can effectively navigate diverse social tasks.
+
+\subsubsection*{Author Contributions}
+L.C. conceptualized and designed the Hypothetical Minds framework, developed the core codebase, conducted experiments, analyzed results, and wrote the manuscript. V.X. contributed to the framework design, codebase, and implementation. A.B. assisted with experiments. D.Y. and N.H. supervised the research, provided guidance on the project direction, and secured funding. All authors reviewed and provided feedback on the manuscript.
+
+\subsubsection*{Acknowledgments}
+We thank members of the Yamins and Haber labs at Stanford University for their valuable feedback and suggestions throughout the development of this work.
+
+\bibliography{iclr2025_conference}
+\bibliographystyle{iclr2025_conference}
+
+\clearpage
+
+\appendix
+\section{Appendix}
+
+\raggedbottom
+
+% \begin{table}[H]
+% \centering
+% \resizebox{\textwidth}{!}{%
+% \begin{tabular}{lccccc}
+% \toprule
+% \textbf{Scenario} & \multicolumn{5}{c}{\textbf{Agent Type}} \\
+% \cmidrule(lr){2-6}
+% & HM (ours) & Reflexion & ReAct & PlanReAct & PPO \\
+% \midrule
+% \makecell{\textbf{Running With}\\\textbf{Scissors Repeated}} & & & & & \\
+% 0: Mix of all 3 & \textbf{50.8 $\pm$ 8.6} & 21.0 $\pm$ 10.2 & -1.0 $\pm$ 3.9 & 5.5 $\pm$ 3.6 & -2.9 $\pm$ 1.8 \\
+% 1: Best Response & \textbf{23.2 $\pm$ 4.7} & -3.5 $\pm$ 3.5 & -2.3 $\pm$ 4.2 & 21.1 $\pm$ 5.0 & 0.5 $\pm$ 1.6 \\
+% 2: 0 $\cup$ 1 & \textbf{54.6 $\pm$ 4.3} & 29.3 $\pm$ 12.5 & 17.1 $\pm$ 7.2 & 16.6 $\pm$ 6.1 & -1.1 $\pm$ 2.0 \\
+% 3: Flip After 2 & \textbf{40.6 $\pm$ 11.1} & 30.9 $\pm$ 5.4 & 12.8 $\pm$ 4.7 & 13.2 $\pm$ 6.4 & 0.8 $\pm$ 0.5 \\
+% 4: Flip After 1 & \textbf{48.5 $\pm$ 6.3} & 1.9 $\pm$ 4.2 & -1.5 $\pm$ 6.1 & 9.0 $\pm$ 5.1 & -2.4 $\pm$ 1.8 \\
+% 5: Gullible & \textbf{12.9 $\pm$ 5.1} & 8.2 $\pm$ 3.2 & 2.5 $\pm$ 1.9 & 7.2 $\pm$ 3.4 & 0.1 $\pm$ 0.6 \\
+% 6: Rock & \textbf{50.5 $\pm$ 4.4} & 17.9 $\pm$ 9.5 & 14.3 $\pm$ 8.6 & 15.6 $\pm$ 4.3 & 1.2 $\pm$ 2.0 \\
+% 7: Paper & \textbf{59.6 $\pm$ 4.0} & 13.2 $\pm$ 6.8 & 2.7 $\pm$ 2.3 & 13.0 $\pm$ 4.4 & -0.1 $\pm$ 1.0 \\
+% 8: Scissors & \textbf{63.8 $\pm$ 5.1} & 31.0 $\pm$ 6.5 & 29.0 $\pm$ 4.3 & 14.4 $\pm$ 3.3 & -4.2 $\pm$ 1.4 \\
+% \midrule
+% \makecell{\textbf{Running With}\\\textbf{Scissors Arena}} & & & & & \\
+% 0: Mix of all 3 & \textbf{13.3 $\pm$ 6.9} & 1.1 $\pm$ 3.6 & 3.5 $\pm$ 3.2 & -8.0 $\pm$ 4.1 & -0.5 $\pm$ 1.5 \\
+% 1: Gullible & -2.6 $\pm$ 3.4 & \textbf{-1.8 $\pm$ 2.3} & -5.6 $\pm$ 4.0 & 0.9 $\pm$ 3.6 & -0.4 $\pm$ 1.0 \\
+% 2: Rock + Flip After 2 & \textbf{16.2 $\pm$ 3.9} & -1.7 $\pm$ 2.2 & -4.4 $\pm$ 2.0 & 2.1 $\pm$ 3.2 & -1.0 $\pm$ 1.1 \\
+% 3: Paper + Flip After 2 & \textbf{11.6 $\pm$ 4.5} & 1.6 $\pm$ 2.2 & -4.2 $\pm$ 3.6 & 0.9 $\pm$ 3.6 & 1.3 $\pm$ 1.4 \\
+% 4: Scissors + Flip After 2 & -2.6 $\pm$ 5.7 & \textbf{10.6 $\pm$ 2.2} & -1.2 $\pm$ 3.3 & -2.4 $\pm$ 3.1 & -2.1 $\pm$ 1.0 \\
+% 5: Rock & \textbf{21.8 $\pm$ 3.0} & 1.4 $\pm$ 2.0 & -4.3 $\pm$ 3.1 & -7.1 $\pm$ 2.0 & 1.7 $\pm$ 0.8 \\
+% 6: Paper & \textbf{24.9 $\pm$ 2.5} & -1.1 $\pm$ 1.4 & -10.7 $\pm$ 2.5 & -4.0 $\pm$ 3.1 & -2.4 $\pm$ 1.0 \\
+% 7: Scissors & \textbf{32.1 $\pm$ 1.8} & 11.8 $\pm$ 4.5 & 11.6 $\pm$ 2.0 & -0.2 $\pm$ 2.6 & 0.9 $\pm$ 0.9 \\
+% \midrule
+% \makecell{\textbf{Collaborative Cooking}\\\textbf{Asymmetric}} & & & & & \\
+% 0: Skilled Partner & \textbf{628.3 $\pm$ 35.1} & 292.6 $\pm$ 38.2 & 225.4 $\pm$ 60.0 & 402.9 $\pm$ 70.1 & 244.0 $\pm$ 76.1 \\
+% 1: Semi-skilled Partner & \textbf{498.8 $\pm$ 78.2} & 402.9 $\pm$ 65.0 & 254.2 $\pm$ 39.1 & 455.6 $\pm$ 55.7 & 86.0 $\pm$ 28.9 \\
+% 2: Unhelpful Partner & \textbf{426.8 $\pm$ 42.5} & 398.1 $\pm$ 33.6 & 383.7 $\pm$ 21.4 & 292.6 $\pm$ 36.7 & 0.0 $\pm$ 0.0 \\
+% \midrule
+% \makecell{\textbf{Prisoner's Dilemma in the Matrix}} & & & & & \\
+% 0: 1 $\cup$ 2 & 40.6 $\pm$ 12.9 & 44.5 $\pm$ 13.2 & \textbf{57.9 $\pm$ 13.0} & 37.0 $\pm$ 15.3 & 20.7 $\pm$ 5.7 \\
+% 1: Cooperator & 78.7 $\pm$ 2.4 & \textbf{87.2 $\pm$ 1.7} & 77.3 $\pm$ 1.0 & 78.8 $\pm$ 2.2 & 40.0 $\pm$ 5.4 \\
+% 2: Defector & 21.9 $\pm$ 0.5 & 22.1 $\pm$ 0.8 & \textbf{24.0 $\pm$ 0.3} & 22.5 $\pm$ 0.5 & 9.1 $\pm$ 2.0 \\
+% 3: Grim Reciprocator & \textbf{31.6 $\pm$ 4.7} & 28.8 $\pm$ 0.4 & 29.2 $\pm$ 1.3 & 25.2 $\pm$ 0.4 & 13.0 $\pm$ 1.1 \\
+% 4: Grim Reciprocator (2 strikes) & 27.8 $\pm$ 1.2 & 29.3 $\pm$ 1.7 & \textbf{30.7 $\pm$ 1.7} & 28.0 $\pm$ 1.2 & 16.5 $\pm$ 1.4 \\
+% 5: Tit-for-tat & \textbf{52.5 $\pm$ 1.1} & 33.9 $\pm$ 0.7 & 35.8 $\pm$ 0.7 & 42.2 $\pm$ 2.1 & 15.4 $\pm$ 2.1 \\
+% 6: Noisy tit-for-tat & \textbf{46.7 $\pm$ 2.2} & 40.3 $\pm$ 2.4 & 41.9 $\pm$ 2.7 & 42.0 $\pm$ 1.3 & 17.3 $\pm$ 2.7 \\
+% 7: Cooperates then defects & 20.9 $\pm$ 0.5 & 25.1 $\pm$ 1.0 & \textbf{28.4 $\pm$ 0.7 }& 24.9 $\pm$ 0.6 & 8.8 $\pm$ 0.9 \\
+% 8: Defector that turns tit-for-tat & \textbf{42.1 $\pm$ 1.5} & 31.0 $\pm$ 1.4 & 30.1 $\pm$ 1.4 & 36.8 $\pm$ 0.9 & 8.1 $\pm$ 2.0 \\
+% 9: Defector that turns to noisy tit-for-tat & \textbf{45.3 $\pm$ 1.8} & 34.7 $\pm$ 1.7 & 36.6 $\pm$ 1.6 & 40.6 $\pm$ 1.1 & 15.1 $\pm$ 2.5 \\
+% \bottomrule
+% \end{tabular}
+% }
+% \caption{Average reward and SEM for different agents across substrates and scenarios (5 seeds). Note that the variance in scenarios that are a union of two scenarios may be related to which scenarios were sampled.}
+% \label{table:results}
+% \end{table}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Scenario} & \multicolumn{6}{c}{\textbf{Agent Type}} \\
+\cmidrule(lr){2-7}
+& HM (ours) & Reflexion & ReAct & PlanReAct & PPO & OPRE \\
+\midrule
+\makecell{\textbf{Running With}\\\textbf{Scissors Repeated}} & & & & & & \\
+0: Mix of all 3 & \textbf{50.8 $\pm$ 8.6} & 21.0 $\pm$ 10.2 & -1.0 $\pm$ 3.9 & 5.5 $\pm$ 3.6 & -2.9 $\pm$ 1.8 & 0.0 $\pm$ 0.0 \\
+1: Best Response & \textbf{23.2 $\pm$ 4.7} & -3.5 $\pm$ 3.5 & -2.3 $\pm$ 4.2 & 21.1 $\pm$ 5.0 & 0.5 $\pm$ 1.6 & -0.1 $\pm$ 0.0 \\
+2: 0 $\cup$ 1 & \textbf{54.6 $\pm$ 4.3} & 29.3 $\pm$ 12.5 & 17.1 $\pm$ 7.2 & 16.6 $\pm$ 6.1 & -1.1 $\pm$ 2.0 & 0.0 $\pm$ 0.0 \\
+3: Flip After 2 & \textbf{40.6 $\pm$ 11.1} & 30.9 $\pm$ 5.4 & 12.8 $\pm$ 4.7 & 13.2 $\pm$ 6.4 & 0.8 $\pm$ 0.5 & 0.0 $\pm$ 0.0 \\
+4: Flip After 1 & \textbf{48.5 $\pm$ 6.3} & 1.9 $\pm$ 4.2 & -1.5 $\pm$ 6.1 & 9.0 $\pm$ 5.1 & -2.4 $\pm$ 1.8 & 0.0 $\pm$ 0.0 \\
+5: Gullible & \textbf{12.9 $\pm$ 5.1} & 8.2 $\pm$ 3.2 & 2.5 $\pm$ 1.9 & 7.2 $\pm$ 3.4 & 0.1 $\pm$ 0.6 & 0.1 $\pm$ 0.0 \\
+6: Rock & \textbf{50.5 $\pm$ 4.4} & 17.9 $\pm$ 9.5 & 14.3 $\pm$ 8.6 & 15.6 $\pm$ 4.3 & 1.2 $\pm$ 2.0 & 0.2 $\pm$ 0.0 \\
+7: Paper & \textbf{59.6 $\pm$ 4.0} & 13.2 $\pm$ 6.8 & 2.7 $\pm$ 2.3 & 13.0 $\pm$ 4.4 & -0.1 $\pm$ 1.0 & 0.1 $\pm$ 0.0 \\
+8: Scissors & \textbf{63.8 $\pm$ 5.1} & 31.0 $\pm$ 6.5 & 29.0 $\pm$ 4.3 & 14.4 $\pm$ 3.3 & -4.2 $\pm$ 1.4 & -0.3 $\pm$ 0.0 \\
+\midrule
+\makecell{\textbf{Running With}\\\textbf{Scissors Arena}} & & & & & & \\
+0: Mix of all 3 & \textbf{13.3 $\pm$ 6.9} & 1.1 $\pm$ 3.6 & 3.5 $\pm$ 3.2 & -8.0 $\pm$ 4.1 & -0.5 $\pm$ 1.5 & 0.1 $\pm$ 0.2 \\
+1: Gullible & -2.6 $\pm$ 3.4 & \textbf{-1.8 $\pm$ 2.3} & -5.6 $\pm$ 4.0 & 0.9 $\pm$ 3.6 & -0.4 $\pm$ 1.0 & -0.6 $\pm$ 0.2 \\
+2: Rock + Flip After 2 & \textbf{16.2 $\pm$ 3.9} & -1.7 $\pm$ 2.2 & -4.4 $\pm$ 2.0 & 2.1 $\pm$ 3.2 & -1.0 $\pm$ 1.1 & 0.5 $\pm$ 0.4 \\
+3: Paper + Flip After 2 & \textbf{11.6 $\pm$ 4.5} & 1.6 $\pm$ 2.2 & -4.2 $\pm$ 3.6 & 0.9 $\pm$ 3.6 & 1.3 $\pm$ 1.4 & 0.3 $\pm$ 0.3 \\
+4: Scissors + Flip After 2 & -2.6 $\pm$ 5.7 & \textbf{10.6 $\pm$ 2.2} & -1.2 $\pm$ 3.3 & -2.4 $\pm$ 3.1 & -2.1 $\pm$ 1.0 & 0.2 $\pm$ 0.3 \\
+5: Rock & \textbf{21.8 $\pm$ 3.0} & 1.4 $\pm$ 2.0 & -4.3 $\pm$ 3.1 & -7.1 $\pm$ 2.0 & 1.7 $\pm$ 0.8 & 0.5 $\pm$ 0.4 \\
+6: Paper & \textbf{24.9 $\pm$ 2.5} & -1.1 $\pm$ 1.4 & -10.7 $\pm$ 2.5 & -4.0 $\pm$ 3.1 & -2.4 $\pm$ 1.0 & 0.4 $\pm$ 0.5 \\
+7: Scissors & \textbf{32.1 $\pm$ 1.8} & 11.8 $\pm$ 4.5 & 11.6 $\pm$ 2.0 & -0.2 $\pm$ 2.6 & 0.9 $\pm$ 0.9 & 0.7 $\pm$ 0.3 \\
+\midrule
+\makecell{\textbf{Collaborative Cooking}\\\textbf{Asymmetric}} & & & & & & \\
+0: Skilled Partner & \textbf{628.3 $\pm$ 35.1} & 292.6 $\pm$ 38.2 & 225.4 $\pm$ 60.0 & 402.9 $\pm$ 70.1 & 244.0 $\pm$ 76.1 & 21.5 $\pm$ 15.0 \\
+1: Semi-skilled Partner & \textbf{498.8 $\pm$ 78.2} & 402.9 $\pm$ 65.0 & 254.2 $\pm$ 39.1 & 455.6 $\pm$ 55.7 & 86.0 $\pm$ 28.9 & 36.6 $\pm$ 28.0 \\
+2: Unhelpful Partner & \textbf{426.8 $\pm$ 42.5} & 398.1 $\pm$ 33.6 & 383.7 $\pm$ 21.4 & 292.6 $\pm$ 36.7 & 0.0 $\pm$ 0.0 & 62.0 $\pm$ 62.0 \\
+\midrule
+\makecell{\textbf{Prisoner's Dilemma in the Matrix}} & & & & & & \\
+0: 1 $\cup$ 2 & 40.6 $\pm$ 12.9 & 44.5 $\pm$ 13.2 & 57.9 $\pm$ 13.0 & 37.0 $\pm$ 15.3 & 20.7 $\pm$ 5.7 & \textbf{67.2 $\pm$ 1.2} \\
+1: Cooperator & 78.7 $\pm$ 2.4 & 87.2 $\pm$ 1.7 & 77.3 $\pm$ 1.0 & 78.8 $\pm$ 2.2 & 40.0 $\pm$ 5.4 & \textbf{102.5 $\pm$ 1.0} \\
+2: Defector & 21.9 $\pm$ 0.5 & 22.1 $\pm$ 0.8 & 24.0 $\pm$ 0.3 & 22.5 $\pm$ 0.5 & 9.1 $\pm$ 2.0 & \textbf{34.5 $\pm$ 0.9} \\
+3: Grim Reciprocator & 31.6 $\pm$ 4.7 & 28.8 $\pm$ 0.4 & 29.2 $\pm$ 1.3 & 25.2 $\pm$ 0.4 & 13.0 $\pm$ 1.1 & \textbf{36.3 $\pm$ 1.0} \\
+4: Grim Reciprocator (2 strikes) & 27.8 $\pm$ 1.2 & 29.3 $\pm$ 1.7 & 30.7 $\pm$ 1.7 & 28.0 $\pm$ 1.2 & 16.5 $\pm$ 1.4 & \textbf{38.1 $\pm$ 1.2} \\
+5: Tit-for-tat & \textbf{52.5 $\pm$ 1.1} & 33.9 $\pm$ 0.7 & 35.8 $\pm$ 0.7 & 42.2 $\pm$ 2.1 & 15.4 $\pm$ 2.1 & 37.4 $\pm$ 0.5 \\
+6: Noisy tit-for-tat & \textbf{46.7 $\pm$ 2.2} & 40.3 $\pm$ 2.4 & 41.9 $\pm$ 2.7 & 42.0 $\pm$ 1.3 & 17.3 $\pm$ 2.7 & 47.8 $\pm$ 0.6 \\
+7: Cooperates then defects & 20.9 $\pm$ 0.5 & 25.1 $\pm$ 1.0 & 28.4 $\pm$ 0.7 & 24.9 $\pm$ 0.6 & 8.8 $\pm$ 0.9 & \textbf{38.3 $\pm$ 0.9} \\
+8: Defector that turns tit-for-tat & \textbf{42.1 $\pm$ 1.5} & 31.0 $\pm$ 1.4 & 30.1 $\pm$ 1.4 & 36.8 $\pm$ 0.9 & 8.1 $\pm$ 2.0 & 38.7 $\pm$ 0.6 \\
+9: Defector that turns to noisy tit-for-tat & 45.3 $\pm$ 1.8 & 34.7 $\pm$ 1.7 & 36.6 $\pm$ 1.6 & 40.6 $\pm$ 1.1 & 15.1 $\pm$ 2.5 & \textbf{46.7 $\pm$ 0.9} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Average reward and SEM for different agents across substrates and scenarios. Note that the variance in scenarios that are a union of two scenarios may be related to which scenarios were sampled.}
+\label{table:results}
+\end{table}
+
+\begin{figure*}[h]   
+\begin{center}
+\includegraphics[width=0.85\textwidth]{figures/results_by_llm_all_envs.png}
+\caption{Comparing base LLM models. 3 seeds are generated per LLM.}
+\vskip -8pt
+\label{fig:fig4}
+\end{center}
+\vskip -0.2in
+\end{figure*}
+
+\begin{figure*}[ht]  
+\begin{center}
+\includegraphics[width=0.9\textwidth]{figures/good_hypothesis_example.png}
+\caption{Example of GPT4-based agent finding a good hypothesis and employing good reasoning to select its next target inventory.}
+\label{fig:fig6}
+\end{center}
+\end{figure*}
+
+\begin{figure}[H]
+\vskip 0.2in    
+\begin{center}
+\centerline{\includegraphics[width=0.9\columnwidth]{figures/fig_hypothesis_evo.pdf}}
+\caption{
+Example of a successful evolution of a hypothesis for MMP + HE + HR playing a Best Response bot. It shows the process of how the LLM-based agent generated a good hypothesis about the opponent's strategy, which was eventually validated.}
+\label{fig:fig7}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\begin{figure}[t]
+\vskip 0.2in    
+\begin{center}
+\centerline{\includegraphics[width=1.0\columnwidth]{figures/ablations_reward_evals.png}}
+\caption{Average reward per episode on all evaluation scenarios for each version of the ToM module using the full version. Errorbars reflect SEM across 5 episodes. Reward is normalized per 1200 timesteps to reduce variance with variable length episodes.}
+\label{fig:fig8}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\begin{tcolorbox}[
+title={\small \textbf{Example generated strategy for HE + HR playing rock bot}},
+width=0.99\columnwidth]
+\fontsize{7pt}{7pt}\selectfont
+\ttfamily
+% {\large \centering \textbf{MEANS} \par}
+Given the interaction history and the current state of the game, it seems that a strategy that adapts to the opponent's recent choices while maintaining an element of unpredictability could be effective. The opponent's strategy is not entirely clear from the interaction history, but there are patterns of losses and wins that can be used to inform our strategy.
+\vspace{2mm}
+
+Here's a high-level strategy for player\_0:
+
+1. Observe the opponent's recent strategy: Look at the last few interactions to determine if the opponent is favoring a particular resource. If a pattern is detected, prepare to counter it.
+
+2. Adapt based on interaction history: If we win an interaction, introduce a slight randomness to our next choice to avoid being predictable. If we lose, counter the opponent's last winning resource. In the case of a tie, either maintain the current resource or switch based on the observed pattern of the opponent.
+
+3. Efficient resource collection: Focus on collecting resources that align with our strategy while avoiding unnecessary collection of other resources. This will help in building a strong inventory for the next duel.
+
+4. Strategic duel initiation: Initiate duels when we have a strong inventory that counters the opponent's likely choice. Use memory and observation to infer the opponent's strategy and position.
+
+5. Avoid unnecessary resource collection: Once we have enough of a particular resource to play a strong strategy, avoid collecting more of that resource and instead focus on positioning for a duel or collecting a different resource if our strategy requires it.
+
+6. Maintain flexibility: Be ready to adapt our strategy based on new information from the opponent's actions and the outcomes of interactions.
+
+\vspace{2mm}
+Now, let's summarize this strategy in a Python dictionary format:
+
+```python
+
+\{
+
+
+    'my\_strategy': 'Adaptive Strategy with Randomness and Countering',
+    'observe\_recent\_opponent\_strategy': True,
+    'adapt\_based\_on\_interaction\_history': True,
+    'introduce\_randomness\_post\_win': True,
+    'efficient\_resource\_collection': True,
+    'strategic\_duel\_initiation': True,
+    'avoid\_unnecessary\_resource\_collection': True,
+    'maintain\_flexibility': True,
+    'interaction\_guidelines': \{
+        'if\_win\_next': 'introduce slight randomness to avoid predictability',
+        'if\_lose\_next': 'counter opponent’s last winning resource',
+        'if\_tie\_next': 'maintain or switch based on observed opponent pattern'
+
+        
+    \}
+
+
+\}
+```
+\end{tcolorbox}
+\caption{
+Example of a failure mode for HE + HR playing rock bot. Generated strategies make little sense given the interaction history and requested format.
+\label{fig:fig9}
+}
+\end{figure}
+\clearpage
+\begin{figure}[H]
+\centering
+\begin{tcolorbox}[
+title={\small \textbf{Example of a successful embodied exploration at the beginning of an episode}},
+width=0.99\columnwidth]
+\fontsize{7pt}{7pt}\selectfont
+\ttfamily,
+% {\large \centering \textbf{MEANS} \par}
+First subgoals: Subgoal Plan:
+Since I am currently at (21, 10) with an orientation facing North and my high-level strategy is to collect 5 yellow resources to play a pure rock strategy, I need to find and move towards the nearest yellow box locations. However, there are no observable yellow box locations in my immediate vicinity. Therefore, my first subgoal is to explore the environment to 
+find yellow boxes. I should move towards the center of the map where I am more likely to find resources and encounter the other player for a 
+potential duel.
+\vspace{2mm}
+
+Given that I am at the edge of the map, I should move left (West) towards the center. I will move to (20, 10), then to (19, 10), and continue in 
+this direction until I find yellow boxes or reach a more central location on the map. If I encounter yellow boxes along the way, I will adjust my 
+path to collect them. Once I have collected 5 yellow boxes, I will look 
+for the opponent to initiate a duel.
+
+Action Plan:
+
+```python
+
+\{
+
+
+  action\_plan: [
+    move\_to((21, 10), (20, 10)),
+    move\_to((20, 10), (19, 10)),
+    move\_to((19, 10), (18, 10)),
+    move\_to((18, 10), (17, 10)),
+    move\_to((17, 10), (16, 10))]
+  
+\}
+```
+\end{tcolorbox}
+\caption{
+Example of a subgoal module exploring the environment at the beginning of an episode to build up a cognitive map of where resources are located. 
+}
+\vspace{-4mm}
+\label{fig:fig10}
+\end{figure}
+
+\section{Hyperparameters and Computational Costs}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Hyperparameter} & \textbf{Value} \\ \hline
+Alpha ($\alpha$) & 0.3 \\ \hline
+Intrinsic reward c & 1.0 \\ \hline
+Threshold for Hypothesis Value ($V_{\text{thr}}$) & 0.7 \\ \hline
+Top $k$ Hypotheses Considered ($k$) & 5 \\ \hline
+\end{tabular}
+\caption{Default Hyperparameters of the Hypothetical Minds model}
+\label{table:hyperparameters}
+\end{table}
+
+\begin{figure}[H] 
+\begin{center}
+\centerline{\includegraphics[width=0.7\columnwidth]{figures/top_k_sweep.png}}
+\caption{Average reward per episode on Running With Scissors Repeated (all scenarios) for four values of top\_k. Top\_k reflects the number of top hypotheses to continue evaluating (default=5). Errorbars reflect SEM across 45 episodes. Reward is normalized per 1200 timesteps to reduce variance with variable length episodes.}
+\label{fig:fig11}
+\end{center}
+\end{figure}
+
+\begin{figure}[H] 
+\begin{center}
+\centerline{\includegraphics[width=0.7\columnwidth]{figures/top_k_sweep_by_scenario.png}}
+\caption{Average reward per scenario on Running With Scissors Repeated for four values of top\_k. Top\_k reflects the number of top hypotheses to continue evaluating (default=5). Errorbars reflect SEM across 5 episodes per scenario. Reward is normalized per 1200 timesteps to reduce variance with variable length episodes.}
+\label{fig:fig12}
+\end{center}
+\end{figure}
+
+\begin{figure}[H] 
+\begin{center}
+\centerline{\includegraphics[width=0.7\columnwidth]{figures/performance_vs_cost_by_topk.png}}
+\caption{Scatter plot showing the relationship between computational cost and reward for different top-k parameter values in the hypothesis generation process. Each point represents an episode, with color indicating the top-k value used. Reward and cost is normalized per 1200 timesteps to reduce variance with variable length episodes.}
+\label{fig:fig13}
+\end{center}
+\end{figure}
+
+\begin{figure}[H] 
+\begin{center}
+\centerline{\includegraphics[width=1.0\columnwidth]{figures/top_costs_subplot.png}}
+\caption{Comparison of computational costs across different top-k values in three metrics. Left: Total monetary cost in dollars. Middle: Number of input tokens consumed. Right: Number of output tokens generated. All metrics are normalized per episode length (1200 steps). Errorbars reflect SEM across 45 episodes.}
+\label{fig:fig14}
+\end{center}
+\end{figure}
+
+\begin{figure}[H] 
+\begin{center}
+\centerline{\includegraphics[width=0.7\columnwidth]{figures/alpha_sweep.png}}
+\caption{Average reward per episode on Running With Scissors Repeated (all scenarios) for each four values of the learning rate alpha $\alpha$. Alpha reflects how much to weigh recent interactions when evaluating the prediction accuracy of the hypotheses, with higher values weighing recent interactions more heavily (default=0.3). Errorbars reflect SEM across 10 episodes in two representative scenarios. Reward is normalized per 1200 timesteps to reduce variance with variable length episodes.}
+\label{fig:fig15}
+\end{center}
+\end{figure}
+
+\begin{figure}[H] 
+\begin{center}
+\centerline{\includegraphics[width=0.7\columnwidth]{figures/v_thr_sweep.png}}
+\caption{Average reward per episode on Running With Scissors Repeated (all scenarios) for each five values of the value threshold for hypothesis validation. V\_thr reflects how confident we want to be before validating a hypothesis as correct such that we do not generate or evaluate more hypotheses until that value falls under the threshold (default=0.7). Errorbars reflect SEM across 10 episodes in two representative scenarios. Reward is normalized per 1200 timesteps to reduce variance with variable length episodes.}
+\label{fig:fig16}
+\end{center}
+\end{figure}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Hyperparameter} & \textbf{Value} \\ \hline
+Alpha ($\alpha$) & 0.3 \\ \hline
+Counterfactual reward c & 3.0 \\ \hline
+Threshold for Hypothesis Value ($V_{\text{thr}}$) & 3.0 \\ \hline
+Top $k$ Hypotheses Considered ($k$) & 5 \\ \hline
+\end{tabular}
+\caption{Hyperparameters of the HE + HR model}
+\label{table:hyperparameters}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Hyperparameter} & \textbf{GPT-4} & \textbf{GPT-3.5} & \textbf{Llama3} \\ \hline
+Model & "gpt-4-1106-preview" & "gpt-3.5-turbo-1106" & "Meta-Llama-3-70B-Instruct"\\ \hline
+Max tokens & 4000 & 2000 & 2000 \\ \hline
+Temperature & 0.1 & 0.2 & 0.2 \\ \hline
+Top p & 1.0 & 1.0 & 1.0 \\ \hline
+n & 1 & 1 & 10 \\ \hline
+\end{tabular}%
+}
+\caption{Hyperparameters of Various Models}
+\label{table:hyperparameters}
+\end{table}
+
+\subsection{Experiments Compute Resources}
+In Table \ref{tab:gpt4_compute_cost}, we show the cost of running an episode with 1000 steps. For Llama3 experiments which required 4 GPUs, we ran our experiments on three compute nodes with A40s or L40s.
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{|>{\centering\arraybackslash}m{4cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|}
+        \hline
+        \textbf{} & \textbf{Money (\$)} & \textbf{Time (mins)} \\
+        \hline
+        \textbf{HM-GPT4} & 10 & 45 \\
+        \hline
+        \textbf{Reflexion} & 8 & 42 \\
+        \hline
+        \textbf{ReAct} & 6 & 14 \\
+        \hline
+        \textbf{PlanReAct} & 4 & 21 \\            
+        \hline
+        \textbf{HM-GPT3.5} & 1 & 24 \\
+        \hline
+        \textbf{HM-Llama3} & - & 58 \\
+    \end{tabular}
+    \caption{Experiment costs for a single episode of RWS Repeated. Rounded to nearest integer.}
+    \label{tab:gpt4_compute_cost}
+\end{table}
+
+\section{Environments}
+
+\subsection{Running With Scissors Repeated}
+
+Specifically, here we evaluate our model on the \textit{Running With Scissors in the matrix: Repeated} environment (RWS) in the Melting Pot multi-agent decision-making benchmark \citep{agapiou2022melting}. This is a zero-sum competitive environment with two players moving around a map and collecting yellow, purple, or blue resources that correspond to rock, paper, and scissors respectively. In addition to movement, the agents have an action to fire an "interaction" beam which initiates a duel with the other player when that player is within range of the beam. An interaction results in one agent getting positive reward and the other agent getting an opposite negative reward according to the inventories of resources picked up by each player. Specifically a player will collect an inventory, which is only observable by that player:
+\[
+\rho = (\rho_{yellow}, \rho_{purple}, \rho_{blue}).
+\]
+
+Reward is determined by matrix multiplication operations mirroring the rock, paper, scissors matrix game:
+\begin{align*}
+r_{\text{row}} &= \mathbf{v}_{\text{row}}^T A_{\text{row}} \mathbf{v}_{\text{col}}, &
+r_{\text{col}} &= -r_{\text{row}}
+\end{align*}
+where \( v_i = \frac{\rho_i}{\sum_{j=1}^K \rho_j} \) and
+\[
+A_{\text{row}} = 
+\begin{bmatrix}
+0 & -10 & +10 \\
++10 & 0 & -10 \\
+-10 & +10 & 0
+\end{bmatrix}.
+\]
+
+The partially-observable input in Melting Pot consists of a 5x5 window around the agent such that it can see three grids in front of itself and one behind it, and two on each side.
+
+\subsubsection{Scenarios}
+
+Description of scenarios for each substrate are reproduced directly from \citep{agapiou2022melting}:
+
+\begin{enumerate}
+    \item[\textbf{SC0:}] \textit{Versus mixed strategy opponent.}  Here the
+focal agent must defeat an opponent that
+was trained to play a pure strategy: either
+rock, paper, or scissors. However, the specific opponent is sampled at test time so it
+could be any of those. All opponents commit strongly to their choice, aiming to collect at least three resources before interacting. To defeat them, the focal agent should
+scout out which pure strategy its opponent
+is playing and then collect the resources to
+implement its counter strategy. Since this is
+a one-shot interaction, success requires the
+focal agent to pay close attention to which
+resources are missing since they provide
+a clue to which strategy their opponent is
+implementing.
+    \item[\textbf{SC1:}] \textit{Versus opponent who plays the best response to what the focal player did in the last round.} Here the focal agent must defeat an opponent
+who may change their strategy with
+each interaction. The opponent will always
+select the best response to what the focal
+player selected in the previous interaction.
+For instance, if the focal player plays rock
+in one interaction then its opponent will
+play paper in the next interaction. On the
+first interaction of each episode it chooses
+one of the three pure strategies at random.
+The opponent always commits strongly to
+its choice, aiming to collect at least five resources
+before interacting. To win the focal
+player can trick its opponent into choosing
+a specific strategy and countering it. This
+requires changing strategy from interaction
+to interaction, cycling around the three options. 
+    \item[\textbf{SC2:}] \textit{Versus opponent who sometimes plays a pure
+strategy but sometimes plays the best response
+to what the focal player did in the
+last round.} Focal player must defeat an
+opponent sampled from the union of the
+background populations used in \textbf{SC 0} and
+\textbf{SC 1}. The probability of sampling a pure
+opponent is 3/4 while the probability of
+sampling a best response opponent is 1/4.
+    \item[\textbf{SC3:}] \textit{Versus mixture of opponents who often flip to
+other strategies after two interactions.}
+Focal
+player must defeat an opponent that may
+initially play any pure strategy and, with
+probability 1/3, may flip after the second
+interaction to the best response to the best
+response to its initial strategy. For example
+if it starts out playing rock then the best response
+to that would be paper, so after the
+second interaction it would switch to playing
+the best response to paper i.e. scissors.
+It only weakly commits to its strategy for
+the first two interactions. That is, it aims to
+collect only one resource before interacting.
+After two interactions, at the point when
+it changes strategy, it also starts committing
+more strongly to its choice, aiming to
+collect five resources before each interaction.
+With probability 2/3, the opponent
+instead plays a pure strategy throughout
+the entire episode. In half of the pure opponent episodes the bot fully commits to
+its pure strategy, aiming to collect five resources
+before interacting, while the other
+half of the time it commits less strongly,
+aiming to collect only one resource before
+interacting. Note that opponents may be
+weakly committed to their strategy for the
+first two interactions regardless of whether
+they will ultimately flip strategy or not so
+it’s not possible for the focal agent to observe
+weak commitment early on as a cue
+to predict whether or not their opponent
+will later flip strategies.
+    \item[\textbf{SC4:}] \textit{Versus mixture of opponents who either flip
+to another strategy after one interaction and
+keep it forever or continue to change, always
+best responding to what the focal player just
+did.} Two kinds of opponents are possible.
+Both change their strategy after the first
+interaction. With probability 3/4 the opponent
+will be a bot that flips to a different
+strategy after the first interaction and then
+follows it till the end of the episode. It always
+flips to the best response to the best
+response to its initial strategy (so if it initially
+plays rock then it will flip to scissors).
+With probability 1/4 the other kind of opponent
+is sampled. This opponent is identical
+to the one in SC 1. Both kinds of opponents
+always fully commit to their choice, aiming
+to collect at least five resources before
+interacting so its not possible to observe
+the opponent’s commitment level to predict
+which kind they are. To win the focal player
+must figure out which kind of opponent it is
+playing against and either best respond by
+selecting the same choice in all interactions
+after the first if paired with the first kind
+of opponent, or apply the cyclic strategy
+described as the solution to SC 1 if paired
+with the second kind of opponent.
+    \item[\textbf{SC5:}] \textit{Versus gullible opponent.} Here the focal
+agent must defeat an opposing agent that
+was trained to best respond to agents playing
+pure strategies. The opponent should
+attempt to scout out what strategy the focal
+agent is playing so it can pick the appropriate
+counter. To defeat it, the focal agent should feint toward one resource and
+then collect the counter to its counter. So
+for example, if the focal agent successfully
+feinted that it would pick rock, inducing
+its opponent to pick paper, the focal agent
+should then collect and play scissors. This
+opponent is fairly weak.
+    \item[\textbf{SC6:}] \textit{Versus pure rock opponent.} Opponent always
+plays rock, and commits to it strongly,
+aiming to collect five resources before interacting.
+The focal player gets a high score
+when it picks paper and commits strongly
+to that choice.
+    \item[\textbf{SC7:}] \textit{Versus pure paper opponent.} Same as SC 6
+but opponent plays paper so focal player
+should play scissors.
+    \item[\textbf{SC8:}] \textit{Versus pure scissors opponent.} Same as SC 6
+but opponent plays scissors so focal player
+should play rock."
+\end{enumerate}
+
+It should be noted that scenario 5 includes a gullible opponent, that attempts to scout out what strategy you are playing and pick the appropriate counter. From first principles, to beat this opponent an agent should feint towards one resource to fool the opponent and then select the counter to its counter. Since our ToM module selects strategies on a higher-level of abstraction than the embodiment, it was not specifically designed to beat this opponent. Integrating high-level strategy information with relevant embodied information is the subject of future research. However, in practice the gullible bot does not effectively scout out our agent, and it frequently plays the same strategy, which is exploited by our agent, leading to positive rewards on this scenario on average for all model versions.
+
+\subsection{Running With Scissors Arena}
+We also evaluate our model on \textit{Running With Scissors in the matrix: Arena} environment in the Melting Pot multi-agent decision-making benchmark \citep{agapiou2022melting}. This environment has the same dynamics as \textit{Running With Scissors in the matrix: Repeated} with the main exception being that their are $8$ players in this substrate playing on a larger $25$ by $24$ matrix with a $11$ by $11$ observability window, skewed towards viewing more in front of the agent. All scenarios under this agent represent one focal resident (agent) playing against 7 others with varying fixed and dynamic policies, attempting to maximize reward decided by the payoff matrix equivalent to the one in Running with Scissors Repeated.
+
+\subsubsection{Scenarios}
+\begin{enumerate}
+    \item[\textbf{SC0:}] \textit{Versus a background population containing
+bots implementing all three pure strategies.}  Here one focal player joins seven from the
+background population. The background
+population contains bots who implement all
+three pure strategies: rock, paper, and scissors. They may either commit to their strategy moderately (aiming to collect three resources before interacting) or more strongly
+(aiming to collect five). The task for the focal agent is to watch its opponents, see what
+strategy one of them is implementing, and
+act accordingly.
+    \item[\textbf{SC1:}] \textit{Versus gullible bots.}  Here one focal player
+joins seven from the background population. The background population consists
+entirely of weak bots who were trained to
+best respond to agents playing pure strategies. They are weak opponents.
+    \item[\textbf{SC2:}] \textit{Versus mixture of opponents who play rock
+and some who flip to scissors after two interactions}  Here one focal player joins seven
+from the background population. The focal
+player should pay attention to what each
+prospective partner has collected since 2/3
+of them play rock while 1/3 play scissors
+after the first two interactions. Choosing paper to best respond to rock is a bad choice if
+accidentally paired with an opponent playing scissors.
+    \item[\textbf{SC3:}] \textit{Versus mixture of opponents who play paper
+and some who flip to rock after two interactions. }  Like SC2 but with bots playing paper
+and bots switching from paper to rock.
+    \item[\textbf{SC4:}] \textit{Versus mixture of opponents who play scissors and some who flip to paper after two
+interactions. }  Like SC 2 but with bots playing scissors and bots switching from scissors
+to paper.
+    \item[\textbf{SC5:}] \textit{Visiting a population of pure paper bots.}   Here one focal player joins seven from the
+background population. All seven background bots play paper so the focal player
+can get a high score by playing scissors.
+    \item[\textbf{SC6:}] \textit{Visiting a population of pure rock bots}  Here
+one focal player joins seven from the background population. All seven background bots play rock so the focal player can get a
+high score by playing paper. 
+    \item[\textbf{SC7:}] \textit{Visiting a population of pure scissors bots.
+Here one focal player joins seven from the
+background population.}  All seven background bots play scissors so the focal player
+can get a high score by playing rock.
+
+\end{enumerate}
+
+
+\subsection{Prisoners Dilemma Repeated}
+The \textit{Prisoners Dilemma in the Matrix Repeated} environment is a mixed-motive one where two individuals collect resources that represent
+‘defect’ (red) or ‘cooperate’ (green) and compare
+inventories in an encounter, analogous to the Running With Scissors substrates. Consequences of the
+inventory comparison are congruent with the classic Prisoner’s Dilemma matrix game, exposing tension between reward for the group and reward for the individual. Reward is delivered after an interaction weighted by the proportion of items in each agent's inventory, as described above for Running With Scissors. The payoff matrix for the
+interaction is
+
+\[
+A_{\text{row}} = A_{\text{col}}^T = 
+\begin{bmatrix}
+3 & 0 \\
+5 & 1 
+\end{bmatrix}
+\]
+
+\subsubsection{Scenarios}
+\begin{enumerate}
+    \item[\textbf{SC0:}] \textit{Partner may play either cooperate or defect}  The optimal strategy is simply to unconditionally defect. However, given that the
+focal doesn’t know the strategy of the background player, a good strategy is more subtle. A reasonable strategy is to be a grim
+reciprocator cooperator, which would cooperate with the cooperator, and defect to
+the defector. Alternatively the focal player
+might try to ascertain whether the background player is exploitable. Doing so, however, carries a risk, for if the background
+player were to be a Grim reciprocator (like
+in other scenarios), this would cause them
+to defect for the rest of the episode.
+    \item[\textbf{SC1:}] \textit{Partner typically plays cooperate.}  The optimal strategy is simply to unconditionally
+defect. The same considerations about uncertainty of the background player’s strategy from Scenario 0 apply here.
+    \item[\textbf{SC2:}] \textit{Partner typically plays defect}  The optimal
+strategy is simply to unconditionally defect.
+However, because the focal player doesn’t a
+priori know the strategy of the background
+player, they must first try to find out their
+strategy. This can be done by looking at
+which resources they collect or by paying
+attention to the results of the first few interactions. Once the focal has identified
+its background partner is defecting then it
+may have confidence that it should defect as
+well. The focal player should also consider
+the possibility that the background bot is
+corrigible, i.e. that it could be persuade to
+switch from defection to cooperation. This
+is not the case here but the background populations used in SC 8 and SC are corrigible.
+    \item[\textbf{SC3:}] \textit{Partner is a hair-trigger grim reciprocator, i.e.
+one who initially cooperates but, if defected
+on once, will retaliate by defecting forever after.}  The optimal strategy is simply to cooperate. Grim reciprocator background players
+are non-exploitable, and there is no way
+to know how they will react to a defection
+ahead of time. Because of this uncertainty,
+testing for exploitability can lead to poor
+performance of the focal player. Conditional
+cooperators who cooperate first but retaliate if defected on should achieve a high
+score.
+    \item[\textbf{SC4:}] \textit{Partner is a two-strikes grim reciprocator, i.e.
+one who initially cooperates, but if defected
+on twice, will retaliate by defecting forever
+after}  The optimal strategy is simply to cooperate. Grim reciprocator background players are non-exploitable, and there is no way
+to know how they will react to a defection
+ahead of time. Because of this uncertainty,
+testing for exploitability can lead to poor
+performance of the focal player. In principle,
+it would be possible to defect once against
+the background player leading to higher reward. But since it is not possible to know
+the background player is a two-strikes grim
+reciprocator, and testing it against a hairtrigger grim reciprocator leads to defection,
+in practice is better simply to cooperate.
+Conditional cooperators who cooperate first
+but retaliate if defected on should achieve
+a high score.
+    \item[\textbf{SC5:}] \textit{Partner is a tit-for-tat conditional cooperator}  The optimal strategy is simply to cooperate.
+Defecting against a tit-for-tat agent, even
+occasionally, might lead to miscoordinated
+interactions where one player cooperates
+and the other defects, in an alternating way.
+Forgiveness is one way to break out of such
+cycles of recrimination. Conditional cooperators who cooperate first but retaliate if
+defected on should also be forgiving to ensure they do well in this scenario.
+    \item[\textbf{SC6:}] \textit{Partner is a tit-for-tat conditional cooperator
+who occasionally plays defect instead of cooperate.}  Like the previous scenario, except the tit-for-tat background player occasionally will defect instead of cooperate. This
+is known as trembling hand in game theory. A strict tit-for-tat focal player would
+occasionally fall into miscoordinated interactions with the background player resulting in alternating cooperation and defection. As in SC5, focal conditional cooperators must also be forgiving to ensure they
+do well in this scenario. Forgiveness is even
+more important here since the background
+player will defect relatively frequently itself
+but will still implement tit-for-tat retaliation
+when defected on itself.
+    \item[\textbf{SC7:}] \textit{Partner plays cooperate for a while then
+switches to defect}  Similar considerations to
+the previous scenarios. A good strategy is a
+grim reciprocator, or tit-for-tat for the focal
+player. Unconditional cooperation would
+be exploited by the background player.
+    \item[\textbf{SC8:}] \textit{Partner tries to take advantage of the focal
+player by playing defect, but if punished, partner then switches to tit-for-tat conditional
+cooperation} Related to Scenario 2, the optimal strategy is for the focal player to persuade the background player to stop defecting by punishing it through defecting itself.
+Once persuaded, the background player implements a conditional cooperation (tit-fortat) strategy. So it is safe to start cooperating with them once you have verified that
+they are themselves consistently cooperating.
+    \item[\textbf{SC9:}] \textit{Partner tries to take advantage of the focal player by playing defect, but if punished, partner then switches to noisy tit-for-tat conditional cooperation}  Like the previous scenario, except the focal player must
+implement a more generous form of conditional cooperation after persuading the
+background player to switch from defection.
+
+\end{enumerate}
+
+
+\subsection{Collaborative Cooking Asymmetric}
+In the \textit{Collaborative Cooking Asymmetric} substrate, players need to collaborate to follow recipes. The environment described in \citep{agapiou2022melting} follows the regular pseudoreward scheme, which is turned off by default. The asymmetric environment is a version of the Collaborative Cooking with an asymmetric
+advantages map. This is to test whether players can choose high-level strategies that play to their strengths.
+\subsubsection{Scenarios}
+\begin{enumerate}
+    \item[\textbf{SC0:}] \textit{Collaborate with a skilled chef}  Here the
+background player implements a particular policy that can be very effective when
+its partner does its part. The two players
+are on two distinct and disconnected sides
+of the map. On one side the goal delivery
+location is close to cooking pots and the
+tomato dispenser is far away whereas on
+the other side the the goal delivery location
+is far from the cooking pots but the tomato
+dispenser is close. The players should collaborate, each specializing in the part of
+the task that it is most efficient for them
+to do on the side of the map where they
+spawned. The background player implements this kind of policy, which depends on
+the actions of its partner to complete the
+task. The background player was trained
+with the V-MPO algorithm.
+    \item[\textbf{SC1:}] \textit{Collaborate with a semi-skilled apprentice
+chef}  This scenario is similar to SC 0 but the
+background player is not as well trained. In
+fact the background population used here is
+the same as in SC0 but from an earlier point
+in training. The importance of evaluating
+cooperation with bots of varying skill levels,
+and different points in training.
+    \item[\textbf{SC2:}] \textit{Succeed despite an unhelpful partner}  In
+this scenario the background player never
+moves or helps in any way. On this map it
+is less efficient to implement all steps of the
+recipe alone versus to work together with
+a partner. But it is still possible for either
+player to perform all the steps on their own.
+The task is to realize that the background
+player won’t do their part of the joint policy
+so the focal agent had better do everything
+itself.
+\end{enumerate}
+
+
+\section{Methods}
+
+\subsection{Textual Map}
+
+Pixel images of the global state are preprocessed into a text-based state representation. The images are divided into 8x8 patches, each corresponding to a cell within the Melting Pot grid that entities can occupy. Each patch may represent one of four types: an agent, a resource, a wall, or a blank space. The patches are labeled by comparing them to manually labeled reference patches of each type of entity, including the numerous possible body orientations and hat colors an agent can embody in each environment. Automating the process with computer vision is a candidate for future work. The global state can then be fully represented in text by coordinates in a Height x Width grid and the entity label at each coordinate. Egocentric states are then created from this according to the partially-observable 5x5 box around an agent (dependent on its orientation). We tried several representations of feeding this textual map to GPT, and in practice the best representation consists of printing each entity type with a list of all the coordinates where that entity type is present. For example ``Player Position: \{'player\_0-S': [(21, 4)]\}, Observable Yellow Box Locations: [(13, 10), (14, 11)]\}, Observable Blue Box Locations: [], Observable Purple Box Locations: [(13, 11), (15, 11)]`` encodes the player position and orientation (south) along with the observable box locations. The player's current inventory is also included in the textual state representation, as it is in the default state representation for Running With Scissors and Prisoner's Dilemma.
+
+\subsection{Memory}
+
+The memory system consists of two parts. The first data structure appends the observed states in the previous step to lists of each entity type in a tuple with the step it was observed. For example: `yellow\_box': [((13, 3), `Step: 1087'), ((13, 4), `Step: 1087'), ((7, 3), `Step: 1091')]. The LLM is prompted that its memory can be outdated and therefore should take the step it was last observed into account.
+
+The second data structure in the memory system contains a list of the agent's inventories and rewards from the interactions that occurred so far. This specific information, distinct from the previously observed states, is relayed to the ToM module.
+
+\subsection{Theory of Mind Module}
+
+The Theory of Mind Module is queried periodically after discrete events. For the \textit{* in the Matrix} substrates, this occurred after an interaction. For collaborative cooking, this occurred after a dish was delivered. 
+
+The ToM module consisted of a multi-step process, as depicted in \autoref{fig:fig1} for the \textit{* in the Matrix} substrates:
+\begin{enumerate}
+    \item \textbf{Record the observed behavior from the other agent's trajectory \( \phi(\tau) \).} Here this refers to whether they played rock, paper, or scissors, the argmax of the inventory (or cooperate/defect in Prisoner's Dilemma). Since the opponent's inventory is never observed, we have to estimate it given the inventory Hypothetical Minds played and the reward it received. Thus, we ask the LLM to estimate the opponent's inventory given this information, and note the output as the empirical opponent's inventory.
+    \item \textbf{Evaluate Hypotheses about opponent's strategy.} In the previous interaction, the top k hypotheses are used to generate predictions about the opponent's next inventory \( \hat{\phi(\tau)} \). These argmax of the inventory predictions are compared to the argmax of the empirical opponent's inventory (did they play rock, paper, or scissors). As described in the main text, Hypotheses that led to correct predictions get a positive intrinsic reward and negative otherwise. If a hypothesis is validated, meeting $V_{\text{thr}}$, then step 3 is skipped and this hypothesis is used for step 4 until the hypothesis falls below the threshold (meaning its not longer making good predictions)
+    \item \textbf{Generate new and refine old hypotheses}. The LLM is tasked with generating a hypothesis about the other agent's strategy given the entire interaction history (see prompt below for more details). The prompt also includes the top k hypotheses generated so far if the hypotheses have a value above 0 (meaning at least one correct prediction) such that the LLM can refine previously generated hypotheses. 
+    \item \textbf{Guess opponent's next goal.} The LLM is prompted to guess the opponent's next inventory given a hypothesis and the interaction history. If no hypothesis has yet surpassed $V_{\text{thr}}$, then guesses are made for the top k hypotheses and the last generated hypothesis. The prediction from the last generated hypothesis would be used to select a counter inventory in the next step. Moreover, all the predictions will be used for step 2 (hypothesis evaluation) after the next interaction. If a hypothesis crosses $V_{\text{thr}}$, then only it will be used in this step.
+    \item \textbf{Select goal to counter opponent.} The LLM is prompted to select a counter inventory given the prediction about the opponent's next inventory. Since this step involves straightforward reasoning given the opponent's predicted inventory, it is done simultaneously in the API/LLM call with the previous step. Therefore, the LLM is specifically tasked with outputting both the predicted opponent's next inventory \( \hat{\phi(\tau)} \) and its own goal/target inventory \textit{z} in a single API/LLM call.
+\end{enumerate}
+
+In RWS Arena, step 4 is done separately than step 5. The LLM is first prompted to guess the next inventory for the opponent they just played. Then in a subsequent step, it is asked again to select which opponents to seek out, and to guess what inventory they will play (this could be a different opponent than the one interacted with in the last round). Therefore, the ToM module can evaluate the hypotheses for each opponent based on the quality of the predictions they make for that particular opponent, and this process is separable from selecting the target inventory in the next interaction (see prompts).
+
+A similar process occurs for \textit{Collaborative Cooking Asymmetric}. Step 1 is hardcoded and not LLM dependent; the other agent's actions/behavior \( \phi(\tau) \) are labeled by custom code given the observations (abstracting away the problem of action recognition from textual observations). These actions include "Teammate picked up a dish", "Teammate put down a dish", "Teammate picked up cooked soup in dish", "Teammate delivered cooked soup", "Teammate picked up a tomato", or nothing. In step 4, the LLM is prompted to guess the teammate's next behavior \( \hat{\phi(\tau)} \) in natural language. Another LLM instance is used in step 2 to assess whether the prediction was correct or not, prompting the LLM to output True or False, and giving each hypothesis the appropriate intrinsic reward. Step 5 is completed in a separate API call for Collaborative Cooking, and the LLM is prompted: "what strategy do you want to take next and why? Teammate's observed strategy: ''. Think step by step about how to adapt to their behavior and maximize all resources and efficiency accordingly."
+
+\subsection{Subgoal Module}
+
+The subgoal module is responsible for generating efficient subgoal plans for the agent. Given the high-level strategy and the current state of the game, the module decomposes the strategy into a sequence of subgoals in the form of action function calls to efficiently implement the strategy. The subgoal module uses the LLM to generate these plans as a sequence of action function calls (usually 3-6). The prompt includes the current step of the game, the high-level strategy/target inventory previously decided upon, details about the current observations (including player position, orientation, inventory, observable resource locations, other agent locations), valid movement locations, memory, and instructions about the action functions.
+
+Action functions for the \textit{* in the Matrix} substrates:
+
+\begin{itemize}
+    \item move\_to(src\_coord, target\_coord): Efficiently move agent from source coordinate to target coordinate.
+    \item fire\_at(target\_coord): Stay around specified coordinate and fire interaction when opponent is spotted to initiate duel.
+\end{itemize}
+
+Action functions for \textit{Collaborative Cooking Asymmetric}:
+
+\begin{itemize}
+    \item move\_to(src\_coord, target\_coord): Efficiently move agent from source coordinate to target coordinate. Only move to valid move\_to locations where counters or objects are not present.
+    \item interact(target\_coord): Move to and interact with the entity at the target coordinate, such as picking up ingredients or delivering dishes of cooked soup. To place an object on a counter to free your hands, use interact(counter\_coord).
+    \item wait(target\_coord): Wait for the pot at target\_coord to finish cooking. Check the progress of the pots and only use valid locations where pots are present.
+\end{itemize}
+
+
+\subsection{Action Planner}
+
+The action planner turns the sequence of subgoals specified by the subgoal module into a sequence of atomic actions compatible with the Melting Pot environment. These actions include step forward, backward, left, or right, turn left or right, fire zapping beam, and noop. For the \texttt{move\_to(source\_coordinate, target\_coordinate)} function, the A* algorithm find the most efficient path given a set of obstacles. Walls are always considered obstacles, and other resources are conditionally added as obstacles. If a path can be found without picking up another resource, the action planner will return it. However, in many cases the language model picks a target coordinate where other resources cannot be avoided. The action planner will use a priority system in this case, privileging paths where only resources of the same type as the target coordinate will be picked up. The \texttt{fire\_at} function returns a sequence of actions to turn towards the opponent and zap them when the agent is within the extent of the zapping beam's range. If the opponent is not in view, then the fire\_at function turns the agent continually clockwise until the other agent is found.
+
+\subsection{Self-Reflection - Collaborative Cooking}
+
+For \textit{Collaborative Cooking Asymmetric}, an evaluator and self-reflection mechanism was added as in the Reflexion baseline \citep{shinn2024reflexion}. This was added such that if the agent was making action plans that did not change the state of the world, for example trying to pick up a tomato while holding a dish, these action plans were not repeated with the same state information. By first reflecting on whether the previous action plan was successful, the agent was able to make less mistakes over the course of the episode. This additional cognitive module for self-reflection could in principle also be added for the other substrates, but was not necessary for good performance on the *\textit{ in the matrix} games because the state transitions were simpler for LLMs to understand.
+
+\section{Baselines}
+
+\subsection{ReAct}
+
+The ReAct \citep{yao2022react} agent combines reasoning traces with task-specific actions in an interleaved manner. This approach allows the agent to generate both reasoning steps and actions within the same language model framework. In our context, the reasoning consists of chain of thought reasoning preceding a subgoal plan in the specified format of utilizing action functions. The agent is prompted to think about the other agents' strategies and come up with a subgoal plan accordingly. Thus, ReAct is functionally an ablation of Hypothetical Minds such that there is only a subgoal module and not a theory of mind module. Three example responses are shown as few-shot prompts, consistent with the ReAct framework.
+
+\subsection{Reflexion}
+
+Reflexion adds evaluation and self-reflection to the ReAct agent backbone serving as the Actor module. After a subgoal plan is completed, the LLM is queried to evaluate the outcomes of that plan. Outcomes are represented as the reward during the plan, and salient state information pre and post plan. This state information includes the position and the inventory of the agent for the \textit{* in the matrix} games. For \textit{Collaborative Cooking Asymmetric}, the given state information included position, what the agent is holding, and the state of the two pots.
+
+\subsection{PlanReAct}
+
+We include the PlanReAct architecture introduced in \citep{liu2023bolaa} as a hierarchical baseline. This model first generates a high-level plan in language and then feeds this plan to a subgoal module that outputs a subgoal plan based on the high-level plan. Thus, the only
+difference between PlanReAct and Hypothetical Minds is that high-level planning is mediated by the multiple processing steps of the theory of mind module, including hypothesis generation, evaluation, and refinement.
+
+\subsection{PPO}
+
+We train RL agents in a population of PPO agents \citep{schulman2017proximal} on each substrate. The weights are randomly initialized for each agent in the population and weights are not shared. Therefore the agents are not playing against identical copies of themselves and see a greater diversity during training than traditional self-play. Models were trained in PyTorch using the Ray Rllib pipeline and this starter code https://github.com/rstrivedi/Melting-Pot-Contest-2023. Optimal parameters were searched over and the final models were trained for 1e8 steps.
+
+\subsection{OPRE}
+
+We include the Options as REsponses model (OPRE) introduced in the first version of the Running With Scissors environment \citep{vezhnevets2020options}. OPRE is a hierarchical MARL method where agents learn high-level options as strategic responses to other agents' behaviors. The high-level controller selects options based on observations of other agents, and the low-level controller executes actions conditioned on these options. As this was included as a baseline in the Melting Pot 2.0 paper, we reuse the results reported in that paper \citep{agapiou2022melting}. 
+
+\section{Ablation Details}
+
+The Hypothesis Evaluation + Hypothesis Refinement model had a different evaluation procedure than the other models. Rather than computing values based on predicting the opponent's inventory, here we use extrinsic reward and counterfactual reward. If a hypothesis is used online for goal selection, then the rewards received in the next interaction can be directly used for evaluating it. For the other considered hypotheses, we simulate counterfactual reward by 1. asking GPT to generate a target inventory given the hypothesis/strategy and the given situation and 2. after the next interaction we ask GPT again to reason about what the reward would have been if it played the inventory from 1. GPT is asked to output, positive, negative, or neutral, which we convert to reward with the $c$ parameter.
+
+% \section{Hyperparameters}
+
+% \begin{table}[ht]
+% \centering
+% \begin{tabular}{|l|l|}
+% \hline
+% \textbf{Hyperparameter} & \textbf{Value} \\ \hline
+% Alpha ($\alpha$) & 0.3 \\ \hline
+% Intrinsic reward c & 1.0 \\ \hline
+% Threshold for Hypothesis Value ($V_{\text{thr}}$) & 0.7 \\ \hline
+% Top $k$ Hypotheses Considered ($k$) & 5 \\ \hline
+% \end{tabular}
+% \caption{Hyperparameters of the Hypothetical Minds model}
+% \label{table:hyperparameters}
+% \end{table}
+
+% \begin{table}[ht]
+% \centering
+% \begin{tabular}{|l|l|}
+% \hline
+% \textbf{Hyperparameter} & \textbf{Value} \\ \hline
+% Alpha ($\alpha$) & 0.3 \\ \hline
+% Counterfactual reward c & 3.0 \\ \hline
+% Threshold for Hypothesis Value ($V_{\text{thr}}$) & 3.0 \\ \hline
+% Top $k$ Hypotheses Considered ($k$) & 5 \\ \hline
+% \end{tabular}
+% \caption{Hyperparameters of the HE + HR model}
+% \label{table:hyperparameters}
+% \end{table}
+
+% \begin{table}[ht]
+% \centering
+% \resizebox{\textwidth}{!}{%
+% \begin{tabular}{|l|l|l|l|}
+% \hline
+% \textbf{Hyperparameter} & \textbf{GPT-4} & \textbf{GPT-3.5} & \textbf{Llama3} \\ \hline
+% Model & "gpt-4-1106-preview" & "gpt-3.5-turbo-1106" & "Meta-Llama-3-70B-Instruct"\\ \hline
+% Max tokens & 4000 & 2000 & 2000 \\ \hline
+% Temperature & 0.1 & 0.2 & 0.2 \\ \hline
+% Top p & 1.0 & 1.0 & 1.0 \\ \hline
+% n & 1 & 1 & 10 \\ \hline
+% \end{tabular}%
+% }
+% \caption{Hyperparameters of Various Models}
+% \label{table:hyperparameters}
+% \end{table}
+
+% \section{Experiments Compute Resources}
+% In Table \ref{tab:gpt4_compute_cost}, we show the cost of running an episode with 1000 steps. For Llama3 experiments which required 4 GPUs, we ran our experiments on three compute nodes with A40s or L40s.
+% \begin{table}[h!]
+%     \centering
+%     \begin{tabular}{|>{\centering\arraybackslash}m{4cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|}
+%         \hline
+%         \textbf{} & \textbf{Money (\$)} & \textbf{Time (mins)} \\
+%         \hline
+%         \textbf{HM-GPT4} & 10 & 45 \\
+%         \hline
+%         \textbf{Reflexion} & 8 & 42 \\
+%         \hline
+%         \textbf{ReAct} & 6 & 14 \\
+%         \hline
+%         \textbf{PlanReAct} & 4 & 21 \\            
+%         \hline
+%         \textbf{HM-GPT3.5} & 1 & 24 \\
+%         \hline
+%         \textbf{HM-Llama3} & - & 58 \\
+%     \end{tabular}
+%     \caption{Experiment costs for a single episode}
+%     \label{tab:gpt4_compute_cost}
+% \end{table}
+
+\section{Prompts}
+
+All prompts can be seen in our code. The most representative prompts are also reproduced below.
+
+\subsection{Running With Scissors: Arena Prompts}
+
+\begin{tcolorbox}[
+    title={\small \textbf{RWS Arena System Message}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{8pt}{9pt}\selectfont\ttfamily,
+]
+You are Agent 0 in the eight player 'running\_with\_scissors' Melting Pot multiagent reinforcement learning environment that is a 25x24 (x by y) grid with resources to collect and walls to navigate around.
+8 Players can move around the map and collect resources of 3 discrete types corresponding to rock, paper, and scissors strategies - Yellow box = rock - Purple box = paper - Blue box = scissors.
+Rock/yellow beats scissors/blue, paper/purple beats rock/yellow, and scissors/blue beats paper/purple.\\
+In addition to movement, the agents have an action to fire an "interaction" beam which initiates a duel with one player getting positive reward and the other agent getting an opposite negative reward according to their inventories.\\
+All players carry an inventory with the count of resources picked up since last respawn and for each respawn start with an inventory of 1 resource each. This inventory is visible in the state with the key 'inventory'.\\
+To play a pure strategy strongly, pick up at least 5 resources or more of the color and then fire the interaction beam at another player. To commit less strongly to a strategy, pick up around 3 resources of the color and then fire the interaction beam at another player.\\
+Usually you will only want to pick up one type of resource before an interaction, in order to gain the most information about the other players' strategies and to not waste time collecting other resources.\\
+You also want to maximize the number of interactions so after you pick up 4-6 resources, you should seek out a duel to reset your inventory and gain more information about the other players' strategies.\\
+Your opponents will also almost always only pick up one type of resource before an interaction.\\
+For example, player0\_inventory = [7, 1, 1] (Yellow, Purple, Blue) is a good inventory that will lead to an informative duel, whereas player0\_inventory = [2, 2, 2] (Yellow, Purple, Blue) will not be informative.\\
+Your reward is the result of a matrix multiplication involving your inventory in a vector format, and your opponent's inventory vector, and a payoff matrix similar to rock paper scissors.\\
+r\_t = transpose(your\_inventory) * A\_payoff * opponent\_inventory where A\_payoff = np.array([[0, -10, 10], [10, 0, -10], [-10, 10, 0]])\\
+The reward usually ranges from (5, -5) depending on the inventories of both players (the min is -10 and max 10, but it is rare to get these magnitudes). Typically +/- 3-5 is a high magnitude, and a reward near 0 suggests both players played a similar inventory.\\
+State Description: This environment is partially-observable, you can observe an 11x11 grid around your agent depending on your position and orientation (you can see more in front of you than behind).\\
+Previously seen states will be represented in memory, but note that these states could potentially be outdated. For example, the other agent could collect a resource that you previously saw.\\
+Given the partially-observable nature of the environment, you will need to explore the environment appropriately and select goals based on the information you've gathered.\\
+Also pay attention to your opponents' positions when you see them in order to duel with them and gain information about their strategy.\\
+To find a specific player, you can first move towards the last known location of the player and then move randomly around the map.\\
+Hanging around the center of the map and waiting for a player to come to you is not a good strategy for this environment.\\
+After you gather information about your opponents' strategies, seek out opponents whose strategy you know and can exploit and play a counter-strategy.
+\end{tcolorbox}
+
+\subsubsection{Hypothetical Minds}
+\begin{tcolorbox}[
+    title={\small \textbf{Subgoal Module Message}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{8pt}{9pt}\selectfont\ttfamily,
+]
+\textbf{Current State Description:}\\
+- Global Map Size: \{map\_size\} grid (Walls are located at the boundaries of the map and in other places that are invalid for move\_to).\\
+- Valid Locations for move\_to: \{movable\_locations\}\\
+- Player Position: \{player\_position\}\\
+- Player Orientation: \{player\_orientation\}\\
+- Player Inventory (yellow, purple, blue): \{player\_inventory\}\\
+- Egocentric Observations Size: 11x11 grid around your agent. You currently can observe the following based on your position and orientation:\\
+- Observable Yellow Box Locations (format: ((x,y), distance from current location)): \{yellow\_locations\_with\_distance\}\\
+- Observable Blue Box Locations: \{blue\_locations\_with\_distance\}\\
+- Observable Purple Box Locations: \{purple\_locations\_with\_distance\}\\
+- Observable Opponent Locations: \{opponent\_locations\}\\
+- Previously seen states from memory (format: ((x,y), step last observed, distance from current location)): \{self.memory\_states\}
+
+\textbf{Execution Outcomes:}\\
+\{execution\_outcomes\}
+
+\textbf{Error for extracting and executing actions from the response:}\\
+\{get\_action\_from\_response\_errors\}
+
+\textbf{Rewards:}\\
+\{rewards\_str\}
+
+\textbf{Strategy Request:}\\
+You are at step \{step\} of the game.\\
+You have decided to execute a high-level strategy/target inventory in a previous response given what you predicted your opponent will do.\\
+Select subgoals in order to achieve the strategy, including first achieving a target my\_next\_inventory: \{self.hls\_next\_inventories\}.\\
+Once you achieve the target inventory, STOP picking up resources and immediately seek out a duel with an opponent close to you that you can exploit based on your hypothesis about their strategy and your current inventory.\\
+So once you've picked up about 5-7 resources in total, seek out a duel to receive rewards, get more information about strategies, and reset your inventory.\\
+Here are your hypotheses about each player's strategy: \{self.opponent\_hypotheses\}\\
+If you've generated a hypothesis about a player's strategy, you can use this to inform your strategy about whether to interact with them or not.\\
+Each strategy is paired with a value on how well it explains the data observed so far, starting at 0.\\
+A hypothesis is validated when its value is greater than: \{self.good\_hypothesis\_thr\}.\\
+Your task is to devise efficient action plans for player \{self.agent\_id\}, reason through what the next subgoals should be given the state information.\\
+Your response should be broken up into two parts:\\
+1. Subgoal Plan - based on the current state and the high-level strategy you previously specified above, decompose this strategy into a sequence of subgoals and actions to efficiently implement this strategy. Think step by step about this. This could be fairly long.\\
+2. Action Plan - output this sequence of actions in the following Python dictionary format, parsable by $\texttt{ast.literal\_eval()}$
+starting with:
+\begin{verbatim}
+{{ 'action_plan': ['move_to((11, 7), (9, 5))', 'move_to((9, 5), (13, 5))'] }}
+\end{verbatim}
+Example response 1, 2, and 3 are formatted similarly, detailing other strategies and actions.
+
+\end{tcolorbox}
+\vspace{10mm}
+
+\begin{tcolorbox}[
+    title={\small \textbf{ToM Module User Message 1}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily % Set the font size and family
+]
+An interaction with another player has occurred at step \{step\}, \{self.interaction\_history[self.last\_played\_id][-1]\}.\\
+\textbf{What was my opponent's likely inventory in the last round given the inventory I played and the reward received?}\\
+Think step by step about this. First think about what resource you had the most of in your inventory, and then think about which resource would beat that if you received a negative reward of -1 or worse or which resource would lose to yours if you received a positive reward of 1 or more.\\
+If you received a small magnitude reward near 0 and in between (-1, 1), then your opponent may have played a similar inventory to you.\\
+Then depending on the magnitude of the reward and the number of resources you played, you can infer the opponent's inventory and whether they played that strategy strongly (5+ of that resource) or weakly (~3 of that resource).\\
+An inventory of \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 1\} is not possible because you need at least 2 resources of a type to play a duel.\\
+Here are some example interactions to help you reason about how the reward function works:\\
+'your\_inventory': \{'rock/yellow': 3, 'paper/purple': 1, 'scissors/blue': 1\}, 'rewards': -2.285, 'possible\_opponent\_inventory': \{'rock/yellow': 1, 'paper/purple': 5, 'scissors/blue': 1\}\\
+'your\_inventory': \{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}, 'rewards': 3.571, 'possible\_opponent\_inventory': \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 6\}\\
+'your\_inventory': \{'rock/yellow': 1, 'paper/purple': 4, 'scissors/blue': 1\}, 'rewards': 2.0, 'possible\_opponent\_inventory': \{'rock/yellow': 3, 'paper/purple': 1, 'scissors/blue': 1\}\\
+
+In the 2nd part of your response, output the predicted opponent's inventory in following Python dictionary format, parsable by $\texttt{ast.literal\_eval()}$ starting with:
+'possible\_opponent\_inventory': \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5\} \\
+Example output:\\
+Given that I last played a strong paper strategy with an inventory of \{'rock/yellow': 1, 'paper/purple': 5, 'scissors/blue': 1\} and received a reward of -3.428, I believe my opponent played a strong scissors strategy.\\
+The reward suggests that my paper was beaten by their scissors, which means their inventory likely had a higher count of blue/scissors resources.\\
+A possible inventory for them could be \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5\} or a similar distribution favoring scissors.
+
+\end{tcolorbox}
+\vspace{10mm}
+\begin{tcolorbox}[
+    title={\small \textbf{ToM Module User Message 2}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily % Set the font size and family
+]
+Total Rewards: \{rewards\_str\}
+
+\textbf{Strategy Request:}\\
+An interaction with another player has occurred at step \{step\}, \{self.interaction\_history[self.last\_played\_id][-1]\}.\\
+The total interaction history with this opponent is: \{self.interaction\_history[self.last\_played\_id]\}.\\
+\textbf{If self-improvement is a focus:}\\
+Here are your previous hypotheses about the algorithm this opponent is playing: \{self.top\_hypotheses[self.last\_played\_id]\}.\\
+What is your opponent's likely policy given the inventories and the reward function? Think step by step about this given the interaction history.\\
+If your previous hypotheses are useful, you can iterate and refine them to get a better explanation of the data observed so far.\\
+If a hypothesis already explains the data very well, then repeat the hypothesis in this response.\\
+They may be playing the same pure policy every time, a complex strategy to counter you, or anything in between.\\
+They are not necessarily a smart agent that adapts to your strategy, you are just playing an algorithm.\\
+Are you getting high positive or negative reward when playing the same type of inventory? For example, getting high positive reward every time you play many paper resources. If so, this opponent may be playing a pure strategy and you can exploit this by playing the counter strategy.\\
+Once you have output a hypothesis about this opponent's strategy with step by step reasoning, you can use the hypothesis to inform your strategy.\\
+In the 2nd part of your response, summarize your hypothesis in a concise message following Python dictionary format, parsable by $\texttt{ast.literal\_eval()}$ starting with:
+'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5
+
+\{'Opponent\_strategy': 'I think my opponent is always playing a pure scissors strategy and collecting around 5 blue resources.'\}\\
+\textbf{Otherwise:}\\
+What is this opponent's likely policy given the inventories and the reward \\
+function? Think step by step about this given the interaction history.\\
+They may be playing the same pure policy every time, a complex strategy to \\ 
+counter you, or anything in between.\\
+They are not necessarily a smart agent that adapts to your strategy.\\
+Are you getting high positive or negative reward when playing the same type of inventory? For example, getting high positive reward every time you play many \\ paper resources. If so, this opponent may be playing a pure strategy and you \\ can 
+exploit this by playing the counter strategy.\\
+Once you have output a hypothesis about this opponent's strategy \\ with step by step reasoning, you can use hypothesis to inform your strategy.\\
+In the 2nd part of your response, summarize your hypothesis in a concise message following Python dictionary format, parsable by \texttt{ast.literal\_eval()} starting with:
+\{'Opponent\_strategy': 'I think my opponent is always playing a pure scissors strategy and collecting around 5 blue resources.'\}
+
+You will be prompted again shortly to select subgoals and action plans to execute this strategy that achieves the target inventory, so do not include that in your response yet right now.
+
+\end{tcolorbox}
+
+\begin{tcolorbox}[
+    title={\small \textbf{ToM Module User Message 3}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily % Set the font size and family
+]
+An interaction with {self.last\_played\_id} has occurred at step \{step\},
+The total interaction history with \{self.last\_played\_id\{ is: 
+You previously made the following guess about this player's strategy:
+Think step by step and predict what this opponent will play the next time you interact with them.
+            Given the above mentioned guess about the opponent's policy/strategy, and the last inventory you played (if their strategy is adaptive, it may not be), what is their likely inventory in the next round.
+            In the 2nd part of your response, output the predicted opponent's next inventory in following Python dictionary format, parsable by `ast.literal\_eval()` starting with ```python.
+            Example response 1:
+            'Opponent\_next\_inventory': Given that my opponent is playing a rock policy, I believe their next inventory will be inventory=\{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}.
+            ```python
+            \{
+              'predicted\_opponent\_next\_inventory': \{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}
+            \}
+            ```
+            Example response 2:
+            'Opponent\_next\_inventory': Since my guess is that this player is playing a scissors policy, I predict that their next inventory will be \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5\}.
+            ```python
+            \{
+              'predicted\_opponent\_next\_inventory': \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5\}
+            \}
+            ```
+            Example response 3:
+            'Opponent\_next\_inventory': Since my opponent is following a paper strategy, I predict their upcoming inventory will be inventory=\{'rock/yellow': 1, 'paper/purple': 5, 'scissors/blue': 1\}.
+            ```python
+            \{
+              'predicted\_opponent\_next\_inventory': \{'rock/yellow': 1, 'paper/purple': 5, 'scissors/blue': 1\}
+            \}
+
+
+\end{tcolorbox}
+
+\begin{tcolorbox}[
+    title={\small \textbf{ToM Module User Message 4}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily % Set the font size and family
+]
+An interaction with {self.last\_played\_id} has occurred at step \{step\},
+The total interaction history with {self.last\_played\_id} is: 
+            The total interaction history overall is: .
+            You previously made the following guesses about all the other players' strategies: {possible\_opponent\_strategy}.
+            High-level strategy Request:
+            Provide the next high-level strategy for your player {self.agent\_id}. 
+            This response should include step by step reasoning in parts 1-3 about which strategy to select based on the entire interaction history in the following format:
+            1. 'Opponents\_to\_seekout': Given the hypotheses about your opponent's strategies and their values, which players should you seek out to duel with next and why? 
+            If possible, select opponents you have a good hypothesis about so you can exploit it and maximize your reward. Try to select multiple players if possible as one player might be hard to find or is respawning.
+            Are you noticing any patterns across the population as a whole?
+            2. 'Opponent\_next\_inventory': Given the above mentioned guess about the opponent's policy/strategy what is their likely inventory in the next round.
+            3. 'My\_next\_inventory': Given the opponent's likely inventory in the next round, what should your next inventory be to counter this?
+            4. In the 4th part of your response, output the opponent to seekout, the predicted opponent's next inventory, and your next inventory in following Python dictionary format, parsable by `ast.literal\_eval()` starting with ```python.
+            Example response 1:
+            1. 'Opponent\_to\_seekout': Given that I am fairly certain that player\_1 and player\_5 is playing a rock policy, I believe I should seek out either player\_1 or player\_5 to duel with next.
+            2. 'Opponent\_next\_inventory': Given that these opponents are playing a rock policy, I believe their next inventory will be something like inventory=\{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}.
+            3. 'My\_next\_inventory': Given that these players are playing a rock policy, I believe my next inventory should be a paper policy inventory=\{'rock/yellow': 1, 'paper/purple': 5, 'scissors/blue': 1\}.
+            ```python
+            \{
+              'opponents\_to\_seekout': ['player\_1', 'player\_5'],
+              'predicted\_opponent\_next\_inventory': \{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}
+              'my\_next\_inventory': \{'rock/yellow': 1, 'paper/purple': 5, 'scissors/blue': 1\}
+            \}
+            Example response 2:
+            1. 'Opponents\_to\_seekout': Considering all the interactions, player\_2, player\_3, and player\_5 seem to heavily favor the scissors/blue strategy with consistent picks. Engaging either of these players could offer a high reward opportunity.
+            2. 'Opponent\_next\_inventory': Based on the observed behavior of player\_2, player\_3, and player\_5, it is likely they will continue with a strong scissors/blue strategy, potentially having an inventory of \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5\}.
+            3. 'My\_next\_inventory': To effectively counter the scissors/blue strategy, my optimal approach would be to adopt a rock/yellow strategy. An inventory geared towards this would be \{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}.
+            ```python
+            \{
+              'opponents\_to\_seekout': ['player\_2', 'player\_3', 'player\_5'],
+              'predicted\_opponent\_next\_inventory': \{'rock/yellow': 1, 'paper/purple': 1, 'scissors/blue': 5\},
+              'my\_next\_inventory': \{'rock/yellow': 5, 'paper/purple': 1, 'scissors/blue': 1\}
+            \}
+
+
+\end{tcolorbox}
+
+\subsection{Running with Scissors: Repeated}
+The prompts for Running with Scissors Repeated remain very similar as Running with Scissors: Arena with the modification of the prompts being in a $2$ player setting.
+
+\subsection{Prisoner's Dilemma: Repeated}
+\vspace{-10pt} % Reduce vertical space before the box
+
+\begin{tcolorbox}[
+    title={\small \textbf{System Message}},
+    width=\linewidth,
+    fontupper=\fontsize{8pt}{9pt}\selectfont\ttfamily, % Slightly smaller font
+    left=5pt,right=5pt,top=5pt,bottom=5pt, % Reduce padding
+    boxsep=2pt,
+    colframe=black,
+    sharp corners,
+    breakable % Allow box to break across pages if needed
+]
+You are Agent \{self.agent\_id\} in the two player 'prisoner\_dilemma\_in\_the\_matrix' Melting Pot multiagent reinforcement learning environment that is an 23x15 (x by y) grid with resources to collect and walls to navigate around.
+Your goal is to maximize reward.
+Players can move around the map and collect resources of 2 discrete types corresponding to cooperate and defect strategies - Green box = cooperate - Red box = defect.
+You and another agent will collect resources and compare inventories in an encounter in repeated rounds.
+In addition to movement, the agents have an action to fire an "interaction" beam which initiates a duel to compare inventories and distribute rewards.
+All players carry an inventory with the count of resources picked up since last respawn and for each respawn start with an inventory of 1 resource each.
+This inventory is visible in the state with the key 'inventory'.
+Here is how the payoff matrix in the generic prisoner dilemma works:
+\begin{itemize} % Compact itemize
+    \item If both players cooperate, they both receive a reward of around 3,
+    \item If one player cooperates and the other defects, the defector receives a reward of around 5 and the cooperator receives a reward of around 0,
+    \item If both players defect, they both receive a reward of around 1.
+\end{itemize}
+
+The nuance of 'prisoner\_dilemma\_in\_the\_matrix\_\_repeated' is that the rewards are using the payoff rules of the classic prisoner dilemma, but the interaction is repeated and the rewards are distributed based on the inventory of resources collected by each player.
+\begin{itemize} % Compact itemize
+    \item If both agents cooperate, the one with more cooperate resources will receive a reward lower than the one with less cooperate resources,
+    \item If one agent cooperates and the other defects, the more defect resources the defector has, the higher the reward for the defector,
+    \item If both agents defect, the one with more defect resources will receive a higher reward than the one with less defect resources.
+\end{itemize}
+
+Your goal before each interaction is to try and infer what the other player will play and how their strategy over time is affected by your plays.
+You will only want to pick up one type of resource before an interaction.
+For example, the inventories \{'cooperate/green': 1, 'defect/red': 1\} and \{'cooperate/green': 3, 'defect/red': 3\} will both result in the same reward, so don't waste time collecting more than you need.
+Player 1 will also always only pick up one type of resource before an interaction.
+To play a strategy strongly, pick up at least 6 resources or more of only one color and then fire the interaction beam at the other player.
+To commit less strongly to a strategy, pick up around 2 resources of only one color and then fire the interaction beam at the other player.
+State Description: This environment is partially-observable, you can observe a 5x5 grid around your agent depending on your position and orientation (you can see more in front of you than behind).
+Previously seen states will be represented in memory, but note that these states could potentially be outdated. For example, the other agent could collect a resource that you previously saw.
+Given the partially-observable nature of the environment, you will need to explore the environment appropriately and select goals based on the information you've gathered.
+Also pay attention to Player 1's position when you see it in order to duel with them and gain information about their strategy.
+Your goal is to maximize reward attained over an entire episode, so keep in mind the long-term consequences of your actions. Look at events in a gestalt manner.
+\end{tcolorbox}
+\vspace{-10pt} 
+
+\subsection{Collaborative Cooking Prompts}
+
+\begin{figure}[H] % Use the 'H' specifier to strictly place the figure here
+\centering
+\begin{tcolorbox}[
+    title={\small \textbf{System Message for Collaborative Cooking Asymmetric}},
+    width=0.99\columnwidth, % Ensure the width is set to 99% of the column width
+    fontupper=\fontsize{7pt}{7pt}\selectfont\ttfamily,
+    before skip=0pt,
+    after skip=0pt
+] % Set the font for the content % You can specify background color if needed (optional)
+    
+You are Player \{self.agent\_id\} in the Collaborative Cooking Asymmetric environment, the goal is to cook and deliver tomato soup dishes with a partner. The environment consists of a kitchen with a tomato dispenser, pots, delivery locations, and dish dispensers. Each agent (of 2) has access to specific parts of the kitchen and can perform actions like picking up ingredients, putting soup in a dish, and delivering cooked soup dishes. There is an impassable barrier in the middle of the kitchen that separates the agents' sides at x=4, where the pots are located. The goal is to work together with the other agent to efficiently cook and serve as many dishes of tomato soup as possible to maximize the collective reward. However, communication is not possible, so you must infer your partner's strategy from their actions and adapt accordingly to coordinate tasks. To cook tomato soup, 1. put 3 tomatoes in a pot, 2. pick up a dish when it is finished cooking, 3. put the cooked soup in a dish, and 4. deliver it to the delivery location. Your team receives a reward of 20 for each successfully delivered dish. Only interact with objects on your side of the kitchen. You can only hold one tomato at once. You cannot pick up a tomato from the tomato dispenser with another item like a dish in your hand. You need to pick up a dish before you pick up cooked soup from a pot. The environment is partially observable, and you can only see a 5x5 grid around your agent. You will be prompted at different points to provide high-level strategies and lower-level action plans to achieve them. 
+
+\textbf{Use these three functions for lower-level action plans:}
+\begin{itemize}
+    \item \texttt{move\_to(src\_coord, target\_coord)}: Efficiently move agent from source coordinate to target coordinate. Only move to valid \texttt{move\_to} locations where counters or objects are not present. Use sparingly.
+    \item \texttt{interact(target\_coord)}: Move to and interact with the entity at the target coordinate, such as picking up ingredients or delivering dishes of cooked soup. To place an object down on a counter to free your hands, use \texttt{interact(counter\_coord)}. Mostly use this function.
+    \item \texttt{wait(target\_coord)}: Wait for the pot at target\_coord to finish cooking. Check the progress of the pots and only use valid locations where pots are present. You probably only want to use this when both pots are full to maximize efficiency.
+\end{itemize}
+Most of the time you will just want to use the \texttt{interact} function because it both moves to and interacts with objects, therefore all the cooking steps can be completed with the \texttt{interact} function.
+To put down an item to pick something else up, interact with a counter to free your hands. Do not put down items on the floor or the delivery location.
+\end{tcolorbox}
+
+\subsubsection{Hypothetical Minds}
+
+\begin{tcolorbox}[
+    title={\small \textbf{High Level Strategy Message (in ToM Module of HM) for Collaborative Cooking Asymmetric}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily
+] % Set the font size and family
+    % Background color of the box
+
+\textbf{Strategy Request:}\\
+You are at step \{step\} of the game.\\
+Provide a strategy for agent \{self.agent\_id\}.\\
+Your response should outline a high-level strategy - what strategy do you want to take next and why?\\
+Teammate's observed strategy: \{self.teammate\_strategy\}\\
+Think step by step about how to adapt to their behavior and maximize all resources and efficiency accordingly.
+
+\textbf{This response will be shown to you in the future in order for you to select lower-level actions to implement this strategy.}\\
+Example response:\\
+High-level strategy: I want to focus on cooking tomato soup dishes.\\
+You will be prompted again shortly to select subgoals and action plans to execute this strategy, so do not include that in your response yet.
+
+\end{tcolorbox}
+
+\end{figure}
+
+\begin{tcolorbox}[
+    title={\small \textbf{Subgoal Module Message}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily
+] % Set the font size and family
+    % Background color of the box
+
+\textbf{Strategy Request:}\\
+You are at step \{step\} of the game.\\
+Your task is to devise efficient action plans for agent \{self.agent\_id\}, reason through what the next subgoals should be given the state information.\\
+Your previously specified high-level strategy is: \{self.my\_strategy\}\\
+Your response should be broken up into two parts:\\
+\begin{enumerate}
+    \item \textbf{Subgoal Plan} - Based on the current state and the high-level strategy you previously specified, decompose this strategy into a sequence of subgoals and actions to efficiently implement this strategy. For every subgoal, think step by step about the best action function and parameter to use for that function. This could be fairly long.
+    \item \textbf{Action Plan} - Output this sequence of actions in the following Python dictionary format, parsable by $\texttt{ast.literal\_eval()}$ starting with:
+    \begin{verbatim}
+    {{ 'action_plan': ['interact((5, 1))'] }}
+    \end{verbatim}
+\end{enumerate}
+Example response 1:\\
+Subgoal Plan: Given the current state and my high-level strategy to focus on cooking tomato soup dishes, I should:\\
+Move to the tomato dispenser and pick up a tomato.\\
+\begin{verbatim}
+{{ 'action_plan': ['interact((5, 1))'] }}
+\end{verbatim}
+Example response 2:\\
+Subgoal Plan: Given the current state and my high-level strategy to focus on delivering tomato soup dishes, I should:\\
+Move to the dish dispenser and pick up a dish, then plate the cooked soup.\\
+\begin{verbatim}
+{{ 'action_plan': ['interact((3, 4))', 'interact((4, 2))'] }}
+\end{verbatim}
+Example response 3:\\
+Subgoal Plan: Next I should move to the delivery location and deliver the cooked soup.\\
+\begin{verbatim}
+{{ 'action_plan': ['interact((3, 1))'] }}
+\end{verbatim}
+
+\end{tcolorbox}
+\vspace{10mm}
+\begin{tcolorbox}[
+    title={\small \textbf{Evaluate Action Outcomes/Self-Reflection}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily,
+    before skip=0pt,
+    after skip=0pt
+] % Set the font size and family% Background color of the box
+
+\textbf{User Message Preamble:}
+
+% Conditionally display content based on subgoal success or failure
+\textbf{If subgoal failed:}\\
+You are an action plan evaluator.\\
+The last subgoal included an interact action that failed.\\
+Your task is to look at the subgoal the agent took, the state of the environment before and after the subgoal,\\
+and evaluate why the subgoal was unsuccessful and provide feedback about what the agent should do next time.\\
+We will next plan an entire new action plan, so suggest specific action plans and action functions to use next when applicable.\\
+
+\textbf{If subgoal succeeded:}\\
+You are an action plan evaluator.\\
+Your task is to look at the action plan the agent took, the state of the environment before the plan and the state of the environment after the plan,\\
+and evaluate whether the action plan was successful, and if not, provide feedback about what failed and what the agent should do next time.\\
+Take into account that your teammate could have influenced the outcome of the subgoal in some circumstances.\\
+Suggest specific action plans and action functions to use next when applicable.\\
+
+\end{tcolorbox}
+\vspace{10mm}
+\begin{tcolorbox}[
+    title={\small \textbf{Infer Teammate Strategy Message}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily,
+    before skip=10pt,
+    after skip=0pt
+]% Set the font size and family% Background color of the box
+
+\textbf{User Message:}
+
+% Conditionally display content based on self-improvement condition
+Based on the observed actions of your teammate (player\_1), what do you think their strategy is?\\
+Are they specializing in any specific activity or subtask?\\
+
+Teammate's observed actions:\\
+\{self.teammate\_actions\}\\
+
+Here are your previous hypotheses about the strategy your partner is playing: \{self.top\_hypotheses\}.\\
+
+Think step by step and provide an analysis of their strategy, any specialization you infer from their behavior, and their competence.\\
+Then analyze how you can adapt your strategy to maximize efficiency and coordination with your teammate.\\
+Remember communication is not allowed.\\
+
+\end{tcolorbox}
+
+
+\begin{tcolorbox}[
+    title={\small \textbf{Predict Teammate Behavior Message}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily,
+    before skip=0pt,
+    after skip=0pt
+]% Set the font size and family] % Background color of the box
+
+A dish has been delivered at step \{step\}.\\
+You previously guessed that your teammate's (player\_1) policy is: \{possible\_teammate\_strategy\}\\
+Based on the proposed hypothesis about your teammate (player\_1), what do you think they will do next?\\
+Output a concise label about your teammate's next behavior in the following Python dictionary format, parsable by $\texttt{ast.literal\_eval()}$ starting with:
+\begin{verbatim}
+python
+{{ 'predicted_next_behavior': 'placing tomatoes into pot (4,2)' }}
+\end{verbatim}
+
+\end{tcolorbox}
+
+\begin{tcolorbox}[
+    title={\small \textbf{Evaluate Predicted Behavior}},
+    width=\linewidth, % Use the full line width
+    fontupper=\fontsize{9pt}{11pt}\selectfont\ttfamily,
+    before skip=10pt,
+    after skip=0pt
+    % Set the font size and family
+]
+A dish has been delivered at step \{step\}.\\
+You previously guessed that your teammate's (player\_1) would perform this behavior in this round: \{predicted\_next\_behavior\}\\
+Here is the observed behavior of your teammate (player\_1) in this round: \{latest\_teammate\_actions\}\\
+Did your prediction match the observed behavior?\\
+Concisely output True or False in the below Python dictionary format, parsable by $\texttt{ast.literal\_eval()}$ starting with:
+\begin{verbatim}
+{{ 'evaluate_predicted_behavior': True }}
+\end{verbatim}
+\end{tcolorbox}
+
+\end{document}

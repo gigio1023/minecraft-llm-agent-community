@@ -1,0 +1,64 @@
+\vspace{-0.1cm}
+\section{Preliminaries}
+\label{sec:framework}
+\vspace{-0.1cm}
+
+\subsection{Reinforcement learning and world models}
+\label{subsec:pomdp_and_wm}
+
+We model the environment as a standard Partially Observable Markov Decision Process (\textsc{pomdp}) \citep{sutton2018reinforcement}, $(\mathcal{S}, \mathcal{A}, \mathcal{O},T,R,O,\gamma)$, where $\mathcal{S}$ is a set of states, $\mathcal{A}$ is a set of discrete actions, and $\mathcal{O}$ is a set of image observations. The transition function $T: \mathcal{S} \times \mathcal{A} \times \mathcal{S} \to [0,1]$ describes the environment dynamics $p(\mathbf{s}_{t+1} \mid \mathbf{s}_t, \ba_t)$, and the reward function $R: \mathcal{S} \times \mathcal{A} \times \mathcal{S} \to \mathbb{R}$ maps transitions to scalar rewards. Agents cannot directly access states $s_t$ and only see the environment through image observations $x_t \in \mathcal{O}$, emitted according to observation probabilities $p(\x_t \mid \mathbf{s}_t)$, described by the observation function $O: \mathcal{S} \times \mathcal{O} \to [0,1]$. The goal is to obtain a policy $\pi$ that maps observations to actions in order to maximize the expected discounted return $\mathbb{E}_\pi[\sum_{t \ge 0} \gamma^t r_t]$, where $\gamma \in [0,1]$ is a discount factor. World models \citep{ha2018world} are generative models of environments, i.e. models of $p(s_{t+1},r_{t} \mid s_t, a_t)$. These models can be used as simulated environments to train RL agents \citep{sutton1991dyna} in a sample-efficient manner \citep{wu2023daydreamer}. In this paradigm, the training procedure typically consists of cycling through the three following steps: collect data with the RL agent in the real environment; train the world model on all the collected data; train the RL agent in the world model environment (commonly referred to as "in imagination"). 
+
+\subsection{Score-based diffusion models}
+\label{subsec:diffusion}
+
+Diffusion models \citep{sohl2015difforigin} are a class of generative models inspired by non-equilibrium thermodynamics that generate samples by reversing a noising process.
+
+We consider a diffusion process $\{\x^\tau\}_{\tau \in [0,\Tau]}$ indexed by a continuous time variable $\tau \in [0,\Tau]$, with corresponding marginals $\{p^\tau\}_{\tau \in [0,\Tau]}$, and boundary conditions $p^0 = p^{data}$ and $p^\Tau = p^{prior}$, where $p^{prior}$ is a tractable unstructured prior distribution, such as a Gaussian. Note that we use $\tau$ and superscript for the diffusion process time, in order to keep $t$ and subscript for the environment time.
+
+This diffusion process can be described as the solution to a standard stochastic differential equation (SDE) \citep{song_sde},
+\begin{equation}
+\label{eq:forward_process}
+    d\x = \mathbf{f} (\x, \tau) d\tau +  g(\tau) d\w, 
+\end{equation}
+where $\w$ is the Wiener process (Brownian motion), $\mathbf{f}$ a vector-valued function acting as a drift coefficient, and  $g$ a scalar-valued function known as the diffusion coefficient of the process.
+
+To obtain a generative model, which maps from noise to data, we must reverse this process. Remarkably, \citet{anderson1982reverse} shows that the reverse process is also a diffusion process, running backwards in time, and described by the following SDE,
+\begin{equation}
+\label{eq:reverse_process}
+    d\x = [\mathbf{f} (\x, \tau) - g(\tau)^2 \scoref] d\tau +  g(\tau) d\Bar{\w}, 
+\end{equation}
+where $\Bar{\w}$ is the reverse-time Wiener process, and $\scoref$ is the (Stein) score function, the gradient of the log-marginals with respect to the support. Therefore, to reverse the forward noising process, we are left to define the functions $f$ and $g$ (in Section \ref{subsec:practical_dwm}), and to estimate the unknown score functions $\scoref$, associated with marginals $\{p^\tau\}_{\tau \in [0,\Tau]}$ along the process. In practice, it is possible to use a single time-dependent score model $\scorem$ to estimate these score functions \citep{song_sde}.
+
+At any point in time, estimating the score function is not trivial since we do not have access to the true score function. Fortunately, \citet{hyvarinen2005estimation} introduces the \textit{score matching} objective, which surprisingly enables training a score model from data samples without the knowledge of the underlying score function. To access samples from the marginal $p^\tau$, we need to simulate the forward process from time $0$ to time $\tau$, as we only have clean data samples. This is costly in general, but if $f$ is affine, we can analytically reach any time $\tau$ in the forward process in a single step, by applying a Gaussian perturbation kernel $p^{0\tau}$ to clean data samples \citep{song_sde}. Since the kernel is differentiable, score matching simplifies to a \textit{denoising score matching} objective \citep{vincent2011connection},
+
+\begin{equation}
+\label{eq:denoising_sm}
+    \mathcal{L}(\theta) = \bbe \left[ \Vert \mathbf{S}_\theta(\x^\tau, \tau) - \nabla_{\x^\tau} \log p^{0\tau}(\x^\tau \mid \x^0) \Vert^2 \right],
+\end{equation}
+
+where the expectation is over diffusion time $\tau$, noised sample $\x^\tau \sim p^{0\tau}(\x^\tau \mid \x^0)$, obtained by applying the $\tau$-level perturbation kernel to a clean sample $\x^0 \sim p^{data}(\x^0)$. Importantly, as the kernel $p^{0\tau}$ is a known Gaussian distribution, this objective becomes a simple $L_2$ reconstruction loss,
+
+\begin{equation}
+\label{eq:reconstruction_sm}
+     \mathcal{L}(\theta) = \bbe \left[ \Vert \mathbf{D}_\theta(\x^\tau, \tau) - \x^{0} \Vert^2 \right],
+\end{equation}
+
+with reparameterization $\mathbf{D}_\theta(\x^\tau, \tau) = \mathbf{S}_\theta(\x^\tau, \tau) \sigma^2(\tau) + \x^\tau$, where $\sigma(\tau)$ is the variance of the $\tau$-level perturbation kernel.
+
+
+
+\subsection{Diffusion for world modeling}
+\label{subsec:dwm_training}
+
+%The score-based diffusion model described in Section \ref{subsec:diffusion} provides an unconditional generative model of $p_{data}$. To serve as a world model, we need a conditional generative model of the environment dynamics, $p(s_{t+1} \mid s_t, a_t)$. Since we consider the more general case of a \textsc{pomdp} where the Markovian state is unknown, we instead approximate this state with a buffer of recent observations and actions. We condition a diffusion model  with this buffer, to estimate $p(\x_{t+1} \mid \x_{\le t}, a_{\le t})$ and generate the next observation directly, as demonstrated in Figure \ref{fig:architecture}. This modifies Equation \ref{eq:reconstruction_sm} as follows,
+
+The score-based diffusion model described in Section \ref{subsec:diffusion} provides an unconditional generative model of $p_{data}$. To serve as a world model, we need a conditional generative model of the environment dynamics, $p(\x_{t+1} \mid \x_{\le t}, a_{\le t})$, where we consider the general case of a \textsc{pomdp}, in which the Markovian state $s_t$ is unknown and can be approximated from past observations and actions. We can condition a diffusion model on this history, to estimate and generate the next observation directly, as shown in Figure \ref{fig:architecture}. This modifies Equation \ref{eq:reconstruction_sm} as follows,
+\begin{equation}
+\label{eq:denoising_sm_conditional}
+     \mathcal{L}(\theta) = \bbe \left[ \Vert \mathbf{D}_\theta(\x_{t+1}^\tau, \tau, \x_{\le t}^0, a_{\le t}) - \x_{t+1}^0 \Vert^2 \right].
+\end{equation}
+\vspace{-5mm}
+
+During training, we sample a trajectory segment $\x_{\le t}^0, a_{\le t}, \x_{t+1}^0$ from the agent's replay dataset, and we obtain the noised next observation $\x_{t+1}^\tau \sim p^{0\tau}(\x_{t+1}^\tau \mid \x_{t+1}^0)$ by applying the $\tau$-level perturbation kernel. In summary, this diffusion process for world modeling resembles the standard diffusion process described in Section \ref{subsec:diffusion}, with a score model conditioned on past observations and actions.
+
+To sample the next observation, we iteratively solve the reverse SDE in Equation \ref{eq:reverse_process}, as illustrated in Figure \ref{fig:architecture}. While we can in principle resort to any ODE or SDE solver, there is an inherent trade-off between sampling quality and Number of Function Evaluations (NFE), that directly determines the inference cost of the diffusion world model (see Appendix \ref{appendix:sampling} for more details).

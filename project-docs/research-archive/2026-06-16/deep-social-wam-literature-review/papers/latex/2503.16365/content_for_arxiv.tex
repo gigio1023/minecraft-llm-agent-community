@@ -1,0 +1,291 @@
+\section{Introduction}
+
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/teaser_v6.pdf}
+    % \vspace{-0.6em}
+    \caption{We present \model, a novel Vision-Language-Action (VLA) model trained with \method paradigm, post-trained on vision language tasks (non-decision-making tasks) before training on trajectory datasets to have better decision-making capabilities.
+    }
+    \label{fig:teaser}
+    % \vspace{-0.2 in}
+    % \vspace{-1.5em}
+\end{figure*}
+
+Pretraining foundation models on large-scale, noisy internet datasets has become a mainstream approach in NLP and vision~\citep{vit,gpt-4,qwen2vl,gemini}. The success of models like GPT and LLAMA~\citep{llama,chatgpt} has shown that large, capable language models can infer and execute tasks described by language prompts. However, this paradigm has yet to achieve similar success in the decision-making domain~\citep{yang2023foundation,cheng2024exploring}. In particular, while OpenAI's Video Pre-Training (VPT) model~\citep{vpt} has attempted to apply a similar approach in Minecraft, it still relies heavily on imitation learning (IL) after collecting large-scale YouTube videos of human play. VPT's approach of pretraining with imitation learning, followed by downstream supervised fine-tuning and reinforcement learning, made significant strides—culminating in the successful \texttt{ObtainDiamond}, a key challenge in Minecraft\footnote{Diamond tools are considered a grand challenge, with experienced human players taking up to 20 minutes (24,000 actions) to craft them.}.
+
+Despite this success, the reliance on next-action prediction in imitation learning limits the development of robust, multi-task decision-making abilities~\citep{rt-1,gr1,octo,openx}. Moreover, this pretraining paradigm struggles to generalize to unseen environments or tasks due to the intricacies of the interactions between observations and behavior, whereas language tokens are more standardized. To overcome these challenges, a new approach has emerged that leverages pretrained Vision Language Models (VLMs) for decision-making. These models, known as Vision Language Action models (VLAs), integrate language understanding with action generation and can be further enhanced through post-training on visual-language tasks~\citep{openVLA,3d-vla}. A more detailed discussion can be found in \autoref{fig:teaser}~(left) and \autoref{sec:training_pipeline}.
+
+However, much like traditional imitation learning, current VLA approaches predominantly focus on action post-training. In these models, the learning objective is to generate correct actions based on large-scale cross-task imitation data. We propose that, in addition to action generation, understanding the environment and incorporating task-related knowledge could be equally important for achieving more flexible and generalizable decision-making. To this end, we introduce a novel training paradigm—Vision Language Post-Training (\method)—which integrates visual-language tasks into the post-training phase of VLA models. Following the above paradigms, we obtain the first VLA models in Minecraft that can follow human instructions on over 1k different atomic tasks, including crafting, smelting, cooking, mining, and killing. 
+
+Our contributions are as follows: (1) We pioneer the use of VLA in the open-world environment of Minecraft by introducing \model, a powerful model achieving state-of-the-art performance in action-based decision-making. 
+%We apply VLA to the open-world environment of Minecraft for the first time, introducing \model, achieving state-of-the-art performance in action-based decision-making. 
+(2) We introduce the concept of Vision Language Post-Training and identify key visual-language guidance strategies that enhance decision-making. (3) We investigate the scaling laws of VLA models, demonstrating that expanding the scale of non-trajectory vision-language tasks during post-training leads to significant improvements in downstream task performance. (4) We open-source the code, models, and datasets to support further research in this area.
+
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/training_pipeline.pdf}
+    % \vspace{-0.6em}
+    \caption{Previous VLA methods usually directly use imitation learning to finetune original vision-language models on large-scale multi-domain decision-making datasets to predict the actions~\citep{openVLA,rt-2}. Our \method training pipeline includes three stages: 1) post-training language models on text-only world knowledge with next-token prediction supervised fine-tuning, 2) post-training both vision encoder and language models on multimodal vision-language alignment and spatial grounding datasets with next-token prediction supervised fine-tuning, and 3) post-training only language models on multi-modal instruction following datasets with imitation learning. 
+    }
+    \label{fig:training_pipeline}
+    % \vspace{-0.2 in}
+    % \vspace{-1.5em}
+\end{figure*}
+
+\section{Learning to Act from Vision Language Post-Training}
+
+In this section, we present a detailed introduction to \method, a new paradigm for training VLA models. One of the most significant improvements is that we investigate a post-training stage prior to imitation learning. Specifically, we instantiate this paradigm in our proposed model, \model. We begin by discussing the architecture for \model in \autoref{sec:architecture}, followed by an explanation of the training pipeline in \autoref{sec:training_pipeline} and the datasets used in \autoref{sec:datasets}. 
+% And we will introduce a comprehensive Minecraft domain question answering benchmark, MCFC-Bench, which is used to evaluate the specific capabilities required by the foundation model of \method in decision-making.
+
+\subsection{Model Structure}\label{sec:architecture}
+
+As illustrated in \autoref{fig:teaser}, \model employs an architecture similar to Llava~\citep{llavanext} but with slight modifications. The structural framework,  consists of several key components:: 1) Visual Encoder: A Vision Transformer~\citep{vit} that processes raw image pixels and converts them into a sequence of fixed-size image patches. 2) Image Projection Module: A lightweight two-layer MLP that projects image patch embeddings into the same representational space as word embeddings. 3) Language Model Transformers~\citep{llama,qwen}: A powerful autoregressive language model that serves as the core of the system, facilitating multimodal reasoning and decision-making.
+
+Unlike OpenVLA~\citep{openVLA}, our framework is designed for partially observable environments. To accommodate this, we adopt a non-Markovian architecture by incorporating a history of observation images within the prompt. This approach ensures that the model retains temporal context, which is crucial for tasks requiring multi-step reasoning and long-horizon decision-making. In our experiments, we employ Llava-Next~\citep{llavanext} and Qwen2-VL~\citep{qwen2vl} as base vision language models, as both models provide robust support for multi-image understanding, enabling enhanced perception and reasoning.
+
+Another key distinguishing feature of \model compared to prior VLA models is the integration of an action decoder. This module is responsible for decoding both discrete and continuous actions. For discrete actions, we consolidate related action dimensions into unified categories to reduce redundancy and improve efficiency. For continuous actions, we discretize the action space into bins, which are then mapped to discrete tokens. These tokens are subsequently appended to the vocabulary of the original foundation model, allowing the model to generate both textual and action-based outputs in a unified manner.
+
+Instead of retraining the base VLM's tokenizer, we adopt a strategy inspired by RT-2~\citep{rt-2}, repurposing the least frequently used tokens from the language tokenizer's vocabulary to represent action semantics. Specifically, we replace the 51 least-used tokens, allocating 22 tokens for mouse control (e.g., cursor movements) and 29 tokens for special keyboard inputs (e.g., function keys and command shortcuts), which can be found in \autoref{app:action_space}. 
+We introduce no other modifications to the original VLM architecture to maintain model generalizability and ensure broad compatibility across different foundation models. This design choice allows \model to be easily integrated with various pre-trained multimodal models while preserving their inherent capabilities.
+
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/dataset_v5.pdf}
+    % \vspace{-0.6em}
+    \caption{\textbf{Illustration of various post-training datasets.} 
+    Models can post-train on various vision-language datasets using a unified tokenizer and support diverse vision-language applications, such as question answering, image captioning, image/video question answering, visual grounding (including points and bounding box), and decision-making.
+    More examples can be found in \autoref{app:training_datasets}.
+    % \zihao{still lack of imitation learning datasets}
+    }
+    \label{fig:datasets}
+    % \vspace{-0.2 in}
+    % \vspace{-1.5em}
+\end{figure*}
+
+\subsection{Training Pipeline}\label{sec:training_pipeline}
+
+Traditional VLA methods typically employ pretrained VLMs and train them via imitation learning on large-scale trajectory data, which includes textual instructions, visual observations, and action token sequences, as illustrated in \autoref{fig:training_pipeline}(left). These methods assume that VLMs, pretrained on diverse internet-scale data, possess strong generalization and fitting capabilities. Consequently, they are fine-tuned directly on downstream decision-making tasks, leveraging multi-scenario data to enhance action understanding and generalization.
+
+However, learning world knowledge from action-labeled trajectory data is inherently challenging~\citep{vpt}. Moreover, the lack of large-scale action-labeled datasets makes it challenging to pretrain expansive models using only trajectory data~\citep{openx}.
+
+To address these challenges, \method enhances the VLM through a structured post-training process, utilizing data that follows the same format as pretraining but is more relevant to decision-making tasks. As shown in \autoref{fig:training_pipeline}(right), our training pipeline consists of three stages.
+
+\paragraph{Stage I: Post-Training Language Models} We first refine the language transformer of the VLM using large-scale textual datasets related to world knowledge in downstream environments, e.g., Minecraft. During this stage, vision-related components, including the ViT and vision adapter modules, are frozen. This step enhances the model’s understanding of decision-making contexts before incorporating multimodal alignment.
+
+\paragraph{Stage II: Post-Training Vision Encoder and Language Models} Following language post-training, we fully unfreeze the VLM and fine-tune it using captioning, visual question-answering (VQA), and spatial grounding datasets, which are multimodal and have images in datasets. This stage ensures improved vision-language alignment, enhancing the model’s capacity to integrate world knowledge with visual perception. Both Stage 1 and Stage 2 employ next-token prediction through supervised fine-tuning, with the optimization objective being:
+\begin{equation}
+\mathcal{L}_\text{SFT} = - \sum_{i=1} \log \mathcal{P}_\theta (x_i \mid x_v, x_{\text{ins}}, x_{1:i-1}) \tag{1}
+\end{equation}
+where $x_v$ denotes visual tokens, $x_{\text{ins}}$ represents the instruction, and $x$ corresponds to the answer. This loss function maintains consistency with the standard causal mask training approach.
+
+\paragraph{Stage III: Action Post-Training for Interaction} The final stage of our pipeline is action post-training, where the VLM transitions from a passive observer to an active agent. During this action post-training, the VLM is fine-tuned on trajectory data ($\mathcal{D}$). The model learns to map textual instructions ($x_{\text{ins}}$) and current visual observations ($o_t \in \mathbb{R}^{H\times W\times 3}$) to action chunks $a_{t:t+\tau}$. The imitation learning objective is to maximize the likelihood of these expert actions:
+\begin{equation}
+\label{equation:3}
+\mathcal{L}_\text{IL} = - \sum_{t=1} \log \pi_\theta (a_{t:t+\tau} \mid o_t, x_{\text{ins}}) \tag{2}
+\end{equation}
+where $\pi_\theta$ is the learned policy parameterized by $\theta$. We employ action chunking as this technique promotes temporally coherent and improves training efficiency~\citep{openvla-oft}. In this stage, the vision-related modules remain frozen. while the language tokenizer is modified to incorporate action tokens,
+and the language transformer undergoes full parameter fine-tuning.
+
+This structured pipeline ensures that the VLM is progressively refined before being adapted to trajectory-based imitation learning, resulting in improved world knowledge acquisition, vision-language alignment and grounding, and action generalization in decision-making tasks.
+
+\subsection{Datasets}
+\label{sec:datasets}
+
+To support the \method training pipeline, we constructed a large-scale multimodal dataset. This dataset includes both non-trajectory task datasets for post-training and trajectory datasets for downstream imitation learning. The non-trajectory datasets are divided into three categories: knowledge-based question answering, vision language alignment, and spatial grounding. These categories are designed to enhance the model’s decision-making capabilities before trajectory fine-tuning. For trajectory datasets, we collected over 7.4 million frames of Minecraft gameplay data, including expert actions from diverse sources such as human-playing~\citep{vpt}, youtube videos, and existing agents~\citep{jarvis1}.
+
+
+The dataset for \textit{world knowledge comprehension} comprises approximately 277K entries that significantly bolster textual understanding, employed during training stage I. The \textit{visual-language alignment} dataset incorporates 35K keyframes enhanced with advanced Vision-Language Models to produce both captions and question-answer pairs, facilitating multimodal supervised fine-tuning in the subsequent training stage. The \textit{spatial grounding} dataset focuses on detailed object localization, generating over 404K data points that are instrumental in refining spatial understanding for \method models. Both the visual-language alignment datasets and the spatial grounding datasets primarily utilize Minecraft observations, which strengthen the VLM's understanding of the world and are used to support training stage II. 
+% This is one of the key reasons \method models efficiently learn to act. 
+
+\paragraph{Imitation Learning Trajectory Dataset}
+VLA training is constructed on a dataset of human gameplay trajectories, particularly from the OpenAI contractor dataset in Minecraft~\citep{vpt}, which includes diverse tasks. We also incorporated an additional 3M rollout frames from VPT~\citep{vpt} and JARVIS-1~\citep{jarvis1} agents. For structured GUI-based tasks like crafting and smelting, we synthesized 6.4M expert data entries to improve imitation learning. This trajectory data was partitioned into two distinct subsets. First, over 100 random trajectories for each MCU benchmark task were allocated for targeted fine-tuning. The remaining data, approximately 10 billion tokens, was then utilized for action post-training. Representative examples of our datasets are shown in \autoref{fig:datasets}, with further details in \autoref{app:training_datasets}.
+
+% To support the training of \method, we have curated visual and linguistic data along with interactive data for post training of the Visual Language Action Models and subsequent imitation learning. All data pertain to the Minecraft game. The supplyment visual and linguistic data are divided into three datasets: 277K entries of purely knowledge-based language question answering, 35K entries related to Minecraft visual recognition involving captioning and question answering, and over 404K entries for visual localization tasks. Furthermore, we collected over 7.4 million frames of Minecraft gameplay data, along with corresponding information and actions from diverse sources, including shell agents and Rocket-1.
+
+% \textbf{Linguistic Knowledge-based Question Answering Data}. 
+% The \method model's instruction-following capability heavily relies on textual information. It is therefore imperative for the model to grasp the specific concepts within the instructions. We sourced content from Wikipedia and the digminecraft website, generating 202K question answering entries using the GPT-3.5-turbo model. This dataset primarily serves the knowledge-based supplementation needs of the foundation model.
+
+% \textbf{Visual Recognition Data}. 
+% For Visual Language Action models, the foundational model’s ability to recognize objects that interact with agents is crucial. We supplemented the foundation model with images sourced from YouTube, contractor gameplay screenshots, and internet data, selecting 35K keyframes based on rule-based criteria focusing on appropriate brightness and complexity. We employed self-constructed methods to either caption these images or generate meaningful visual question-answer pairs. Specifically, we utilized models such as OpenAI ChatGPT-4o, Antholopy Claude 3.5 Sonnet, and Molmo to ensure data diversity. To minimize recognition errors induced by the models, advanced Visual Language Models first query about the objects contained in images, followed by question filtering and modification using llama3.1 72b. The selected questions are then used by the same models to generate answers based on the images, and llama3.1 72b is used to eliminate incorrect responses. Based on the generated visual question-answers, we filter high-quality questions as seed questions, considering various aspects related to objects, environment, mobs, etc. These questions guide the VLMs to repeat the data generation process for each image, expanding and refining the QA pairs. We sampled half of the photos to generate captioning data using ChatGPT-4o, resulting in 17K high-quality visual recognition data descriptions.
+
+% \textbf{Visual Localization Data}. 
+% Accurate localization is essential for effective interaction within VLA models. In the 3D environment of Minecraft, we utilized the Backward Trajectory Relabeling method, as described in Rocket-1, to accurately determine object locations using contractor data. This method involves tracing the history of object locations up to $t$ frames backward. For 2D data, interactions with GUI items were scripted, and both entities and objects within the GUI were recorded in real-time. We generated over 404k data entries that support both bounding box and pointing formats, which are important for accurate localization required by \method during interactions.
+
+
+% \textbf{Gameplay Data}. 
+% Our VLA uses extensively OpenAI-collected contractor data from 4500 hours of human gameplay in Minecraft, focusing on decision-making scenarios like tree chopping and diamond collecting. To address the noisy data from human players, we integrated an additional 3 Million 3D interaction entries trained using contractor data for VPT and Rocket-1 models. Tasks performed in the GUI, such as crafting and smelting, were synthesized into 6.4 million entries of expert learning data for SPVLA imitation training.
+
+% \subsection{Formulate the Capabilities of Foundation Models}
+% \label{sec:benchmark}
+% We expect that the post training on VLM will significantly enhance its capabilities necessary for decision-making. However, it is not prudent to assume that a VLM, trained solely with the expert datasets we given, will inherently improve its abilities. An evaluation of the VLM before and after training is essential. For this purpose, we introduce the Minecraft Fundamental Capability Benchmark (MCFC-Bench). MCFC-Bench is a comprehensive question answering benchmark in the Minecraft domain, consisting of assessments across 5 core areas and 23 fine-grained dimensions, including world knowledge, reasoning, visual recognition, visual grounding, and visual comprehension. The content for MCFC-Bench are sourced from the internet. And they maintains the same format as the expert dataset. For the four areas excluding visual localization, we use GPT-4o to assess the correctness of responses from 16 types of foundation models, with specific rankings detailed in Appendix \ref{app: mcfc-bench}. Visual localization refers to the foundation model's ability to accurately identify the locations of objects, which we evaluate using accuracy measures too.
+
+
+
+% 3.1 Pretraining Foundation Model for Decision-Making Pipeline
+% 这里要有一个图！
+% 我们的基本 Pipeline 是：
+% pretraining (vision encoder 的 pretraining，language model 的 Pretraining，还有一个是 VLM 的 pretraining主要做的是 visual language alignment) → supervised finetuning
+% 其中我们探索了不同的 pretraining 方法：imitation learning 、question-answering
+% 为了统一训练的范式，我们统一使用 next-token prediction 的方法来进行
+% 而 supervised finetuning 统一用 text-conditioned imitation learning 方法和 decision-making 数据集
+
+% 3.2 Pretraining Method
+	
+
+% 一个好的 foundation model for decision-making，主要有如下的能力：
+% Text Instruction Understanding、Visual Concept Recognition、Visual Language Alignment、Action Grounding
+
+% 其中 Generative Tasks 主要包括：Knowledge pretraining、Visual Grounding、Visual Question-Answering and Visual Captioning
+% 其中 Knowledge Pretraining 主要可以提高 instruction understanding
+% Visual Grounding 主要可以提高 Visual Recognition
+% Visual Question Answering 可以提高 Vision Language Alignment
+% Action grounding 需要对应的是 imitation learning
+% 对应以上的几种方法，我们统一用 next-token prediction 来 formulate，注意有些要被 mask 掉，分别训练 vlm 的什么 modules
+% 要有公式！
+
+% 3.3 Pretraining Datasets and Finetuning Datasets
+% 大概讲一下数据集的构成，以及如何构建的？
+
+% 3.4 Training Details
+% 待定
+
+
+
+
+\section{Experiments}
+
+Our experiments (starting from subsection 4.2) aim to address the following questions:
+
+
+\noindent \textbf{Q1}: How do \model compare to \textit{sota} open-world agents and imitation learning methods? 
+
+\noindent \textbf{Q2}: Is vision language post-training the true cause of the performance improvement?
+
+\noindent \textbf{Q3}: Whether VLAs exhibit scaling laws and how \method influences them?
+
+\noindent \textbf{Q4}: Is \method sensitive to different VLM backbones? 
+Due to space constraints, we quickly respond with an affirmative no, detailed experiment discussion deferred to \autoref{sec:experiments_vlm_ablation}.
+
+\subsection{Experimental Setup}\label{sec:experimental_setups}
+
+\paragraph{Evaluation Environment} 
+We use Minecraft 1.16.5 as our experimental platform~\citep{minerl}. As an open-world game with a substantial knowledge base on platforms such as Reddit and wiki~\citep{minedojo}, Minecraft poses significant challenges to agents while simultaneously offering rich resources for research. To ensure fair comparisons, we align the action and visual observation spaces with those of human players~\citep{vpt}.
+% setting the display resolution to 640×360. 
+Additionally, we hide information unavailable to human players as well, such as agent location and inventory stats.
+
+\input{tables/atom_tasks}
+
+\paragraph{Benchmark and Evaluation Metrics}
+We conduct evaluations using two broad benchmarks: (i) the agent’s capacity to interact with the Minecraft environment to complete tasks; and (ii) vision-language tasks (e.g., question answering, spatial grounding) designed to assess the VLM's understanding of Minecraft-specific knowledge.
+For the instruction-following tasks, we adopt the MCU Benchmark~\citep{mcu}, focusing on four categories—\texttt{Mine Blocks}, \texttt{Kill Entities}, \texttt{Craft Items}, and \texttt{Smelt Items}—that represent a wide range of typical game-play behaviors in Minecraft. Notably, \texttt{Craft} and \texttt{Smelt} require 2D GUI manipulation through the mouse (covering thousands of item categories), whereas \texttt{Mine} and \texttt{Kill} involve recognizing, navigating, and interacting with targets in a 3D environment.
+Each category contains at least 5 distinct tasks. For instance, the \texttt{Mine Blocks} category includes mining iron ore \includegraphics[scale=0.035,valign=c]{figures/avatar/iron_ore.png} with a stone pickaxe, oak logs \includegraphics[scale=0.035,valign=c]{figures/avatar/oak_log.png} with bare hands, grass \includegraphics[scale=0.035,valign=c]{figures/avatar/grass2.png}, dirt \includegraphics[scale=0.16,valign=c]{figures/avatar/dirt.png}, and obsidian \includegraphics[scale=0.030,valign=c]{figures/avatar/obsidian.png} with a diamond pickaxe. Our evaluation set includes both simpler tasks (e.g., mining oak logs) and more complex ones (e.g., mining obsidian for over 10 seconds) that have proven challenging for prior state-of-the-art agents~\citep{groot,steve1}.
+We perform each task at least 30 times and report the success rate per task, as well as the average success rate within each category. To ensure fairness, maximum execution steps for selected tasks match those reported by \citet{mcu}.
+For vision-language assessments, the task formulations are illustrated in \autoref{fig:datasets}. We provide human-written ground-truth answers and employ an LLM-as-judge to evaluate the performance of various VLMs (GPT-4o, Llava, Qwen-VL, and our post-trained VLMs). Detailed information on these vision-language benchmarks and results can be found in \autoref{app:benchmarks}.
+
+\paragraph{Training and VLA Configurations}. 
+Our training pipeline follows the process described in \autoref{sec:training_pipeline}: we first obtain a visual-language post-training intermediate model, then further train it on trajectory tasks to produce the \model. We conduct experiments using two popular frameworks: Qwen2-VL~\citep{qwen2vl} and Llava~\citep{llavanext}. 
+% Both adhere to the architecture specified in \autoref{sec:architecture}, but note that Qwen2-VL has been pre-trained for spatial grounding whereas Llava-Next has not.
+We develop a discretized action tokenizer specific to Minecraft, comprising 51 tokens that represent camera movements and button actions. 
+% For Llava, we resize input images to 672×336 for its image processor, whereas for Qwen2-VL we use the native render resolution as input. 
+We utilize the \texttt{trl} SFT Trainer~\citep{trl} for finetuning and deploy the VLA with \texttt{vLLM}~\citep{vllm}. Training is carried out on 32 A800-80G GPUs, while inference runs on a single NVIDIA RTX 3090. Further training details are provided in \autoref{app:training_configs}.
+
+\paragraph{Baselines} 
+We compare our model with: 1) VPT~\citep{vpt}, including both the behavior cloning (VPT-BC) and reinforcement learning (VPT-RL) variants; 2) STEVE-1\citep{steve1}, a text-conditioned policy that combines VPT and MineCLIP\citep{minedojo} for instruction following;
+3) GROOT~\citep{groot}, which uses video prompts as task instructions; and 4) MineDreamer~\citep{minedreamer}, which leverages a vision-language model and a diffusion model to guide the STEVE-1 policy.
+Each method follows the default configuration provided in the MCU benchmark for a fair comparison.
+
+
+
+
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/post_training_ablation_v4.pdf}
+    % \vspace{-0.6em}
+    \caption{\textbf{Ablation results on different post-training datasets.} 
+    We select knowledge datasets, visual question-answering datasets, and spatial grounding datasets to conduct ablation experiments. Our goal is to evaluate which capabilities and post-training datasets most significantly influence downstream decision-making tasks.
+    }
+    \label{fig:posttrain_dataset_ablation}
+    % \vspace{-0.2 in}
+    % \vspace{-1.5em}
+\end{figure*}
+
+\subsection{VLA Performance Evaluation}
+\label{sec:main_experiments}
+
+We present the performance results of our proposed model across four categories from the MCU benchmark~\citep{mcu}, as shown in \autoref{tab:atom_tasks}. For each MCU task, we collect over 100 random trajectories, which are used to fine-tune base VLMs to create our final VLA models.
+
+We evaluate three variants of the VLMs as base models:
+1) Qwen2-VL~(raw): the original VLM checkpoint, fine-tuned directly on the task-specific dataset. 2) Qwen2-VL~(IL): first undergoes action post-training, then trained on the same task-specific fine-tuning dataset. 3) \model-Qwen2-VL: first post-trained using our proposed \method paradigm, then fine-tuned on the same dataset. Performance is measured by the average success rate across tasks within each category. Our results show that \model-Qwen2-VL, post-trained using our approach, consistently outperforms prior methods across almost all tasks.
+
+Remarkably, even without task-specific post-training, raw Qwen2-VL model, fine-tuned on downstream tasks, outperforms several previous baselines, including STEVE-1~\citep{steve1} and GROOT~\citep{groot}, which were trained using large-scale imitation learning. This highlights the effectiveness of using a robust pre-trained VLM as the base model for the policy, leading to strong performance even without additional fine-tuning.
+
+Notably, we observe a significant performance boost with \method post-training. For tasks such as \texttt{Craft Items} and \texttt{Smelt Items}, where previous methods struggled, \model-Qwen2-VL achieves success rates more than double those of the baseline models. This underscores the effectiveness of our off-trajectory vision-language task strategy. Furthermore, \model-Qwen2-VL outperforms Qwen2-VL~(IL) by over 15\%, despite using only 21\% of the training trajectory data. 
+In crafting category tasks, the \model model surpasses traditional baselines by more than double, outperforming models like VPT-BC~\citep{vpt} and STEVE-1~\citep{steve1} on tasks such as "Craft crafting table" (\includegraphics[scale=0.08,valign=c]{figures/avatar/crafting_table.png}). This significant improvement is primarily due to the use of ViT in VLM and high-resolution processing, which are crucial for tasks like crafting and smelting that demand precise control in the GUI interface.
+This suggests that integrating off-trajectory vision-language tasks into the training pipeline enhances decision-making capabilities, enabling more accurate action predictions in VLA models. 
+Further analysis and additional experiments will be presented in the next section.
+
+
+
+\subsection{Ablation on Training Paradigm}
+\label{sec:experiment_paradigm}
+To assess the impact of visual-language post-training, we designed an additional baseline, Qwen2-VL-7B (one-stage). It is co-trained on the original checkpoint of Qwen2-VL, using the combination of non-trajectory datasets and trajectory datasets in a single unified training stage. After training for one epoch, Qwen2-VL-7B (one-stage) is fine-tuned on MCU tasks. We compare it with \model-Qwen2-VL, which is post-trained in three separated steps.
+
+\input{tables/paradigm_ablation}
+
+The results presented in \autoref{tab:paradigm_ablation} indicate that separating visual-language post-training from action learning, rather than merging all stages into a single training phase, yields a significant performance boost. For instance, when comparing our \model-Qwen2-VL to the one-stage co-finetuning approach, we observed substantial improvements, including approximately 57\% on the "Smelt iron ingot \includegraphics[scale=0.04,valign=c]{figures/avatar/iron_ingot1.jpg}" task and 23\% on the "Crafting the ladder \includegraphics[scale=0.06,valign=c]{figures/avatar/ladder.png}" task. We hypothesize that dedicated post-training on visual-language datasets enhances the foundational capabilities of the VLM, providing a more advantageous starting point for subsequent imitation learning.
+
+
+\subsection{Ablation on Non-Trajectory Datasets}\label{sec:experiment_datasets_ablation}
+
+In this section, we focus on the post-training of Qwen2-VL using various non-trajectory vision-language tasks to investigate the specific contributions to its enhanced performance.
+
+To understand the impact of different task enhancements, we conduct an ablation study by dividing the non-trajectory datasets and training Qwen2-VL separately on three types of tasks: spatial grounding, vision language alignment, and knowledge-based question-answering, which are all related to Minecraft games. This results in three variants of the VLM, each augmented with one of these capabilities—spatial grounding, visual recognition, and world knowledge. All models are finetuned using the same gameplay dataset and imitation learning techniques. We also develop a benchmark, detailed in \autoref{app:benchmarks}, to evaluate these capabilities. For this evaluation, we select three long-sequence atomic tasks: "Craft the diamond sword" (\includegraphics[scale=0.08,valign=c]{figures/avatar/diamond_sword.png}), "Mine the obsidian" (\includegraphics[scale=0.035,valign=c]{figures/avatar/obsidian.png}), and "Cook the beef" (\includegraphics[scale=0.038,valign=c]{figures/avatar/cooked_beef.png}), as downstream instruction-following tasks.
+
+The results of our ablation studies, presented in \autoref{fig:posttrain_dataset_ablation}, demonstrate that post-training with non-trajectory vision-language tasks significantly enhances the core capabilities of the VLM across the respective benchmarks. Notably, after fine-tuning, models enhanced with spatial grounding exhibit the most substantial improvement in downstream decision-making tasks. These findings underscore the effectiveness of non-trajectory post-training in boosting the performance of Vision-Language-Action models in decision-making tasks, even when the focus is on a single task. We find that non-trajectory vision-language tasks, which are essential for agent pipelines~\citep{deps,jarvis1}, are more effective for fine-tuning end-to-end VLA models. This demonstrates the connection between developing LLM-based agent pipelines with separate modules and fine-tuning end-to-end VLA models.
+
+\begin{figure*}[t]
+\centering
+    \includegraphics[width=0.95\linewidth]{figures/action_pt-emergency.pdf}
+    \caption{\textbf{The relation between downstream task success rate, training loss, and training steps.} The curve shows that scaling downstream finetuning trajectories can scale up the success rate when the loss is lower than 0.22.}
+    \label{fig:scaling}
+    % \vspace{-1.5em}
+\end{figure*}
+
+\begin{figure}
+\centering
+    \includegraphics[width=0.99\linewidth]{figures/scaling_law_v4.pdf}
+    \caption{
+    \textbf{The relationship between post-training loss and downstream task success rates.} Our findings indicate that increasing the size of post-training non-trajectory datasets can significantly enhance downstream task success rates, even with a fixed number of fine-tuning trajectories.
+    }
+    \label{fig:scaling_law_v2}
+    % \vspace{-1.5em}
+\end{figure}
+
+% \subsection{Emergent Capability}\label{sec:more_analysis}
+\subsection{Scaling Experiments}\label{sec:more_analysis}
+
+Recent work on large language models (LLMs) trained on vast amounts of text via next-token prediction has shown strong scaling laws~\citep{Emergent_abilities_openai,Emergent_abilities_zhipu,lin2024selecting,wangoptimizing}. We investigate whether VLAs, obtained through post-training on VLMs, exhibit similar scaling behavior. Specifically, we explore two questions: Q1) Can scaling up downstream imitation learning trajectories further improve the VLA’s task success rate? Q2) Does increasing the amount of non-trajectory vision-language tasks used during post-training enhance task completion success?
+
+The results for Q1 are shown in \autoref{fig:scaling}. Using the same base model, we observe that increasing the number of downstream trajectories improves the VLA model’s task success rate. However, since the success rate is a discrete metric, we find that tasks only show a non-zero success rate when the evaluation loss is below 0.30. This indicates that the dataset size for downstream fine-tuning must be sufficiently large enough. Furthermore, we observe that different tasks require varying amounts of downstream data to reduce the evaluation loss below 0.30, which correlates with the length and difficulty of the tasks.
+
+
+
+The results for Q2 are illuminated in \autoref{fig:scaling_law_v2}. We also explore the relationship between the evaluation loss during post-training on non-trajectory vision-language tasks and task success rate in downstream tasks. We use base models from different stages of post-training (with different eval loss on post-training datasets), fine-tuning them with the same downstream trajectory dataset. The baseline represents post-training using imitation learning on cross-task trajectories. We find that, for nearly all tasks, the success rate in downstream tasks correlates linearly with evaluation loss in post-training, with the lowest loss yielding the best results. Notably, models post-trained with knowledge-based tasks exhibit the best downstream performance for a given evaluation loss. Models enhanced with spatial grounding show the lowest evaluation loss and the highest task success rates.
+These findings demonstrate scaling up off-trajectory vision language datasets directly enhances downstream task performance, which has been overlooked in previous VLA works~\citep{openVLA,rt-2}. 
+
+\section{Related Works}
+\label{Preliminary}
+
+\subsection{Visual-Language-Action Models}
+% Imitation learning~(IL) focuses on learning by mimicking the interactions between an expert policy and the environment, with the core challenge being the creation of high-quality datasets from the expert’s policy. In response to these challenges, numerous studies have sought to enhance the original IL
+% approach~\citep{BehaviorTransformer,diffusion_policy,octo,rt-1}. A promising direction is the use of Visual-Language-Action (VLA) models~\citep{rt-2,ecot,tracevla,hiRT}. relying solely on end-to-end imitation learning from scale, VLA models typically begin with fine-tuning a Visual Language Model (VLM) pre-trained on internet-scale textual data. OpenVLA~\cite{openVLA} demonstrated the benefits of selecting a high-capability VLM backbone, and this was further validated by RoboVLM~\cite{roboVLA} through large-scale comparative experiments. Additionally, \citet{rt-2} emphasize that co-training with web-scale vision-language data enhances the generalization capability of VLA models. \citet{gr1,gr2,3d-vla} explore new dimensions in the context of Visual Language Models. However, previous research has largely focused on selecting the best-performing VLM without enhancing its capabilities through visual-language post-training. In contrast, our work addresses this gap by enhancing the backbone VLM through visual-language post-training.
+Imitation learning (IL) involves learning by mimicking expert interactions with the environment, with the primary challenge being the collection of high-quality expert demonstration datasets. Numerous studies have sought to enhance traditional IL approaches~\citep{diffusion_policy,octo,rt-1}. A promising direction is the use of Visual-Language-Action (VLA) models~\citep{rt-2,openVLA,tracevla,hiRT,dexgraspvla}, which adopt end-to-end imitation learning by fine-tuning VLMs. OpenVLA~\citep{openVLA} has demonstrated the importance of selecting a capable VLM backbone, a conclusion further reinforced by RoboVLM~\citep{roboVLA}. Similarly, \citet{rt-2} highlighted that co-training with web-scale vision-language data significantly improves the generalization of VLA models. While previous works primarily focused on optimizing the selection of VLMs, several recent studies have begun to pay attention to the comprehension capabilities of VLA models~\citep{upvla,objectvla,chatvla,combat_vla}. However, few have explicitly focused on enhancing the VLM backbone itself through visual-language post-training. Our work addresses this gap by proposing targeted visual-language post-training methods to enrich the capabilities of VLMs, thereby improving their performance on downstream VLA tasks.
+
+\subsection{VLM-based Agents in Minecraft}\label{app:vlm_agents_minecraft}
+Existing Minecraft agents based on VLMs typically adopt hierarchical architectures~\citep{deps,minedreamer,minedojo,deng2025open,zhao2024optimizing,cai2023open}. These methods leverage a VLM’s world knowledge for planning via zero-shot or few-shot in-context learning, without modifying the VLM parameters during agent optimization~\citep{deps,jarvis1,voyager,li2024optimus}.
+STEVE-EYE~\citep{zheng2023steve} fine-tuned Llama language models~\citep{llama} using internet text data, achieving improved planning over zero-shot prompting. MineDreamer~\citep{minedreamer} employs the instruction-following capability of VLMs to predict future visual observations and generate actions based on STEVE-1~\citep{steve1}. OmniJARVIS~\citep{omnijarvis} uses a behavior tokenizer~\citep{groot,groot2} to model human trajectories in Minecraft with pretrained VLMs.
+While these approaches optimize VLMs, they still rely on additional policies for action grounding. In contrast, we propose a VLA-based agent model that generates actions directly from textual instructions and visual inputs, eliminating the need for extra grounding policies.
+
+\section{Conclusions}
+We present \method, a novel training framework for visual-language-action models that leverages vision-language post-training to enhance decision-making capabilities in dynamic environments. Our experiments demonstrate that post-training on non-trajectory tasks significantly enhances foundation models’ ability to understand complex environments, resulting in substantial improvements in downstream imitation learning on trajectory data. The effectiveness of this model is validated across multiple VLM architectures, providing strong evidence of its broad applicability and potential for visual-language-action model training, as exemplified by our state-of-the-art model, \model.
+%Our experiments demonstrate that post-training on diverse vision and language data using autoregressive next-token prediction significantly improves VLA models. Indicate that extensive post-training can unlock latent capabilities in VLA models, facilitating more sophisticated decision-making processes. The effectiveness of this approach is validated across different VLM architectures, confirming its general applicability and potential for enhancing the robustness of decision-making agents in complex, dynamic settings. 

@@ -1,0 +1,40 @@
+\subsection{Data Scaling Properties of the Foundation Model}
+\label{section:foundation_data_scaling}
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=\linewidth]{assets/Foundation_Model_Data_Scale.pdf}
+\end{center}
+\vspace{-10px}
+\caption{\textbf{(Left)} Zero-shot rollout performance of foundation models trained on varying amounts of data. Models to the left of the dashed black line (points $\le$1k hours) were trained on contractor data (ground-truth labels), and models to the right were trained on IDM pseudo-labeled subsets of \texttt{web\_clean}. Due to compute limitations, this analysis was performed with smaller (71 million parameter) models except for the final point, which is the 0.5 billion parameter VPT foundation model. \textbf{(Right)} The corresponding performance of each model \emph{after} BC fine-tuning each model to the \texttt{contractor\_house} dataset.
+}
+\label{fig:foundation_data_scale}
+\end{figure}
+
+In this section we validate a core hypothesis behind this work: that it is far more effective to use labeled contractor data to train an IDM within the VPT method than it is to directly train a BC foundation model from that same small contractor dataset.
+If we could cheaply collect a labeled contractor dataset of a similar order of magnitude as \texttt{web\_clean}, then this would not be important; however, collecting that scale of data would have cost millions of dollars.
+Figure~\ref{fig:foundation_data_scale} compares foundation models trained on increasing orders of magnitude of data from 1 hour up to the full $\sim$70k \texttt{web\_clean} dataset.
+Foundation models trained up to and including 1k hours are trained on the IDM contractor data, and those trained on 5k hours and above are trained on subsets of \texttt{web\_clean}, which does not contain any IDM contractor data.
+Scaling training data increases log collection, mining, and crafting capabilities.
+The zero-shot model only begins to start crafting crafting tables at over 5000 hours of training data.
+When fine-tuning each foundation model to \texttt{contractor\_house}, we see that crafting rates for crafting tables and wooden tools increase by orders of magnitude when using the entire $\sim$70k hour \texttt{web\_clean} dataset. We furthermore only see the emergence of crafting stone tools at the largest data scale.
+
+
+\subsection{Effect of Inverse Dynamics Model Quality on Behavioral Cloning}
+\label{section:idm_data_scaling}
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+\vspace{-20px}
+\begin{center}
+\includegraphics[width=\linewidth]{assets/IDM_quality_to_BC.pdf}
+\end{center}
+\vspace{-8px}
+\caption{Zero-shot performance of BC models trained from scratch on the \texttt{earlygame\_keyword} dataset labeled with IDMs that were trained on increasing amounts of contractor data.
+}
+\label{fig:idm_data_effect}
+\vspace{-10px}
+\end{wrapfigure}
+
+This section investigates how downstream BC performance is affected by IDM quality. We train IDMs on increasingly larger datasets and use each to independently label the \texttt{earlygame\_keyword} dataset (this smaller dataset was chosen due to a limited compute budget). We then train a BC model from scratch on each dataset and report game statistics for each model as a function of IDM contractor dataset size (Fig.~\ref{fig:idm_data_effect}).
+
+IDMs trained on at least 10 hours of data are required for any crafting, and the crafting rate increases quickly up until 100 hours of data, after which there are few to no gains and differences are likely due to noise. Similarly, crafting tables are only crafted after 50 or more hours of IDM data, and again gains plateau after 100 hours. While in all previous experiments we use our best IDM trained on 1962 hours of data, these results suggest we could reduce that number to as low as 100 hours.

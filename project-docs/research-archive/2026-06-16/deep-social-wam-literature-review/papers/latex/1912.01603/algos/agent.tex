@@ -1,0 +1,56 @@
+\begin{algorithm}[b]
+%\small
+\SetEndCharOfAlgoLine{}
+\SetKwComment{Comment}{// }{}
+\begin{minipage}[t]{.62\textwidth}%
+\BlankLine
+Initialize dataset $\mathcal{D}$ with $S$ random seed episodes. \;
+Initialize neural network parameters $\theta,\phi,\psi$ randomly. \;
+\While{not converged}{
+  \For{update step $c=1..C$}{
+    \BlankLine\Comment{Dynamics learning}
+    Draw $B$ data sequences $\{(a_t,o_t,r_t)\}_{t=k}^{k+L}\sim\mathcal{D}$. \;
+    Compute model states $s_t\sim\pr[p_\theta](s_t|s_{t-1},a_{t-1},o_t)$. \;
+    Update $\theta$ using representation learning. \;
+    \BlankLine\Comment{Behavior learning}
+    Imagine trajectories $\{(s_\tau,a_\tau)\}_{\tau=t}^{t+H}$ from each $s_t$. \;
+    Predict rewards $\E{}{\pr[q_\theta](r_\tau|s_\tau)}$ and values $v_\psi(s_\tau).$ \;
+    Compute value estimates $\mathrm{V}_{\mathrm{\lambda}}(s_\tau)$ via \cref{eq:lambda_value}. \;
+    Update $\phi\leftarrow\phi+\alpha\nabla_\phi\sum_{\tau=t}^{t+H}\mathrm{V}_{\mathrm{\lambda}}(s_\tau)$. \;
+    Update $\shortpsi\leftarrow\shortpsi-\alpha\nabla_\psi\sum_{\tau=t}^{t+H}\frac{1}{2}\big\|v_\psi(s_\tau)\!\shortminus\!\mathrm{V}_{\mathrm{\lambda}}(s_\tau)\big\|^2$.
+  }
+  \BlankLine\Comment{Environment interaction}
+  $o_1\leftarrow\texttt{env.reset()}$ \;
+  \For{time step $t=1..T$}{
+    Compute $s_t\sim\pr[p_\theta](s_t|s_{t-1},a_{t-1},o_t)$ from history. \;
+    Compute $a_t\sim\pr[q_\phi](a_t|s_t)$ with the action model. \;
+    Add exploration noise to action. \;
+    $r_t,o_{t+1}\leftarrow\texttt{env.step(}a_t\texttt{)}.$ \;
+  }
+  Add experience to dataset $\mathcal{D}\leftarrow\mathcal{D}\cup\{(o_t,a_t,r_t)_{t=1}^T\}.$ \;
+  \BlankLine
+}
+\end{minipage}%
+\begin{minipage}[t]{.38\textwidth}%
+\vspace{1ex}%
+\textbf{Model components} \\
+\begin{tabular}[t]{@{} p{7em} @{} l @{}}%
+Representation & $\pr[p_\theta](s_t|s_{t\text{-}1},a_{t\text{-}1},o_t)$ \\
+Transition & $\pr[q_\theta](s_t|s_{t\text{-}1},a_{t\text{-}1})$ \\
+Reward & $\pr[q_\theta](r_t|s_t)$ \\
+Action & $\pr[q_\phi](a_t|s_t)$ \\
+Value & $\pr[v_\psi](s_t)$ \vspace{1ex} \\
+\end{tabular}
+\textbf{Hyper parameters} \\
+\begin{tabular}[t]{@{} p{14em} @{} c @{}}%
+Seed episodes & $S$ \\
+Collect interval & $C$ \\
+Batch size & $B$ \\
+Sequence length & $L$ \\
+Imagination horizon & $H$ \\
+Learning rate & $\alpha$ \\
+\end{tabular}
+\end{minipage}%
+\caption{Dreamer}
+\label{alg:agent}
+\end{algorithm}

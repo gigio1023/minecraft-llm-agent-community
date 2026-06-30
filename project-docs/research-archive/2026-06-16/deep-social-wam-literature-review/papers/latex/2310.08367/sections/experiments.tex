@@ -1,0 +1,298 @@
+
+\section{Experiments}
+
+In this section, we first demonstrate the effectiveness of \emph{AutoEval}. Subsequently, we assess the capabilities of state-of-the-art agents using MCU and provide insights for the development of future open-ended Minecraft agents.
+
+\subsection{Validity of Automatic Evaluation}
+
+\paragraph{Experimental Setup} 
+To validate the effectiveness of automatic evaluation, we compare the results of automatic evaluation methods with human annotations. We also evaluate a baseline approach, MineCLIP~\citep{minedojo}, which also focuses on automatic evaluation. Our evaluation is conducted under two distinct settings: (1) \textit{comparative evaluation}, where the quality of two trajectories of same task is compared; and (2) \textit{absolute rating}, where a score is assigned to a single trajectory. For \emph{AutoEval}, the comparative prediction for two trajectory is given by comparing the scores.
+
+\paragraph{Dataset} We collected 500 trajectories spanning 60 tasks, derived from both agent rollouts and human gameplay videos. To evaluate the quality of these trajectories, we engaged 20 expert Minecraft players to provide annotations. The players were tasked with performing both comparative evaluations and absolute ratings on randomly sampled trajectory pairs for the same task or individual trajectories. Each player contributed 1 hours of work. Details regarding the annotation process are provided in~\cref{app:human_video}.
+
+
+\begin{table}[t]
+\centering
+\caption{F1 scores for predicting the better human-annotated trajectory across different task categories. The compared methods include MineCLIP~\citep{minedojo}, our \emph{AutoEval} on both open-access models (MiniCPM~\citep{minicpm}, JarvisVLA~\citep{jarvisvla}) and closed API-based models (GPT-4o). The highest score for each task category is \textbf{bolded}.}
+\Large
+\resizebox{1\linewidth}{!}{
+\begin{tabular}{@{}lccccccr@{}}
+\toprule
+\textbf{Method} & \textbf{Survive} & \textbf{Build} & \textbf{Craft} & \textbf{Mine} & \textbf{Explore} & \textbf{Average} \\ \midrule
+
+MineCLIP    & 11.0            & 45.0          & 44.0                   & 73.0          & 0.0            & 34.6            \\
+AutoEval (MiniCPM) & 65.0          & 43.0          & 80.0           & 59.0          & 53.0            & 60.0            \\
+AutoEval (JarvisVLA) & 73.0          & 62.0          & 73.0           & 84.0          & 65.0            & 71.4            \\
+
+% AutoEval (w/o criteria) & \textbf{100.0}  & 73.0         & 53.0           & 49.0          & \textbf{100.0} & 75.0            \\
+AutoEval (GPT-4o)  & \textbf{100.0}  & \textbf{85.0}       & \textbf{62.0}                   & \textbf{73.0}          & \textbf{100.0} & \textbf{84.0}        \\ \bottomrule
+\end{tabular}
+}
+\label{tab:human_align_acc}
+\end{table}
+
+
+\begin{table}[t]
+\centering
+\caption{F1 scores for predicting the better human-annotated trajectory across various dimensions (denoted using abbreviations).}
+\Large
+\resizebox{1\linewidth}{!}{
+\begin{tabular}{@{}ccccccccr@{}}
+\toprule
+ \textbf{\makecell[c]{Progress}} & \textbf{\makecell[c]{Action}} & \textbf{\makecell[c]{Error Rec.}} & \textbf{\makecell[c]{Creative}} & \textbf{\makecell[c]{Efficiency}} & \textbf{\makecell[c]{Material}} & \textbf{\makecell[c]{Average}} \\ \midrule
+ 84.0 & 96.0 & 86.0 & 100.0 & 92.0 & 91.0 & \textbf{91.5} \\ \bottomrule
+\end{tabular}
+}
+\label{tab:dimen_align}
+\vspace{-5pt}
+\end{table}
+
+
+
+
+% train_test.py felis1
+
+
+\paragraph{Comparative Evaluation} In this setting, participants are asked to vote on the comparative quality of the trajectory videos (denoted as \emph{A} and \emph{B}), selecting from the following options: \emph{A is better}, \emph{B is better}, \emph{tie}, or \emph{both are bad}. We filtered trajectory pairs annotated with first two options for automatic evaluation, resulting in 236 pairs. As shown in~\cref{tab:human_align_acc}, our methodology exhibits a significant improvement over MineCLIP, a CLIP model~\citep{clip} finetuned on large-scale Minecraft video frames. MineCLIP, however, struggles to capture complex event-level semantics with an average F1 score of only 34.6 (compared to 84.0 of \emph{AutoEval}). For intricate tasks such as \texttt{craft}, which demand precise attention to detail and the recognition of subtle elements, the performance of \emph{AutoEval} is slightly reduced. We leave further improvements in this for future work. Nevertheless, as demonstrated in~\cref{tab:dimen_align}, our automated evaluation metric achieves an average agreement rate of $91.5\%$ with human assessments across all dimensions. This highlights the effectiveness of the criteria-enhanced \emph{AutoEval} for multi-dimensional evaluations.
+
+
+\paragraph{Absolute Rating}
+For absolute rating, we collected a total of 227 individual ratings across approximately 50 distinct tasks. The Pearson and Kendall correlation coefficients between \emph{AutoEval} and human ratings are presented in~\cref{tab.absolute_rating}, demonstrating a strong overall positive correlation. However, the correlation varies across different dimensions. For instance, objective dimensions such as \emph{task progress} exhibit high agreement between human evaluators and VLM assessments, with a Pearson correlation of 0.78. In contrast, more subjective dimensions, such as \emph{creativity}, show a lower correlation. Additionally, we compute the inter-rater agreement for scoring the same trajectory, revealing a higher \emph{Pearson correlation} for task progress (0.83) and a lower correlation for creativity (0.69).
+
+\begin{table}[t]
+\centering
+\caption{The Pearson correlation and Kendall's $\tau$ between \emph{AutoEval} and human ratings across different dimensions.}
+\Large
+\resizebox{0.99\linewidth}{!}{
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+\textbf{Dimension} & \multicolumn{2}{c}{\textbf{Pearson}} & \multicolumn{2}{c}{\textbf{Kendall's $\tau$}} \\ \cmidrule{2-3} \cmidrule{4-5} 
+ & Coefficient & P-value & Coefficient & P-value \\ \midrule
+Task Progress & 0.78 & $1.70 \times 10^{-22}$ & 0.71 & $1.94 \times 10^{-19}$ \\
+Action & 0.76 & $6.22 \times 10^{-19}$ & 0.67 & $1.68 \times 10^{-16}$ \\
+Error Recog. & 0.68 & $1.10 \times 10^{-12}$ & 0.62 & $4.40 \times 10^{-10}$ \\
+Creativity & 0.63 & $5.90 \times 10^{-9}$ & 0.56 & $1.18 \times 10^{-7}$ \\
+Efficiency & 0.75 & $1.10 \times 10^{-16}$ & 0.67 & $1.02 \times 10^{-14}$ \\
+Material & 0.70 & $2.28 \times 10^{-16}$ & 0.63 & $2.29 \times 10^{-13}$ \\ \bottomrule
+\end{tabular}
+}
+\label{tab.absolute_rating}
+\vspace{-7pt}
+\end{table}
+
+
+
+
+
+\begin{table*}[ht]
+\vspace{-7pt}
+\centering
+\caption{Task progress for 35 tasks. Performance table across all tasks in simple mode. \textbf{Abbreviations:} 
+\textbf{Exp} = exploring,\,
+\textbf{FD} = find diamond,\,
+\textbf{FF} = find forest,\,
+\textbf{FV} = find villages,\,
+\textbf{CM} = climb mountain;\,
+\textbf{Crv} = carve,\,
+\textbf{CO} = compose obsidian,\,
+\textbf{Drk} = drink,\,
+\textbf{F\&S} = flint\&steel,\,
+\textbf{Slp} = sleep;\,
+\textbf{Ck} = cake,\,
+\textbf{Clk} = clock,\,
+\textbf{CT} = craft table,\,
+\textbf{DS} = diamond sword,\,
+\textbf{Ld} = ladder;\,
+\textbf{DO} = diamond ore,\,
+\textbf{Dt} = dirt,\,
+\textbf{Gr} = grass,\,
+\textbf{IO} = iron ore,\,
+\textbf{Ob} = obsidian;\,
+\textbf{End} = enderman,\,
+\textbf{Shp} = sheep,\,
+\textbf{Skl} = skeletons,\,
+\textbf{Spd} = spiders,\,
+\textbf{Zmb} = zombies;\,
+\textbf{BP} = build pillar,\,
+\textbf{Cv} = cave,\,
+\textbf{NP} = nether portal,\,
+\textbf{SG} = snow golem;\,
+\textbf{Wf} = waterfall;\,
+\textbf{CTS} = crafting table from scratch,\,
+\textbf{MDS} = mine diamond from scratch,\,
+\textbf{D\&S} = dye and shear sheep,\,
+\textbf{T\&P} = till and plant seeds,\,
+\textbf{PAG} = prepare a gift. Best values within the same task are \textbf{bolded}.}
+\label{tab:merged}
+
+%----------------------------------------
+%-------------- PART A ------------------
+%----------------------------------------
+\Large
+\begin{minipage}{\textwidth}
+\centering
+\resizebox{0.8\textwidth}{!}{%
+\begin{tabular}{lcccccccccccccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Agent}} 
+& \multicolumn{6}{c}{\textbf{Navigation Task}} 
+& \multicolumn{6}{c}{\textbf{Tool-use Task}} 
+& \multicolumn{6}{c}{\textbf{Crafting Task}} \\
+\cmidrule(lr){2-7} \cmidrule(lr){8-13} \cmidrule(lr){14-19}
+& Exp & FD & FF & FV & CM & \textbf{Avg} 
+& Crv & CO & Drk & F\&S & Slp & \textbf{Avg}
+& Ck & Clk & CT & DS & Ld & \textbf{Avg} \\
+\midrule
+GROOT
+& 0.90 & 0.56 & 0.75 & 0.60 & \textbf{0.60} & 0.72 
+& 0.20 & \textbf{0.10} & \textbf{0.40} & 0.10 & \textbf{0.85} & \textbf{0.33}
+& 0.35 & 0.60 & 0.45 & \textbf{0.75} & 0.25 & 0.48 \\
+
+Steve-I
+& \textbf{0.95} & 0.50 & \textbf{0.95} & \textbf{0.90} & 0.35 & 0.73
+& \textbf{0.45} & 0.00 & 0.35 & \textbf{0.20} & 0.10 & 0.22
+& \textbf{0.80} & \textbf{0.70} & 0.45 & 0.20 & \textbf{0.70} & \textbf{0.57} \\
+
+VPT (BC)
+& 0.90 & \textbf{0.65} & 0.87 & 0.75 & \textbf{0.60} & \textbf{0.75}
+& 0.25 & 0.00 & \textbf{0.40} & 0.10 & 0.45 & 0.24
+& 0.45 & 0.35 & 0.30 & 0.50 & 0.45 & 0.41 \\
+
+VPT (RL)
+& 0.70 & 0.58 & 0.55 & 0.50 & 0.35 & 0.54
+& 0.15 & \textbf{0.10} & 0.35 & 0.15 & 0.25 & 0.20
+& 0.70 & 0.62 & \textbf{0.50} & 0.30 & 0.62 & 0.55 \\
+\bottomrule
+\vspace{-7pt}
+\end{tabular}}
+
+\end{minipage}
+
+\vspace{0.5em}
+
+%----------------------------------------
+%-------------- PART B ------------------
+%----------------------------------------
+\begin{minipage}{\textwidth}
+\centering
+\resizebox{1.0\textwidth}{!}{%
+\begin{tabular}{lcccccccccccccccccccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Agent}}
+& \multicolumn{6}{c}{\textbf{Mining Task}} 
+& \multicolumn{6}{c}{\textbf{Combating Task}}
+& \multicolumn{6}{c}{\textbf{Building Task}}
+& \multicolumn{6}{c}{\textbf{Compositional Task}} \\
+\cmidrule(lr){2-7} \cmidrule(lr){8-13} \cmidrule(lr){14-19} \cmidrule(lr){20-25}
+& DO & Dt & Gr & IO & Ob & \textbf{Avg}
+& End & Shp & Skl & Spd & Zmb & \textbf{Avg}
+& BP & Cv & NP & SG & Wf & \textbf{Avg}
+& CTS & MDS & D\&S & T\&P & PAG & \textbf{Avg} \\
+\midrule
+GROOT  
+& \textbf{0.81} & 0.70 & 0.90 & 0.56 & \textbf{0.40} & \textbf{0.67}
+& \textbf{0.30} & 0.50 & \textbf{0.56} & 0.50 & \textbf{0.75} & 0.53
+& 0.40 & \textbf{0.20} & \textbf{0.45} & \textbf{0.65} & 0.15 & \textbf{0.38}
+& 0.45 & \textbf{0.71} & 0.05 & \textbf{0.50} & 0.19 & 0.23 \\
+
+Steve-I
+& 0.35 & \textbf{0.85} & \textbf{0.95} & \textbf{0.20} & 0.35 & 0.54
+& 0.05 & 0.30 & 0.40 & \textbf{0.75} & 0.42 & \textbf{0.54}
+& \textbf{0.60} & 0.10 & 0.30 & 0.05 & 0.05 & 0.13
+& 0.45 & 0.35 & \textbf{0.30} & 0.20 & \textbf{0.30} & 0.13 \\
+
+VPT (BC)
+& 0.30 & 0.30 & 0.50 & 0.15 & 0.38 & 0.33
+& 0.25 & \textbf{0.55} & 0.55 & 0.35 & 0.50 & 0.36
+& 0.00 & 0.02 & 0.35 & 0.00 & 0.20 & 0.11
+& 0.30 & 0.30 & 0.10 & 0.00 & 0.25 & 0.13 \\
+
+VPT (RL)
+& 0.15 & 0.35 & 0.37 & 0.05 & 0.35 & 0.22
+& 0.15 & 0.35 & 0.35 & 0.25 & 0.30 & 0.28
+& 0.10 & 0.02 & 0.40 & 0.13 & \textbf{0.25} & 0.23
+& \textbf{0.90} & 0.50 & 0.00 & 0.00 & \textbf{0.30} & \textbf{0.34} \\
+\bottomrule
+\end{tabular}
+}
+\end{minipage}
+\label{tab.inter_task}
+\vspace{-7pt}
+\end{table*}
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{table}[t]
+\centering
+\caption{Performance changes of GROOT for selected tasks in simple and hard modes. Each result is averaged over 10 seeds.}
+\Large
+\resizebox{0.99\linewidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+\multirow{2}{*}{\textbf{Task}} & \multicolumn{3}{c}{\textbf{Task Progress}} & \multicolumn{3}{c}{\textbf{Action Control}} \\ 
+\cmidrule(lr){2-4} \cmidrule(lr){5-7} 
+ & \textbf{Simple} & \textbf{Hard} & $\Delta$ & \textbf{Simple} & \textbf{Hard} & $\Delta$ \\ 
+\midrule
+{Build Nether Portal}    & 0.45 & 0.30 & \textcolor{google_red}{-0.15} & 0.50 & 0.40 & \textcolor{google_red}{-0.10} \\
+{Mine Iron Ore}   & 0.56 & 0.60 & 0.04 & 0.44 & 0.55 & 0.11 \\
+{Craft to Cake}   & 0.35 & 0.32 & \textcolor{google_red}{-0.03} & 0.31 & 0.25 & \textcolor{google_red}{-0.06} \\
+{Combat Skeletons} & 0.56 & 0.30 & \textcolor{google_red}{-0.26} & 0.25 & 0.20 & \textcolor{google_red}{-0.05} \\
+{Carve Pumpkin}   & 0.20 & 0.15 & \textcolor{google_red}{-0.05} & 0.35 & 0.25 & \textcolor{google_red}{-0.10} \\
+{Sleep in bed}    & 0.85 & 0.50 & \textcolor{google_red}{-0.35} & 0.40 & 0.30 & \textcolor{google_red}{-0.10} \\
+\midrule
+\textbf{Average}  & 0.50 & 0.36 & \textcolor{google_red}{-0.14} & 0.38 & 0.33 & \textcolor{google_red}{-0.05} \\
+\bottomrule
+\end{tabular}
+}
+\vspace{-7pt}
+\label{tab:intra_task}
+\end{table}
+
+
+
+
+\subsection{Evaluating Existing Agents with MCU}
+\label{sec:expr}
+
+\paragraph{Agents} We evaluate four powerful foundation agents in Minecraft, all supported by MineStudio: (1) VPT (BC), a behavior cloning agent initially pre-trained on YouTube Minecraft videos and further fine-tuned on refined early-game contractor data; (2) VPT (RL), a reinforcement learning fine-tuned model based on VPT (BC) that maximizes the reward for obtaining diamonds in Minecraft; (3) STEVE-I~\citep{steve1}, which follows text instructions to complete tasks; and (4) GROOT~\citep{groot}, which solves tasks demonstrated by a reference video.  GROOT receives video instructions, STEVE-I receives text instructions, and VPT operates without instructions. We exclude agents that simplify the Minecraft environment by deviating from the native action space.
+More details on these models can be found in~\citet{groot}.
+
+\paragraph{Experimental Setup} 
+While MCU enables scalable task evaluation without extensive human annotation, we carefully select a small yet diverse set of 30 atomic and 5 compositional tasks to illustrate our experimental conclusions without introducing excessive complexity. A comprehensive evaluation of a total of 150 tasks, including 90 randomly sampled atomic tasks and 60 compositional tasks, is deferred to~\cref{app:batch_inference}.
+The 30 atomic tasks are drawn from six major categories, ensuring inter-task diversity while maintaining a moderate difficulty level suitable for Minecraft junior players. The difficulty of each task is of \emph{simple} mode, and each task is evaluated using 30 random seeds.
+To highlight the importance of intra-task diversity, we select six atomic tasks (1-2 from each category), assessing both \emph{simple} and \emph{hard} modes of these tasks seperately. Each difficulty level is evaluated with 10 random seeds.
+
+
+
+\subsubsection{Inter-task Generalization}
+We present the \emph{AutoEval}-generated ``task progress'' scores for the inter-task generalization experiments in~\cref{tab.inter_task}, while the multi-dimensional performance, averaged over all tasks, is visualized in~\cref{fig:framework}c. 
+Notably, the task progress metric is closely related to the commonly used ``task success rate'' in agent benchmarks. However, unlike success rate, which is a binary (0-1) outcome-based criterion, task progress is a process-supervised metric. This allows for a more fine-grained assessment of an agent's performance beyond simply determining whether a task was completed.
+
+We observe that agents often struggle to reliably complete many tasks (e.g., \texttt{combat} and \texttt{build}). However, they still exhibit nonzero task progress, indicating partial progress as determined by the LLM. This suggests that while agents may not always achieve full task success, they are capable of making incremental advancements toward task completion.
+Among the evaluated agents, we note that VPT (RL), which is specifically RL-tuned to maximize rewards for obtaining diamonds, performs well on tasks aligned with this objective (e.g., crafting a crafting table from scratch). However, it significantly underperforms on tasks unrelated to its target. This highlights the importance of inter-task diversity in assessing the generalizability of agents. While generalist agents such as GROOT and Steve-I demonstrate better open-endedness, they struggle with specific tasks (e.g., crafting particular items), indicating that future efforts should focus on improving performance in these areas. 
+Additionally, we observe that task progress for compositional tasks is lower than for atomic tasks, underscoring the persistent challenge of MCU. Furthermore, as shown in~\cref{fig:framework}c, current agents fall short in creativity, error recognition, and efficiency, suggesting important directions for future research aimed at improving these aspects.
+
+
+
+
+
+
+\subsubsection{Intra-task Generalization}
+
+The task progress and action control performance of intra-task generalization experiments for GROOT, the best agent among the compared agents, are presented in~\cref{tab:intra_task}. The results indicate that for the same task, slight changes in the task situation lead to a significant drop in task progress performance. For example, consider the very simple task of \texttt{sleep in bed}, which only requires the agent to identify a bed and right-click the mouse. In \emph{simple} mode, the bed is placed directly in front of the agent on a plain with no surrounding objects. However, in \emph{hard} mode, both the bed and the agent are inside a house, requiring the agent to correctly identify the bed and interact with it. We observed failure cases where the agent mistakenly interacted with a chest in the room or left the house instead. This suggests that GROOT does not learn the skill robustly, a phenomenon not previously reported in the Minecraft agent literature.
+
+Nevertheless, some tasks exhibited relatively stable performance across difficulty levels, such as \texttt{mine iron ore}, \texttt{craft to cake}, and \texttt{combat skeletons}. This may be because certain categories of tasks (e.g., building, tool-use, and crafting) are more susceptible to difficulty variations due to increased environmental complexity, while others are less affected. Overall, enhancing intra-task diversity of tasks is beneficial to test the robust generalzability of agents.
+
+\input{sections/related_work.tex}
+
+
+

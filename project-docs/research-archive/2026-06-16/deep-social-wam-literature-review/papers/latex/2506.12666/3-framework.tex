@@ -1,0 +1,69 @@
+\section{\lifelongsotopia Framework}
+\label{sec:framework}
+
+\subsection{Dataset Preparation}
+\label{sec:framework:dataset}
+There are three main components of our dataset in \sotopia including: (1) \textit{Characters}, representing the profiles of the role-playing characters as defined in \S \ref{sec:background:sotopia}, with their details including their name, age, occupation, gender, personality, etc. (2) \textit{Relationships}, which detail the relationships the characters may possess with other characters in the dataset. They can either be strangers, know each other by name, acquaintances, friends, romantic partners or family members. (3) \textit{Scenarios}, which outline the scenarios in which the characters will participate, also detailing the goals of each agent and certain constraints on the character profiles such as on their age, occupation, or relationship with the other agent.
+
+We directly use the 40 characters and 90 relationships provided in the \sotopia database. The scenarios in our framework are sampled based on the constraint on the relationship between the agents (\S \ref{sec:framework:chaining}), and hence we require an equal number of scenarios for all relationship types. For this purpose, we utilise the GPT-4 API along with few-shot prompting techniques to build our dataset. Scenarios are randomly sampled based on the relation type from the \sotopia database as few-shot examples, and then the LLM is prompted to generate new scenarios based on them. The prompt used for this purpose is shown in Appendix \S \ref{appendix:prompts:envprofiles}. A further manual check is run on the generated profiles similar to \sotopia to ensure the quality of the profiles and remove any redundancies and repetition. 
+\review{In total, we obtain 41 scenarios for each relationship type.}
+% In total, 40 scenarios are generated for each relationship type.
+
+\subsection{Multi-episode chaining}
+\label{sec:framework:chaining}
+All episodes in \sotopia are independent of one another. However,
+for the \lifelongsotopia benchmark, our aim is to simulate lifelong social interactions over extended contexts. To achieve this, we implement ``episode chaining,'' whereby multiple scenarios are connected together, allowing characters to progress through each episode sequentially while retaining a memory of their previous interactions. For a given pair of characters, episodes are sampled based on their relationship type, resulting in a set of 40 episodes for each sampled pair (\S \ref{sec:framework:dataset}). As characters are equipped with a memory of all their past interactions, the context length increases linearly with the number of episodes. While some scenarios are entirely independent of others in the set, certain scenarios are interconnected, where the memory of previous episodes can directly influence the outcomes of subsequent ones. For example, in certain scenarios, a character passionate about social work must convince another to donate to a Charity. These scenarios repeat with the cause or Charity changing. However, once a character has already donated, they may be less willing to donate again due to potential financial concerns. This makes the task progressively harder for the agent in future scenarios. Our approach of chaining the episodes effectively mirrors real-life situations, in which we sometimes encounter situations with another person that are related to past interactions, while at other times, the situations may be completely independent.
+
+\subsection{Implementation Details}
+\label{sec:framework:implementation}
+
+As previously mentioned, the characters are provided with a memory of their prior interactions, and we implement this in two distinct ways.
+
+\textbf{Entire interaction as memory} \quad Characters are given the complete interaction details from each episode as context for subsequent episodes. Thus, for the $n$-th episode in the sequence, characters have access to all their interactions from the previous $n-1$ episodes, including the scenarios and their goals from those episodes. The task of retrieving relevant information and reasoning over it to better achieve their goals in current future scenarios is left to the characters, who are prompted to do so during their interactions. 
+
+\textbf{Advanced memory module} \quad In the second method, we employ a more advanced memory module, drawing inspiration from prior works~\citep{park2023generative, zhu2023ghostminecraftgenerallycapable, bae-etal-2022-keep, zhong-etal-2022-less}. Instead of supplying the complete interaction as memory, we generate a concise summary of approximately 200-300 words for each episode. This summary explicitly focuses on three aspects: (1) a brief overview of the entire interaction within the episode, (2) useful negotiation techniques employed by either character to achieve their goals, and (3) new information gained about the other character, including their likes and dislikes, behavioral traits, etc., which may prove useful in future interactions. The prompt for generating this summary is demonstrated in Appendix \S \ref{appendix:prompts:summary}. By providing a summary of each episode as a memory rather than the entire interaction, we ensure that only relevant and useful information remains in the characters' memory, thereby simplifying their reasoning process.
+
+\subsection{Evaluation Protocol}
+\label{sec:framework:evaluation}
+Here, we will define the evaluation protocol and how we test the performance of the language agents in our environment. For this purpose, we evaluate the agents on two dimensions, namely, \believabilityFull and \goalcompletionFull. A more detailed explanation of what these dimensions evaluate is as follows: 
+
+\believabilityFull (\believability) [0-10]: It focuses on the extent to which the character’s behavior is perceived as natural, realistic, and aligned with their profile, thus simulating believable proxies of human behavior.
+
+\goalcompletionFull (\goalcompletion) [0-10]: This evaluates the extent to which the character achieved their goals defined in the environment. 
+
+The main idea is to analyze how the scores of various LLM-based agents evolve as they step through the constructed episode chains. We use \believability scores to evaluate the \textit{consistency} of the models. As they go through more social interactions, the context provided to the models increases. This context incorporates two distinct streams of information — one from the model's own perspective and the other from the character they interact with — making it increasingly difficult for the models to distinguish and parse through these different sources. Therefore, if the models maintain their scores on this dimension throughout the chain, we can assert that they exhibit consistency over lifelong interactions.
+
+On the other hand, analyzing \goalcompletion scores helps us evaluate the \textit{social intelligence} of the models. As the context grows, the models accumulate more information about the other character's behavioral traits, preferences, and dislikes, while also having the opportunity to learn new negotiation strategies. If the LLMs perform at or above human-level competence, they would be able to effectively use the provided information, reason through it, learn from their successes and failures, and better optimize their goal completion strategies in later episodes. This would manifest as either consistent or improving \goalcompletion scores.
+
+While GPT-4 is used as the evaluator model for all our experiments, initial results revealed that \textbf{GPT-4 overestimated the \believability scores} and failed to recognize several cues that made the conversations less believable. This was observed through manual inspection of the generated episodes. The error cases where the evaluator began overestimating the \believability scores generally occurred later in the episode chain, when the context length had increased significantly. This issue was likely not detected in the original \sotopia paper for the same reason.
+
+To help the evaluator better assess the agent performance on \believability, we constructed an exhaustive checklist of the failures observed in the LLMs during their interactions. We name this dimension \believabilityextendedFull (\believabilityextended). The checklist comprises 8 items in total:
+
+\begin{itemize}
+    \item \textit{Repetition of Sentences:} The character must not repeat the same sentence multiple times throughout the conversation.
+    
+    \item \textit{Consistency with Character Traits:} The character must remain true to the traits assigned to them and avoid imitating the other character's personality.
+    
+    \item \textit{Consistency with Environment Goals:} The character’s dialogue must align with their specific goals within the environment.
+    
+    \item \textit{Agent Leaves Promptly After Goal Resolution:} We observed that even after both characters achieved their respective goals, they often continued to converse about unrelated topics, which detracted from the believability. This behavior should not occur.
+    
+    \item \textit{Repetition of Exact Goals:} Characters should avoid repeating their exact goals (which are provided as private information) and instead engage in a believable conversation with the other character.
+    
+    \item \textit{Stalling in a Conversation:} The character should not stall or remain idle during the conversation.
+    
+    \item \textit{Character Responses:} The character’s dialogue should directly respond to the other character. In some cases, the character would discuss unrelated topics or ignore direct questions, which negatively impacted the interaction.
+    
+    \item \textit{Episode Beginning:} The beginning of the conversation should not be abrupt or unrelated to the current scenario. We observed that due to the large context provided to the models, they sometimes confused current episodes with previous ones, leading to conversations that referenced past interactions.
+\end{itemize}
+
+Appendix \S \ref{appendix:qual_belext} provides specific episodes where these failure cases happen for better interpretability. Furthermore, the prompts used to evaluate \believability, \goalcompletion and \believabilityextended are demonstrated in Appendix \S \ref{appendox:prompts:evaluation}. 
+
+During the evaluation of an episode, alongside scoring on \believability and \goalcompletion as in \sotopia, the evaluator model is tasked with assigning a binary rating of 0 or 1 to each item on the checklist in \believabilityextended, depending on whether the agent fails to meet that criterion. A penalty of 5 points is imposed on the \believability score for each checkpoint that the agent fails. The lower bound of 0 for \believability remains unchanged. Thus, the final \believability score is calculated as follows:
+\begin{align}
+    \text{\believability} = \max\left(\text{Initial Score} -\left(5 \times \text{(checkpoints in \believabilityextended failed)}\right), 0\right)
+\end{align}
+
+Additionally, a manual validation of the performance of the GPT-4 evaluator was conducted on the new believability-extended dimension. The validation procedure is as follows: For each checkpoint in our list, we randomly sampled 50 positive episodes (where the character passed the checkpoint) and 50 negative episodes (where the character failed the checkpoint). After shuffling these episodes, a human annotator assigned a binary rating to each data point. Table~\ref{tab:bel_extended:validation} provides details of the performance of GPT-4 on each of the checkpoints.
+
+\input{fig_tab_alg/bel_extended/tab_validation}

@@ -1,0 +1,35 @@
+\ourmethod ($\pi_0$) jointly predicts video $I_{t:t+H}$ and actions $A_{t:t+H}$ conditioned on language instruction $l$, proprioceptive state $q_t$ and visual observation including the current and the past history $I_{0:t}$ where $H>0$ is a fixed horizon. Joint prediction of video and action can be decomposed into (1) autoregrssive video prediction and (2) action prediction from an inverse-dynamics model (IDM): 
+\begin{equation}
+    \pi_0(I_{t:t+H}, A_{t:t+H} | I_{0:t}, l, q_t) = \pi_0(I_{t:t+H} | I_{0:t}, l, q_t) \pi_0(A_{t:t+H} | I_{0:T}, l, q_t) 
+\label{eq:joint_pred}
+\end{equation}
+Instead of using separate two models (video prediction model and IDM) to model the decomposed objective \citep{pai2025mimic}, we train a single model end-to-end with joint prediction objective. Since pretrained video models are already optimized on video prediction objective of diverse internet data, \ourmethod only need to additionally learn to predict videos for the robot embodiment videos and extract corresponding actions from the generated videos. We hypothesize that instead of learning $\pi_0(A_{t:t+H}| I_t, l, q_t)$ from a VLM pretrained with $\pi_0(l_{t:H}|I_t, l_{0:t})$, learning $\pi_0(I_{t:t+H}, A_{t:t+H} | I_{0:t}, l, q_t)$ from a video diffusion model pretrained with $\pi_0(I_{0:H} | I_0, l)$ objective enables better transfer learning, leading to better generalization.
+
+The model architecture is shown in Figure \ref{fig:main_arch}. To retain the generalization capability of video models, we introduce minimal additional parameters: state encoders, action encoders, and decoders. For robot training data that contains multiple views, we concatenate each views into a single frame instead of making architectural changes to the backbone model. 
+
+For joint video-action training, \ourmethod is trained to predict video frames autoregressively. Autoregressive generation possess the following advantages: (1) it enables faster inference speed by utilizing KV-cache, (2) the policy model can leverage the visual observation history as guidance for the next generation, and (3) it makes the video-language-action modalities more aligned to each other. We introduce autoregressive modeling only for the video modality to avoid error propagation coming from closed-loop action prediction. \ourmethod is trained to predict video frames in a \textit{chunk} manner; each chunk has a fixed number of frames $K$ to match the action horizon. Chunk-wise generation enables training on variable length of videos, similar to how LLMs are trained on variable length of language tokens. We provide more details on the model architecture in Appendix \ref{}.
+
+Similar to recent video generation model and VLAs, we employ flow-matching as the training objective \citep{wan2025wan, ali2025world, teng2025magi}. Unlike recent WAMs \citep{zhu2025unified, anonymous2025cosmos, li2025unified, liao2025genie}, \ourmethod shares the denoising timestep between video and action modality for faster convergence. 
+% Instead, we sample independent Gaussian noise for each chunk, training \ourmethod to perform chunk-wise denoising. 
+Also, the training objective of \ourmethod is teacher forcing \citep{jin2024pyramidal, gao2024ca2}; the model is trained to denoise the noisy current chunk conditioned on the clean previous chunks. 
+Given a specific chunk index $k$ and the denoising step $t$, we define the corresponding video latent as $x_{t,k}$ and normalized actions as $y_{t,k}$. Based on this notation, the clean context from the previous chunks is defined as $\mathcal{C}_{<k} = \bigcup_{j=1}^{k-1} \{x_{1, j}, \ y_{1, j}\}$ and the clean current video latent is defined as $x_{1,k}$ and normalized actions as $y_{1,k}$. The corresponding noise initialization for both modality is defined as $x_{0,k} \sim \mathcal{N}(0,I), y_{0,k} \sim \mathcal{N}(0,I)$. The intermediate noisy latents for chunk $k$ are constructed using a shared timestep $t_k \sim \text{Logit-Normal}(0, I)$ sampled independently for each chunk:
+\begin{equation}
+    \begin{cases}
+        x_{t,k} = t_k x_{1,k} + (1 - t_k) x_{0,k} \\
+        y_{t,k} = t_k y_{1,k} + (1 - t_k) y_{0,k}
+    \end{cases}
+\end{equation}
+Because both modalities follow a linear interpolation (Rectified Flow) indexed by the same $t_k$, the ground truth velocity $\mathbf{v}_{t,k}$ for chunk $k$ is the constant directional vector: 
+\begin{equation}
+    \mathbf{v}_{t,k} = \begin{bmatrix} v_{t,k}^x \\ v_{t,k}^y \end{bmatrix} = \begin{bmatrix} \frac{dx_{t,k}}{dt_k} \\ \frac{dy_{t,k}}{dt_k} \end{bmatrix} = \begin{bmatrix} x_{1,k} - x_{0,k} \\ y_{1,k} - y_{0,k} \end{bmatrix}
+\end{equation}
+
+The model $\mathbf{u}_{\theta}$ predicts the joint velocity for both modalities. The training objective is to minimize the weighted Mean Squared Error (MSE) summed across all temporal chunks:
+\begin{equation}
+    \mathcal{L} = \mathbb{E}_{x, y, t} \sum_{k=1}^{K} w(t_k) \left\| \mathbf{u}(\mathcal{C}_{<k}, x_{t,k}, y_{t,k}, c, q_{k},  t_{total}; \theta) - \mathbf{v}_{t,k} \right\|^2
+\end{equation}
+where $c$ is the text conditioning context, $q_{k}$ is the proprioceptive state, and $t_{total}=[t_{clean}, t_k]$. Here, $t_{clean}$ is a vector of fixed timesteps ($t=1$) corresponding to the length of $\mathcal{C}_{<k}$. To enable efficient training, we update the gradient on trajectory level and apply attention masking so that the current noisy video and chunk can attend to clean context of previous chunks.
+
+
+During inference, \ourmethod jointly denoises video and action chunk. Similar to autoregressive video generation models~\citep{huang2025self, teng2025magi, yin2025slow}, we leverage KV cache for efficient inference. However, since we have a closed-loop system, it is quite different from pure video generation; we can get \textit{ground truth} observations from the real-world as the robot executes the generated actions and the observations can be used as clean context ${C}_{<k}$ when generating the video and actions for the next chunk $k$. Specifically, every time the robot performs an action, we update the KV cache corresponding to the inference chunk index with the ground truth execution video frames. 
+Therefore, unlike traditional autoregressive video diffusion models, \ourmethod does not suffer from exposure bias, where the error accumulates as the generation proceeds. Additionally, \ourmethod is a stateful policy, which can leverage the visual history as guidance for tasks that require memory.

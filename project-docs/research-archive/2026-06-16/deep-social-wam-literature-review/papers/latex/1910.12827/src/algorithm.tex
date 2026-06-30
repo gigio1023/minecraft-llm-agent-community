@@ -1,0 +1,60 @@
+\subsection{Interactive Inference for Binding Object Properties to Latent Variables} \label{sec:op3_inference}
+For the observation and dynamics models to operate from raw pixels hinges on the ability to bind the properties of specific physical objects $h^*_{1:K}$ to the entity variables $H_{1:K}$.
+For latent variable models, we frame this variable binding problem as an inference problem: binding information about $h^*_{1:K}$ to $H_{1:K}$ can be cast as a problem of inferring the parameters of $p(H^{(0:T)} \sgiven x^{(0:T)}, a^{(0:T-1)})$, the posterior distribution of $H_{1:K}$ given a sequence of interactions.
+Maximizing the ELBO in Sec.~\ref{sec:problem_formulation} offers a method for learning the parameters of the observation and dynamics models while simultaneously learning an approximation to the posterior $q(H^{(0:T)} \sgiven x^{(0:T)}, a^{(0:T-1)}) = \prod_{t=0}^T \mathdutchcal{Q}(H^{(t)}_{1:K} \sgiven H^{(t-1)}_{1:K}, x^{(t)}, a^{(t)})$, which we have chosen to factorize into a per-timestep recognition distribution $\mathdutchcal{Q}$ shared across timesteps.
+We also choose to enforce the entity abstraction on the process that computes the recognition distribution $\mathdutchcal{Q}$ (in Fig.~\ref{fig:combined_overview}e) by decomposing it into a recognition distribution $\mathdutchcal{q}$ applied to each entity:
+\footnotesize
+\begin{align}
+    \mathdutchcal{Q}\left(H^{(t)}_{1:K} \sgiven h^{(t-1)}_{1:K}, x^{(t)}, a^{(t)}\right) = \prod_{k=1}^K \mathdutchcal{q}\left(H^{(t)}_{k} \sgiven h^{(t-1)}_{k}, x^{(t)}, a^{(t)}\right).
+\end{align} 
+\normalsize
+Whereas a neural network encoder is often used to approximate the posterior~\citep{hafner2018learning,xu2018modeling,kulkarni2019unsupervised}, a single forward pass that computes $\mathdutchcal{q}$ in parallel for each entity is insufficient to break the symmetry for dividing responsibility of modeling different objects among the entity variables~\citep{zhang2019set} because the entities do not have the opportunity to communicate about which part of the scene they are representing.
+
+We therefore adopt an \textit{iterative inference} approach~\citep{marino2018iterative} to compute the recognition distribution $\mathdutchcal{Q}$, which has been shown to break symmetry among modeling objects in static scenes~\citep{greff2019iodine}.
+Iterative inference computes the recognition distribution via a \textit{procedure}, rather than a single forward pass of an encoder, that iteratively refines an initial guess for the posterior parameters $\lambda_{1:K}$ by using gradients from how well the generative model is able to predict the observation based on the current posterior estimate.
+The initial guess provides the noise to break the symmetry.
+
+For scenes where position and color are enough for disambiguating objects, a static image may be sufficient for inferring $\mathdutchcal{q}$.
+However, in interactive environments disambiguating objects is more underconstrained because what constitutes an object depends on the goals of the agent.
+We therefore incorporate actions into the amortized varitional filtering framework~\citep{marino2018general} to develop an \textit{interactive inference} algorithm (Appdx.~\ref{appdx:interactive_inference} and Fig.~\ref{fig:inference}) that uses temporal continuity and interactive feedback to disambiguate objects.
+Another benefit of enforcing entity abstraction is that preserving temporal consistency on entities comes for free: information about each object remains bound to its respective $H_k$ through time, mixing with information about other entities only through explicitly defined avenues, such as in the dynamics model.
+
+\subsection{Training at Different Timescales} \label{sec:training}
+The variational parameters $\lambda_{1:K}$ are the interface through which the neural networks $f_{\mathdutchcal{g}}$, $f_{\mathdutchcal{d}}$, $f_{\mathdutchcal{q}}$ that respectively output the distribution parameters of $\mathdutchcal{G}$, $\mathdutchcal{D}$, and $\mathdutchcal{Q}$ communicate.
+For a \textit{particular} dynamic scene, the execution of interactive inference optimizes the variational parameters $\lambda_{1:K}$.
+\textit{Across} scene instances, we train the weights of $f_{\mathdutchcal{g}}$, $f_{\mathdutchcal{d}}$, $f_{\mathdutchcal{q}}$ by backpropagating the ELBO through the entire inference procedure, spanning multiple timesteps.
+OP3 thus learns at three different timescales: the variational parameters learn (1) across $M$ steps of inference within a single timestep and (2) across $T$ timesteps within a scene instance, and the network weights learn (3) across different scene instances.
+
+Beyond next-step prediction, we can directly train to compute the posterior predictive distribution $p(X^{(T+1:T+d)} \sgiven x^{(0:T)}, a^{(0:T+d)})$ by sampling from the approximate posterior of $H_{1:K}^{(T)}$ with $\mathdutchcal{Q}$, rolling out the dynamics model $\mathdutchcal{D}$ in latent space from these samples with a sequence of $d$ actions, and predicting the observation $X^{(T+d)}$ with the observation model $\mathdutchcal{G}$.
+This approach to action-conditioned video prediction predicts future observations directly from observations and actions, but with a bottleneck of $K$ time-persistent entity-variables with which the dynamics model $\mathdutchcal{D}$ performs symbolic relational computation.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.9\textwidth]{figs/method/iterative_inference_updated.png}
+\caption{\small{
+\textbf{Amortized interactive inference} alternates between refinement (pink) and dynamics (orange) steps, iteratively updating the belief of $\lambda_{1:K}$ over time.
+$\hat{\lambda}$ corresponds to the output of the dynamics network, which serves as the initial estimate of $\lambda$ that is subsequently refined by $f_\mathdutchcal{G}$ and $f_\mathdutchcal{Q}$. $\triangledown$ denotes the feedback used in the refinement process, which includes gradient information and auxiliary inputs (Appdx.~\ref{appdx:interactive_inference}).
+}}
+\label{fig:inference}
+\end{figure}
+
+\subsection{Object-Centric Planning} \label{sec:planning}
+OP3 rollouts, computed as the posterior predictive distribution, can be integrated into the standard visual model-predictive control~\citep{finn2017deep} framework.
+Since interactive inference grounds the entities $H_{1:K}$ in the actual objects $h_{1:K}^*$ depicted in the raw observation, this grounding essentially gives OP3 access to a \textit{pointer} to each object, enabling the rollouts to be in the space of entities and their relations.
+These pointers enable OP3 to not merely predict in the space of entities, but give OP3 access to an \textit{object-centric action space}: 
+for example, instead of being restricted to the standard \texttt{(pick\_xy, place\_xy)} action space common to many manipulation tasks, which often requires biased picking with a scripted policy~\citep{levine2018learning,kalashnikov2018qt}, these pointers enable us to compute a mapping (Appdx.~\ref{appdx:multi_step_block_stacking}) between \texttt{entity\_id} and \texttt{pick\_xy}, allowing OP3 to automatically use a \texttt{(entity\_id, place\_xy)} action space without needing a scripted policy.
+
+\subsection{Generalization to Various Tasks} \label{sec:cost_function}
+We consider tasks defined in the same environment with the same physical laws that govern appearance and dynamics.
+Tasks are differentiated by goals, in particular goal configurations of objects.
+Building good cost functions for real world tasks is generally difficult~\citep{fu2018variational} because the underlying state of the environment is always unobserved and can only be modeled through modeling observations.
+However, by representing the environment state as the state of its entities, we may obtain finer-grained goal-specification without the need for manual annotations~\citep{ebert2018visual}.
+Having rolled out OP3 to a particular timestep, we construct a cost function to compare the predicted entity states $H_{1:K}^{(P)}$ with the entity states $H_{1:K}^{(G)}$ inferred from a goal image by considering pairwise distances between the entities, another example of enforcing the pairwise entity abstraction.
+Letting $S'$ and $S$ denote the set of goal and predicted entities respectively, we define the form of the cost function via a composition of the task specific distance function $\mathdutchcal{c}$ operating on entity-pairs:
+\footnotesize
+\begin{equation}
+    \mathdutchcal{C}\left(H_{1:K}^{(G)}, H_{1:K}^{(P)}\right) = \sum_{a \in S'} \min_{b \in S} \; \mathdutchcal{c}\left(H_{a}^{(G)}, H_{b}^{(P)}\right),
+\end{equation}
+\normalsize
+in which we pair each goal entity with the closest predicted entity and sum over the costs of these pairs.
+Assuming a single action suffices to move an object to its desired goal position, we can greedily plan each timestep by defining the cost to be $\min_{a \in S', b \in S} \; \mathdutchcal{c}(H_{a}^{(G)}, H_{b}^{(P)})$, the pair with minimum distance, and removing the corresponding goal entity from further consideration for future planning.

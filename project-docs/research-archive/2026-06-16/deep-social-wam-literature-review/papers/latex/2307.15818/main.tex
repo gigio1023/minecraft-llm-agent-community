@@ -1,0 +1,437 @@
+\documentclass[11pt, a4paper, logo, copyright]{deepmind}
+
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+
+\usepackage{xspace}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{url}
+\usepackage{framed} 
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage[export]{adjustbox}
+\usepackage{wrapfig}
+\usepackage{tablefootnote}
+\usepackage{floatrow}
+\newfloatcommand{capbtabbox}{table}[][\FBwidth]
+\newfloatcommand{capbfigbox}{figure}[][\FBwidth]
+
+\captionsetup{belowskip=-1pt, font=small}
+\setlength{\belowcaptionskip}{-1pt}
+
+
+\setlength{\textfloatsep}{6pt plus 1pt minus 1pt}
+\setlength{\dbltextfloatsep}{2pt plus 1pt minus 1pt}
+\setlength{\dblfloatsep}{2pt plus 1pt minus 1pt}
+\setlength{\abovecaptionskip}{2pt plus 1pt minus 1pt}
+\setlength{\belowcaptionskip}{2pt plus 1pt minus 1pt}
+
+
+
+\newcommand{\categoryname}{VLA\xspace}
+\newcommand{\categoryfullname}{vision-language-action\xspace}
+\newcommand{\methodname}{RT-2\xspace}
+\newcommand{\methodfullname}{Robotics Transformer 2\xspace}
+
+\newcommand\todo[1]{\textcolor{red}{#1}}  %
+
+\title{\methodname: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control}
+
+
+
+  
+
+\correspondingauthor{chebotar@google.com, tianheyu@google.com, karolhausman@google.com}
+
+\paperurl{https://robotics-transformer2.github.io}
+
+\begin{abstract}
+We study how vision-language models trained on Internet-scale data can be incorporated directly into end-to-end robotic control to boost generalization and enable emergent semantic reasoning. Our goal is to enable a single end-to-end trained model to both learn to map robot observations to actions and enjoy the benefits of large-scale pretraining on language and vision-language data from the web. To this end, we propose to co-fine-tune state-of-the-art vision-language models on both robotic trajectory data and Internet-scale vision-language tasks, such as visual question answering. In contrast to other approaches, we propose a simple, general recipe to achieve this goal: in order to fit both natural language responses and robotic actions into the same format, we express the actions as text tokens and incorporate them directly into the training set of the model in the same way as natural language tokens. We refer to such category of models as \categoryfullname models (\categoryname) and instantiate an example of such a model, which we call \methodname. Our extensive evaluation (6k evaluation trials) shows that our approach leads to performant robotic policies and enables \methodname to obtain a range of emergent capabilities from Internet-scale training. This includes significantly improved generalization to novel objects, the ability to interpret commands not present in the robot training data (such as placing an object onto a particular number or icon), and the ability to perform rudimentary reasoning in response to user commands (such as picking up the smallest or largest object, or the one closest to another object).
+We further show that incorporating chain of thought reasoning allows \methodname to perform multi-stage semantic reasoning, for example figuring out which object to pick up for use as an improvised hammer (a rock), or which type of drink is best suited for someone who is tired (an energy drink).
+\end{abstract}
+
+\author[ \hspace{-0.6ex}]{\mbox{Anthony Brohan}}
+\author[ \hspace{-0.6ex}]{\mbox{Noah Brown}}
+\author[ \hspace{-0.6ex}]{\mbox{Justice Carbajal}}
+\author[ \hspace{-0.6ex}]{\mbox{Yevgen Chebotar}}
+\author[ \hspace{-0.6ex}]{\mbox{Xi Chen}}
+\author[ \hspace{-0.6ex}]{\mbox{Krzysztof Choromanski}}
+\author[ \hspace{-0.6ex}]{\mbox{Tianli Ding}}
+\author[ \hspace{-0.6ex}]{\mbox{Danny Driess}}
+\author[ \hspace{-0.6ex}]{\mbox{Avinava Dubey}}
+\author[ \hspace{-0.6ex}]{\mbox{Chelsea Finn}}
+\author[ \hspace{-0.6ex}]{\mbox{Pete Florence}}
+\author[ \hspace{-0.6ex}]{\mbox{Chuyuan Fu}}
+\author[ \hspace{-0.6ex}]{\mbox{Montse Gonzalez Arenas}}
+\author[ \hspace{-0.6ex}]{\mbox{Keerthana Gopalakrishnan}}
+\author[ \hspace{-0.6ex}]{\mbox{Kehang Han}}
+\author[ \hspace{-0.6ex}]{\mbox{Karol Hausman}}
+\author[ \hspace{-0.6ex}]{\mbox{Alexander Herzog}}
+\author[ \hspace{-0.6ex}]{\mbox{Jasmine Hsu}}
+\author[ \hspace{-0.6ex}]{\mbox{Brian Ichter}}
+\author[ \hspace{-0.6ex}]{\mbox{Alex Irpan}}
+\author[ \hspace{-0.6ex}]{\mbox{Nikhil Joshi}}
+\author[ \hspace{-0.6ex}]{\mbox{Ryan Julian}}
+\author[ \hspace{-0.6ex}]{\mbox{Dmitry Kalashnikov}}
+\author[ \hspace{-0.6ex}]{\mbox{Yuheng Kuang}}
+\author[ \hspace{-0.6ex}]{\mbox{Isabel Leal}}
+\author[ \hspace{-0.6ex}]{\mbox{Lisa Lee}}
+\author[ \hspace{-0.6ex}]{\mbox{Tsang-Wei Edward Lee}}
+\author[ \hspace{-0.6ex}]{\mbox{Sergey Levine}}
+\author[ \hspace{-0.6ex}]{\mbox{Yao Lu}}
+\author[ \hspace{-0.6ex}]{\mbox{Henryk Michalewski}}
+\author[ \hspace{-0.6ex}]{\mbox{Igor Mordatch}}
+\author[ \hspace{-0.6ex}]{\mbox{Karl Pertsch}}
+\author[ \hspace{-0.6ex}]{\mbox{Kanishka Rao}}
+\author[ \hspace{-0.6ex}]{\mbox{Krista Reymann}}
+\author[ \hspace{-0.6ex}]{\mbox{Michael Ryoo}}
+\author[ \hspace{-0.6ex}]{\mbox{Grecia Salazar}}
+\author[ \hspace{-0.6ex}]{\mbox{Pannag Sanketi}}
+\author[ \hspace{-0.6ex}]{\mbox{Pierre Sermanet}}
+\author[ \hspace{-0.6ex}]{\mbox{Jaspiar Singh}}
+\author[ \hspace{-0.6ex}]{\mbox{Anikait Singh}}
+\author[ \hspace{-0.6ex}]{\mbox{Radu Soricut}}
+\author[ \hspace{-0.6ex}]{\mbox{Huong Tran}}
+\author[ \hspace{-0.6ex}]{\mbox{Vincent Vanhoucke}}
+\author[ \hspace{-0.6ex}]{\mbox{Quan Vuong}}
+\author[ \hspace{-0.6ex}]{\mbox{Ayzaan Wahid}}
+\author[ \hspace{-0.6ex}]{\mbox{Stefan Welker}}
+\author[ \hspace{-0.6ex}]{\mbox{Paul Wohlhart}}
+\author[ \hspace{-0.6ex}]{\mbox{Jialin Wu}}
+\author[ \hspace{-0.6ex}]{\mbox{Fei Xia}}
+\author[ \hspace{-0.6ex}]{\mbox{Ted Xiao}}
+\author[ \hspace{-0.6ex}]{\mbox{Peng Xu}}
+\author[ \hspace{-0.6ex}]{\mbox{Sichun Xu}}
+\author[ \hspace{-0.6ex}]{\mbox{Tianhe Yu}}
+\author[ \hspace{-0.6ex}]{\mbox{Brianna Zitkovich}}
+\affil[ \hspace{-0.6ex}]{Google DeepMind. Authors listed in alphabetical order, with contributions listed in Appendix \ref{sec:contributions}.}
+
+\begin{document}
+\maketitle
+
+
+\section{Introduction}
+\label{sec:intro}
+
+High-capacity models pretrained on broad web-scale datasets provide an effective and powerful platform for a wide range of downstream tasks: large language models can enable not only fluent text generation~\citep{brohan2022rt,openai2023gpt4,anil2023palm} but emergent problem-solving~\citep{cobbe2021training,lewkowycz2022solving,polu2022formal} and creative generation of prose~\citep{brown2020language,openai2023gpt4} and code~\citep{chen2021evaluating}, while vision-language models enable open-vocabulary visual recognition~\citep{radford2021learning,minderer2022simple,kirillov2023segment} and can even make complex inferences about object-agent interactions in images~\citep{alayrac2022flamingo,hao2022language,wang2022git,chen2023pali,chen2023palix,driess2023palm,huang2023language}. Such semantic reasoning, problem solving, and visual interpretation capabilities would be tremendously useful for generalist robots that must perform a variety of tasks in real-world environments. However, it is unclear how robots should acquire such capabilities. While a brute force approach might entail collecting millions of robotic interaction trials, the most capable language and vision-language models are trained on billions of tokens and images from the web~\citep{alayrac2022flamingo,chen2023pali,chen2023palix,huang2023language} -- an amount unlikely to be matched with robot data in the near future. On the other hand, directly applying such models to robotic tasks is also difficult: such models reason about semantics, labels, and textual prompts, whereas robots require grounded low-level actions, such as Cartesian end-effector commands. While a number of recent works have sought to incorporate language models (LLMs) and vision-language models (VLMs) into robotics~\citep{ahn2022can,driess2023palm,vemprala2023chatgpt}, such methods generally address only the ``higher level'' aspects of robotic planning, essentially taking the role of a state machine that interprets commands and parses them into individual primitives (such as picking and placing objects),
+which are then executed by separate low-level controllers that themselves do not benefit from the rich semantic knowledge of Internet-scale models during training. Therefore, in this paper we ask: can large pretrained vision-language models be integrated directly into low-level robotic control to boost generalization and enable emergent semantic reasoning?
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/rt2_teaser.pdf}
+    \caption{
+\methodname overview: we represent robot actions as another language, which can be cast into text tokens and trained together with Internet-scale vision-language datasets. 
+During inference, the text tokens are de-tokenized into robot actions, enabling closed loop control.
+This allows us to leverage the backbone and pretraining of vision-language models in learning robotic policies, transferring some of their generalization, semantic understanding, and reasoning to robotic control. 
+We demonstrate examples of \methodname execution on the project website: \texttt{\href{https://robotics-transformer2.github.io/}{robotics-transformer2.github.io}}.}
+\vspace{-0.2cm}
+    \label{fig:teaser}
+\end{figure}
+\vspace{-0.1cm}
+
+To this end, we explore an approach that is both simple and surprisingly effective: we directly train vision-language models designed for open-vocabulary visual question answering and visual dialogue to output low-level robot actions, along with solving other Internet-scale vision-language tasks. Although such models are typically trained to produce natural language tokens, we can train them on robotic trajectories by {\em{tokenizing the actions into text tokens}} and creating ``multimodal sentences''~\citep{driess2023palm} that ``respond'' to robotic instructions paired with camera observations by producing corresponding actions. 
+In this way, vision-language models can be directly trained to act as instruction following robotic policies. This simple approach is in contrast with prior alternatives for incorporating VLMs into robot policies~\citep{shridhar2022cliport} or designing new vision-language-action architectures from scratch~\citep{reed2022generalist}: instead, pre-existing vision-language models, with already-amortized significant compute investment, are trained without any new parameters to output text-encoded actions. We refer to this category of models as \categoryfullname (\categoryname) models.
+We instantiate \categoryname models by building on the protocol proposed for RT-1~\citep{brohan2022rt}, using a similar dataset, but expanding the model to use a large vision-language backbone. Hence we refer to our model as \methodname (\methodfullname). We provide an overview in Figure~\ref{fig:teaser}.
+
+
+We observe that robotic policies derived from such vision-language models exhibit a range of remarkable capabilities, combining the physical motions learned from the robot data with the ability to interpret images and text learned from web data into a single model. 
+Besides the expected benefit of dramatically improving generalization to novel objects and semantically varied instructions, we observe a number of emergent capabilities. While the model's physical skills are still limited to the distribution of skills seen in the robot data, the model acquires the ability to deploy those skills in new ways by interpreting images and language commands using knowledge gleaned from the web. 
+Some example highlights are shown in Figure~\ref{fig:qualitative_emergent}. The model is able to re-purpose pick and place skills learned from robot data to place objects near semantically indicated locations, such as specific numbers or icons, despite those cues not being present in the robot data. The model can also interpret relations between objects to determine which object to pick and where to place it, despite no such relations being provided in the robot demonstrations. Furthermore, if we augment the command with chain of thought prompting, the model is able to make even more complex semantic inferences, such as figuring out which object to pick up for use as an improvised hammer (a rock), or which type of drink is best suited for someone who is tired (an energy drink).
+
+Our main contribution is \methodname, a family of models derived from fine-tuning  large vision-language models trained on web-scale data to directly act as generalizable and semantically aware robotic policies. Our experiments investigate models with up to 55B parameters trained on Internet data and  instruction-annotated robotic trajectories from previous work~\citep{brohan2022rt}. Over the course of 6k robotic evaluations, we show that \methodname enable significant improvements to generalization over objects, scenes, and instructions, and exhibit a breadth of emergent capabilities inherited from web-scale vision-language pretraining.
+
+\section{Related Work}
+\label{sec:rw}
+
+\textbf{Vision-language models.}
+There are several categories of \emph{Vision-Language Models} (VLMs)~\citep{gan2022vision}, with perhaps two most relevant: (1) representation-learning models, e.g. CLIP~\citep{radford2021learning}, which learn common embeddings for both modalities, and (2) visual language models of the form $\{\text{vision},\text{text}\} \rightarrow \{\text{text}\}$ which learn to take vision and language as input and provide free-form text. 
+Both categories have been used to provide pretraining for a wide variety of applied to downstream applications such as object classification~\citep{radford2021learning}, detection~\citep{gu2021open}, and segmentation~\citep{ghiasi2021open}.
+In this work, we focus on the latter category~\citep{alayrac2022flamingo, chen2023pali, chen2023palix, driess2023palm, li2019visualbert, lu2019vilbert, hao2022language, li2023blip}. 
+These models are generally trained on many different tasks, such as image captioning, vision-question answering (VQA), and general language tasks on multiple datasets at the same time.
+While prior works study VLMs for a wide range of problems and settings including in robotics, our focus is on how the capabilities of VLMs 
+can be extended to robotics closed-loop control by endowing them with the ability to predict robot actions, thus leveraging the knowledge already present in VLMs to enable new levels of generalization.
+
+\textbf{Generalization in robot learning.} Developing robotic controllers that can broadly succeed in a variety of scenarios is a long-standing goal in robotics research~\citep{smith1973design,kaelbling2020foundation}. A promising approach for enabling generalization in robotic manipulation is by learning from large and diverse datasets~\citep{pinto2016supersizing,levine2018learning,dasari2019robonet}. By doing so, prior methods have demonstrated how robots can generalize to novel object instances~\citep{pinto2016supersizing,mahler2017dex,levine2018learning,finn2017deep,young2021visual}, to tasks involving novel combinations of objects and skills~\citep{finn2017one,yu2018one,james2018task,dasari2021transformers,jang2022bc}, to new goals or language instructions~\citep{pong2019skew,nair2022learning,jang2022bc,jiang2022vima,mees2022matters,liu2022instruction}, to tasks with novel semantic object categories~\citep{shridhar2021cliport,stone2023open}, and to unseen environments~\citep{hansen2020self,cui2022play,du2023behavior}. Unlike most of these prior works, we aim to develop and study a single model that can generalize to unseen conditions along all of these axes. A key ingredient of our approach is to leverage pre-trained models that have been exposed to data that is much broader than the data seen by the robot.
+
+\textbf{Pre-training for robotic manipulation.} Pre-training has a long history in robotic learning. Most works focus on pre-trained visual representations that can be used to initialize the encoder of the robot's camera observations, either via supervised ImageNet classification~\citep{shah2021rrl}, data augmentation~\citep{laskin2020reinforcement,laskin2020curl,kostrikov2020image,pari2021surprising} or objectives that are tailored towards robotic control~\citep{nair2022r3m,ma2022vip,xiao2022masked,karamcheti2023language,majumdar2023we}. Other works have incorporated pre-trained language models, often either as an instruction encoder~\citep{hill2020human,lynch2020language,nair2022learning,jang2022bc,jiang2022vima,brohan2022rt,shridhar2022perceiver} or for high-level planning~\citep{huang2022language,ahn2022can,driess2023palm,singh2022progprompt,wu2023tidybot,mu2023embodiedgpt}. Rather than using pre-training vision models or pre-trained language models, we specifically consider the use of pre-trained vision-language models (VLMs), which provide rich, grounded knowledge about the world. Prior works have studied the use of VLMs for robotics~\citep{shridhar2021cliport,karamcheti2023language,stone2023open,driess2023palm,gadre2022clip,pmlr-v205-shah23b,du2023vision}, and form part of the inspiration for this work. These prior approaches use VLMs for visual state representations~\citep{karamcheti2023language}, for identifying objects~\citep{stone2023open,gadre2022clip}, for high-level planning~\citep{driess2023palm}, or for providing supervision or success detection~\citep{xiao2022robotic,du2023vision,sumers2023distilling,zhang2023grounding,ma2023liv}. While CLIPort~\citep{shridhar2021cliport} and MOO~\citep{stone2023open} integrate pre-trained VLMs into end-to-end visuomotor manipulation policies, both incorporate significant structure into the policy that limits their applicability. Notably, our work does not rely on a restricted 2D action space and does not require a calibrated camera. %
+Moreover, a critical distinction is that, unlike these works, we leverage VLMs that generate language, and the unified output space of our formulation enables model weights to be entirely shared across language and action tasks, without introducing action-only model layer components.   
+
+
+
+
+
+
+
+\section{Vision-Language-Action Models}
+
+\label{sec:method}
+
+In this section, we present our model family and the design choices for enabling training VLMs to directly perform closed-loop robot control.
+First, we describe the general architecture of our models and how they can be
+derived from models that are commonly used for vision-language tasks. Then, we introduce the recipe and challenges of fine-tuning large VLMs that are pre-trained on web-scale data to directly output robot actions, becoming VLA models. Finally, we describe how to make these models practical for robot tasks, addressing challenges with model size and inference speed to enable real-time control.
+
+
+\subsection{Pre-Trained Vision-Language Models}
+
+The vision-language models~\citep{chen2023palix,driess2023palm} that we build on in this work take as input one or more images and produce a sequence of tokens, which conventionally represents natural language text. Such models can perform a wide range of visual interpretation and reasoning tasks, from inferring the composition of an image to answering questions about individual objects and their relations to other objects~\citep{alayrac2022flamingo,chen2023palix,driess2023palm,huang2023language}. Representing the knowledge necessary to perform such a wide range of tasks requires large models and web-scale datasets. In this work, we adapt two previously proposed VLMs to act as VLA models: PaLI-X~\citep{chen2023palix} and PaLM-E~\citep{driess2023palm}. We will refer to vision-language-action versions of these models as \methodname-PaLI-X and \methodname-PaLM-E. 
+We leverage instantiations of these models that range in size from billions to tens of billions of parameters. We provide a detailed description of the architecture of these two models in Appendix~\ref{sec:app_vlm}.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/RT2-capabilities-dm.png}
+    \caption{\methodname is able to generalize to a variety of real-world situations that require reasoning, symbol understanding, and human recognition. We study these challenging scenarios in detail in Section \ref{sec:exp}.
+    }
+    \label{fig:qualitative_emergent}
+    \vspace{-0.2cm}
+\end{figure}
+
+\subsection{Robot-Action Fine-tuning}
+\label{sec:action_ft}
+
+To enable vision-language models to control a robot, they must be trained to output actions. We take a direct approach to this problem, representing actions as tokens in the model's output, which are treated in the same way as language tokens. We base our action encoding on the discretization proposed by \citet{brohan2022rt} for the RT-1 model. The action space consists of 6-DoF positional and rotational displacement of the robot end-effector, as well as the level of extension of the robot gripper and a special discrete command for terminating the episode, which should be triggered by the policy to signal successful completion. The continuous dimensions (all dimensions except for the discrete termination command) are discretized into 256 bins uniformly. Thus, the robot action can be represented using ordinals of the discrete bins as 8 integer numbers. In order to use these discretized actions to finetune a vision-language into a vision-language-\emph{action} model, we need to associate tokens from the model's \emph{existing} tokenization with the discrete action bins. This requires reserving 256 tokens to serve as action tokens. Which tokens to choose depends on the particular tokenization used by each VLM, which we discuss later in this section. In order to define a target for VLM fine-tuning we convert the action vector into a single string by simply concatenating action tokens for each dimension with a space character:
+\begin{align*}
+    \text{``terminate} \enspace \Delta \text{pos}_x \enspace \Delta \text{pos}_y \enspace \Delta \text{pos}_z \enspace \Delta \text{rot}_x \enspace \Delta \text{rot}_y \enspace \Delta \text{rot}_z \enspace \text{gripper\_extension''}.
+\end{align*}
+A possible instantiation of such a target could be: ``1 128 91 241 5 101 127''. The two VLMs that we finetune in our experiments, PaLI-X~\citep{chen2023palix} and PaLM-E~\citep{driess2023palm}, use different tokenizations. For PaLI-X, integers up to 1000 each have a unique token, so we simply associate the action bins to the token representing the corresponding integer. For the PaLM-E model, which does not provide this convenient representation of numbers, we simply overwrite the 256 least frequently used tokens to represent the action vocabulary.
+It is worth noting that training VLMs to override existing tokens with action tokens is a form of symbol tuning~\citep{wei2023symbol}, which has been shown to work well for VLMs in prior work.
+
+
+Taking the action representation described above, we convert our robot data to be suitable for VLM model fine-tuning, where our inputs include robot camera image and textual task description (using standard VQA format ``Q: what action should the robot take to [task instruction]? A:''), and our output is formatted as a string of numbers/least frequently used tokens representing a robot action.
+
+\textbf{Co-Fine-Tuning.} As we will show in our experiments, a key technical detail of the training recipe that improves robot performance is \textit{co-fine-tuning} robotics data with the original web data instead of na\"ive finetuning on robot data only. 
+We notice that co-fine-tuning leads to more generalizable policies since the policies are exposed to both abstract visual concepts from web scale data and low level robot actions during fine-tuning, instead of just robot actions.
+During co-fine-tuning we balance the ratios of robot and web data in each training batch by increasing the sampling weight on the robot dataset. 
+
+
+\textbf{Output Constraint.} One important distinction between \methodname and standard VLMs is that \methodname is required to output valid action tokens for execution on the real robot. 
+Thus, to ensure that \methodname outputs valid action tokens during decoding, we constrain its output vocabulary via only sampling valid action tokens when the model is prompted with a robot-action task, whereas the model is still allowed to output the full range of natural language tokens on standard vision-language tasks. 
+
+
+
+
+
+
+\subsection{Real-Time Inference}
+
+The size of modern VLMs can reach tens or hundreds of billions of parameters~\citep{chen2023palix,driess2023palm}. The largest model trained in this work uses 55B parameters. It is infeasible to directly run such models on the standard desktop-style machines or on-robot GPUs commonly used for real-time robot control. To the best of our knowledge, our model is the largest ever, by over an order of magnitude, used for direct closed-loop robotic control, and therefore requires a new set of solutions to enable efficient real-time inference. We develop a protocol that allows us to run \methodname models on robots by deploying them in a multi-TPU cloud service and querying this service over the network. With this solution, we can achieve a suitable frequency of control and also serve multiple robots using the same cloud service. The largest model we evaluated, the 55B parameter \methodname-PaLI-X-55B model, can run at a frequency of 1-3 Hz. The smaller version of that model, consisting of 5B parameters, can run at a frequency of around 5 Hz. 
+
+
+
+
+
+
+
+\section{Experiments}
+\label{sec:exp}
+
+
+Our experiments focus on real-world generalization and emergent capabilities of \methodname and aim to answer the following questions:
+\begin{enumerate}
+\itemsep0em 
+\item How does \methodname perform on seen tasks and more importantly, generalize over new objects, backgrounds, and environments? 
+\item Can we observe and measure any emergent capabilities of \methodname?
+\item How does the generalization vary with parameter count and other design decisions? 
+\item Can \methodname exhibit signs of chain-of-thought reasoning similarly to vision-language models?
+\end{enumerate}
+We evaluate our approach and several baselines with about 6,000 evaluation trajectories in a variety of conditions, which we describe in the following sections. 
+Unless specified otherwise, we use a 7DoF mobile manipulator with the action space described in Sec.~\ref{sec:action_ft}.
+We also demonstrate examples of \methodname execution on the project website: \texttt{\href{https://robotics-transformer2.github.io/}{robotics-transformer2.github.io}}. We train two specific instantiations of \methodname that leverage pre-trained VLMs: (1) \textbf{\methodname-PaLI-X} is built from 5B and 55B PaLI-X~\citep{chen2023palix}, and (2) \textbf{\methodname-PaLM-E} is built from 12B PaLM-E~\citep{driess2023palm}.
+
+For training, we leverage the original web scale data from \citet{chen2023palix} and \citet{driess2023palm}, which consists of visual question answering, captioning, and unstructured interwoven image and text examples. We combine it with the robot demonstration data from \citet{brohan2022rt}, which was collected with 13 robots over 17 months in an office kitchen environment.
+Each robot demonstration trajectory is annotated with a natural language instruction that describes the task performed, consisting of a verb describing the skill (e.g., ``pick'', ''open'', ``place into'') and one or more nouns describing the objects manipulated (e.g., ``7up can'', ``drawer'', ``napkin'') (see Appendix~\ref{sec:app_data} for more details on the used datasets). For all \methodname training runs we adopt the hyperparameters from the original PaLI-X~\citep{chen2023palix} and PaLM-E~\citep{driess2023palm} papers, including learning rate schedules and regularizations. More training details can be found in Appendix~\ref{sec:training_details}.
+
+\textbf{Baselines.} We compare our method to multiple state-of-the-art baselines that challenge different aspects of our method. All of the baselines use the exact same robotic data. 
+To compare against a state-of-the-art policy, we use \textbf{RT-1}~\citep{brohan2022rt}, a 35M parameter transformer-based model.
+To compare against state-of-the-art pretrained representations, we use \textbf{VC-1}~\citep{majumdar2023vc1} and \textbf{R3M}~\citep{nair2022r3m}, with policies implemented by training an RT-1 backbone to take their representations as input.
+To compare against other architectures for using VLMs, we use \textbf{MOO}~\citep{stone2023open}, which uses a VLM to create an additional image channel for a semantic map, which is then fed into an RT-1 backbone.
+More information is provided in Appendix~\ref{sec:app_baselines}.
+
+
+
+
+
+
+\subsection{How does \methodname perform on seen tasks and more importantly, generalize over new objects, backgrounds, and environments?}\label{sec:quant}
+
+\begin{figure}[h]
+\vspace{-0.3cm}
+    \centering
+    \includegraphics[width=0.99\textwidth]{figures/generalization_evals_dm.pdf}
+    \vspace{-0.3cm}
+    \caption{Example generalization scenarios used for evaluation in Figures~\ref{fig:main_baselines} and \ref{fig:ablations} and  Tables~\ref{table:main_baselines} and~\ref{table:ablations}.}
+    \label{fig:generalization_evals}
+\end{figure}
+
+To evaluate in-distribution
+performance as well as generalization capabilities, we compare the \methodname-PaLI-X and \methodname-PaLM-E models to the four baselines listed in the previous sections. For the \textit{seen tasks} category, we use the same suite of seen instructions as in RT-1~\citep{brohan2022rt}, which include over 200 tasks in this evaluation: 36 for picking objects, 35 for knocking objects, 35 for placing things upright, 48 for moving objects, 18 for opening and closing various drawers, and 36 for picking out of and placing objects into drawers.
+Note, however, that these ``in-distribution'' evaluations still vary the  placement of objects and factors such as time of day and robot position, requiring the skills to generalize to realistic variability in the environment.
+
+Figure~\ref{fig:generalization_evals} shows example generalization evaluations, which are split into \textit{unseen} categories (\textit{objects}, \textit{backgrounds} and \textit{environments}), and are additionally split into easy and hard cases.
+For unseen objects, hard cases include harder-to-grasp and more unique objects (such as toys).
+For unseen backgrounds, hard cases include more varied backgrounds and novel objects.
+Lastly, for unseen environments, hard cases correspond to a more visually distinct office desk environment with monitors and accessories, while the easier environment is a kitchen sink.
+These evaluations consists of over 280 tasks that focus primarily on pick and placing skills in many diverse scenarios. 
+The list of instructions for unseen categories is specified in Appendix~\ref{sec:app_eval_instr}.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1.0\textwidth]{figures/rt2_overall_wide_dm.png}
+\caption{Overall performance of two instantiations of \methodname and baselines across seen training tasks as well as unseen evaluations measuring generalization to novel objects, novel backgrounds, and novel environments. Appendix Table~\ref{table:main_baselines} details the full results.}
+\label{fig:main_baselines}
+\end{figure}
+
+The evaluation results are shown in Figure~\ref{fig:main_baselines} and Appendix Table~\ref{table:main_baselines}. The performance on seen tasks is similar between the \methodname models and RT-1, with other baselines attaining a lower success rate. 
+The difference between the \methodname models and the baseline is most pronounced in the various generalization experiments, suggesting that the strength of vision-language-action models lies in transferring more generalizable visual and semantic concepts from their Internet-scale pretraining data. Here, on average, both instantiations of \methodname perform similarly, resulting in $\sim$2x improvement over the next two baselines, RT-1 and MOO, and ${\scriptsize \sim}$6x better than the other baselines. The PaLM-E version of \methodname seems to perform better than the \methodname-PaLI-X in harder versions of generalization scenarios while under-performing on easier ones, resulting in a similar average performance.
+
+\textbf{Open Source Language Table Benchmark.} To provide an additional point of comparison using open-source baselines and environments, we leverage the open-source Language-Table simulation environment from~\citet{lynch2022interactive}. We co-fine-tune a smaller PaLI 3B model on several prediction tasks, including in-domain VQA tasks, for the Language-Table dataset, and evaluate the resulting policy in simulation. For the action prediction task, we discretize and encode actions as text in the format ``\texttt{X Y}'', where \texttt{X} and \texttt{Y} range between \{-10, -9, \ldots, +9, +10\}, and represent delta 2D cartesian setpoints of the end effector. Due to its reduced size, the resulting model can run inference at a similar rate (5 Hz) as the other baselines. 
+The results of this experiment are presented in Table~\ref{table:sim-langtable}. We observe a significant performance boost when using our model compared to the baselines, indicating that the VLM-based pre-training together with the expressiveness of the large PaLI model can be beneficial in other scenarios, in this case, simulation with a different robot.
+We also show qualitative real-world out-of-distribution behaviors behaviors in Figure~\ref{fig:lang-table-real}, demonstrating novel pushing tasks and targeting objects not before seen in this environment. 
+More details about the Language Table experiments can be found in Appendix~\ref{sec:app_data} and~\ref{sec:app_vlm}.
+
+
+
+
+
+
+\begin{figure}
+\begin{floatrow}
+\capbfigbox{%
+  \includegraphics[width=0.53\textwidth]{figures/LangTable-R2-Narrow-DM.png}
+}{%
+  \caption{
+  Real-world out-of-distribution behaviors in the Language Table environment. Identical \methodname-PaLI-3B model checkpoint is used as in Tab.~\ref{table:sim-langtable}.}
+    \label{fig:lang-table-real}
+}
+\hspace{-0.2cm}
+\capbtabbox{%
+\scriptsize
+  \begin{tabular}{cc}
+    \toprule
+    Model & Language-Table \\
+    \midrule
+    BC-Zero~\citep{jang2022bc} & 72 $\pm$ 3 \\
+    RT-1~\citep{brohan2022rt} & 74 $\pm$ 13 \\
+    LAVA~\citep{lynch2022interactive} & 77 $\pm$ 4 \\
+    \textbf{\methodname-PaLI-3B (ours)} & \textbf{90 $\pm$ 10} \\
+    \bottomrule
+    \end{tabular}
+}{%
+  \caption{Performance on the simulated Language-Table tasks~\citep{lynch2020language}.}%
+  \label{table:sim-langtable}
+}
+\end{floatrow}
+\end{figure}
+
+\subsection{Can we observe and measure any emergent capabilities of \methodname?}
+\label{sec:emergent}
+In addition to evaluating the generalization capabilities of vision-language-action models, we also aim to evaluate the degree to which such models can enable new capabilities beyond those demonstrated in the robot data by transferring knowledge from the web. We refer to such capabilities as \emph{emergent}, in the sense that they emerge by transferring Internet-scale pretraining. We do not expect such transfer to enable new robotic \emph{motions}, but we do expect semantic and visual concepts, including relations and nouns, to transfer effectively, even in cases where those concepts were not seen in the robot data. 
+
+\textbf{Qualitative Evaluations.} First, we experiment with our \methodname-PaLI-X model to determine various emergent capabilities transferred from vision-language concepts. We demonstrate some examples of such interactions in Figure~\ref{fig:qualitative_emergent}.
+We find through our explorations that \methodname inherits novel capabilities in terms of semantic understanding and basic reasoning in the context of the scene.
+For example accomplishing the task ``put strawberry into the correct bowl'' requires a nuanced understanding of not only what a strawberry and bowl are, but also reasoning in the context the scene to know the strawberry should go with the like fruits.
+For the task ``pick up the bag about to fall off the table,'' \methodname demonstrates physical understanding to disambiguate between two bags and recognize the precariously placed object.
+All the interactions tested in these scenarios have never been seen in the robot data, which points to the transfer of semantic knowledge from vision-language data.
+
+\textbf{Quantitative Evaluations.}
+To quantify these emergent capabilities, we take the top two baselines from the previous evaluations, RT-1 and VC-1, and compare them against our two models: \methodname-PaLI-X and \methodname-PaLM-E. To reduce the variance of these experiment, we evaluate all of the methods using the A/B testing framework~\citep{fisher1936design}%
+, where all four models are evaluated one after another in the exact same conditions.
+
+
+We' split the emergent capabilities of \methodname into three categories covering axes of reasoning and semantic understanding (with examples of each shown in  Appendix Figure~\ref{fig:quant_eval_collage}). 
+The first we term \textit{symbol understanding}, which explicitly tests whether the \methodname policy transfers semantic knowledge from vision-language pretraining that was not present in any of the robot data. Example instructions in this category are ``move apple to 3'' or ``push coke can on top of heart''. 
+The second category we term \textit{reasoning}, which  demonstrates the ability to apply various aspects of reasoning of the underlying VLM to control tasks.
+These tasks require visual reasoning (``move the apple to cup with same color''), math (``move X near the sum of two plus one''), and multilingual understanding (``mueve la manzana al vaso verde'').
+We refer to the last category as \textit{human recognition} tasks, which include tasks such as ``move the coke can to the person with glasses'', to demonstrate human-centric understanding and recognition.
+The full list of instructions used for this evaluation is specified in Appendix~\ref{sec:app_eval_instr}.
+
+
+We present the results of this experiment in Figure~\ref{fig:emergent} with all the numerical results in Appendix~\ref{sec:app_emergent}. We observe that our \categoryname models significantly outperform the baselines across all categories, with our best \methodname-PaLI-X model achieving more than 3x average success rate over the next best baseline (RT-1). We also note that while the larger PaLI-X-based model results in better symbol understanding, reasoning and person recognition performance on average, the smaller PaLM-E-based model has an edge on tasks that involve math reasoning. We attribute this interesting result to the different pre-training mixture used in PaLM-E, which results in a model that is more capable at math calculation than the mostly visually pre-trained PaLI-X. 
+
+
+
+
+\begin{figure}[h]
+\centering
+    \begin{subfigure}[b]{0.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/rt2_emergent_dm.png}
+\caption{Performance comparison on various emergent skill evaluations (Figure~\ref{fig:quant_eval_collage}) between \methodname and two baselines.}
+\label{fig:emergent}
+\end{subfigure}
+\begin{subfigure}[b]{0.49\textwidth}
+\centering
+    \includegraphics[width=\textwidth]{figures/rt2_ablations_dm.png}
+    \caption{Ablations of \methodname-PaLI-X showcasing the impact of parameter count and training strategy on generalization.}
+    \label{fig:ablations}
+    \end{subfigure}
+\caption{Quantitative performance of \methodname across (\ref{fig:emergent}) emergent skills and (\ref{fig:ablations}) size and training ablations. Appendix Tables~\ref{table:emergent} and \ref{table:ablations} detail the full numerical results.}
+\label{fig:quant}
+\end{figure}
+
+\subsection{How does the generalization vary with parameter count and other design decisions?} \label{sec:ablations}
+
+For this comparison, we use \methodname-PaLI-X model because of its flexibility in terms of the model size (due to the nature of PaLM-E, \methodname-PaLM-E is restricted to only certain sizes of PaLM and ViT models). In particular, we compare two different model sizes, 5B and 55B, as well as three different training routines: training a model from scratch, without using any weights from the VLM pre-training; fine-tuning a pre-trained model using robot action data only; and co-fine-tuning (co-training with fine-tuning), the primary method used in this work where we use both the original VLM training data as well as robotic data for VLM fine-tuning. Since we are mostly interested in the generalization aspects of these models, we remove the \textit{seen tasks} evaluation from this set of experiments.
+
+The results of the ablations are presented in Figure~\ref{fig:ablations} and Appendix Table~\ref{table:ablations}. First, we observe that training a very large model from scratch results in a very poor performance even for the 5B model. Given this result, we decide to skip the evaluation of an even bigger 55B PaLI-X model when trained from scratch. Second, we notice that co-fine-tuning a model (regardless of its size) results in a better generalization performance than simply fine-tuning it with robotic data. We attribute this to the fact that keeping the original data around the fine-tuning part of training, allows the model to not forget its previous concepts learned during the VLM training. Lastly, somewhat unsurprisingly, we notice that the increased size of the model results in a better generalization performance.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Can \methodname exhibit signs of chain-of-thought reasoning similarly to vision-language models?}
+\label{sec:cot}
+
+Inspired by the chain-of-thought prompting method in LLMs~\citep{wei2022chain}, we fine-tune a variant of \methodname with PaLM-E for just a few hundred gradient steps to increase its capability of utilizing language and actions jointly with the hope that it will elicit a more sophisticated reasoning behavior. 
+We augment the data to include an additional ``Plan'' step, which describes the purpose of the action that the robot is about to take in natural language first, which is then followed by the actual action tokens, e.g. ``Instruction: I'm hungry. Plan: pick rxbar chocolate. Action: 1 128 124 136 121 158 111 255.''
+This data augmentation scheme acts as a bridge between VQA datasets (visual reasoning) and manipulation datasets (generating actions).
+
+We qualitatively observe that \methodname with chain-of-thought reasoning is able to answer more sophisticated commands due to the fact that it is given a place to plan its actions in natural language first. This is a promising direction that provides some initial evidence that using LLMs or VLMs as planners~\citep{ahn2022can, driess2023palm} can be combined with low-level policies in a single VLA model.
+Rollouts of \methodname with chain-of-thought reasoning are shown in Figure~\ref{fig:cot} and in Appendix~\ref{sec:app_cot}.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{figures/RT2CoT_Narrow.pdf}
+    \caption{Rollouts of \methodname with chain-of-thought reasoning, where \methodname generates both a plan and an action.}
+    \label{fig:cot}
+\end{figure}
+
+
+\section{Limitations}
+\label{sec:limitations}
+Even though \methodname exhibits promising generalization properties, there are multiple limitations of this approach. First, although we show that including web-scale pretraining via VLMs boosts generalization over semantic and visual concepts, the robot does not acquire any ability to perform new \emph{motions} by virtue of including this additional experience. The model's physical skills are still limited to the distribution of skills seen in the robot data (see Appendix \ref{sec:failure-cases}), but it learns to deploy those skills in new ways. 
+We believe this is a result of the dataset not being varied enough along the axes of skills. An exciting direction for future work is to study how new skills could be acquired through new data collection paradigms such as videos of humans.
+
+Second, although we showed we could run large VLA models in real time, the computation cost of these models is high, and as these methods are applied to settings that demand high-frequency control, real-time inference may become a major bottleneck. An exciting direction for future research is to explore quantization and distillation techniques that might enable such models to run at higher rates or on lower-cost hardware. This is also connected to another current limitation in that there are only a small number of generally available VLM models that can be used to create \methodname. We hope that more open-sourced models will become available (e.g. \url{https://llava-vl.github.io/}) and the proprietary ones will open up their fine-tuning APIs, which is a sufficient requirement to build \categoryname models. 
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+In this paper, we described how vision-language-action (VLA) models could be trained by combining vision-language model (VLM) pretraining with robotic data. We then presented two instantiations of VLAs based on PaLM-E and PaLI-X, which we call \methodname-PaLM-E and \methodname-PaLI-X. These models are co-fine-tuned with robotic trajectory data to output robot actions, which are represented as text tokens. We showed that our approach results in very performant robotic policies and, more importantly, leads to a significantly better generalization performance and emergent capabilities inherited from web-scale vision-language pretraining. We believe that this simple and general approach shows a promise of robotics directly benefiting from better vision-language models, which puts the field of robot learning in a strategic position to further improve with advancements in other fields.
+
+
+\section*{Acknowledgments}
+We would like to acknowledge Fred Alcober, Jodi Lynn Andres, Carolina Parada, Joseph Dabis, Rochelle Dela Cruz, Jessica Gomez, Gavin Gonzalez, John Guilyard, Tomas Jackson, Jie Tan, Scott Lehrer, Dee M, Utsav Malla, Sarah Nguyen, Jane Park, Emily Perez, Elio Prado, Jornell Quiambao, Clayton Tan, Jodexty Therlonge, Eleanor Tomlinson, Wenxuan Zhou, and the greater Google DeepMind team for their feedback and contributions.
+
+\clearpage
+
+\bibliography{references}  %
+
+\input{appendix}
+\end{document}

@@ -1,0 +1,71 @@
+\section{Agreement Evaluation}
+\label{sec:agreement_eval}
+
+We study the agreement between different LLM judges and humans on MT-bench and Chatbot Arena datasets. On MT-bench, we also study the agreement among humans. MT-bench represents a small-scale study with controlled human evaluation, while Chatbot Arena represents a larger-scale study with crowdsourced human evaluation in the wild.
+\subsection{Setup}
+
+\textbf{MT-bench.}
+We generate answers for all 80 questions with 6 models: GPT-4, GPT-3.5, Claude-V1, Vicuna-13B, Alpaca-13B~\cite{alpaca}, and LLaMA-13B~\cite{touvron2023llama}. We then use 2 kinds of judges: LLM judges and 58 expert-level human labelers. The labelers are mostly graduate students so they are considered experts and more skilled than average crowd workers.
+We let LLM judges evaluate all pairs and let each human evaluate at least 20 random multi-turn questions. This resulted in around 3K votes for all questions.
+The detailed data collection process is in \Cref{sec:data-collection}.
+
+\textbf{Chatbot Arena.}
+We randomly sample 3K single-turn votes from 30K arena data, which covers models including GPT-4,  GPT-3.5, Claude, Vicuna-7B/13B, Koala-13B~\cite{koala}, Alpaca-13B, LLaMA-13B, and Dolly-12B. We use two kinds of judges: LLM judges and collected crowd judges (2114 unique IPs).
+
+
+\textbf{Metrics.}
+We define the \textit{agreement} between two types of judges as the probability of randomly selected individuals (but not identical) of each type agreeing on a randomly selected question.
+See more explanation in \Cref{subsec:agreement-evaluation}.
+\textit{Average win rate} is the average of win rates against all other players.
+These metrics can be computed with or without including tie votes.
+
+\subsection{High agreement between GPT-4 and humans}
+\label{sec:agreement}
+
+We compute agreement on MT-bench data.
+In \Cref{table:agreement_mt_bench}, GPT-4 with both pairwise comparison and single answer grading show very high agreements with human experts.
+The agreement under setup S2 (w/o tie) between GPT-4 and humans reaches 85\%, which is even higher than the agreement among humans (81\%). This means GPT-4's judgments closely align with the majority of humans.
+We also show that GPT-4's judgments may help humans make better judgments. During our data collection, when a human's choice deviated from GPT-4, we presented GPT-4's judgments to humans and ask if they are reasonable (details in \Cref{subsec:mt-data-collection}). Despite different views, humans deemed GPT-4's judgments reasonable in 75\% of cases and are even willing to change their choices in 34\% of cases.
+
+
+The data from Arena shows a similar trend, as illustrated by \Cref{table:agreement_arena}. Comparing GPT-4 and other LLM judges, we find they reach a similar non-tie agreement ratio between humans but the number of non-tied votes from GPT-4 is much larger. This means that GPT-4 is more affirmative and less suffered from position bias but other models also perform well when they give an affirmative answer.
+
+In both tables, GPT-4 with single-answer grading matches both pairwise GPT-4 and human preferences very well.
+This means GPT-4 has a relatively stable internal rubric.
+Although it may sometimes perform slightly worse than pairwise comparison and give more tie votes, it is a more scalable method.
+
+
+We then perform a breakdown analysis by computing agreement on different model pairs and categories.
+We only include non-tied votes.
+In \Cref{fig:categorized_agreement}, we observe the agreement between GPT-4 and human progressively increases in line with the performance disparity of the model pairs (i.e., larger win rate difference), from 70\% to nearly 100\%. This suggests that GPT-4 aligns with humans better when significant performance differences exist between the models.
+
+\input{tables/agreement_mt-bench}
+\vspace{2em}
+\input{tables/agreement_arena}
+\input{tables/win_rate}
+
+\begin{table}[H]
+\centering
+\caption{Category-wise win rate of models.}
+\label{table:win_rate_category}
+\footnotesize
+\resizebox{0.95\columnwidth}{!}{
+\begin{tabular}{lllllllll}
+\toprule
+Model & Writing & Roleplay & Reasoning & Math & Coding & Extraction & STEM & Humanities \\
+\midrule
+GPT-4           & 61.2\%  & 67.9\%  & 49.3\%  & 66.1\%  & 56.3\%  & 66.2\%  & 76.6\%  & 72.2\%  \\
+GPT-3.5         & 50.9\%  & 60.6\%  & 32.6\%  & 63.8\%  & 55.0\%  & 48.8\%  & 52.8\%  & 53.8\%  \\
+Vicuna-13B      & 39.7\%  & 39.2\%  & 20.1\%  & 18.0\%  & 36.9\%  & 29.2\%  & 47.0\%  & 47.5\%  \\
+LLaMA-13B       & 15.1\%  & 15.1\%  & 7.8\%   & 7.5\%   & 2.1\%   & 9.3\%   & 6.8\%   & 10.1\%  \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+\subsection{Win rates under different judges}
+We plot the average win rate of models under different judges on MT-bench and Chatbot Arena in \Cref{fig:mt_bench_win_rate} and \Cref{fig:arena_win_rate}, respectively. The win rate curves from LLM judges closely match the curves from humans. On MT-bench second turn, proprietary models like Claude and GPT-3.5 are more preferred by the humans compared to the first turn, meaning that a multi-turn benchmark can better differentiate some advanced abilities of models. We also list the per-category win rate of representative models in \Cref{table:win_rate_category} to show how MT-bench differentiates models, in which we see GPT-4 is significantly better than others.
+Vicuna-13B is noticeably worse than GPT-3.5/4 in reasoning, math, and coding categories.
+Note that in math/coding category, GPT-3.5 and GPT-4 have similar overall win-rate because they both failed to answer some hard questions, but GPT-4 is still significantly better than GPT-3 in the direct pairwise comparison or single-answer grading.
+Please see a performance breakdown of MT-bench score for each category in \Cref{subsec:category-wise-scores}.

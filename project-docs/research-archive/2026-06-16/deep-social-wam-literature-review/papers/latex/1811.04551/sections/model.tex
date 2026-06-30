@@ -1,0 +1,56 @@
+\section{Recurrent State Space Model}
+\label{sec:model}
+
+\input{figures/models/figure}
+
+For planning, we need to evaluate thousands of action sequences at every time step of the agent. Therefore, we use a recurrent state-space model (RSSM) that can predict forward purely in latent space, similar to recently proposed models \citep{karl2016dvbf,buesing2018dssm,doerr2018prssm}. This model can be thought of as a non-linear Kalman filter or sequential VAE. Instead of an extensive comparison to prior architectures, we highlight two findings that can guide future designs of dynamics models: our experiments show that both stochastic and deterministic paths in the transition model are crucial for successful planning. In this section, we remind the reader of latent state-space models and then describe our dynamics model.
+
+\paragraph{Latent dynamics}
+
+We consider sequences $\{o_t,a_t,r_t\}_{t=1}^T$ with discrete time step $t$, image observations $o_t$, continuous action vectors $a_t$, and scalar rewards $r_t$. A typical latent state-space model is shown in \cref{fig:ssm} and resembles the structure of a partially observable Markov decision process. It defines the generative process of the images and rewards using a hidden state sequence $\{s_t\}_{t=1}^T$,
+\begin{gather}
+\begin{aligned}
+\makebox[12em][l]{Transition model:} && s_t &\sim\p(s_t|s_{t-1},a_{t-1}) \\
+\makebox[12em][l]{Observation model:} && o_t &\sim\p(o_t|s_t) \\
+\makebox[12em][l]{Reward model:} && r_t &\sim\p(r_t|s_t),
+\label{eq:ssm}
+\end{aligned}
+\raisetag{1.4\baselineskip}
+\end{gather}%
+where we assume a fixed initial state $s_0$ without loss of generality. The transition model is Gaussian with mean and variance parameterized by a feed-forward neural network, the observation model is Gaussian with mean parameterized by a deconvolutional neural network and identity covariance, and the reward model is a scalar Gaussian with mean parameterized by a feed-forward neural network and unit variance. Note that the log-likelihood under a Gaussian distribution with unit variance equals the mean squared error up to a constant.
+
+\paragraph{Variational encoder}
+
+Since the model is non-linear, we cannot directly compute the state posteriors that are needed for parameter learning. Instead, we use an encoder $\q(s_{1:T}|o_{1:T},a_{1:T})=\prod_{t=1}^T\q(s_t|s_{t-1},a_{t-1},o_t)$ to infer approximate state posteriors from past observations and actions, where $\q(s_t|s_{t-1},a_{t-1},o_t)$ is a diagonal Gaussian with mean and variance parameterized by a convolutional neural network followed by a feed-forward neural network. We use the filtering posterior that conditions on past observations since we are ultimately interested in using the model for planning, but one may also use the full smoothing posterior during training \citep{babaeizadeh2017sv2p,gregor2018tdvae}.
+
+\paragraph{Training objective}
+
+Using the encoder, we construct a variational bound on the data log-likelihood. For simplicity, we write losses for predicting only the observations --- the reward losses follow by analogy. The variational bound obtained using Jensen's inequality is
+{\small\begin{multline}
+\ln\p(o_{1:T}|a_{1:T})
+\triangleq\ln\int\prod_t\p(s_t|s_{t-1},a_{t-1})\p(o_t|s_t)\d s_{1:T} \\[-2ex]
+\begin{aligned}
+&\geq\sum_{t=1}^T \Big(
+  \describe{\E{\q(s_t|o_{\leq t},a_{<t})}{\ln\p(o_t|s_t)}}{reconstruction} \eqbr
+  &\quad-\describe{\Ebelow[\big]{\q(s_{t-1}|o_{\leq t-1},a_{<t-1})}{\KL{\q(s_t|o_{\leq t},a_{<t})}{\p(s_t|s_{t-1},a_{t-1})}}}{complexity} \Big).
+\end{aligned}
+\label{eq:elbo}
+\end{multline}}%
+For the derivation, please see \cref{eq:elbo_deriv} in the appendix. Estimating the outer expectations using a single reparameterized sample yields an efficient objective for inference and learning in non-linear latent variable models that can be optimized using gradient ascent \citep{kingma2013vae,rezende2014vae,krishnan2017ssmelbo}.
+
+\paragraph{Deterministic path}
+
+Despite its generality, the purely stochastic transitions make it difficult for the transition model to reliably remember information for multiple time steps. In theory, this model could learn to set the variance to zero for some state components, but the optimization procedure may not find this solution. This motivates including a deterministic sequence of activation vectors $\{h_t\}_{t=1}^T$ that allow the model to access not just the last state but all previous states deterministically \citep{chung2015vrnn,buesing2018dssm}. We use such a model, shown in \cref{fig:rssm}, that we name recurrent state-space model (RSSM),
+\begin{gather}
+\begin{aligned}
+\makebox[11em][l]{Deterministic state model:} && h_t &=f(h_{t-1},s_{t-1},a_{t-1}) \\
+\makebox[11em][l]{Stochastic state model:} && s_t &\sim\p(s_t|h_t) \\
+\makebox[11em][l]{Observation model:} && o_t &\sim\p(o_t|h_t,s_t) \\
+\makebox[11em][l]{Reward model:} && r_t &\sim\p(r_t|h_t,s_t),
+\end{aligned}
+\raisetag{2.5\baselineskip}
+\label{eq:rssm}
+\end{gather}%
+where $f(h_{t-1},s_{t-1},a_{t-1})$ is implemented as a recurrent neural network (RNN). Intuitively, we can understand this model as splitting the state into a stochastic part $s_t$ and a deterministic part $h_t$, which depend on the stochastic and deterministic parts at the previous time step through the RNN. We use the encoder $\q(s_{1:T}|o_{1:T},a_{1:T})=\prod_{t=1}^T \q(s_t|h_t,o_t)$ to parameterize the approximate state posteriors. Importantly, all information about the observations must pass through the sampling step of the encoder to avoid a deterministic shortcut from inputs to reconstructions.
+
+In the next section, we identify a limitation of the standard objective for latent sequence models and propose a generalization of it that improves long-term predictions.

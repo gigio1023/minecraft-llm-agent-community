@@ -1,0 +1,79 @@
+\section{The \name{} Model}
+\label{sec:model}
+
+We introduce the \name{} model, a \modelsize{}-parameter vision-language-action model (VLA) trained on \nepisodes{}~robot demonstrations from the Open X-Embodiment dataset~\citep{open_x_embodiment_rt_x_2023}.
+There are many, largely unexplored, questions around best practices for developing VLA models, \eg what are the best model backbones, datasets, and hyperparameters to use for training.
+Below, we detail our approach for developing \name{} and summarize our key learnings. Concretely, we first provide a brief overview of modern VLMs, which form the backbone of \name{} (\cref{sec:prismatic_preliminaries}); then describe our basic training recipe and dataset (\cref{sec:train_procedure} and \cref{sec:data_mix}); discuss key design decisions (\cref{sec:train_details}); and provide details of the used infrastructure for training and inference (\cref{sec:infra}).
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/openvla_model.pdf}
+    \caption{
+        \textbf{\name{} model architecture.} Given an image observation and a language instruction, the model predicts 7-dimensional robot control actions. The architecture consists of three key components: (1)~a \textbf{vision encoder} that concatenates Dino~V2~\citep{oquab2023dinov2} and SigLIP~\citep{zhai2023sigmoid} features, (2)~a \textbf{projector} that maps visual features to the language embedding space, and (3)~the \textbf{LLM backbone}, a Llama~2 7B-parameter large language model~\citep{touvron2023llama2}.
+    }
+    \label{fig:architecture}
+\end{figure}
+
+\subsection{Preliminaries: Vision-Language Models}
+\label{sec:prismatic_preliminaries}
+
+The architecture of most recent VLMs~\citep{liu2023llava, liu2023llavav15, chen2023pali3, karamcheti2024prismatic} consists of three main parts (see \cref{fig:architecture}): (1)~a \textbf{visual encoder} that maps image inputs to a number of ``image patch embeddings'', (2)~a \textbf{projector} that takes the output embeddings of the visual encoder and maps them into the input space of a language model, and (3) a \textbf{large language model (LLM) backbone}. During VLM training, the model is trained end-to-end with a next text token prediction objective on paired or interleaved %
+vision and language data curated from various Internet sources.
+
+In this work, we build on the Prismatic-7B VLM~\citep{karamcheti2024prismatic}. Prismatic follows the same standard architecture described above, with a 600M-parameter \textbf{visual encoder}, a small 2-layer MLP \textbf{projector}, and a 7B-parameter Llama~2 \textbf{language model backbone}~\citep{touvron2023llama2}. Notably, Prismatic uses a \emph{two-part} visual encoder, consisting of pretrained SigLIP~\citep{zhai2023sigmoid} and DinoV2~\citep{oquab2023dinov2} models. Input image patches are passed separately through both encoders and the resulting feature vectors are concatenated channel-wise. In contrast to the more commonly used vision encoders such as CLIP- \citep{radford2021learning} or SigLIP-only encoders, the addition of DinoV2 features has been shown to be helpful for improved spatial reasoning~\citep{karamcheti2024prismatic}, which can be particularly helpful for robot control. 
+
+SigLIP, DinoV2, and Llama~2 do not release details about their training data, which likely consists of trillions of tokens of Internet-sourced image-text, image-only, and text-only data respectively. The Prismatic VLM is fine-tuned on top of these components using the LLaVA~1.5 data mixture~\citep{liu2023llavav15}, which contains a total of approximately 1M image-text and text-only data samples from open-source datasets~\citep{sharma2018conceptual, schuhmann2021laion, hudson2019gqa, sidorov2020textcaps, liu2023llava}.
+
+
+\subsection{\name{} Training Procedure}
+\label{sec:train_procedure}
+
+To train \name{}, we fine-tune a pretrained Prismatic-7B VLM backbone for robot action prediction (see \cref{fig:architecture}).
+We formulate the action prediction problem as a ``vision-language'' task, where an input observation image and a natural language task instruction are mapped to a string of predicted robot actions~\citep{rt22023arxiv}. To enable the VLM's language model backbone to predict robot actions, we represent the actions in the output space of the LLM by mapping continuous robot actions to discrete tokens used by the language model's tokenizer. Following \citet{rt22023arxiv}, we discretize each dimension of the robot actions separately into one of 256 bins. For each action dimension, we set the bin width to uniformly divide the interval between the 1\textsuperscript{st} and 99\textsuperscript{th} quantile of the actions in the training data. Using quantiles instead of the min-max bounds \citet{rt22023arxiv} used allows us to ignore outlier actions in the data that could otherwise drastically expand the discretization interval and reduce the effective granularity of our action discretization. 
+
+Using this discretization, we obtain N~discrete integers $\in [0 \dots 255]$ 
+for an $N$-dimensional robot action. Unfortunately, the tokenizer used by \name{}'s language backbone, the Llama tokenizer~\citep{touvron2023llama2}, only reserves 100 ``special tokens'' for tokens newly introduced during fine-tuning, which is too few for the 256 tokens of our action discretization. Instead, we again opt for simplicity and follow \citet{rt22023arxiv}'s approach by simply overwriting the 256 \emph{least used} tokens in the Llama tokenizer's vocabulary (which corresponds to the last 256 tokens) with our action tokens. 
+Once the actions are processed into a sequence of tokens, \name{} is trained with a standard next-token prediction objective, evaluating the cross-entropy loss on the predicted action tokens only. We discuss key design decisions for implementing this training procedure in \cref{sec:train_details}. Next, we describe the robot dataset we use for \name{} training. 
+
+
+\subsection{Training Data}
+\label{sec:data_mix}
+
+The goal in constructing the \name{} training dataset is to capture a large diversity of robot embodiments, scenes, and tasks. This enables the final model to control various robots out of the box \emph{and} admits efficient fine-tuning to new robot setups. We leverage the Open X-Embodiment dataset~\citep{open_x_embodiment_rt_x_2023} (OpenX) as a base to curate our training dataset. The full OpenX dataset, at the time of writing, consists of more than 70 individual robot datasets, with more than 2M robot trajectories, that were pooled into a coherent and easy-to-use data format in a large community effort. To make training on this data practical, we apply multiple steps of data curation to the raw dataset. 
+
+The goals of this curation are to ensure (1)~a coherent input and output space across all training datasets, and (2)~a balanced mix of embodiments, tasks, and scenes in the final training mixture.\footnote{Octo~\citep{octo_2023} demonstrated training across datasets with heterogeneous sensory inputs. While very promising, we leave an investigation of VLA training across heterogeneous sensor modalities and action spaces to future work.} To address (1), we follow \citep{open_x_embodiment_rt_x_2023, octo_2023} and restrict our training dataset to contain only manipulation datasets with at least one 3\textsuperscript{rd} person camera and use single-arm end-effector control. For (2), we leverage the data mixture weights of Octo~\citep{octo_2023} for all datasets that pass the first round of filtering. Octo heuristically down-weights or removes less diverse datasets and up-weights datasets with larger task and scene diversity; see \citet{octo_2023} for details.
+
+We also experimented with incorporating a few additional datasets into our training mixture that were added to the OpenX dataset since the release of Octo, including the DROID dataset~\citep{khazatsky2024droid}, although at a conservative mixture weight of 10\%. In practice, we found that the action token accuracy on DROID remained low throughout training, suggesting a larger mixture weight or model 
+may be required to fit its diversity in the future. To not jeopardize the quality of the final model, we removed DROID from the data mixture for the final third of training. We provide a complete overview of the used datasets and mixture weights in \cref{sec:app:data_mix}.
+
+\subsection{\name{} Design Decisions}
+\label{sec:train_details}
+
+When developing the \name{} model, we explored various design decisions in smaller-scale experiments before starting the final model training run. Concretely, we trained and evaluated \name{} models on BridgeData~V2~\citep{walke2023bridgedata} for our initial experiments, instead of training on the full OpenX mixture, to increase iteration speed and reduce computational cost. We summarize key learnings from these explorations below.
+
+\textbf{VLM Backbone.} Initially, we experimented with multiple VLM backbones. Apart from Prismatic~\citep{karamcheti2024prismatic}, we tested fine-tuning IDEFICS-1~\citep{idefics2024} and LLaVA~\citep{liu2024visual} for robot action prediction.
+We found that LLaVA and IDEFICS-1 performed comparably on tasks with only one object in the scene, but LLaVA demonstrated stronger language grounding in tasks that involved multiple objects in the scene and required the policy to manipulate the \emph{correct} object, \ie the object specified in the language instruction. Concretely, LLaVA improved upon IDEFICS-1 by 35\% in absolute success rate, averaged across five language grounding tasks in a BridgeData~V2 sink environment. The fine-tuned Prismatic VLM policy achieved further improvements, outperforming the LLaVA policy by roughly 10\% in absolute success rate across both simple single-object tasks and multi-object, language grounding tasks. We attribute this performance delta to improved spatial reasoning capabilities afforded by the fused SigLIP-DinoV2 backbones (see \cref{sec:prismatic_preliminaries}). In addition to the performance enhancements, Prismatic also provides a modular and easy-to-use codebase, so we ultimately chose it to be the backbone for the \name{} model.
+
+\textbf{Image Resolution.} The resolution of input images has significant impact on the computational requirements of VLA training, since higher-resolution images result in more image patch tokens and thus longer context lengths that quadratically increase training compute. We compared VLAs with $224 \times 224$px and $384 \times 384$px inputs, but found no performance difference in our evaluations, while the latter takes 3x longer to train. We thus opt for a resolution of $224 \times 224$px for the final \name{} model. Note that on many VLM benchmarks, increased resolution does improve performance~\citep{karamcheti2024prismatic, mckinzie2024mm1, lin2023vila}, but we did not see this trend (yet) for VLAs.
+
+\textbf{Fine-Tuning Vision Encoder.} Prior work on VLMs found that freezing vision encoders during VLM training typically leads to higher performance~\citep{karamcheti2024prismatic}. Intuitively, a frozen vision encoder may better preserve the robust features learned from its Internet-scale pretraining. However, we found fine-tuning the vision encoder during VLA training to be crucial for good VLA performance. We hypothesize that the pretrained vision backbone may not capture sufficient fine-grained spatial details about important parts of the scene to enable precise robotic control.
+
+\textbf{Training Epochs.} Typical LLM or VLM training runs complete at most one or two epochs through their training dataset. In contrast, we found it important for VLA training to iterate through the training dataset significantly more times, with real robot performance continually increasing until training action token accuracy surpasses 95\%. Our final training run completes \nepochs{}~epochs through its training dataset. 
+
+\textbf{Learning Rate.} We swept the learning rate across multiple orders of magnitude for VLA training, and achieved the best results using a fixed learning rate of \trainlearningrate{} (the same learning rate used during VLM pretraining~\citep{karamcheti2024prismatic}). We did not find learning rate warmup to provide benefits.
+
+
+
+\subsection{Infrastructure for Training and Inference}
+\label{sec:infra}
+
+The final \name{} model is trained on a cluster of \ngpus{}~GPUs for \ntraindays{}~days, or a total of 21,500~A100-hours, using a batch size of \batchsize{}. During inference, \name{} requires 15GB of GPU memory when loaded in \texttt{bfloat16} precision (\ie without quantization) and runs at approximately 6Hz on one NVIDIA~RTX~4090~GPU (without compilation, speculative decoding, or other inference speed-up tricks). We can further reduce the memory footprint of \name{} during inference via quantization, without compromising performance in real-world robotics tasks, as shown in \cref{sec:quantization_exp}. We report inference speed on various consumer- and server-grade GPUs in \cref{fig:inference_speed}. For convenience, we implement a remote VLA inference server to allow real-time remote streaming of action predictions to the robot -- removing the requirement of having access to a powerful local compute device to control the robot. We release this remote inference solution as part of our open-source code release (\cref{sec:code}).
+
+\section{The \name{} Codebase}
+\label{sec:code}
+
+Along with our model, we release the \name{} codebase, a modular PyTorch codebase for training VLA models (see \website{}). It scales from fine-tuning VLAs on individual GPUs to training billion-parameter VLAs on multi-node GPU clusters, and supports modern techniques for large transformer model training such as automatic mixed precision (AMP, \citet{pytorch_amp}), FlashAttention~\citep{dao2023flashattention}, and fully sharded data parallelism (FSDP, \citet{zhao2023pytorch}). Out of the box, the \name{} codebase has full support for training on the Open X dataset, integrates with HuggingFace's~\citep{wolf-etal-2020-transformers} \texttt{AutoModel} class, and supports LoRA fine-tuning~\citep{hu2021lora} and quantized model inference~\citep{dettmers2022gpt3, dettmers2024qlora}.
+
+
+

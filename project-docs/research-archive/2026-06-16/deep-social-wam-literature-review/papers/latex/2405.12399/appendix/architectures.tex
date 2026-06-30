@@ -1,0 +1,14 @@
+\section{Model architectures}\label{app:architectures}
+
+The diffusion model $\mathbf{D}_\theta$ is a standard U-Net 2D \citep{ronneberger2015unet}, conditioned on the last 4 frames and actions, as well as the diffusion time $\tau$. We use frame stacking for observation conditioning, and adaptive group normalization \citep{adagn} for action and diffusion time conditioning.
+
+The reward/termination model $R_\psi$ layers are shared except for the final prediction heads. The model takes as input a sequence of frames and actions, and forwards it through convolutional residual blocks \citep{He2015} followed by an LSTM cell \citep{a3c,lstm,Gers2000}. Before starting the imagination procedure, we burn-in \citep{r2d2} the conditioning frames and actions to initialize the hidden and cell states of the LSTM. 
+
+The weights of the policy $\pi_\phi$ and value network $V_\phi$ are shared except for the last layer. In the following, we refer to $(\pi,V)_\phi$ as the "actor-critic" network, even though $V$ is technically a state-value network, not a critic. This network takes as input a frame, and forwards it through convolutional trunk followed by an LSTM cell. The convolutional trunk consists of four residual blocks and 2x2 max-pooling with stride 2. The main path of the residual blocks consists of a group normalization \citep{groupnorm} layer, a SiLU activation \citep{elfwing2018sigmoid}, and a 3x3 convolution with stride 1 and padding 1. Before starting the imagination procedure, we burn-in the conditioning frames to initialize the hidden and cell states of the LSTM. 
+
+
+Please refer to Table \ref{tbl_architecture} below for hyperparameter values, and to Algorithm \ref{alg:diamond} for a detailed summary of the training procedure. 
+
+\vspace{1cm}
+
+\input{tables/table_architecture}

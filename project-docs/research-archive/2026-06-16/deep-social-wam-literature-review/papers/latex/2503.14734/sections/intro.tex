@@ -1,0 +1,34 @@
+\section{Introduction}
+\label{sec:intro}
+
+
+Creating autonomous robots to perform everyday tasks in the human world has long been a fascinating goal and, at the same time, a significant technical undertaking. Recent progress in robotic hardware, artificial intelligence, and accelerated computing has collectively paved the ground for developing general-purpose robot autonomy. To march toward human-level physical intelligence, we advocate for a full-stack solution that integrates the three key ingredients: hardware, models, and data. First and foremost, robots are embodied physical agents, and their hardware determines their capability envelope. It makes \textbf{humanoid robots} a compelling form factor to build robot intelligence due to their human-like physique and versatility. Second, the diversity and variability of the real world demands that the robots operate on open-ended objectives and perform a wide range of tasks. Achieving this requires a \textbf{generalist robot model} sufficiently expressive and capable of handling various tasks. Third, real-world humanoid data are costly and time-consuming to acquire at scale. We need an effective data strategy to train large-scale robotic models.
+
+
+In recent years, foundation models~\cite{} have brought forth dramatic breakthroughs in understanding and generating visual and text data. They demonstrate the effectiveness of training generalist models on web-scale data to enable strong generalization and fast adaptation to downstream tasks. The successes of foundation models in neighboring fields of AI have depicted a promising roadmap for building the ``backbone'' of intelligence for generalist robots, endowing them with a set of core competencies and enabling them to rapidly learn and adapt in the real world.
+%so where is the foundation model of \emph{actions} for humanoid robot control?
+%
+However, unlike the digital realms of words and pixels, no Internet of humanoid robot datasets exist for large-scale pre-training. The data available for any single humanoid hardware would be orders of magnitude too small. Recent efforts in the robot learning community~\citep{open_x_embodiment_rt_x_2023} have explored cross-embodied learning to enlarge the dataset by pooling training data from many different robots. However, the great variability in robot embodiments, sensors, actuator degrees of freedom, control modes, and other factors result in an archipelago of ``data islands'' rather than a coherent, Internet-scale dataset needed for training a true generalist model.
+
+%
+\begin{wrapfigure}{R}{0.5\textwidth}
+\begin{center}
+\vspace{-4mm}
+\includegraphics[height=5cm]{assets/data_pyramid.pdf}
+\caption{\textbf{Data Pyramid for Robot Foundation Model Training.} \modelname{}'s heterogeneous training corpora can be represented as a pyramid: data quantity decreases, and embodiment-specificity increases, moving from the bottom to the top.\label{fig:data_pyramid}} 
+%\checkthis{can we rename parts in the image/section titles in \Cref{sec:datasets} so that they match?}}
+\end{center}
+\end{wrapfigure}
+
+
+We introduce \modelname{}, an open foundation model for generalist humanoid robots. The \modelname{} model is a Vision-Language-Action (VLA) model, which generates actions from image and language instruction input. It has cross-embodiment support from tabletop robot arms to dexterous humanoid robots. It adopts a \textbf{dual-system compositional architecture}, inspired by human cognitive processing~\citep{kahneman2011thinking}. The System 2 reasoning module is a pre-trained Vision-Language Model (VLM) that runs at 10Hz on an NVIDIA L40 GPU. It processes the robot's visual perception and language instruction to interpret the environment and understand the task goal. Subsequently, a Diffusion Transformer, trained with action flow-matching, serves as the System 1 action module. It cross-attends to the VLM output tokens and employs embodiment-specific encoders and decoders to handle variable state and action dimensions for motion generation. It generates closed-loop motor actions at a higher frequency (120Hz). Both the System 1 and System 2 modules are implemented as Transformer-based neural networks, tightly coupled and jointly optimized during training to facilitate coordination between reasoning and actuation.
+
+To mitigate the ``data island'' problem mentioned earlier, we structure the VLA training corpora as a \textbf{data pyramid}, illustrated in \FIGREF{fig:data_pyramid}. Rather than treating the training datasets as a homogeneous pool, we organize heterogeneous sources by scale: large quantities of web data and human videos lay the base of the pyramid; synthetic data generated with physics simulations and/or augmented by off-the-shelf neural models form the middle layer, and real-world data collected on the physical robot hardware complete the top. The lower layers of the pyramid provide broad visual and behavioral priors, while the upper layers ensure grounding in embodied, real-robot execution.
+
+% To harness the entire data pyramid for model training, 
+We develop an effective \textbf{co-training} strategy to learn across the entire data pyramid in both pre- and post-training phases. To train our model with action-less data sources, such as human videos and neural-generated videos, we learn a latent-action codebook~\citep{ye2025latent} and also use a trained inverse dynamics model (IDM) to infer pseudo-actions. These techniques enable us to annotate actions on action-less videos so we can effectively treat them as additional robot embodiments for model training. By unifying all data sources across the data pyramid, we construct a consistent dataset where the input consists of the robot state, visual observations, and language instruction, and the output is the corresponding motor action. We pre-train our model end-to-end across the three data layers, spanning (annotated) video datasets, synthetically generated datasets, and real-robot trajectories --- by sampling training batches across this heterogeneous data mixture.
+
+
+With a unified model and single set of weights, \modelname{} can generate diverse manipulation behaviors using single-arm, bimanual, and humanoid embodiments.
+%
+Evaluated on standard simulation benchmark environments, \modelname{} achieves superior results compared to state-of-the-art imitation learning baselines. We also demonstrate \modelname{}'s strong performance in real-world experiments with GR-1 humanoid robots. Our \modellarge{} model checkpoint, training data, and simulation benchmarks are publicly available here: \href{http://github.com/NVIDIA/Isaac-GR00T}{GitHub} and \href{https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-X-Embodiment-Sim}{HuggingFace Datasets}.
