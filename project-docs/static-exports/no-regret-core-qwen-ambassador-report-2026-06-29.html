@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Natural Village 30-Cycle Model Comparison</title>
+  <style>
+    :root {
+      --paper: #f3efe2;
+      --paper-deep: #e6dbc7;
+      --ink: #20251f;
+      --muted: #61685d;
+      --line: #c9bda4;
+      --surface: #fffaf0;
+      --surface-2: #ebe3d1;
+      --grass: #2d7a4d;
+      --moss: #7d9451;
+      --water: #2f6f86;
+      --stone: #626963;
+      --wood: #a36d3f;
+      --red: #9f3f35;
+      --gold: #c0953f;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      background:
+        linear-gradient(90deg, rgba(32,37,31,.05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(32,37,31,.045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 24px 24px;
+    }
+    a { color: inherit; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; background: rgba(98,105,99,.12); border: 1px solid rgba(98,105,99,.2); border-radius: 5px; padding: 1px 5px; }
+    img { max-width: 100%; display: block; }
+    .page { width: min(1380px, calc(100% - 32px)); margin: 0 auto; padding: 18px 0 60px; }
+    .topbar { display:flex; gap: 16px; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; padding: 8px 0 16px; }
+    .nav { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .nav a { text-decoration:none; border:1px solid var(--line); background: rgba(255,250,240,.8); border-radius:999px; padding: 6px 10px; }
+    .hero { display:grid; grid-template-columns: minmax(0,.94fr) minmax(440px,1.06fr); gap:22px; border-top: 3px solid var(--ink); border-bottom:1px solid var(--line); padding: 24px 0 22px; align-items:stretch; }
+    .hero-copy { min-height: 620px; display:grid; align-content:space-between; gap:24px; }
+    .kicker { margin:0 0 8px; color: var(--grass); font-size:12px; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    h1,h2,h3,p { margin:0; }
+    h1 { font-size: clamp(42px, 6.3vw, 86px); line-height:.95; letter-spacing:0; max-width: 850px; }
+    h2 { font-size: clamp(28px, 3.4vw, 48px); line-height:1.04; letter-spacing:0; }
+    h3 { font-size: 20px; line-height:1.15; }
+    .lead { margin-top:16px; max-width: 760px; color:#3d443b; font-size:18px; }
+    .thesis { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:10px; margin-top:22px; }
+    .thesis div, .metric, .run-card, .panel, .shot-card, .blocker { border:1px solid var(--line); background: rgba(255,250,240,.88); border-radius:8px; }
+    .thesis div { padding:14px; }
+    .thesis span, .metric span, figcaption, .small { display:block; color:var(--muted); font-size:12px; font-weight:760; letter-spacing:.02em; text-transform:uppercase; }
+    .thesis strong { display:block; margin-top:6px; font-size:17px; }
+    .hero-visual { display:grid; grid-template-rows: 1fr auto; gap: 10px; min-width:0; }
+    .hero-shot { position:relative; min-height:470px; border:1px solid #857962; background:#d8e4d4; overflow:hidden; }
+    .hero-shot img { width:100%; height:100%; min-height:470px; object-fit:cover; }
+    .label-strip { position:absolute; left:12px; right:12px; bottom:12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .chip { display:inline-flex; align-items:center; gap:6px; min-height:26px; padding:4px 9px; border:1px solid rgba(32,37,31,.22); background: rgba(255,250,240,.88); border-radius:999px; color:#263027; font-size:12px; font-weight:760; line-height:1.2; }
+    .chip.ok { border-color: rgba(45,122,77,.45); background: rgba(45,122,77,.14); color:#225d3b; }
+    .chip.warn { border-color: rgba(159,63,53,.5); background: rgba(159,63,53,.12); color:#7d3028; }
+    .chip.info { border-color: rgba(47,111,134,.45); background: rgba(47,111,134,.12); color:#255d71; }
+    .metrics { display:grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap:10px; margin-top:18px; }
+    .metric { padding:13px; min-width:0; }
+    .metric strong { display:block; margin-top:7px; font-size:26px; line-height:1; font-variant-numeric: tabular-nums; }
+    .metric em { display:block; margin-top:7px; color:var(--muted); font-size:12px; font-style:normal; }
+    .section { border-top:1px solid var(--line); padding:34px 0; }
+    .section-title { display:grid; grid-template-columns:190px minmax(0,1fr); gap:24px; align-items:start; margin-bottom:18px; }
+    .section-title > p { color:var(--grass); font-size:12px; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+    .section-title h2 { max-width: 980px; }
+    .run-grid { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:12px; }
+    .run-card { padding:16px; border-top: 5px solid var(--accent); }
+    .run-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+    .score { min-width:82px; text-align:right; font-size:42px; line-height:1; color:var(--accent); font-variant-numeric: tabular-nums; }
+    .score small { font-size:16px; color:var(--muted); }
+    .run-story { margin-top:14px; color:#3e463d; }
+    .stack { display:flex; height:16px; border:1px solid rgba(32,37,31,.2); border-radius:999px; overflow:hidden; margin:16px 0 12px; background:#e8dfcc; }
+    .seg.progress { background:var(--grass); } .seg.blocked { background:var(--red); } .seg.none { background:#b7aa8e; }
+    .mini-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:8px; }
+    .mini-grid span { border:1px solid rgba(32,37,31,.13); background:rgba(255,255,255,.36); border-radius:6px; padding:8px; color:var(--muted); font-size:12px; }
+    .mini-grid b { display:block; color:var(--ink); font-size:18px; font-variant-numeric:tabular-nums; }
+    .inventory-row { display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; }
+    .item { display:inline-flex; align-items:center; gap:6px; min-height:30px; border:1px solid rgba(32,37,31,.15); background:rgba(255,255,255,.46); border-radius:6px; padding:4px 7px; font-size:12px; }
+    .item img { width:20px; height:20px; image-rendering: pixelated; }
+    .item em { min-width:18px; color:var(--ink); font-style:normal; font-weight:850; text-align:right; }
+    .milestone { margin-top:12px; color:var(--muted); font-size:13px; }
+    .panel { padding:16px; }
+    .two-col { display:grid; grid-template-columns: minmax(0,1.1fr) minmax(360px,.9fr); gap:14px; align-items:start; }
+    table { width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line); border-radius:8px; overflow:hidden; font-size:13px; }
+    th, td { padding:10px 9px; border-bottom:1px solid rgba(201,189,164,.7); text-align:left; vertical-align:top; }
+    th { font-weight:850; } td { color:#3c443a; }
+    tr:last-child th, tr:last-child td { border-bottom:0; }
+    .number-viz { display:grid; gap:10px; }
+    .viz-row { display:grid; grid-template-columns: 120px minmax(0,1fr) 76px; gap:10px; align-items:center; font-size:13px; }
+    .bar { height:13px; background:#e5dcc8; border:1px solid rgba(32,37,31,.14); border-radius:999px; overflow:hidden; }
+    .bar i { display:block; height:100%; background:var(--grass); }
+    .bar.requests i { background:var(--water); } .bar.tokens i { background:var(--gold); } .bar.progress i { background:var(--grass); }
+    .timeline-block { display:grid; gap:13px; }
+    .timeline-row { display:grid; grid-template-columns: 116px minmax(0,1fr); gap:12px; align-items:center; }
+    .timeline { display:grid; grid-template-columns: repeat(30, minmax(10px,1fr)); gap:3px; }
+    .tick { min-height:26px; border:1px solid rgba(32,37,31,.18); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; color:rgba(32,37,31,.75); font-variant-numeric:tabular-nums; }
+    .tick.ok { background:rgba(45,122,77,.25); border-color:rgba(45,122,77,.35); }
+    .tick.bad { background:rgba(159,63,53,.23); border-color:rgba(159,63,53,.35); }
+    .tick.idle { background:rgba(183,170,142,.32); }
+    .legend { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:12px; }
+    .legend i { width:13px; height:13px; display:inline-block; border-radius:3px; margin-right:4px; vertical-align:-2px; border:1px solid rgba(32,37,31,.2); }
+    .shot-stack { display:grid; gap:14px; }
+    .shot-card { padding:14px; }
+    .shots { display:grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap:8px; margin-top:12px; }
+    figure { margin:0; border:1px solid var(--line); background:var(--surface-2); border-radius:7px; overflow:hidden; }
+    figure img { width:100%; aspect-ratio:16/9; object-fit:cover; }
+    figcaption { padding:6px 7px; text-transform:none; letter-spacing:0; font-weight:650; }
+    .matrix .status { display:inline-flex; min-width:88px; justify-content:center; border-radius:999px; padding:4px 8px; font-size:12px; font-weight:800; border:1px solid rgba(32,37,31,.15); }
+    .status.yes { background:rgba(45,122,77,.15); color:#205c38; } .status.pending { background:rgba(192,149,63,.16); color:#78591e; } .status.no { background:rgba(159,63,53,.14); color:#7b3028; }
+    .blockers { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:12px; }
+    .blocker { padding:15px; }
+    .blocker ul { margin:12px 0 0; padding-left:18px; color:#3f463d; }
+    .blocker li + li { margin-top:8px; }
+    .callout { border-left:5px solid var(--red); background:rgba(159,63,53,.09); padding:14px 16px; border-radius:0 8px 8px 0; }
+    .callout.good { border-left-color:var(--grass); background:rgba(45,122,77,.1); }
+    .muted { color:var(--muted); }
+    .footnotes { color:var(--muted); font-size:13px; }
+    @media (max-width: 980px) {
+      .hero, .two-col { grid-template-columns: 1fr; }
+      .hero-copy { min-height:auto; }
+      .metrics, .run-grid, .blockers { grid-template-columns: 1fr; }
+      .section-title { grid-template-columns:1fr; gap:8px; }
+      .shots { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .timeline-row { grid-template-columns:1fr; }
+      table { display:block; overflow-x:auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <div>No-regret core pilot · 2026-06-29 · file report</div>
+      <nav class="nav" aria-label="Report sections">
+        <a href="#protocol">Protocol</a><a href="#models">Models</a><a href="#charts">Metrics</a><a href="#visuals">Visuals</a><a href="#diagnosis">Diagnosis</a><a href="#next">Next</a>
+      </nav>
+    </div>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <div>
+          <p class="kicker">Natural village · goal-oriented 30-cycle comparison</p>
+          <h1>마을 근처 자연 월드에서 모델이 실제로 뭘 했는지 본다</h1>
+          <p class="lead">이번 run은 연구 결론이 아니다. <code>natural-village-spawn-v1</code>에서 fresh world를 매 lane마다 만들고, actor가 30 cycles 동안 shared work point의 실마리를 실제 Minecraft evidence로 남기는지 본 pilot이다. 말이 아니라 inventory delta, placed block, movement, verifier result, screenshot capture를 본다.</p>
+          <div class="thesis">
+            <div><span>Research target today</span><strong>goal-oriented physical competence + continuity</strong></div>
+            <div><span>Not counted</span><strong>prose claim, self-declared progress, screenshot-only block identity</strong></div>
+            <div><span>Task</span><strong>logs → planks/sticks/table → safe village-adjacent work point</strong></div>
+            <div><span>Decision use</span><strong>다음 60-cycle 전 runtime/action-skill gap을 찾는 pilot</strong></div>
+          </div>
+        </div>
+        <div class="metrics">
+          <div class="metric "><span>lanes</span><strong>3</strong><em>Qwen Plus · Qwen Max · GPT-5.4 mini</em></div>
+          <div class="metric "><span>cycles</span><strong>90</strong><em>30 cycles × 3 fresh worlds</em></div>
+          <div class="metric "><span>visual captures</span><strong>288</strong><em>first/follow/high every cycle</em></div>
+          <div class="metric "><span>verified progress</span><strong>35</strong><em>review outcome, not self-report</em></div>
+          <div class="metric warn"><span>provider records</span><strong>280</strong><em>OpenAI mini drove most requests</em></div>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-shot">
+          <img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0030-cycle-end-third-person-high.png" alt="Minecraft natural village final high camera screenshot">
+          <div class="label-strip"><span class="chip ok">visual audit passed</span><span class="chip info">server 1.21.4</span><span class="chip warn">renderer is review-only</span></div>
+        </div>
+        <div class="shot-card"><div class="shots">
+          <figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/cycle-0030-cycle-end-third-person-follow.png" alt="Qwen Plus final follow camera"><figcaption>Qwen Plus · final follow</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0030-cycle-end-third-person-follow.png" alt="Qwen Max final follow camera"><figcaption>Qwen Max · final follow</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/cycle-0030-cycle-end-third-person-follow.png" alt="GPT-5.4 mini final follow camera"><figcaption>GPT-5.4 mini · final follow</figcaption></figure>
+        </div></div>
+      </div>
+    </section>
+
+    <section class="section" id="protocol">
+      <div class="section-title"><p>Protocol</p><h2>같은 seed, 같은 scenario, 매 lane fresh world. 목적은 workbench foothold evidence.</h2></div>
+      <div class="two-col">
+        <div class="panel">
+          <table>
+            <tbody>
+              <tr><th>Scenario</th><td><code>natural-village-spawn-v1</code></td></tr>
+              <tr><th>Seed</th><td><code>4167799982467607063</code></td></tr>
+              <tr><th>Reset</th><td><code>--fresh-world</code> per lane</td></tr>
+              <tr><th>Actor</th><td><code>npc_b</code>, run-scoped workspace under <code>data/actors/social-runs/&lt;run_id&gt;</code></td></tr>
+              <tr><th>Visual profile</th><td><code>report</code>, <code>first_person</code>, <code>third_person_follow</code>, <code>third_person_high</code>, every cycle</td></tr>
+              <tr><th>Concrete evidence</th><td>inventory delta, world block delta, position delta, container mutation, explicit blocker evidence</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout good">
+          <p><b>해석 기준.</b> 이 run은 Goldilocks prediction gate가 아니다. 지금 보는 건 자연 마을 스폰에서 actor가 30 cycles 동안 material chain을 유지하고, 실패 후 같은 실패만 반복하는지, runtime evidence가 나중에 리뷰 가능한지다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="models">
+      <div class="section-title"><p>Model lanes</p><h2>세 lane 모두 30 cycles 완주. 하지만 “완주”와 “목표 달성”은 다르다.</h2></div>
+      <div class="run-grid"><article class="run-card" style="--accent:#2d7a4d;--accent-2:#9ec469">
+    <div class="run-head">
+      <div><p class="kicker">modelscope-api</p><h3>Qwen Plus</h3><code>Qwen-Ambassador/Qwen3.7-Plus</code></div>
+      <strong class="score">12<small>/30</small></strong>
+    </div>
+    <p class="run-story">초반 wood → planks/sticks → crafting table → wooden pickaxe 연결을 가장 깔끔하게 닫았다. 후반에는 이동과 채굴 매핑에서 마찰이 커졌다.</p>
+    <div class="stack" aria-label="Qwen Plus outcome stack"><div class="seg progress" style="width:40%" title="verified 12/30"></div><div class="seg blocked" style="width:27%" title="blocked 8/30"></div><div class="seg none" style="width:33%" title="no progress 10/30"></div></div>
+    <div class="mini-grid">
+      <span><b>20</b> verifier passed</span>
+      <span><b>8</b> blocked</span>
+      <span><b>38</b> provider records</span>
+      <span><b>1.13M</b> total tokens</span>
+    </div>
+    <div class="inventory-row"><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_planks.png" alt=""><b>cherry_planks</b><em>2</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_log.png" alt=""><b>oak_log</b><em>3</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_planks.png" alt=""><b>oak_planks</b><em>1</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/stick.png" alt=""><b>stick</b><em>2</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/stick.png" alt=""><b>wooden_pickaxe</b><em>1</em></span></div>
+    <p class="milestone">table evidence 0004 · wooden_pickaxe in inventory · no cobblestone</p>
+  </article><article class="run-card" style="--accent:#5f6f2d;--accent-2:#c0a15a">
+    <div class="run-head">
+      <div><p class="kicker">modelscope-api</p><h3>Qwen Max</h3><code>Qwen-Ambassador/Qwen3.7-Max</code></div>
+      <strong class="score">15<small>/30</small></strong>
+    </div>
+    <p class="run-story">verified progress가 가장 많고 후반에 cobblestone까지 뽑았다. 대신 craft_with_table 실패와 observe/craft 루프가 중반을 잡아먹었다.</p>
+    <div class="stack" aria-label="Qwen Max outcome stack"><div class="seg progress" style="width:50%" title="verified 15/30"></div><div class="seg blocked" style="width:27%" title="blocked 8/30"></div><div class="seg none" style="width:23%" title="no progress 7/30"></div></div>
+    <div class="mini-grid">
+      <span><b>16</b> verifier passed</span>
+      <span><b>8</b> blocked</span>
+      <span><b>38</b> provider records</span>
+      <span><b>1.09M</b> total tokens</span>
+    </div>
+    <div class="inventory-row"><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_planks.png" alt=""><b>cherry_planks</b><em>1</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/grass_block.png" alt=""><b>cobblestone</b><em>6</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/dirt.png" alt=""><b>dirt</b><em>4</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/stick.png" alt=""><b>stick</b><em>6</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/stick.png" alt=""><b>wooden_pickaxe</b><em>1</em></span></div>
+    <p class="milestone">table evidence 0003 · wooden_pickaxe in inventory · 6 cobblestone</p>
+  </article><article class="run-card" style="--accent:#2f6f86;--accent-2:#8bc1cf">
+    <div class="run-head">
+      <div><p class="kicker">openai-api</p><h3>GPT-5.4 mini</h3><code>gpt-5.4-mini</code></div>
+      <strong class="score">8<small>/30</small></strong>
+    </div>
+    <p class="run-story">30-cycle은 완주했다. 하지만 crafting table을 들고도 world placement checklist를 만족시키지 못했고, generated action 시도 두 번이 schema/tool 문제로 막혔다.</p>
+    <div class="stack" aria-label="GPT-5.4 mini outcome stack"><div class="seg progress" style="width:27%" title="verified 8/30"></div><div class="seg blocked" style="width:30%" title="blocked 9/30"></div><div class="seg none" style="width:43%" title="no progress 13/30"></div></div>
+    <div class="mini-grid">
+      <span><b>19</b> verifier passed</span>
+      <span><b>9</b> blocked</span>
+      <span><b>204</b> provider records</span>
+      <span><b>1.12M</b> total tokens</span>
+    </div>
+    <div class="inventory-row"><span class="item"><img src="../../probe/src/dashboard/assets/icons/crafting_table.png" alt=""><b>crafting_table</b><em>1</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/dirt.png" alt=""><b>dirt</b><em>3</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_log.png" alt=""><b>oak_log</b><em>3</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_planks.png" alt=""><b>oak_planks</b><em>6</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/oak_planks.png" alt=""><b>oak_stairs</b><em>1</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/short_grass.png" alt=""><b>pink_petals</b><em>2</em></span><span class="item"><img src="../../probe/src/dashboard/assets/icons/stick.png" alt=""><b>stick</b><em>4</em></span></div>
+    <p class="milestone">table held, not placed/verified · no pickaxe evidence · no cobblestone</p>
+  </article></div>
+    </section>
+
+    <section class="section" id="charts">
+      <div class="section-title"><p>Metrics</p><h2>비교 축은 model leaderboard가 아니라 concrete action evidence다.</h2></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>Outcome table</h3>
+          <table style="margin-top:12px">
+            <thead><tr><th>Lane</th><th>Model</th><th>Status</th><th>Verified progress</th><th>Blocked</th><th>No progress</th><th>Verifier P/F/NA</th><th>Records</th><th>Total tokens</th><th>Records / progress</th><th>Tokens / progress</th></tr></thead>
+            <tbody><tr>
+    <th>Qwen Plus</th>
+    <td><code>Qwen-Ambassador/Qwen3.7-Plus</code></td>
+    <td>passed</td>
+    <td>12</td>
+    <td>8</td>
+    <td>10</td>
+    <td>20/8/2</td>
+    <td>38</td>
+    <td>1,129,990</td>
+    <td>3.2</td>
+    <td>94K</td>
+  </tr><tr>
+    <th>Qwen Max</th>
+    <td><code>Qwen-Ambassador/Qwen3.7-Max</code></td>
+    <td>passed</td>
+    <td>15</td>
+    <td>8</td>
+    <td>7</td>
+    <td>16/8/6</td>
+    <td>38</td>
+    <td>1,093,021</td>
+    <td>2.5</td>
+    <td>73K</td>
+  </tr><tr>
+    <th>GPT-5.4 mini</th>
+    <td><code>gpt-5.4-mini</code></td>
+    <td>passed</td>
+    <td>8</td>
+    <td>9</td>
+    <td>13</td>
+    <td>19/9/2</td>
+    <td>204</td>
+    <td>1,115,823</td>
+    <td>25.5</td>
+    <td>139K</td>
+  </tr></tbody>
+          </table>
+        </div>
+        <div class="panel number-viz">
+          <h3>Progress, requests, tokens</h3>
+          <div class="viz-row"><b>Plus</b><div class="bar progress"><i style="width:80%"></i></div><span>12</span></div><div class="viz-row"><b>Max</b><div class="bar progress"><i style="width:100%"></i></div><span>15</span></div><div class="viz-row"><b>GPT mini</b><div class="bar progress"><i style="width:53%"></i></div><span>8</span></div>
+          <div class="small">verified progress</div>
+          <div class="viz-row"><b>Plus</b><div class="bar requests"><i style="width:19%"></i></div><span>38</span></div><div class="viz-row"><b>Max</b><div class="bar requests"><i style="width:19%"></i></div><span>38</span></div><div class="viz-row"><b>GPT mini</b><div class="bar requests"><i style="width:100%"></i></div><span>204</span></div>
+          <div class="small">provider records</div>
+          <div class="viz-row"><b>Plus</b><div class="bar tokens"><i style="width:100%"></i></div><span>1.13M</span></div><div class="viz-row"><b>Max</b><div class="bar tokens"><i style="width:97%"></i></div><span>1.09M</span></div><div class="viz-row"><b>GPT mini</b><div class="bar tokens"><i style="width:99%"></i></div><span>1.12M</span></div>
+          <div class="small">total tokens; provider tokenizers differ, so use this as cost pressure, not pure quality score</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <h3>Cycle timeline</h3>
+        <div class="timeline-block" style="margin-top:12px">
+          <div class="timeline-row"><b>Qwen Plus</b><div class="timeline" aria-label="Qwen Plus cycle timeline"><span class="tick ok" title="cycle-0001: verified_progress / collect_logs"><b>01</b></span><span class="tick ok" title="cycle-0002: verified_progress / collect_logs"><b>02</b></span><span class="tick ok" title="cycle-0003: verified_progress / craftPlanksAndSticks"><b>03</b></span><span class="tick ok" title="cycle-0004: verified_progress / craftCraftingTable"><b>04</b></span><span class="tick ok" title="cycle-0005: verified_progress / placeCraftingTable"><b>05</b></span><span class="tick ok" title="cycle-0006: verified_progress / collect_logs"><b>06</b></span><span class="tick ok" title="cycle-0007: verified_progress / craftPlanksAndSticks"><b>07</b></span><span class="tick ok" title="cycle-0008: verified_progress / craft_item"><b>08</b></span><span class="tick ok" title="cycle-0009: verified_progress / craftPlanksAndSticks"><b>09</b></span><span class="tick bad" title="cycle-0010: blocked / inspect_chest"><b>10</b></span><span class="tick ok" title="cycle-0011: verified_progress / craftWoodenPickaxe"><b>11</b></span><span class="tick bad" title="cycle-0012: blocked / craft_with_table"><b>12</b></span><span class="tick idle" title="cycle-0013: no_progress / move_to"><b>13</b></span><span class="tick idle" title="cycle-0014: no_progress / move_to"><b>14</b></span><span class="tick idle" title="cycle-0015: no_progress / observe"><b>15</b></span><span class="tick idle" title="cycle-0016: no_progress / move_to"><b>16</b></span><span class="tick idle" title="cycle-0017: no_progress / observe"><b>17</b></span><span class="tick idle" title="cycle-0018: no_progress / move_to"><b>18</b></span><span class="tick bad" title="cycle-0019: blocked / move_to"><b>19</b></span><span class="tick bad" title="cycle-0020: blocked / move_to"><b>20</b></span><span class="tick bad" title="cycle-0021: blocked / mine_block"><b>21</b></span><span class="tick ok" title="cycle-0022: verified_progress / collectLogs"><b>22</b></span><span class="tick ok" title="cycle-0023: verified_progress / collectLogs"><b>23</b></span><span class="tick bad" title="cycle-0024: blocked / move_to"><b>24</b></span><span class="tick bad" title="cycle-0025: blocked / mine_block"><b>25</b></span><span class="tick bad" title="cycle-0026: blocked / move_to"><b>26</b></span><span class="tick idle" title="cycle-0027: no_progress / move_to"><b>27</b></span><span class="tick idle" title="cycle-0028: no_progress / move_to"><b>28</b></span><span class="tick idle" title="cycle-0029: no_progress / move_to"><b>29</b></span><span class="tick idle" title="cycle-0030: no_progress / move_to"><b>30</b></span></div></div><div class="timeline-row"><b>Qwen Max</b><div class="timeline" aria-label="Qwen Max cycle timeline"><span class="tick ok" title="cycle-0001: verified_progress / collect_logs"><b>01</b></span><span class="tick ok" title="cycle-0002: verified_progress / craftPlanksAndSticks"><b>02</b></span><span class="tick ok" title="cycle-0003: verified_progress / craftCraftingTable"><b>03</b></span><span class="tick ok" title="cycle-0004: verified_progress / placeCraftingTable"><b>04</b></span><span class="tick ok" title="cycle-0005: verified_progress / collectLogs"><b>05</b></span><span class="tick ok" title="cycle-0006: verified_progress / craftPlanksAndSticks"><b>06</b></span><span class="tick bad" title="cycle-0007: blocked / craftWoodenPickaxe"><b>07</b></span><span class="tick ok" title="cycle-0008: verified_progress / craft_item"><b>08</b></span><span class="tick idle" title="cycle-0009: no_progress / observe"><b>09</b></span><span class="tick ok" title="cycle-0010: verified_progress / craft_item"><b>10</b></span><span class="tick bad" title="cycle-0011: blocked / craft_item"><b>11</b></span><span class="tick bad" title="cycle-0012: blocked / craft_with_table"><b>12</b></span><span class="tick ok" title="cycle-0013: verified_progress / craft_item"><b>13</b></span><span class="tick ok" title="cycle-0014: verified_progress / craft_with_table"><b>14</b></span><span class="tick idle" title="cycle-0015: no_progress / observe"><b>15</b></span><span class="tick bad" title="cycle-0016: blocked / craft_with_table"><b>16</b></span><span class="tick idle" title="cycle-0017: no_progress / remember"><b>17</b></span><span class="tick idle" title="cycle-0018: no_progress / observe"><b>18</b></span><span class="tick bad" title="cycle-0019: blocked / craft_item"><b>19</b></span><span class="tick idle" title="cycle-0020: no_progress / observe"><b>20</b></span><span class="tick ok" title="cycle-0021: verified_progress / mineCobblestone"><b>21</b></span><span class="tick bad" title="cycle-0022: blocked / move_to"><b>22</b></span><span class="tick bad" title="cycle-0023: blocked / move_to"><b>23</b></span><span class="tick idle" title="cycle-0024: no_progress / observe"><b>24</b></span><span class="tick idle" title="cycle-0025: no_progress / equip_item"><b>25</b></span><span class="tick bad" title="cycle-0026: blocked / move_to"><b>26</b></span><span class="tick ok" title="cycle-0027: verified_progress / mine_block"><b>27</b></span><span class="tick ok" title="cycle-0028: verified_progress / mine_block"><b>28</b></span><span class="tick ok" title="cycle-0029: verified_progress / mine_block"><b>29</b></span><span class="tick ok" title="cycle-0030: verified_progress / mine_block"><b>30</b></span></div></div><div class="timeline-row"><b>GPT-5.4 mini</b><div class="timeline" aria-label="GPT-5.4 mini cycle timeline"><span class="tick ok" title="cycle-0001: verified_progress / collect_logs"><b>01</b></span><span class="tick ok" title="cycle-0002: verified_progress / craft_item"><b>02</b></span><span class="tick ok" title="cycle-0003: verified_progress / craft_item"><b>03</b></span><span class="tick bad" title="cycle-0004: blocked / placeCraftingTable"><b>04</b></span><span class="tick idle" title="cycle-0005: no_progress / move_to"><b>05</b></span><span class="tick bad" title="cycle-0006: blocked / move_to"><b>06</b></span><span class="tick bad" title="cycle-0007: blocked / place_block"><b>07</b></span><span class="tick bad" title="cycle-0008: blocked / placeCraftingTable"><b>08</b></span><span class="tick idle" title="cycle-0009: no_progress / move_to"><b>09</b></span><span class="tick ok" title="cycle-0010: verified_progress / collect_logs"><b>10</b></span><span class="tick ok" title="cycle-0011: verified_progress / craftPlanksAndSticks"><b>11</b></span><span class="tick ok" title="cycle-0012: verified_progress / craftPlanksAndSticks"><b>12</b></span><span class="tick bad" title="cycle-0013: blocked / move_to"><b>13</b></span><span class="tick ok" title="cycle-0014: verified_progress / craft_item"><b>14</b></span><span class="tick idle" title="cycle-0015: no_progress / move_to"><b>15</b></span><span class="tick idle" title="cycle-0016: no_progress / move_to"><b>16</b></span><span class="tick idle" title="cycle-0017: no_progress / move_to"><b>17</b></span><span class="tick ok" title="cycle-0018: verified_progress / collect_logs"><b>18</b></span><span class="tick idle" title="cycle-0019: no_progress / observe"><b>19</b></span><span class="tick idle" title="cycle-0020: no_progress / move_to"><b>20</b></span><span class="tick idle" title="cycle-0021: no_progress / move_to"><b>21</b></span><span class="tick idle" title="cycle-0022: no_progress / move_to"><b>22</b></span><span class="tick idle" title="cycle-0023: no_progress / observe"><b>23</b></span><span class="tick bad" title="cycle-0024: blocked / author_mineflayer_action"><b>24</b></span><span class="tick bad" title="cycle-0025: blocked / ?"><b>25</b></span><span class="tick bad" title="cycle-0026: blocked / move_to"><b>26</b></span><span class="tick idle" title="cycle-0027: no_progress / move_to"><b>27</b></span><span class="tick idle" title="cycle-0028: no_progress / move_to"><b>28</b></span><span class="tick bad" title="cycle-0029: blocked / author_mineflayer_action"><b>29</b></span><span class="tick idle" title="cycle-0030: no_progress / move_to"><b>30</b></span></div></div>
+        </div>
+        <div class="legend"><span><i style="background:rgba(45,122,77,.25)"></i>verified progress</span><span><i style="background:rgba(159,63,53,.23)"></i>blocked</span><span><i style="background:rgba(183,170,142,.32)"></i>no progress / diagnostic</span></div>
+      </div>
+
+      <div class="two-col" style="margin-top:14px">
+        <div class="panel">
+          <h3>Executed tool mix</h3>
+          <table style="margin-top:12px"><thead><tr><th>Lane</th><th>collect_logs</th><th>observe</th><th>craft_item</th><th>craft_with_table</th><th>place_block</th><th>move_to</th><th>mine_block</th><th>run_mineflayer_program</th></tr></thead><tbody><tr><th>Qwen Plus</th><td>5</td><td>10</td><td>5</td><td>2</td><td>1</td><td>12</td><td>2</td><td>0</td></tr><tr><th>Qwen Max</th><td>2</td><td>12</td><td>8</td><td>4</td><td>1</td><td>3</td><td>5</td><td>0</td></tr><tr><th>GPT-5.4 mini</th><td>3</td><td>6</td><td>5</td><td>0</td><td>3</td><td>14</td><td>0</td><td>2</td></tr></tbody></table>
+        </div>
+        <div class="panel matrix">
+          <h3>Settlement checklist</h3>
+          <table style="margin-top:12px"><thead><tr><th>Lane</th><th>Crafting table known/placed</th><th>Starter shelter</th><th>Shared storage</th><th>Memory/judgment</th><th>Blocker summary</th></tr></thead><tbody>
+            <tr><th>Qwen Plus</th><td><span class="status yes">satisfied</span></td><td><span class="status pending">pending</span></td><td><span class="status pending">pending</span></td><td><span class="status yes">satisfied</span></td><td><span class="status yes">satisfied</span></td></tr><tr><th>Qwen Max</th><td><span class="status yes">satisfied</span></td><td><span class="status pending">pending</span></td><td><span class="status pending">pending</span></td><td><span class="status yes">satisfied</span></td><td><span class="status yes">satisfied</span></td></tr><tr><th>GPT-5.4 mini</th><td><span class="status pending">pending</span></td><td><span class="status pending">pending</span></td><td><span class="status pending">pending</span></td><td><span class="status yes">satisfied</span></td><td><span class="status yes">satisfied</span></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="visuals">
+      <div class="section-title"><p>Visual evidence</p><h2>매 cycle 캡쳐는 됐다. 단, block identity는 runtime state가 권위다.</h2></div>
+      <div class="shot-stack"><article class="shot-card"><h3>Qwen Plus</h3><div class="shots"><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/initial-initial-third-person-high.png" alt="Qwen Plus initial screenshot"><figcaption>initial</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/cycle-0010-cycle-end-third-person-follow.png" alt="Qwen Plus cycle 10 screenshot"><figcaption>cycle 10</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/cycle-0020-cycle-end-third-person-follow.png" alt="Qwen Plus cycle 20 screenshot"><figcaption>cycle 20</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/cycle-0030-cycle-end-first-person.png" alt="Qwen Plus final first screenshot"><figcaption>final first</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/cycle-0030-cycle-end-third-person-follow.png" alt="Qwen Plus final follow screenshot"><figcaption>final follow</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-plus/cycle-0030-cycle-end-third-person-high.png" alt="Qwen Plus final high screenshot"><figcaption>final high</figcaption></figure></div></article><article class="shot-card"><h3>Qwen Max</h3><div class="shots"><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/initial-initial-third-person-high.png" alt="Qwen Max initial screenshot"><figcaption>initial</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0010-cycle-end-third-person-follow.png" alt="Qwen Max cycle 10 screenshot"><figcaption>cycle 10</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0020-cycle-end-third-person-follow.png" alt="Qwen Max cycle 20 screenshot"><figcaption>cycle 20</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0030-cycle-end-first-person.png" alt="Qwen Max final first screenshot"><figcaption>final first</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0030-cycle-end-third-person-follow.png" alt="Qwen Max final follow screenshot"><figcaption>final follow</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/qwen-max/cycle-0030-cycle-end-third-person-high.png" alt="Qwen Max final high screenshot"><figcaption>final high</figcaption></figure></div></article><article class="shot-card"><h3>GPT-5.4 mini</h3><div class="shots"><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/initial-initial-third-person-high.png" alt="GPT-5.4 mini initial screenshot"><figcaption>initial</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/cycle-0010-cycle-end-third-person-follow.png" alt="GPT-5.4 mini cycle 10 screenshot"><figcaption>cycle 10</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/cycle-0020-cycle-end-third-person-follow.png" alt="GPT-5.4 mini cycle 20 screenshot"><figcaption>cycle 20</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/cycle-0030-cycle-end-first-person.png" alt="GPT-5.4 mini final first screenshot"><figcaption>final first</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/cycle-0030-cycle-end-third-person-follow.png" alt="GPT-5.4 mini final follow screenshot"><figcaption>final follow</figcaption></figure><figure><img src="../Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/screenshots/report-html/gpt-5-4-mini/cycle-0030-cycle-end-third-person-high.png" alt="GPT-5.4 mini final high screenshot"><figcaption>final high</figcaption></figure></div></article></div>
+      <p class="footnotes" style="margin-top:12px">All three lanes passed <code>visual-evidence-audit/v1</code>. Screenshots are useful for human review of motion and context. They are not authoritative for block names, especially when prismarine-viewer renders unsupported or version-skewed blocks strangely.</p>
+    </section>
+
+    <section class="section" id="diagnosis">
+      <div class="section-title"><p>Diagnosis</p><h2>가장 큰 차이는 “무엇을 만들었나”보다 “어디서 막혔고 어떻게 회복했나”에 있다.</h2></div>
+      <div class="blockers"><article class="blocker"><h3>Qwen Plus</h3><ul><li><b>C0010</b> <code>inspect_chest</code> verifier=failed, tools=inspect_chest, statuses=inspect_chest:blocked. Outcome contract=blocked; expected=diagnostic_unlock; observed=blocker_recorded.</li><li><b>C0012</b> <code>craft_with_table</code> verifier=failed, tools=craft_with_table, statuses=craft_with_table:blocked. Outcome contract=blocked; expected=inventory_delta; observed=blocker_recorded.</li><li><b>C0019</b> <code>move_to</code> verifier=failed, tools=move_to, statuses=move_to:blocked. Outcome contract=blocked; expected=position_delta; observed=blocker_recorded.</li><li><b>C0020</b> <code>move_to</code> verifier=failed, tools=move_to, statuses=move_to:blocked. Outcome contract=blocked; expected=position_delta; observed=blocker_recorded.</li></ul></article><article class="blocker"><h3>Qwen Max</h3><ul><li><b>C0007</b> <code>craftWoodenPickaxe</code> verifier=failed, tools=observe,craft_with_table, statuses=observe:ok, craft_with_table:blocked. Outcome contract=blocked; expected=inventory_delta; observed=diagnostic_delta,blocker_recorded.</li><li><b>C0011</b> <code>craft_item</code> verifier=failed, tools=craft_item, statuses=craft_item:blocked. Outcome contract=blocked; expected=inventory_delta; observed=blocker_recorded.</li><li><b>C0012</b> <code>craft_with_table</code> verifier=failed, tools=craft_with_table, statuses=craft_with_table:blocked. Outcome contract=blocked; expected=inventory_delta; observed=blocker_recorded.</li><li><b>C0016</b> <code>craft_with_table</code> verifier=failed, tools=craft_with_table, statuses=craft_with_table:blocked. Outcome contract=blocked; expected=inventory_delta; observed=blocker_recorded.</li></ul></article><article class="blocker"><h3>GPT-5.4 mini</h3><ul><li><b>C0004</b> <code>placeCraftingTable</code> verifier=failed, tools=observe,place_block, statuses=observe:ok, place_block:blocked. Outcome contract=blocked; expected=world_block_delta; observed=diagnostic_delta,blocker_recorded.</li><li><b>C0006</b> <code>move_to</code> verifier=failed, tools=move_to, statuses=move_to:blocked. Outcome contract=blocked; expected=position_delta; observed=blocker_recorded.</li><li><b>C0007</b> <code>place_block</code> verifier=failed, tools=place_block, statuses=place_block:blocked. Outcome contract=blocked; expected=world_block_delta; observed=blocker_recorded.</li><li><b>C0008</b> <code>placeCraftingTable</code> verifier=failed, tools=observe,place_block, statuses=observe:ok, place_block:blocked. Outcome contract=blocked; expected=world_block_delta; observed=diagnostic_delta,blocker_recorded.</li></ul></article></div>
+      <div class="two-col" style="margin-top:14px">
+        <div class="callout">
+          <p><b>OpenAI mini caveat.</b> Preflight는 40 requests / 1.3M tokens로 allowed였다. 실제 run은 204 provider records / 1.12M total tokens였다. 토큰은 mini pool 안에 남았지만, request estimate는 틀렸다. 다음 OpenAI mini 30-cycle은 최소 220 requests로 preflight해야 한다.</p>
+        </div>
+        <div class="callout good">
+          <p><b>Qwen Ambassador angle.</b> Qwen Max는 이번 pilot에서 가장 높은 verified progress와 후반 material diversity를 보였다. Qwen Plus는 초반 workbench chain이 더 깔끔했다. 둘 다 shared storage와 shelter는 못 닫았다. 이건 모델 홍보용 승패보다 harness가 실제로 어디를 봐야 하는지 알려준다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="next">
+      <div class="section-title"><p>Next run</p><h2>바로 60-cycle로 키우기 전에 placement/codegen gap을 먼저 좁힌다.</h2></div>
+      <div class="panel">
+        <table>
+          <tbody>
+            <tr><th>Keep</th><td><code>natural-village-spawn-v1</code>, fresh world per lane, report visual profile, same three camera modes, run-scoped workspaces.</td></tr>
+            <tr><th>Fix before larger comparison</th><td><code>place_block</code> / <code>placeCraftingTable</code> blocker diagnosis, generated Mineflayer output schema friction, movement timeout recovery, final inventory consolidation in the summary.</td></tr>
+            <tr><th>Budget rule</th><td>Qwen 30-cycle: estimate at least 40 requests per lane. OpenAI <code>gpt-5.4-mini</code> 30-cycle: estimate at least 220 requests and 1.3M+ total tokens. <code>gpt-5.5</code> remains blocked for this comparison unless local cap and dashboard state change.</td></tr>
+            <tr><th>Research use</th><td>This pilot supports the no-regret core: it shows concrete transition evidence, runtime blockers, visual completeness, and action-skill gaps. It does not prove the Goldilocks prediction layer yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><p>Artifacts</p><h2>Reproducible local pointers</h2></div>
+      <div class="panel footnotes">
+        <p><code>project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/model-comparison-30cycle-analysis.json</code></p>
+        <p><code>reports/qwen-3.7-plus.json</code>, <code>reports/qwen-3.7-max.json</code>, <code>reports/gpt-5.4-mini.json</code></p>
+        <p><code>preflight/openai-gpt54-mini-30cycle-pre-run-2026-06-29.json</code></p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
