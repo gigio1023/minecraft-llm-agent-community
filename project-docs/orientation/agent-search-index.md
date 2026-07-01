@@ -21,8 +21,9 @@ guidance.
 | `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
 | `RESEARCH_ARCHIVE` | Historical research, literature reviews, paper dumps, and stale public plans are preserved but not active build instructions | `project-docs/references/`, `project-docs/archive/` |
 | `KARPATHY_GUIDELINES` | Think before coding, keep changes simple and surgical, and define verifiable success criteria | `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` |
-| `MANDATORY_AGENT_SKILL_ROUTING` | Repeated workflows route through repo-local agent skills before free-form execution | `AGENTS.md`, `.agents/skills/provider-quota-preflight/SKILL.md`, `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md` |
+| `MANDATORY_AGENT_SKILL_ROUTING` | Repeated workflows route through repo-local agent skills before free-form execution | `AGENTS.md`, `.agents/skills/provider-quota-preflight/SKILL.md`, `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md`, `.agents/skills/mineflayer-code-generation/SKILL.md` |
 | `EXTERNAL_SKILL_COMPATIBILITY` | Global skills such as Ponytail or Matt-style skills are advisory only and cannot override repo gates | `AGENTS.md`, `CLAUDE.md` |
+| `AGENT_SKILLS_AUDIT_2026_07_01` | Audit of repo-local agent skill intent, consolidation boundaries, metadata, and drift risks | `project-docs/operations/audits/agent-skills-audit-2026-07-01.md`, `.agents/skills/` |
 
 ## Product Direction
 

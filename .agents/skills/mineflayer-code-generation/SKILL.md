@@ -97,8 +97,16 @@ cover.
 
 ## Mineflayer Notes
 
-These notes are adapted from the local upstream Mineflayer repo at
-`~/git/mineflayer`, commit `03eba44f`.
+These notes are adapted from upstream `PrismarineJS/mineflayer` at commit
+`03eba44f`. A local clone such as `~/git/mineflayer` can be used for inspection,
+but the committed reference is the upstream repo and commit, not a device-local
+path.
+
+Keep this skill aligned with
+`probe/src/runtime/goals/actorEpisode/mineflayerCodegenSkill.ts`,
+`probe/src/runtime/goals/actorEpisode/validators.ts`, and
+`probe/src/provider/socialActorTurnCodegenContract.ts` when helper names,
+helper API version, verifier vocabulary, or generated-candidate fields change.
 
 - Loaded-world visibility is bounded. `bot.findBlock` and `bot.findBlocks`
   search loaded blocks near the bot; a null result is not proof the block does

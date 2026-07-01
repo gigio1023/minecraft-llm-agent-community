@@ -3,9 +3,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 function usage() {
-  console.error("usage: report-readiness-check.mjs <report.json> [--json]");
+  console.error("usage: report-readiness-check.mjs <report.json> [--json] [--publishable]");
 }
 
 function readJson(filePath) {
@@ -26,9 +27,27 @@ function existsMaybe(filePath) {
   return Boolean(filePath && fs.existsSync(filePath));
 }
 
+function stringRefs(...values) {
+  return values.flatMap((value) => {
+    if (typeof value === "string" && value.length > 0) {
+      return [value];
+    }
+    if (Array.isArray(value)) {
+      return value.filter((item) => typeof item === "string" && item.length > 0);
+    }
+    return [];
+  });
+}
+
+function refExistsInScopes(ref, scopes) {
+  return scopes.some((scope) => existsMaybe(resolveMaybe(scope, ref)));
+}
+
 function runSummarizer(reportPath) {
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const script = path.resolve(
-    ".agents/skills/minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.mjs"
+    scriptDir,
+    "../../minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.mjs"
   );
   if (!fs.existsSync(script)) {
     return { status: "missing_script", stdout: "", stderr: "" };
@@ -46,8 +65,13 @@ function runSummarizer(reportPath) {
 }
 
 const args = process.argv.slice(2);
+if (args.includes("--help") || args.includes("-h")) {
+  usage();
+  process.exit(0);
+}
 const reportArg = args.find((arg) => !arg.startsWith("--"));
 const jsonMode = args.includes("--json");
+const publishableMode = args.includes("--publishable");
 
 if (!reportArg) {
   usage();
@@ -70,6 +94,28 @@ const providerOutputRefs = cycles.flatMap((cycle) => cycle.provider_output_refs 
 const visualCaptures = Array.isArray(report.visual_evidence?.captures)
   ? report.visual_evidence.captures
   : [];
+const transitionRowRefs = cycles.flatMap((cycle) => [
+  ...stringRefs(cycle.transition_row_ref, cycle.transition_row_refs),
+  ...(Array.isArray(cycle.action_attempts)
+    ? cycle.action_attempts.flatMap((attempt) => stringRefs(attempt?.transition_row_ref, attempt?.transition_row_refs))
+    : [])
+]);
+const transitionBatchAuditRefs = stringRefs(
+  report.transition_row_batch_audit_ref,
+  report.transition_row_batch_audit_refs,
+  report.transition_row_batch_ref,
+  report.transition_row_batch_refs,
+  report.batch_audit_ref,
+  report.batch_audit_refs
+);
+const noRegretRefs = stringRefs(
+  report.no_regret_run_declaration_ref,
+  report.no_regret_run_declaration_refs,
+  report.seed_reset_record_ref,
+  report.seed_reset_record_refs,
+  report.seed_reset_records_ref,
+  report.seed_reset_records_refs
+);
 const usageStatuses = Array.isArray(report.provider_usage?.budget_status)
   ? report.provider_usage.budget_status.map((status) => status?.status).filter(Boolean)
   : [];
@@ -80,6 +126,10 @@ const missingProviderOutputRefs = providerOutputRefs.filter((ref) => !existsMayb
 const missingVisualRefs = visualCaptures
   .flatMap((capture) => [capture?.image_ref, capture?.artifact_ref].filter(Boolean))
   .filter((ref) => !existsMaybe(resolveMaybe(actorDir, ref)) && !existsMaybe(resolveMaybe(reportDir, ref)));
+const refScopes = [actorDir, reportDir].filter(Boolean);
+const missingTransitionRowRefs = transitionRowRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
+const missingTransitionBatchAuditRefs = transitionBatchAuditRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
+const missingNoRegretRefs = noRegretRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
 
 const providerId = report.provider?.provider_id ?? "";
 const providerBacked = providerId && !providerId.startsWith("deterministic") && providerId !== "builtin-planner";
@@ -129,8 +179,36 @@ const checks = [
   },
   {
     name: "preflight_ref_present",
-    status: providerBacked ? (hasPreflightRef ? "passed" : "warning") : "not_applicable",
+    status: providerBacked ? (hasPreflightRef ? "passed" : publishableMode ? "failed" : "warning") : "not_applicable",
     detail: preflightRefs
+  },
+  {
+    name: "transition_row_refs_exist",
+    status: transitionRowRefs.length === 0
+      ? "not_applicable"
+      : missingTransitionRowRefs.length === 0 ? "passed" : "failed",
+    detail: missingTransitionRowRefs
+  },
+  {
+    name: "transition_row_batch_audit_ref_present",
+    status: transitionRowRefs.length === 0
+      ? "not_applicable"
+      : transitionBatchAuditRefs.length > 0 ? "passed" : publishableMode ? "failed" : "warning",
+    detail: transitionBatchAuditRefs
+  },
+  {
+    name: "transition_row_batch_audit_refs_exist",
+    status: transitionBatchAuditRefs.length === 0
+      ? "not_applicable"
+      : missingTransitionBatchAuditRefs.length === 0 ? "passed" : "failed",
+    detail: missingTransitionBatchAuditRefs
+  },
+  {
+    name: "no_regret_refs_exist",
+    status: noRegretRefs.length === 0
+      ? "not_applicable"
+      : missingNoRegretRefs.length === 0 ? "passed" : "failed",
+    detail: missingNoRegretRefs
   }
 ];
 
@@ -150,11 +228,14 @@ const result = {
   report_path: reportPath,
   generated_at: new Date().toISOString(),
   provider_backed: Boolean(providerBacked),
+  publishable_mode: publishableMode,
   checks,
   final_status: failed.length > 0 ? "failed" : warnings.length > 0 ? "warning" : "passed",
   report_claim_requirements: [
     "separate Recording verdict from Experiment verdict",
     "include a claim table with artifact refs",
+    "for transition-row reports, separate observed_delta evidence from actor expected_outcome",
+    "state whether transition-row-batch-audit/v1 passes no-regret thresholds",
     "treat screenshots as review-only evidence",
     "state unsupported research, leaderboard, sociality, and budget claims explicitly"
   ]

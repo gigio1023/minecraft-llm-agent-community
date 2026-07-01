@@ -37,6 +37,14 @@ const zero: ProviderUsageCounts = {
   total_tokens: 0
 };
 
+function usage() {
+  return `usage: provider-quota-preflight.ts --candidate provider:model --estimate-requests N --estimate-total-tokens N --estimate-requests-per-minute N [--out path] [--operator-approved --approval-note text]`;
+}
+
+function hasValue(value: string | undefined) {
+  return value !== undefined && !value.startsWith("--");
+}
+
 function parsePositiveInt(value: string | undefined, label: string) {
   if (!value) {
     return 0;
@@ -60,6 +68,11 @@ function parseCandidate(value: string): Candidate {
 }
 
 function parseArgs(argv: string[]): Args {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(usage());
+    process.exit(0);
+  }
+
   const repoRoot = process.cwd();
   const args: Args = {
     candidates: [],
@@ -78,62 +91,66 @@ function parseArgs(argv: string[]): Args {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = argv[index + 1];
-    if (arg === "--candidate" && next) {
+    if (arg === "--candidate" && hasValue(next)) {
       args.candidates.push(parseCandidate(next));
       index += 1;
-    } else if (arg === "--ledger" && next) {
+    } else if (arg === "--ledger" && hasValue(next)) {
       args.ledgerPath = path.resolve(next);
       index += 1;
-    } else if (arg === "--budgets" && next) {
+    } else if (arg === "--budgets" && hasValue(next)) {
       args.budgetsPath = path.resolve(next);
       index += 1;
-    } else if (arg === "--out" && next) {
+    } else if (arg === "--out" && hasValue(next)) {
       args.outPath = path.resolve(next);
       index += 1;
-    } else if (arg === "--approval-note" && next) {
+    } else if (arg === "--approval-note" && hasValue(next)) {
       args.approvalNote = next;
       index += 1;
-    } else if (arg === "--approval-note-file" && next) {
+    } else if (arg === "--approval-note-file" && hasValue(next)) {
       args.approvalNote = fs.readFileSync(path.resolve(next), "utf8").trim();
       index += 1;
-    } else if (arg === "--estimate-requests" && next) {
+    } else if (arg === "--estimate-requests" && hasValue(next)) {
       args.estimate.requests = parsePositiveInt(next, arg);
       args.estimateRequestsProvided = true;
       index += 1;
-    } else if (arg === "--estimate-input-tokens" && next) {
+    } else if (arg === "--estimate-input-tokens" && hasValue(next)) {
       args.estimate.input_tokens = parsePositiveInt(next, arg);
       args.estimateTokensProvided = true;
       index += 1;
-    } else if (arg === "--estimate-output-tokens" && next) {
+    } else if (arg === "--estimate-output-tokens" && hasValue(next)) {
       args.estimate.output_tokens = parsePositiveInt(next, arg);
       args.estimateTokensProvided = true;
       index += 1;
-    } else if (arg === "--estimate-thinking-tokens" && next) {
+    } else if (arg === "--estimate-thinking-tokens" && hasValue(next)) {
       args.estimate.thinking_tokens = parsePositiveInt(next, arg);
       args.estimateTokensProvided = true;
       index += 1;
-    } else if (arg === "--estimate-total-tokens" && next) {
+    } else if (arg === "--estimate-total-tokens" && hasValue(next)) {
       args.estimate.total_tokens = parsePositiveInt(next, arg);
       args.estimateTokensProvided = true;
       index += 1;
-    } else if (arg === "--estimate-requests-per-minute" && next) {
+    } else if (arg === "--estimate-requests-per-minute" && hasValue(next)) {
       args.minuteEstimate.requests = parsePositiveInt(next, arg);
       args.minuteRequestsProvided = true;
       index += 1;
-    } else if (arg === "--estimate-input-tokens-per-minute" && next) {
+    } else if (arg === "--estimate-input-tokens-per-minute" && hasValue(next)) {
       args.minuteEstimate.input_tokens = parsePositiveInt(next, arg);
       index += 1;
-    } else if (arg === "--estimate-output-tokens-per-minute" && next) {
+    } else if (arg === "--estimate-output-tokens-per-minute" && hasValue(next)) {
       args.minuteEstimate.output_tokens = parsePositiveInt(next, arg);
       index += 1;
-    } else if (arg === "--estimate-thinking-tokens-per-minute" && next) {
+    } else if (arg === "--estimate-thinking-tokens-per-minute" && hasValue(next)) {
       args.minuteEstimate.thinking_tokens = parsePositiveInt(next, arg);
       index += 1;
-    } else if (arg === "--estimate-total-tokens-per-minute" && next) {
+    } else if (arg === "--estimate-total-tokens-per-minute" && hasValue(next)) {
       args.minuteEstimate.total_tokens = parsePositiveInt(next, arg);
       index += 1;
     } else if (arg === "--operator-approved") {
       args.operatorApproved = true;
+    } else if (arg.startsWith("-")) {
+      throw new Error(`Unknown or incomplete option ${arg}`);
+    } else {
+      throw new Error(`Unexpected positional argument ${arg}`);
     }
   }
 

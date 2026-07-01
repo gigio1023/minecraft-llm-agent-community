@@ -42,7 +42,13 @@ the repo term **action skill**.
    evidence, read `references/actor-turn-visual-review.md` before deciding the
    verdict. It covers current `action_ref` artifacts, `author_mineflayer_action`
    failure modes, screenshot renderer artifacts, and product-objective gaps.
-7. Decide the behavior verdict:
+7. When the run includes `transition-row/v1` or
+   `transition-row-batch-audit/v1`, read
+   `project-docs/research/current-spine/transition-row-v1-contract.md`,
+   `project-docs/research/current-spine/transition-row-label-codebook.md`, and
+   `project-docs/research/current-spine/no-regret-core-research-protocol.md`
+   before making no-regret or Goldilocks claims.
+8. Decide the behavior verdict:
    - `VALID_PROGRESS`: world or inventory state proves progress.
    - `DIAGNOSABLE_FAILURE`: no success, but artifacts explain the next fix.
    - `MISLEADING_SUCCESS`: final status says success while evidence says stall.
@@ -54,10 +60,10 @@ the repo term **action skill**.
      verified low-level progress, but observation/action choices collapsed into
      narrow loops or failed to update durable settlement/social state.
    - `UNDIAGNOSABLE`: artifacts are missing the facts needed to improve code.
-8. Map each finding to a small implementation target: verifier, tool primitive,
+9. Map each finding to a small implementation target: verifier, tool primitive,
    action runner, session/reconnect, transcript/artifact, provider proposal, or
    setup/auth.
-9. Report findings first, then propose or apply narrow fixes if the user asked
+10. Report findings first, then propose or apply narrow fixes if the user asked
    for implementation.
 
 ## Evidence Sources
@@ -69,17 +75,17 @@ Read `references/behavior-insight-loop.md` when the user describes what they saw
 in-game or when the artifact says "success/progress" but the visible behavior
 looked wrong.
 
-Read `references/minecraft-skill-audit.md` when reviewing seed action skills,
-Mineflayer primitives, Minecraft progression, or advertised action-skill
-capabilities.
+Read `references/minecraft-action-skill-audit.md` when reviewing seed action
+skills, Mineflayer primitives, Minecraft progression, or advertised
+action-skill capabilities.
 
 Read `references/live-matrix-lessons.md` when a deterministic action-skill
 matrix fails, a single-skill probe passes but the full matrix fails, block
 mining/chopping stalls, storage observation breaks unrelated probes, or the run
 depends on generated fixture state.
 
-Read `references/skill-creation-review.md` when reviewing proposals to create,
-promote, supersede, or retire an action skill from runtime evidence.
+Read `references/action-skill-creation-review.md` when reviewing proposals to
+create, promote, supersede, or retire an action skill from runtime evidence.
 
 Read `references/social-cycle-report-schema.md` before analyzing
 `social-cycle-run-report/v1` shape, actor workspace refs, provider usage,
@@ -93,6 +99,14 @@ Read `references/actor-turn-visual-review.md` when reviewing current Actor Turn
 runs, generated Mineflayer action authoring, tool-call contract rejections,
 PlanBeads boundaries, screenshots, prismarine-viewer captures, or user comments
 about weird visible blocks/camera output.
+
+For no-regret-core row batches, prefer the current-spine contracts over older
+social-cycle summary habits:
+
+- `project-docs/research/current-spine/transition-row-v1-contract.md`
+- `project-docs/research/current-spine/transition-row-label-codebook.md`
+- `project-docs/research/current-spine/seed-reset-record-v1-contract.md`
+- `project-docs/research/current-spine/no-regret-core-research-protocol.md`
 
 ## Review Workflow
 

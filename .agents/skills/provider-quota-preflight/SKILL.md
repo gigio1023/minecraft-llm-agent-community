@@ -23,10 +23,14 @@ emergency brakes, and operator approval evidence.
 ## Quick Start
 
 1. Identify every requested candidate as `(provider_id, model)`.
-   - OpenAI API: `openai-api`, exact model such as `gpt-5.5`.
-   - Gemini API: `gemini-api`, exact model such as `gemini-3.1-flash-lite`.
-   - ModelScope: `modelscope-api`, exact model such as
-     `Qwen-Ambassador/Qwen3.7-Max`.
+   - OpenAI API: `openai-api`, exact model from the command or current policy
+     matrix, for example `gpt-5.5`.
+   - Gemini API: `gemini-api`, exact model from the command or current policy
+     matrix, for example `gemini-3.1-flash-lite`.
+   - ModelScope: `modelscope-api`, exact model from the command or current
+     policy matrix, for example `Qwen-Ambassador/Qwen3.7-Max`.
+   These model names are examples, not authority. The exact run candidate and
+   `probe/src/provider/providerQuotaPolicies.ts` decide which policy applies.
 2. Estimate the whole planned run or lane set, not one request:
    - `requests`
    - `input_tokens`

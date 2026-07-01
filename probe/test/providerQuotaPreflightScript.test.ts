@@ -15,9 +15,20 @@ const scriptPath = path.join(
   repoRoot,
   ".agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts"
 );
+const estimatorScriptPath = path.join(
+  repoRoot,
+  ".agents/skills/provider-quota-preflight/scripts/estimate-social-cycle-usage.ts"
+);
 
 async function runPreflight(args: string[]) {
   return execFileAsync(process.execPath, [scriptPath, ...args], {
+    cwd: repoRoot,
+    maxBuffer: 10 * 1024 * 1024
+  });
+}
+
+async function runEstimator(args: string[]) {
+  return execFileAsync(process.execPath, [estimatorScriptPath, ...args], {
     cwd: repoRoot,
     maxBuffer: 10 * 1024 * 1024
   });
@@ -76,5 +87,28 @@ test("provider quota preflight rejects missing whole-run estimates", async () =>
       "--estimate-requests-per-minute", "1"
     ]),
     /--estimate-requests is required/
+  );
+});
+
+test("provider quota scripts reject unknown options", async () => {
+  await assert.rejects(
+    runPreflight([
+      "--candidate", "gemini-api:gemma-4-31b-it",
+      "--estimate-requests", "1",
+      "--estimate-total-tokens", "1000",
+      "--estimate-requests-per-minute", "1",
+      "--typo"
+    ]),
+    /Unknown or incomplete option --typo/
+  );
+
+  await assert.rejects(
+    runEstimator([
+      "--provider", "gemini-api",
+      "--model", "gemma-4-31b-it",
+      "--cycles", "2",
+      "--typo"
+    ]),
+    /Unknown or incomplete option --typo/
   );
 });
