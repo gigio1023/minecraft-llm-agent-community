@@ -265,7 +265,7 @@ Worker assignment rule:
   criteria, verification command set, required artifacts, and stop conditions.
 - Tell workers they are not alone in the codebase and must not revert unrelated
   edits.
-- Do not allow workers to edit SPEC.md, AGENTS.md, CLAUDE.md, GEMINI.md,
+- Do not allow workers to edit SPEC.md, AGENTS.md, CLAUDE.md,
   provider auth, or live provider setup unless explicitly assigned.
 - Close or pause workers that edit outside scope, claim success without fresh
   verification, or turn PlanBeads into a domain strategy.
@@ -576,7 +576,7 @@ These are campaign blockers, not actor behavior failures.
 
 Require explicit coordinator or user review for:
 
-- changes to `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`;
+- changes to `SPEC.md`, `AGENTS.md`, or `CLAUDE.md`;
 - live provider or budgeted game-runtime runs;
 - actor persistent-state migration that could affect existing workspace data;
 - any PlanBead applier rule that changes mutation authority;

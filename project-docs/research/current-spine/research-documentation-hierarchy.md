@@ -28,7 +28,6 @@ alignment.
 - `SPEC.md`
 - `AGENTS.md`
 - `CLAUDE.md`
-- `GEMINI.md`
 - `project-docs/specification/*`
 - `project-docs/orientation/terminology.md`
 

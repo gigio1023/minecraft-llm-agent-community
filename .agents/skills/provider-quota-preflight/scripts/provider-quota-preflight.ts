@@ -19,9 +19,14 @@ type Args = {
   candidates: Candidate[];
   ledgerPath: string;
   budgetsPath: string;
+  outPath?: string;
+  approvalNote?: string;
   estimate: ProviderUsageCounts;
   minuteEstimate: ProviderUsageCounts;
   operatorApproved: boolean;
+  estimateRequestsProvided: boolean;
+  estimateTokensProvided: boolean;
+  minuteRequestsProvided: boolean;
 };
 
 const zero: ProviderUsageCounts = {
@@ -60,9 +65,14 @@ function parseArgs(argv: string[]): Args {
     candidates: [],
     ledgerPath: path.join(repoRoot, "build", "provider-usage", "provider-usage-ledger.jsonl"),
     budgetsPath: path.join(repoRoot, "build", "provider-usage", "free-tier-budgets.json"),
+    outPath: undefined,
+    approvalNote: undefined,
     estimate: { ...zero },
     minuteEstimate: { ...zero },
-    operatorApproved: false
+    operatorApproved: false,
+    estimateRequestsProvided: false,
+    estimateTokensProvided: false,
+    minuteRequestsProvided: false
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -77,23 +87,38 @@ function parseArgs(argv: string[]): Args {
     } else if (arg === "--budgets" && next) {
       args.budgetsPath = path.resolve(next);
       index += 1;
+    } else if (arg === "--out" && next) {
+      args.outPath = path.resolve(next);
+      index += 1;
+    } else if (arg === "--approval-note" && next) {
+      args.approvalNote = next;
+      index += 1;
+    } else if (arg === "--approval-note-file" && next) {
+      args.approvalNote = fs.readFileSync(path.resolve(next), "utf8").trim();
+      index += 1;
     } else if (arg === "--estimate-requests" && next) {
       args.estimate.requests = parsePositiveInt(next, arg);
+      args.estimateRequestsProvided = true;
       index += 1;
     } else if (arg === "--estimate-input-tokens" && next) {
       args.estimate.input_tokens = parsePositiveInt(next, arg);
+      args.estimateTokensProvided = true;
       index += 1;
     } else if (arg === "--estimate-output-tokens" && next) {
       args.estimate.output_tokens = parsePositiveInt(next, arg);
+      args.estimateTokensProvided = true;
       index += 1;
     } else if (arg === "--estimate-thinking-tokens" && next) {
       args.estimate.thinking_tokens = parsePositiveInt(next, arg);
+      args.estimateTokensProvided = true;
       index += 1;
     } else if (arg === "--estimate-total-tokens" && next) {
       args.estimate.total_tokens = parsePositiveInt(next, arg);
+      args.estimateTokensProvided = true;
       index += 1;
     } else if (arg === "--estimate-requests-per-minute" && next) {
       args.minuteEstimate.requests = parsePositiveInt(next, arg);
+      args.minuteRequestsProvided = true;
       index += 1;
     } else if (arg === "--estimate-input-tokens-per-minute" && next) {
       args.minuteEstimate.input_tokens = parsePositiveInt(next, arg);
@@ -115,12 +140,21 @@ function parseArgs(argv: string[]): Args {
   if (args.candidates.length === 0) {
     throw new Error("At least one --candidate provider:model is required");
   }
+  if (!args.estimateRequestsProvided || args.estimate.requests <= 0) {
+    throw new Error("--estimate-requests is required and must be greater than zero");
+  }
+  if (!args.estimateTokensProvided) {
+    throw new Error("--estimate-total-tokens or token component estimates are required");
+  }
   if (args.estimate.total_tokens === 0) {
     args.estimate.total_tokens =
       args.estimate.input_tokens + args.estimate.output_tokens + args.estimate.thinking_tokens;
   }
-  if (args.minuteEstimate.requests === 0 && args.estimate.requests > 0) {
-    args.minuteEstimate.requests = 1;
+  if (args.estimate.total_tokens <= 0) {
+    throw new Error("Estimated total tokens must be greater than zero");
+  }
+  if (!args.minuteRequestsProvided || args.minuteEstimate.requests <= 0) {
+    throw new Error("--estimate-requests-per-minute is required and must be greater than zero");
   }
   if (args.minuteEstimate.total_tokens === 0) {
     args.minuteEstimate.total_tokens =
@@ -132,6 +166,9 @@ function parseArgs(argv: string[]): Args {
     args.minuteEstimate.total_tokens =
       Math.ceil(args.estimate.total_tokens / args.estimate.requests) *
       Math.max(1, args.minuteEstimate.requests);
+  }
+  if (args.operatorApproved && !args.approvalNote) {
+    throw new Error("--operator-approved requires --approval-note or --approval-note-file");
   }
   return args;
 }
@@ -370,14 +407,25 @@ const finalStatus = results.some((result) => result.status === "blocked" || resu
     ? "needs_dashboard_approval"
     : "allowed";
 
-console.log(JSON.stringify({
+const output = {
   schema: "provider-quota-preflight/v1",
   generated_at: new Date().toISOString(),
   ledger_path: args.ledgerPath,
   budgets_path: args.budgetsPath,
+  approval: {
+    operator_approved: args.operatorApproved,
+    approval_note: args.approvalNote ?? null
+  },
   windows,
   estimate: args.estimate,
   minute_estimate: args.minuteEstimate,
   final_status: finalStatus,
   results
-}, null, 2));
+};
+
+const outputJson = `${JSON.stringify(output, null, 2)}\n`;
+if (args.outPath) {
+  fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
+  fs.writeFileSync(args.outPath, outputJson, "utf8");
+}
+console.log(outputJson.trimEnd());

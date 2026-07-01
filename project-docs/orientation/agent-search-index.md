@@ -18,9 +18,11 @@ guidance.
 | `PROJECT_DOCS_ROOT` | Internal specs, architecture notes, setup notes, handoffs, terminology, and routing live under `project-docs/` | `project-docs/orientation/documentation-map.md`, `AGENTS.md`, `SPEC.md` |
 | `PUBLIC_DOCS_ROOT` | Docusaurus-exposed public docs live under `docs/public-docs/`; do not add internal docs under this tree | `project-docs/orientation/documentation-map.md`, `docs/README.md`, `docs/sidebars.js`, `docs/docusaurus.config.js` |
 | `BLOG_ROOT` | `docs/blog/` is only for explicitly dated public blog posts, not internal docs or setup notes | `project-docs/orientation/documentation-map.md`, `docs/blog/` |
-| `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
+| `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
 | `RESEARCH_ARCHIVE` | Historical research, literature reviews, paper dumps, and stale public plans are preserved but not active build instructions | `project-docs/references/`, `project-docs/archive/` |
-| `KARPATHY_GUIDELINES` | Think before coding, keep changes simple and surgical, and define verifiable success criteria | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CONTRIBUTING.md` |
+| `KARPATHY_GUIDELINES` | Think before coding, keep changes simple and surgical, and define verifiable success criteria | `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` |
+| `MANDATORY_AGENT_SKILL_ROUTING` | Repeated workflows route through repo-local agent skills before free-form execution | `AGENTS.md`, `.agents/skills/provider-quota-preflight/SKILL.md`, `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md` |
+| `EXTERNAL_SKILL_COMPATIBILITY` | Global skills such as Ponytail or Matt-style skills are advisory only and cannot override repo gates | `AGENTS.md`, `CLAUDE.md` |
 
 ## Product Direction
 
@@ -82,6 +84,7 @@ guidance.
 | `CONTEXT_COMPACTION` | Preserve evidence-linked state without laundering weak evidence into progress | `SPEC.md`, `project-docs/specification/runtime-evidence-and-action-skills.md`, `probe/src/runtime/goals/socialCycleContextCompaction.ts` |
 | `LIVE_TRANSCRIPT_FIRST` | Runtime value is primarily proven through live transcript and artifact evidence | `project-docs/runtime/evidence-and-verification/transcript-and-runtime-artifacts.md`, `project-docs/operations/handoffs/current-handoff-and-next-work.md` |
 | `VISUAL_EVIDENCE_1_21_4_RULE` | Report-grade Minecraft screenshots must use the supported visual capture protocol, three camera modes, and same-cycle state evidence; pixels never prove block identity alone | `project-docs/runtime/evidence-and-verification/minecraft-visual-evidence-capture-protocol.md`, `AGENTS.md`, `probe/src/runtime/visualEvidence.ts` |
+| `MINECRAFT_RUN_REPORT_AUTHOR` | Evidence-grounded report authoring gate for Minecraft run reports, model comparisons, HTML/static reports, and visual reports | `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-run-report-author/scripts/report-readiness-check.mjs`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md`, `AGENTS.md` |
 
 ## Current Implementation
 
@@ -111,6 +114,7 @@ guidance.
 |--------------|---------|--------------------|
 | `HEADLESS_MINEFLAYER_PROBE` | Local server and headless Mineflayer runtime setup | `project-docs/operations/setup/headless-server.md`, `project-docs/runtime/overview/minimal-probe.md` |
 | `PROVIDER_USAGE_GUARD` | Provider usage ledger, budget guard, and post-run usage summaries | `project-docs/operations/setup/provider-setup.md`, `project-docs/runtime/evidence-and-verification/transcript-and-runtime-artifacts.md`, `probe/src/provider/providerUsageTracker.ts` |
+| `PROVIDER_QUOTA_PREFLIGHT` | Mandatory preflight for provider-backed runs, model comparisons, quota-reset checks, and reruns | `.agents/skills/provider-quota-preflight/SKILL.md`, `.agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts`, `.agents/skills/provider-quota-preflight/scripts/estimate-social-cycle-usage.ts`, `AGENTS.md` |
 | `PROVIDER_FREE_TIER_RESET_WINDOWS` | OpenAI and Gemini API free-tier daily reset windows and KST conversion rules | `project-docs/operations/setup/provider-free-tier-reset-windows.md`, `project-docs/operations/setup/provider-setup.md`, `probe/src/provider/providerUsageTracker.ts` |
 | `MODELSCOPE_QWEN_API_ACCESS` | ModelScope private Qwen API-Inference endpoint, model ids, token storage, response-header quota checks, and future `modelscope-api` usage guard shape | `project-docs/operations/setup/modelscope-qwen-api-access.md`, `project-docs/operations/setup/provider-setup.md` |
 | `GEMINI_API_SOCIAL_PROVIDER` | Lightweight live social-cycle provider path using Gemini API / Gemma | `project-docs/operations/setup/provider-setup.md`, `README.md`, `probe/src/provider/geminiApiJsonProvider.ts` |
@@ -124,7 +128,7 @@ For any onboarding developer or agent, read in this order:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CLAUDE.md` or `GEMINI.md` when using those agents
+3. `CLAUDE.md` when using Claude Code
 4. `project-docs/research/current-spine/research-documentation-hierarchy.md`
 5. `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
 6. `project-docs/research/current-spine/research-value-harness.md`

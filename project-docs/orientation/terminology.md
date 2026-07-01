@@ -642,7 +642,7 @@ physical progress.
 ## Agent Guide
 
 An **agent guide** is repo guidance for coding agents, such as `AGENTS.md`,
-`GEMINI.md`, or an agent skill reference. Agent guides must point back to this
+`CLAUDE.md`, or an agent skill reference. Agent guides must point back to this
 terminology when discussing action skills, agent skills, actor state, or
 platform-sensitive work.
 

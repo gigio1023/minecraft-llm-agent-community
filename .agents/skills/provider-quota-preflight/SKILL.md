@@ -1,21 +1,24 @@
 ---
 name: provider-quota-preflight
 description: >
-  Use before any live LLM/provider benchmark or "can we run this model?" request.
-  Checks requested model/provider candidates across OpenAI, Gemini, and
-  ModelScope using provider-specific reset windows, local usage ledger, built-in
-  quota policy matrix, local emergency brakes, and estimated request/token cost.
-  Trigger for Korean/English prompts like "quota 확인", "초기화됐는지",
-  "run gpt/qwen/gemini benchmark", "사용 가능한 모델인지 체크", and "provider
-  preflight". Do not use for post-hoc chart scoring only.
+  Use before any live provider-backed Minecraft run, LLM/provider benchmark,
+  model availability decision, quota reset check, model-comparison lane,
+  report rerun, long social-cycle run, OpenAI/Gemini/ModelScope smoke, or
+  provider budget/429/auth issue. Checks requested provider/model candidates
+  across OpenAI, Gemini, and ModelScope using reset windows, local usage ledger,
+  built-in policy matrix, local emergency brakes, dashboard approval state, and
+  whole-run request/token estimates. Trigger for Korean/English prompts like
+  "quota 확인", "초기화됐는지", "run gpt/qwen/gemini benchmark", "사용 가능한
+  모델인지 체크", and "provider preflight".
 ---
 
 # Provider Quota Preflight
 
-Use this skill before any live provider-backed benchmark, smoke, or model
-availability decision. The goal is to prevent paid or quota-exhausting calls by
-checking the exact provider/model pair against the current local usage ledger,
-provider reset window, default policy matrix, and local emergency brakes.
+Use this skill before any live provider-backed benchmark, smoke, rerun,
+comparison, or model availability decision. The goal is to prevent paid or
+quota-exhausting calls by checking the exact provider/model pair against the
+current local usage ledger, provider reset window, default policy matrix, local
+emergency brakes, and operator approval evidence.
 
 ## Quick Start
 
@@ -24,7 +27,7 @@ provider reset window, default policy matrix, and local emergency brakes.
    - Gemini API: `gemini-api`, exact model such as `gemini-3.1-flash-lite`.
    - ModelScope: `modelscope-api`, exact model such as
      `Qwen-Ambassador/Qwen3.7-Max`.
-2. Estimate the whole planned run, not one request:
+2. Estimate the whole planned run or lane set, not one request:
    - `requests`
    - `input_tokens`
    - `output_tokens`
@@ -32,19 +35,37 @@ provider reset window, default policy matrix, and local emergency brakes.
    - `total_tokens`
    Also estimate peak one-minute usage separately. For a serial social-cycle
    benchmark this is usually far smaller than total run usage.
-3. Run the bundled script from the repo root:
+3. For social-cycle runs, optionally create a conservative estimate:
+
+   ```bash
+   .agents/skills/provider-quota-preflight/scripts/estimate-social-cycle-usage.ts \
+     --provider gemini-api \
+     --model gemma-4-31b-it \
+     --cycles 30 \
+     --lanes 1 \
+     --max-actions-per-cycle 3
+   ```
+
+4. Run the bundled preflight script from the repo root and write the JSON next
+   to the experiment/report artifacts:
 
    ```bash
    .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
      --candidate openai-api:gpt-5.5 \
      --estimate-requests 80 \
      --estimate-total-tokens 1700000 \
-     --estimate-requests-per-minute 1
+     --estimate-requests-per-minute 1 \
+     --out project-docs/experiments/curated/<date>/<run>/preflight/openai-gpt55.json
    ```
 
-4. Treat `blocked`, `unbudgeted`, and `needs_dashboard_approval` as not runnable.
-5. For `openai-api`, even an otherwise under-cap result still requires operator
-   approval after dashboard/free-tier eligibility is checked.
+5. Treat `blocked`, `unbudgeted`, and `needs_dashboard_approval` as not runnable.
+6. For `openai-api`, even an otherwise under-cap result still requires operator
+   approval after dashboard/free-tier eligibility is checked. If the user has
+   approved a dashboard-checked run, pass both:
+
+   ```bash
+   --operator-approved --approval-note "User checked dashboard at <time>; <brief ref>"
+   ```
 
 ## Candidate Rules
 
@@ -56,6 +77,8 @@ provider reset window, default policy matrix, and local emergency brakes.
   not enough.
 - If a model has no matching built-in or local budget, the result is
   `unbudgeted`; do not run a benchmark with it.
+- Require planned `requests`, `total_tokens`, and `requests_per_minute`. Missing
+  estimates are a blocker, not permission to use defaults.
 
 ## Reset Windows
 
@@ -107,6 +130,10 @@ The script prints JSON with:
 - Do not turn a reset-time observation into a free-run decision.
 - If the user asks to "just run it", still run this preflight first and report
   the exact blocking condition before any provider HTTP request.
+- Persist the preflight JSON beside the report artifacts and mention it in the
+  report or final answer.
+- After provider-backed runs, compare report `provider_usage` totals and budget
+  status against the preflight estimate.
 
 ## Reference Files
 
