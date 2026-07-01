@@ -220,7 +220,7 @@ function actorTurnInput(): ActorTurnInput {
     ],
     minecraft_basic_guide: {
       schema: "minecraft-basic-guide/v1",
-      guide_ref: "knowledge/minecraft-basic-guide.json",
+      guide_ref: "project-docs/runtime/overview/minecraft-basic-guide.md",
       item_flows: ["log -> planks -> crafting_table"],
       station_requirements: ["wooden_pickaxe requires crafting_table access"],
       blocker_recovery_guides: ["if placement target is occupied, pick another adjacent valid cell"],

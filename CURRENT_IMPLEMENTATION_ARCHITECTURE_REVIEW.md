@@ -404,12 +404,12 @@ If documents disagree, start from:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-4. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-5. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-6. `project-docs/Documentation-Map.md`
-7. `project-docs/Terminology.md`
+3. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+4. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+5. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+6. `project-docs/orientation/documentation-map.md`
+7. `project-docs/orientation/terminology.md`
 
-Historical docs and `project-docs/research-archive/**` are references only. They are not
-active implementation specs unless a current architecture document explicitly
-routes to them.
+Reference docs under `project-docs/references/**` and historical docs under
+`project-docs/archive/**` are not active implementation specs unless a current
+architecture document explicitly routes to them.

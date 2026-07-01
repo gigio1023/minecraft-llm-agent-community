@@ -22,11 +22,12 @@ fact that actions are checked.
 
 ## 1. Spec Authority And Governance
 
-`SPEC.md` and the documents under `project-docs/Specification/` define the
+`SPEC.md` and the documents under `project-docs/specification/` define the
 long-term project spec. `project-docs/` is the repo-internal project
 documentation root. Docusaurus-exposed public docs live under
 `docs/public-docs/`, repo-internal review and agent-operation docs live at the
-project root, and historical research lives under `project-docs/research-archive/`.
+project root, references live under `project-docs/references/`, and historical
+material lives under `project-docs/archive/`.
 `AGENTS.md` is binding repo-agent guidance for how agents apply that spec in
 day-to-day work.
 Changing any of these files changes product direction or agent operating rules.
@@ -44,7 +45,7 @@ Rules for agents:
 
 Detailed governance lives in:
 
-- `project-docs/Specification/Engineering-Governance-And-Testing.md`
+- `project-docs/specification/engineering-governance-and-testing.md`
 
 ## 2. Product Identity And Research Object
 
@@ -76,8 +77,8 @@ selection path and the runtime remains the execution boundary.
 
 Read the product identity spec:
 
-- `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-- `project-docs/Specification/Advisory-Social-Material-WAM.md`
+- `project-docs/specification/soul-grounded-social-simulation.md`
+- `project-docs/specification/advisory-social-material-wam.md`
 
 ## 2.1 Autonomy Substrate, Not Domain Strategy
 
@@ -145,7 +146,7 @@ hints are acceptable because they are low-dimensional and easy to audit.
 Observation geometry, action/failure history, social pressure, PlanBead work
 state, and generated action trials must carry source evidence cards or refs
 beside any summary. Summary-only context for those surfaces is information loss.
-Use `project-docs/Architecture/Context-Projection-And-Source-Evidence.md` as the
+Use `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md` as the
 active rule for Actor Turn provider input.
 
 LLM-facing prose must never become hidden runtime policy. Do not parse
@@ -213,68 +214,68 @@ Read these documents to understand the full spec:
 
 1. `SPEC.md`
    - entrypoint, authority, project identity, non-negotiable rules.
-2. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
+2. `project-docs/specification/soul-grounded-social-simulation.md`
    - Soul/ActorSoul identity, LifeGoal continuity, social context, and why
      Minecraft actions matter for social-material consequences.
-3. `project-docs/Specification/Advisory-Social-Material-WAM.md`
+3. `project-docs/specification/advisory-social-material-wam.md`
    - current research spine: advisory WAM object, social-material transition
      rows, prediction-vs-acting separation, autoresearch loop boundary, and
      verification-as-hygiene rule.
-4. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
+4. `project-docs/specification/runtime-evidence-and-action-skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.
-5. `project-docs/Specification/Engineering-Governance-And-Testing.md`
+5. `project-docs/specification/engineering-governance-and-testing.md`
    - spec change governance, implementation style, Detroit-style tests, live
      runs, comments, file size, domain modeling, and documentation rules.
-6. `project-docs/Specification/Reference-Adaptation-Guide.md`
+6. `project-docs/specification/reference-adaptation-guide.md`
    - how to use external research without copying reference architectures.
-7. `project-docs/Documentation-Map.md`
+7. `project-docs/orientation/documentation-map.md`
    - documentation authority order, active/supporting/historical categories,
      and cleanup rules.
-8. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
+8. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
    - compact current-goal routing for Actor Turn as hot path and PlanBeads as
      passive actor-owned work state.
-9. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
+9. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
    - active campaign gates for proving cheap-model Actor Turn behavior.
-10. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
+10. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
    - Active Episode, Actor Turn, Action Cards, Evidence Trace, and branch-only
      Deliberation architecture.
-11. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
+11. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
     - current implementation sequence and acceptance gates for the Actor Turn
       migration.
-12. `project-docs/Architecture/Soul-Life-Goal-Runtime-Architecture.md`
+12. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
    - concrete Soul/LifeGoal/CycleGoal architecture.
-13. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
+13. `project-docs/runtime/overview/runtime-loop-and-verification.md`
    - hot path, runtime verification, and bounded execution.
-14. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
+14. `project-docs/runtime/evidence-and-verification/transcript-and-runtime-artifacts.md`
    - transcript and artifact persistence contract.
-15. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
+15. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
    - actor-owned memory and action-skill state.
-16. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
+16. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
    - restart-safe actor state, PlanBead work graph, dependencies, and ready front.
-17. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+17. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
     - Actor Turn-only generated Mineflayer action-skill authoring authority.
-18. `project-docs/Architecture/Minecraft-Basic-Guide.md`
+18. `project-docs/runtime/overview/minecraft-basic-guide.md`
     - provider-visible basic Minecraft mechanics guide.
-19. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
+19. `project-docs/runtime/actor-state-and-memory/social-actor-profiles-and-relationships.md`
     - actor profiles, role context, and relationship state.
-20. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
+20. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
     - current implementation state and next work.
 21. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
     - repo-internal whole-project implementation map for current boundaries,
       runtime flow, evidence, and risks.
-22. `project-docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+22. `project-docs/operations/audits/current-architecture-and-implementation-audit.md`
     - latest architecture/implementation cross-check.
-23. `project-docs/Agent-Search-Index.md`
+23. `project-docs/orientation/agent-search-index.md`
     - routing map and search tokens.
-24. `project-docs/Terminology.md`
+24. `project-docs/orientation/terminology.md`
     - canonical terms such as `agent skill` and `action skill`.
 
 Setup docs:
 
-- `project-docs/Setup/Headless-Server.md`
-- `project-docs/Setup/Provider-Setup.md`
-- `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+- `project-docs/operations/setup/headless-server.md`
+- `project-docs/operations/setup/provider-setup.md`
+- `project-docs/operations/setup/provider-free-tier-reset-windows.md`
 
 ## 4. Non-Negotiable Direction
 
@@ -390,7 +391,7 @@ after the real runtime behavior is broken, rewrite or delete it.
 
 Detailed testing rules live in:
 
-- `project-docs/Specification/Engineering-Governance-And-Testing.md`
+- `project-docs/specification/engineering-governance-and-testing.md`
 
 ## 8. External References
 
@@ -413,7 +414,7 @@ Reference mechanisms must be translated into this project:
 
 Detailed reference mapping with links lives in:
 
-- `project-docs/Specification/Reference-Adaptation-Guide.md`
+- `project-docs/specification/reference-adaptation-guide.md`
 
 Reference anchors include:
 
@@ -439,8 +440,8 @@ those details in handoff and audit docs, not as the long-term spec itself.
 
 Current-state references:
 
-- `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-- `project-docs/Architecture/Current-Architecture-And-Implementation-Audit.md`
+- `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+- `project-docs/operations/audits/current-architecture-and-implementation-audit.md`
 
 As of this spec update, the current action-skill evidence baseline is described
 in the architecture audit, including the fresh 14/14 live matrix after the

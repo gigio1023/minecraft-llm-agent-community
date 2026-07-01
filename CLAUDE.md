@@ -10,25 +10,25 @@ has approved an operating-rule change.
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/Documentation-Map.md`
-5. `project-docs/Agent-Search-Index.md`
-6. `project-docs/Terminology.md`
-7. `project-docs/Specification/Advisory-Social-Material-WAM.md`
-8. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-9. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
-10. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-11. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-12. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-13. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-14. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-15. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-16. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
-17. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-18. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-19. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-20. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-21. `project-docs/Setup/Provider-Setup.md`
-22. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+4. `project-docs/orientation/documentation-map.md`
+5. `project-docs/orientation/agent-search-index.md`
+6. `project-docs/orientation/terminology.md`
+7. `project-docs/specification/advisory-social-material-wam.md`
+8. `project-docs/specification/soul-grounded-social-simulation.md`
+9. `project-docs/specification/evidence-grounded-minecraft-society.md`
+10. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+11. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
+12. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+13. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
+14. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+15. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+16. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+17. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
+18. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
+19. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
+20. `project-docs/runtime/overview/minecraft-basic-guide.md`
+21. `project-docs/operations/setup/provider-setup.md`
+22. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
 
 ## Project Direction
 
@@ -235,6 +235,8 @@ research notes under `docs/blog/`. `docs/blog/` is only for explicitly requested
 chronological blog posts.
 
 Repo-internal review and agent-operation docs live at the project root when they
-guide direct branch review. Historical research, old public plans, and raw paper
-dumps live under `project-docs/research-archive/`. Do not move archived research back
-into public navigation unless an active spec or handoff explicitly promotes it.
+guide direct branch review. Literature references and raw source material live
+under `project-docs/references/`; superseded plans and historical public docs
+live under `project-docs/archive/`. Do not move archived or reference material
+back into public navigation unless an active spec or handoff explicitly promotes
+it.

@@ -3,11 +3,10 @@
 ## Active Central Plan (2026-06-27)
 
 The current central plan for this repository is
-`project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+`project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
 (search token `ACTIVE_CENTRAL_PLAN`). Read it before planning new runtime,
 predictor, benchmark, or experiment work. It reconciles the dated review in
-`project-docs/research-archive/2026-06-27/wam-direction-stress-test-and-reframe/`
-(reports `00`-`08`) into one decision-gated sequence:
+the earlier stress-test and reframe work into one decision-gated sequence:
 
 1. Do not pick a research headline yet. Three framings are live and none is
    provable today: a native action-consequence model (F-native), an advisory
@@ -27,11 +26,11 @@ predictor, benchmark, or experiment work. It reconciles the dated review in
 
 Where it conflicts, this supersedes: the "advisory social-material WAM / empty
 cell" HEADLINE framing below and in
-`project-docs/Specification/Advisory-Social-Material-WAM.md`; the advisory-ONLY
+`project-docs/specification/advisory-social-material-wam.md`; the advisory-ONLY
 constraint as a research wall (the central object may be coupled to action and
 measured by capability ablation, while the separate-measurement rule is kept);
 and the phase ordering in
-`project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
+`project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
 (the preflight now precedes the loop and the ledgers).
 
 This does NOT change runtime authority. Verifier-owns-truth, schema/permission
@@ -65,7 +64,7 @@ a layer where the LLM prior is insufficient and observed Minecraft history adds
 learnable signal. Only after that gate should the repo consider a larger
 confirming experiment for F-native, F-loop, or F-society.
 
-For F-society, use `project-docs/Architecture/Society-Observable-Preflight.md`
+For F-society, use `project-docs/research/current-spine/society-observable-preflight.md`
 as the separate branch gate. It asks whether recurring evidence-gated
 social-material patterns appear under small embodied constraints. It is not
 settled by prediction lift alone.
@@ -110,7 +109,7 @@ Search token: `VISUAL_EVIDENCE_1_21_4_RULE`.
 For any Minecraft run whose screenshots will be reviewed, shown in an HTML
 report, used in Qwen/OpenAI comparison material, or used to inspect actual NPC
 movement later, follow
-`project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`
+`project-docs/runtime/evidence-and-verification/minecraft-visual-evidence-capture-protocol.md`
 before running the experiment.
 
 Use `PROBE_SERVER_VERSION=1.21.4` for `prismarine-viewer` screenshot runs unless
@@ -235,9 +234,9 @@ failure modes, and prompt/config patterns with exact citation, while labeling
 them as unverified report claims until runnable code, raw logs, scoring scripts,
 or independent replication exist.
 
-Use `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
+Use `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
 as the active research spine for new direction-setting docs. Use
-`project-docs/Specification/Advisory-Social-Material-WAM.md` as a subordinate
+`project-docs/specification/advisory-social-material-wam.md` as a subordinate
 historical/reference spec where it does not conflict with the central plan.
 
 ## PlanBeads Intent Rule
@@ -334,9 +333,9 @@ be schema-bound and helper-limited:
 - a passed trial is not active action skill authority until lifecycle promotion
   succeeds.
 
-Use `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
+Use `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
 as the active outer-selection spec for this rule. Use
-`project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
+`project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
 only for generated candidate, helper allowlist, verifier, trial, and promotion
 mechanics after authoring has been selected.
 
@@ -455,67 +454,67 @@ beyond LLM prior.
 ## Canonical Docs
 
 Start with the active central plan -
-`project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md` -
+`project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md` -
 which takes precedence over the headline framing in the docs below where they
 conflict (see "Active Central Plan" near the top of this file). Then read these:
 
 For screenshot-producing Minecraft runs, also read
-`project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`
+`project-docs/runtime/evidence-and-verification/minecraft-visual-evidence-capture-protocol.md`
 before starting the server or provider run.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/Architecture/Research-Documentation-Hierarchy.md`
-4. `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
-5. `project-docs/Architecture/Research-Value-Harness.md`
-6. `project-docs/Architecture/Prior-Work-Proximity-Current-Spine-2026-06-29.md`
-7. `project-docs/Architecture/No-Regret-Core-Research-Protocol.md`
-8. `project-docs/Architecture/Transition-Row-V1-Contract.md`
-9. `project-docs/Architecture/Seed-Reset-Record-V1-Contract.md`
-10. `project-docs/Architecture/Transition-Row-Label-Codebook.md`
-11. `project-docs/Architecture/No-Regret-Core-Scenario-Catalog.md`
-12. `project-docs/Architecture/Goldilocks-Preflight-Protocol.md`
-13. `project-docs/Architecture/Society-Observable-Preflight.md`
-14. `project-docs/Architecture/Research-Decision-Current-Spine-2026-06-29.md`
-15. `project-docs/Architecture/No-Regret-Core-Implementation-Campaign.md`
+3. `project-docs/research/current-spine/research-documentation-hierarchy.md`
+4. `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
+5. `project-docs/research/current-spine/research-value-harness.md`
+6. `project-docs/research/current-spine/prior-work-proximity-current-spine-2026-06-29.md`
+7. `project-docs/research/current-spine/no-regret-core-research-protocol.md`
+8. `project-docs/research/current-spine/transition-row-v1-contract.md`
+9. `project-docs/research/current-spine/seed-reset-record-v1-contract.md`
+10. `project-docs/research/current-spine/transition-row-label-codebook.md`
+11. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
+12. `project-docs/research/current-spine/goldilocks-preflight-protocol.md`
+13. `project-docs/research/current-spine/society-observable-preflight.md`
+14. `project-docs/research/current-spine/research-decision-current-spine-2026-06-29.md`
+15. `project-docs/research/current-spine/no-regret-core-implementation-campaign.md`
 16. `CLAUDE.md`
 17. `GEMINI.md`
 18. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-19. `project-docs/Specification/Advisory-Social-Material-WAM.md`
-20. `project-docs/Specification/Soul-Grounded-Social-Simulation.md`
-21. `project-docs/Specification/Evidence-Grounded-Minecraft-Society.md`
-22. `project-docs/Specification/Runtime-Evidence-And-Action-Skills.md`
-23. `project-docs/Specification/Engineering-Governance-And-Testing.md`
-24. `project-docs/Specification/Reference-Adaptation-Guide.md`
-25. `project-docs/Documentation-Map.md`
-26. `project-docs/Agent-Search-Index.md`
-27. `project-docs/Terminology.md`
-28. `project-docs/Architecture/Actor-Turn-Passive-PlanBeads-Goal-Brief.md`
-29. `project-docs/Architecture/Runtime-Loop-And-Verification.md`
-30. `project-docs/Architecture/Transcript-And-Runtime-Artifacts.md`
-31. `project-docs/Architecture/Actor-Workspace-And-Action-Skill-Memory.md`
-32. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-33. `project-docs/Architecture/PlanBeads-Implementation-Campaign.md`
-34. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-35. `project-docs/Architecture/Low-Cost-Social-Simulation-Campaign-Spec.md`
-36. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-37. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-38. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Implementation-Plan.md`
-39. `project-docs/Architecture/Action-Selection-Gated-Action-Skill-Authoring-Plan.md`
-40. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-41. `project-docs/Architecture/Async-Reviewer-Sidecars.md`
-42. `project-docs/Architecture/Implementation-Workstreams.md`
-43. `project-docs/Architecture/Action-Skill-Verification.md`
-44. `project-docs/Architecture/Current-Handoff-And-Next-Work.md`
-45. `project-docs/Architecture/Minimal-Probe.md`
-46. `project-docs/Architecture/Social-Actor-Profiles-And-Relationships.md`
-47. `project-docs/Setup/Headless-Server.md`
-48. `project-docs/Setup/Provider-Setup.md`
-49. `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+19. `project-docs/specification/advisory-social-material-wam.md`
+20. `project-docs/specification/soul-grounded-social-simulation.md`
+21. `project-docs/specification/evidence-grounded-minecraft-society.md`
+22. `project-docs/specification/runtime-evidence-and-action-skills.md`
+23. `project-docs/specification/engineering-governance-and-testing.md`
+24. `project-docs/specification/reference-adaptation-guide.md`
+25. `project-docs/orientation/documentation-map.md`
+26. `project-docs/orientation/agent-search-index.md`
+27. `project-docs/orientation/terminology.md`
+28. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
+29. `project-docs/runtime/overview/runtime-loop-and-verification.md`
+30. `project-docs/runtime/evidence-and-verification/transcript-and-runtime-artifacts.md`
+31. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
+32. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+33. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
+34. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+35. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
+36. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+37. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+38. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
+39. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
+40. `project-docs/runtime/overview/minecraft-basic-guide.md`
+41. `project-docs/runtime/overview/async-reviewer-sidecars.md`
+42. `project-docs/operations/future-work/implementation-workstreams.md`
+43. `project-docs/runtime/action-skills/action-skill-verification.md`
+44. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+45. `project-docs/runtime/overview/minimal-probe.md`
+46. `project-docs/runtime/actor-state-and-memory/social-actor-profiles-and-relationships.md`
+47. `project-docs/operations/setup/headless-server.md`
+48. `project-docs/operations/setup/provider-setup.md`
+49. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
 
 Treat `SPEC.md` as the canonical rebuild spec.
 
-`SPEC.md` and `project-docs/Specification/*` are long-term spec files.
+`SPEC.md` and `project-docs/specification/*` are long-term spec files.
 `AGENTS.md` is binding repo-agent guidance for interpreting and applying that
 spec. `CLAUDE.md` and `GEMINI.md` mirror these rules for their agent surfaces
 and must point back to `AGENTS.md` as the authority when rules conflict. Editing
@@ -532,12 +531,12 @@ command output, and volatile evidence in handoff or audit docs instead.
   validate, execute, verify, and record. Conversation-like actions are action
   skills when they run through the game runtime.
 - Do not use bare `skill` in active guidance when the meaning could be confused.
-- `project-docs/Terminology.md` is normative. New docs, code comments, prompts,
+- `project-docs/orientation/terminology.md` is normative. New docs, code comments, prompts,
   report labels, and agent guides must follow it.
-- If existing code or docs conflict with `Terminology.md`, either update them or
-  add an explicit old-identifier mapping in `Terminology.md`. Do not spread
+- If existing code or docs conflict with `project-docs/orientation/terminology.md`, either update them or
+  add an explicit old-identifier mapping in `project-docs/orientation/terminology.md`. Do not spread
   outdated wording into new surfaces.
-- Avoid AI-slop wording listed in `Terminology.md`, such as "AI brain",
+- Avoid AI-slop wording listed in `project-docs/orientation/terminology.md`, such as "AI brain",
   "magic", "vibes", "smart NPC", broad "autonomous" claims, ambiguous "skill",
   and "persona" as active architecture. Use concrete runtime, Minecraft, and
   schema-backed terms instead.
@@ -671,7 +670,7 @@ observations on common LLM coding mistakes:
 
 ## Search Index
 
-Read `project-docs/Agent-Search-Index.md` first for routing.
+Read `project-docs/orientation/agent-search-index.md` first for routing.
 
 Important search tokens:
 
@@ -838,7 +837,7 @@ Important search tokens:
   success unless observed world, inventory, position, block, container, chat, or
   transcript evidence supports them.
 - Human visual inspection is optional support evidence. When screenshots are
-  used, follow `project-docs/Architecture/Minecraft-Visual-Evidence-Capture-Protocol.md`:
+  used, follow `project-docs/runtime/evidence-and-verification/minecraft-visual-evidence-capture-protocol.md`:
   treat `prismarine-viewer` images as review-only evidence, pair them with
   observe/worldStateSummary/world-state-scan artifacts, and never infer block
   identity or progress from pixels alone.
@@ -977,9 +976,9 @@ Reference anchors:
 
 ## Documentation Rules
 
-- Keep `SPEC.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `project-docs/intro.md`,
-  `project-docs/Documentation-Map.md`, `project-docs/Terminology.md`, and
-  `project-docs/Agent-Search-Index.md` aligned.
+- Keep `SPEC.md`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `project-docs/orientation/overview.md`,
+  `project-docs/orientation/documentation-map.md`, `project-docs/orientation/terminology.md`, and
+  `project-docs/orientation/agent-search-index.md` aligned.
 - Internal project docs live under `project-docs/`. This includes specs,
   architecture notes, setup notes, provider/API access notes, handoffs,
   implementation campaigns, terminology, and routing indexes.
@@ -994,9 +993,10 @@ Reference anchors:
   provider-budget state, dated run handoffs, implementation workstreams, or
   agent operating rules under `docs/public-docs/` or `docs/blog/`.
 - Repo-internal review and operation docs belong in the project root when they
-  guide branch review or agents directly. Historical research, stale public
-  plans, and raw paper dumps belong under `project-docs/research-archive/`.
-- When adding or changing project vocabulary, update `project-docs/Terminology.md`
+  guide branch review or agents directly. Literature references and raw source
+  material belong under `project-docs/references/`; superseded plans and
+  historical public docs belong under `project-docs/archive/`.
+- When adding or changing project vocabulary, update `project-docs/orientation/terminology.md`
   first, then update affected docs/code comments/prompts to match it.
 - If a plan becomes historical rather than active, mark it clearly as archived or
   deprecated instead of leaving it ambiguous.
@@ -1036,7 +1036,7 @@ image assets or explicitly state why the report is local-only.
 
 For **Mineflayer TypeScript codegen** (long-objective / direct-generated planner),
 do **not** use Gemini Native Audio Dialog as a planner path. Recorded verdict:
-`project-docs/Architecture/Gemini-Native-Audio-Codegen-Verdict.md`.
+`project-docs/runtime/provider-and-codegen/gemini-native-audio-codegen-verdict.md`.
 
 Use:
 
@@ -1106,7 +1106,7 @@ Live provider calls must be explicit and auditable.
   `build/provider-usage/free-tier-budgets.json` as `already_used` before running
   long or repeated live provider tests.
 - Before long OpenAI or Gemini API free-tier runs, read
-  `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md` and use its reset
+  `project-docs/operations/setup/provider-free-tier-reset-windows.md` and use its reset
   windows when deciding whether the budget has refreshed:
   - OpenAI API data-sharing complimentary tokens reset at `00:00 UTC`, which is
     `09:00 KST`.
@@ -1155,7 +1155,7 @@ cost-sensitive tests until budget state is known.
 `deterministic-social` is for tests and baseline reports only (`builtin_goal_authority`).
 Do not use `probe:long-objective` as the social-life runtime.
 
-Canonical plan: `project-docs/Architecture/composer-2.5-Soul-Life-Goal-Runtime-Implementation-Plan.md`.
+Canonical plan: `project-docs/runtime/actor-state-and-memory/composer-2.5-soul-life-goal-runtime-implementation-plan.md`.
 
 ## Auth Rule
 

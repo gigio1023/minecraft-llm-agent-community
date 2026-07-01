@@ -42,13 +42,13 @@ https://github.com/gigio1023/minecraft-llm-agent-community/blob/research/docs/QW
 ## Local Artifact Index
 
 - Final self-contained HTML report:
-  `project-docs/static-exports/final-natural-village-model-comparison-report-2026-06-30.html`
+  `project-docs/exports/static/final-natural-village-model-comparison-report-2026-06-30.html`
 - Combined comparison JSON:
-  `project-docs/Experiments/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/combined-model-comparison-30cycle-analysis.json`
+  `project-docs/experiments/curated/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/combined-model-comparison-30cycle-analysis.json`
 - Qwen 30-cycle base experiment:
-  `project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/`
+  `project-docs/experiments/curated/2026-06-29/goal-oriented-natural-village-30cycle-qwen/`
 - Gemini extension experiment:
-  `project-docs/Experiments/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/`
+  `project-docs/experiments/curated/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/`
 - Cookbook blog:
   `docs/blog/2026-06-30-qwen-modelscope-minecraft-agent-cookbook.md`
 - Supporting public-docs cookbook:
@@ -89,7 +89,7 @@ docs/blog/2026-06-30-qwen-modelscope-minecraft-agent-cookbook.md
 Then inspect the final report:
 
 ```text
-project-docs/static-exports/final-natural-village-model-comparison-report-2026-06-30.html
+project-docs/exports/static/final-natural-village-model-comparison-report-2026-06-30.html
 ```
 
 The final report embeds screenshots as data URIs so it can be opened locally

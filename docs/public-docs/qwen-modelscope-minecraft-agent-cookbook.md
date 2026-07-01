@@ -36,7 +36,7 @@ Run provider preflight before spending quota. The exact preflight artifact used
 for the comparison is stored at:
 
 ```text
-project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/preflight/qwen-30cycle-preflight.json
+project-docs/experiments/curated/2026-06-29/goal-oriented-natural-village-30cycle-qwen/preflight/qwen-30cycle-preflight.json
 ```
 
 The run should be treated as provider-backed and budget-sensitive. Do not start
@@ -58,7 +58,7 @@ bun run probe:social-cycle -- \
   --max-actions-per-cycle 1 \
   --world-scenario natural-village-spawn-v1 \
   --visual-profile report \
-  --report ../project-docs/Experiments/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-max.json
+  --report ../project-docs/experiments/curated/2026-06-29/goal-oriented-natural-village-30cycle-qwen/reports/qwen-3.7-max.json
 ```
 
 Use `Qwen-Ambassador/Qwen3.7-Plus` for the Plus lane.
@@ -78,8 +78,8 @@ Do not judge the run from model text alone. Inspect these artifacts:
 For the final comparison, start with:
 
 ```text
-project-docs/static-exports/final-natural-village-model-comparison-report-2026-06-30.html
-project-docs/Experiments/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/combined-model-comparison-30cycle-analysis.json
+project-docs/exports/static/final-natural-village-model-comparison-report-2026-06-30.html
+project-docs/experiments/curated/2026-06-30/goal-oriented-natural-village-gemini-30cycle-extension/combined-model-comparison-30cycle-analysis.json
 ```
 
 ## Observed Qwen Result
