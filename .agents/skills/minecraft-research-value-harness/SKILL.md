@@ -22,7 +22,7 @@ runtime authority.
 ## Quick Start
 
 1. Read the active central plan:
-   `project-docs/Architecture/Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`.
+   `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`.
 2. Read `references/protocol.md` for the end-to-end workflow.
 3. If the task asks "is this paper-worthy?", "what is the research gap?", or
    "what experiment should we run?", read `references/research-value-rubric.md`.

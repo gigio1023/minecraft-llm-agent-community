@@ -129,18 +129,18 @@ Read in this order:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/Specification/Advisory-Social-Material-WAM.md`
-5. `project-docs/Documentation-Map.md`
-6. `project-docs/Agent-Search-Index.md`
-7. `project-docs/Architecture/Actor-Episode-And-Actor-Turn-Architecture.md`
-8. `project-docs/Architecture/Actor-Turn-Tool-Calling-And-Full-Context-Codegen.md`
-9. `project-docs/Architecture/Context-Projection-And-Source-Evidence.md`
-10. `project-docs/Architecture/Actor-Persistent-State-And-PlanBeads.md`
-11. `project-docs/Architecture/Grounded-Social-Trajectory-Benchmark-Spec.md`
-12. `project-docs/Architecture/Material-Claims-And-Social-Economy-Benchmark-Plan.md`
-13. `project-docs/Architecture/Minecraft-Basic-Guide.md`
-14. `project-docs/Setup/Headless-Server.md`
-15. `project-docs/Setup/Provider-Setup.md`
+4. `project-docs/specification/advisory-social-material-wam.md`
+5. `project-docs/orientation/documentation-map.md`
+6. `project-docs/orientation/agent-search-index.md`
+7. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+8. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+9. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+10. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+11. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+12. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+13. `project-docs/runtime/overview/minecraft-basic-guide.md`
+14. `project-docs/operations/setup/headless-server.md`
+15. `project-docs/operations/setup/provider-setup.md`
 
 ## Running Checks
 
@@ -153,6 +153,6 @@ cd docs && npm run build
 git diff --check
 ```
 
-For live Minecraft experiments, use `project-docs/Setup/Headless-Server.md` and
-`project-docs/Setup/Provider-Setup.md`. Treat provider quota, Docker platform,
+For live Minecraft experiments, use `project-docs/operations/setup/headless-server.md` and
+`project-docs/operations/setup/provider-setup.md`. Treat provider quota, Docker platform,
 and server lifecycle as experiment hygiene, not as actor behavior.

@@ -14,13 +14,14 @@ the important ownership boundary. Do not add internal specs, setup notes,
 handoffs, provider-access notes, or implementation plans to the public docs
 tree.
 
-Repo-internal project docs live under `project-docs/`. Historical research,
-stale public plans, and raw paper dumps live under `project-docs/research-archive/`.
+Repo-internal project docs live under `project-docs/`. Literature references and
+raw source material live under `project-docs/references/`; superseded plans and
+historical public docs live under `project-docs/archive/`.
 
 Keep the web docs consistent with the public-facing direction in `README.md`,
 while keeping internal authority and operation detail in `SPEC.md`,
-`AGENTS.md`, `project-docs/Documentation-Map.md`, and
-`project-docs/Agent-Search-Index.md`.
+`AGENTS.md`, `project-docs/orientation/documentation-map.md`, and
+`project-docs/orientation/agent-search-index.md`.
 
 Long-term spec changes still require explicit approval. Future implementation
 ideas discovered from live runs belong in internal handoff or future-work docs

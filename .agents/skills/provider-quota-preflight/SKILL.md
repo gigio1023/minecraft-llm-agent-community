@@ -110,8 +110,8 @@ The script prints JSON with:
 
 ## Reference Files
 
-- `project-docs/Setup/Provider-Setup.md`
-- `project-docs/Setup/Provider-Free-Tier-Reset-Windows.md`
+- `project-docs/operations/setup/provider-setup.md`
+- `project-docs/operations/setup/provider-free-tier-reset-windows.md`
 - `probe/src/provider/providerQuotaPolicies.ts`
 - `probe/src/provider/providerUsageTracker.ts`
 - `build/provider-usage/provider-usage-ledger.jsonl` local ignored ledger
