@@ -64,7 +64,9 @@ separate commits.
 
 ## Commit Message Format
 
-Use detailed commit messages.
+Use detailed commit messages. The commit log should explain the work well enough
+that a reviewer can understand the motivation, implementation shape, and
+validation from `git log --show` without opening the full diff.
 
 ### Subject line
 
@@ -93,7 +95,7 @@ Subject line rules:
 
 ## Commit Body Format
 
-Every non-trivial commit should include a body with these sections:
+Every non-trivial commit must include a detailed body with these sections:
 
 ```text
 Why:
@@ -114,6 +116,20 @@ Optional section when useful:
 Notes:
 - <follow-up, limitation, or intentional omission>
 ```
+
+Body rules:
+
+- Use a body for all repo changes except truly tiny mechanical edits.
+- Name the real motivation, not only "requested by user".
+- List the important files, modules, docs, scripts, or tests changed.
+- State the behavior or workflow impact, especially for agent guidance,
+  provider quota, reports, runtime authority, schemas, and generated artifacts.
+- Include the exact validation commands run, or the exact blocker when a command
+  could not be run.
+- Prefer a longer, concrete body over a terse body that forces reviewers to open
+  the diff to understand what happened.
+- Do not make bodyless commits for governance, runtime, provider, report,
+  transition-row, or documentation-architecture work.
 
 Example:
 
@@ -183,3 +199,4 @@ If only a narrow slice changed, targeted test commands are encouraged before the
   in order.
 - If `gh` or GitHub app tooling is unavailable, still keep local commit messages
   complete enough that a later PR can use `--fill` safely.
+- If a validation command cannot run, include the exact command and blocker.

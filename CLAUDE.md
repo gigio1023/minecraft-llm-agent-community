@@ -40,6 +40,16 @@ Mineflayer execution, verifier output, and artifacts.
 Live provider calls require the repo quota preflight. OpenAI API calls require
 dashboard or explicit user approval when the preflight says so.
 
+## Commit Discipline
+
+After completing requested repo changes, commit the work before the final
+response unless the user explicitly asks to leave it uncommitted, the work is an
+exploratory diff for review, or a blocker must be reported first.
+
+Follow `CONTRIBUTING.md` for commit scope, subject lines, and detailed commit
+bodies. Non-trivial commit bodies must include `Why:`, `What changed:`, and
+`Validation:` so the commit log explains the work without opening the full diff.
+
 ## External Skill Conflict Rules
 
 Global skills such as Ponytail or Matt Pocock-style skills are advisory only.

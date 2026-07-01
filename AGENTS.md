@@ -310,14 +310,20 @@ snapshot-heavy suites.
 
 ## Commit And Push Discipline
 
-Important completed work should not remain only as local dirty state. Important
+After completing requested repo changes, commit the work before the final
+response unless the user explicitly asks to leave it uncommitted, the work is an
+exploratory diff for review, or a blocking condition must be reported first.
+
+Important completed work must not remain only as local dirty state. Important
 work includes provider-backed experiments, reports, architecture/governance
 changes, active plan updates, runtime contract changes, transition-row or
 seed/reset artifacts, and work the user asks to record.
 
 Follow `CONTRIBUTING.md`: scoped commits, precise subjects, and bodies with
-`Why:`, `What changed:`, `Validation:`, and `Notes:` when useful. Do not sweep
-unrelated dirty files into commits.
+`Why:`, `What changed:`, `Validation:`, and `Notes:` when useful. Commit bodies
+for non-trivial work must be detailed enough that `git log --show` explains the
+work without opening the full diff. Do not sweep unrelated dirty files into
+commits.
 
 ## User Communication
 
