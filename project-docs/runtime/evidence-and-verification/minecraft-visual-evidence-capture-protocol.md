@@ -202,7 +202,7 @@ background polling off unless request-count budget has explicitly been sized
 for it:
 
 ```bash
-.agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
+bun run .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
   --operator-approved \
   --candidate openai-api:gpt-5.5 \
   --estimate-requests 4 \

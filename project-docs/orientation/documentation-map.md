@@ -19,7 +19,7 @@ When documents disagree, use this order:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CLAUDE.md` and `GEMINI.md`, subordinate to `AGENTS.md`
+3. `CLAUDE.md`, subordinate to `AGENTS.md`
 4. current research spine docs under `project-docs/research/current-spine/`
 5. long-term specs under `project-docs/specification/`
 6. `project-docs/orientation/terminology.md`
@@ -52,7 +52,7 @@ project-docs/
 ```
 
 Keep directory names lowercase kebab-case. Root convention files such as
-`README.md`, `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` are exceptions.
+`README.md`, `SPEC.md`, `AGENTS.md`, and `CLAUDE.md` are exceptions.
 Raw source dumps may preserve original upstream filenames.
 
 ## Repo-Root Internal Documents
@@ -64,7 +64,6 @@ reviewers, or implementation review:
 - `SPEC.md`
 - `AGENTS.md`
 - `CLAUDE.md`
-- `GEMINI.md`
 - `CONTRIBUTING.md`
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 

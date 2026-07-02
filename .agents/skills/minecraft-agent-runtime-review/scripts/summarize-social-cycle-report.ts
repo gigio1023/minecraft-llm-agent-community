@@ -1,9 +1,9 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import fs from "node:fs";
 import path from "node:path";
 
 function usage() {
-  console.error("usage: summarize-social-cycle-report.mjs <social-cycle-report.json>");
+  console.error("usage: summarize-social-cycle-report.ts <social-cycle-report.json>");
   process.exit(2);
 }
 

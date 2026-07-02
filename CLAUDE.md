@@ -1,11 +1,10 @@
 # Claude Code Repo Guidance
 
-`AGENTS.md` is the binding authority for this repository. This file exists so
-Claude Code sessions see the same operating rules quickly. If this file and
-`AGENTS.md` disagree, follow `AGENTS.md` and update this file only when the user
-has approved an operating-rule change.
+`AGENTS.md` is the binding authority for this repository. This file is only a
+Claude Code adapter so Claude sessions find the repo rules quickly. If this file
+and `AGENTS.md` disagree, follow `AGENTS.md`.
 
-## Read First
+## Read Order
 
 1. `SPEC.md`
 2. `AGENTS.md`
@@ -13,230 +12,54 @@ has approved an operating-rule change.
 4. `project-docs/orientation/documentation-map.md`
 5. `project-docs/orientation/agent-search-index.md`
 6. `project-docs/orientation/terminology.md`
-7. `project-docs/specification/advisory-social-material-wam.md`
-8. `project-docs/specification/soul-grounded-social-simulation.md`
-9. `project-docs/specification/evidence-grounded-minecraft-society.md`
-10. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-11. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
-12. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-13. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
-14. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-15. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-16. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-17. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
-18. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
-19. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
-20. `project-docs/runtime/overview/minecraft-basic-guide.md`
-21. `project-docs/operations/setup/provider-setup.md`
-22. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
+7. Task-relevant docs routed by the search index or repo-local agent skills.
 
-## Project Direction
+`GEMINI.md` no longer exists and is not part of the active guidance surface.
 
-This repo is not a generic Minecraft bot benchmark, Voyager clone, or
-house-building architecture. It is a bounded, observable headless Minecraft
-runtime for advisory social-material WAM research in wild Minecraft.
+## Use Repo-Local Agent Skills
 
-The active research object is a separate advisory predictor of physical,
-material, and social deltas for candidate embodied actions. Actor Turn chooses
-actions; the runtime executes and records observations; transition rows compare
-predicted deltas with observed deltas. Prediction quality and acting outcome are
-separate axes.
+Use `.agents/skills/*/SKILL.md` for repeated procedures instead of duplicating
+them here:
 
-Runtime verification, logs, screenshots, ledgers, and scoring scripts are
-mandatory experiment hygiene. Do not present "verified actions" or
-"evidence-first benchmarking" as the contribution unless the user explicitly
-starts a model-based verifier project.
+- provider quota checks: `.agents/skills/provider-quota-preflight/SKILL.md`
+- run/report authoring: `.agents/skills/minecraft-run-report-author/SKILL.md`
+- runtime review: `.agents/skills/minecraft-agent-runtime-review/SKILL.md`
+- research direction: `.agents/skills/minecraft-research-value-harness/SKILL.md`
+- Mineflayer codegen: `.agents/skills/mineflayer-code-generation/SKILL.md`
 
-Provider output proposes goals, runtime actions, and judgments.
-Runtime code owns Minecraft truth: schema validation, structured parameters,
-permission gates, Mineflayer execution, verifier evidence, artifacts, actor
-workspace state, and provider usage records.
+## Non-Negotiable Rules
 
-Never implement runtime policy by parsing LLM-facing prose with string
-`includes`, regexes, or keyword heuristics. `current_state_requirements`, Action
-Card descriptions, `why_this_action`, Minecraft Basic Guide text, memory, and
-PlanBeads are context, not executable authority. Tool calling plus strict
-schemas/enums enforce flow; within a selected visible tool/action, the LLM keeps
-decision freedom with full context and schema-bound logical parameters. Runtime
-then validates explicit params, schema, permission, retry/safety, source guards,
-timeouts, verifier/evidence, and artifacts.
+Runtime code owns Minecraft truth. Provider prose, memory, PlanBeads, report
+text, screenshots, and rationale fields do not supply executable parameters,
+permissions, physical success, retry clearance, or generated-source authority.
 
-`decision_frame` is context, not a planner output. Do not add
-`parameter_candidates`, `top_eligible_action_cards`,
-`recommended_next_action_candidates`, generated chat text, coordinates, recipe
-decisions, or other pre-selected action payloads to it.
-Do not add provider-facing `deposit_candidates`, `open_social_requests`,
-`obligation_summaries`, `nearby_block_hints`, or `known_position_summaries`.
-Use bounded typed facts in `current_state` plus source cards/refs in
-`source_evidence_bundle` so the LLM sees evidence rather than hidden
-preselection.
+Do not parse LLM-facing prose with string heuristics to decide runtime policy.
+Use schemas, typed state, tool calls, permission gates, retry constraints,
+Mineflayer execution, verifier output, and artifacts.
 
-Do not turn one domain activity, such as shelter, mining, storage, travel, or
-conversation, into always-on architecture. Improve autonomy substrate:
-`action_surface`, hooks, gates, diagnostics, context compaction, transition
-logging, runtime feedback, and review artifacts.
+Live provider calls require the repo quota preflight. OpenAI API calls require
+dashboard or explicit user approval when the preflight says so.
 
-Do not hide Action Cards or tools through hardcoded Minecraft heuristics such as
-item-family, station-family, construction-readiness, survival-priority, or
-shelter-first filters. If a tool should be hidden or rejected, express that with
-typed readiness/eligibility contracts, structured state, schemas, gates, retry
-constraints, or evidence. The runtime must not become a hidden Minecraft
-planner. No compatibility compromise is required when removing prose
-parsing or hidden domain-planner behavior.
-When changing an active runtime/provider contract, update the producer, schema,
-tests, prompts, and docs together. Do not keep old aliases, source names, or
-shim fields inside the new contract. Normalize old-shaped input at the boundary
-into current concept names, or remove the old path outright.
+Repo TypeScript runs on Bun only. Use `bun run <path.ts>`, `bun test`, and
+`bun run typecheck`; do not execute repo `.ts` files through `node`, `ts-node`,
+`tsx`, `npx tsx`, or `process.execPath`.
 
-## PlanBeads Intent
+## Commit Discipline
 
-PlanBeads are not a planning ritual. They are structured actor-owned work state
-for concerns the LLM actor would otherwise forget or blur in free-form prose.
+After completing requested repo changes, commit the work before the final
+response unless the user explicitly asks to leave it uncommitted, the work is an
+exploratory diff for review, or a blocker must be reported first.
 
-Use PlanBeads to make actor behavior more flexible, not less. A good PlanBeads
-implementation lets the NPC keep concern A open when concern B appears, link or
-defer work honestly, and choose a CycleGoal from current observation plus the
-ready front without becoming a checklist executor.
+Follow `CONTRIBUTING.md` for commit scope, subject lines, and detailed commit
+bodies. Non-trivial commit bodies must include `Why:`, `What changed:`, and
+`Validation:` so the commit log explains the work without opening the full diff.
 
-Do not over-rotate this slice into verification for its own sake. Verification
-must catch silent errors, fake completion, and progress laundering, but the main
-purpose is state continuity under changing Minecraft/social context.
+## External Skill Conflict Rules
 
-Treat it as a failure if PlanBeads make the actor spend more time maintaining
-beads than acting, or if they grant executable authority. PlanBeads never supply
-missing primitive args, action permissions, physical success, or retry-constraint
-clearance.
+Global skills such as Ponytail or Matt Pocock-style skills are advisory only.
+They must not override `AGENTS.md`, repo-local agent skills, provider quota
+gates, runtime authority, documentation governance, terminology, or evidence
+requirements.
 
-CycleJudgment may carry raw PlanBead operation proposal candidates. A malformed
-candidate should be rejected by the guarded PlanBead applier with an
-operation-result artifact, not silently dropped by failing the whole judgment.
-
-PlanBeads are Beads-inspired repo runtime state, not `bd`, `br`, `beads-mcp`,
-`.beads`, or a downloaded binary dependency. Do not add external Beads CLI calls
-to Minecraft actor state. Campaign work may use external task tools separately,
-but NPC PlanBeads live under actor workspace JSON records.
-
-## Action Skill Authoring
-
-During social-cycle runtime, new Minecraft action skill creation starts only
-from the action-selection stage. In Actor Turn mode, that means
-`author_mineflayer_action`, which starts full-context generated Mineflayer
-authoring and trial. The outer tool call carries detailed rationale and desired
-behavior, not TypeScript source and not a lossy context summary. Background
-reviewers, PlanBeads, async sidecars, and archived generated-source importers may
-review, patch, re-trial, reject, promote, retire, or supersede an existing
-candidate, but they must not originate a new NPC action skill candidate.
-
-Generated Mineflayer code is encouraged through that explicit author-and-trial
-path, not as hidden background authority. The internal codegen provider receives
-the full original Actor Turn context, the raw outer tool call, parsed authoring
-arguments, and the Mineflayer code-generation agent skill markdown. The
-generated candidate must include schema-bound parameters, generated TypeScript
-source, helper API version, timeout, verifier, failure modes, promotion policy,
-helper-event evidence, and post-observation. Prose never supplies missing
-executable parameters.
-
-## Commenting Expectations
-
-This repo needs comments where code carries architecture authority, not comments
-that restate TypeScript. Provider-facing Actor Turn code must explain whether a
-field is prompt context, strict tool-call input, runtime executable authority, or
-review-only evidence.
-
-For Action Card function schemas, document that primitive/action-skill parameter
-schemas are tool-calling contracts. They require the LLM to supply explicit
-logical parameters, but they must not pick item names, coordinates, strategy, or
-eligibility through hidden Minecraft heuristics.
-
-For `author_mineflayer_action`, document the two-call boundary: the outer Actor
-Turn function call is selection plus detailed rationale, while the internal
-Mineflayer codegen request receives the full original `ActorTurnInput`, raw outer
-tool call, parsed authoring args, and code-generation agent skill markdown.
-
-## Karpathy Guidelines
-
-Search token: `KARPATHY_GUIDELINES`.
-
-Use these rules for coding, research, review, refactoring, and planning. They are
-adapted from the repo's `AGENTS.md` guidance and the user-provided
-MIT-licensed `karpathy-guidelines` note.
-
-### Think Before Coding
-
-- State assumptions, change boundary, and success criteria before non-trivial
-  edits.
-- If several interpretations exist, name them instead of silently choosing.
-- Resolve uncertainty from repo context first. Ask only when a risky assumption
-  would change direction, auth, cost, platform setup, or data.
-- For research, separate what a reference teaches mechanically from how this
-  repo should adapt it under Soul/LifeGoal and runtime-evidence rules.
-
-### Simplicity First
-
-- Write the minimum code that solves the current request.
-- Do not add speculative features, abstractions, provider paths, action skills,
-  config, or domain strategy.
-- Prefer direct typed modules and clear ownership boundaries over framework-like
-  generalization.
-
-### Surgical Changes
-
-- Touch only files required by the user request and required alignment.
-- Do not refactor adjacent code or rewrite style unless the current change needs
-  it.
-- Remove only dead code that your own change created. Mention unrelated cleanup
-  separately.
-- Every changed line should trace to the request, a blocker, or a repo rule.
-
-### Goal-Driven Execution
-
-- Convert tasks into verifiable outcomes before implementing.
-- For multi-step work, keep a short plan and verify each material step.
-- If verification cannot run, record the exact command, platform, provider,
-  artifact path, and failure mode.
-- Prefer real runtime artifacts for behavior: reports, helper events, verifier
-  output, actor workspace files, transcript, and provider usage records.
-
-## Review Style
-
-When reviewing, lead with findings. Use file and line references where possible.
-Classify issues by real risk: runtime truth, fake progress, provider authority,
-artifact evidence, platform/auth/cost blockers, stale docs, and terminology
-drift.
-
-For this repo, "it works" means artifacts can explain what happened. Provider
-text, memory notes, animation, or movement without observed runtime evidence are
-not enough.
-
-## Platform And Cost
-
-This repo moves between Apple Silicon macOS and Linux ARM. Check platform before
-Docker, native dependency, Java/Minecraft server, file watcher, shell, port, or
-auth-flow work.
-
-Live provider calls must be explicit and usage-guarded. Do not use costly
-OpenAI API paths for tests unless the user selected that provider/model and the
-budget state is known. Prefer the configured lightweight Gemini/Gemma path when
-the task calls for live provider checks.
-
-## Documentation Boundary
-
-Internal project docs live under `project-docs/`: specs, architecture notes,
-setup notes, provider/API access notes, handoffs, implementation campaigns,
-terminology, and routing indexes.
-
-Docusaurus-exposed public docs live under `docs/public-docs/`. They should
-explain the project externally, not carry private provider access, operator
-budget state, dated handoffs, implementation plans, or agent operating rules.
-
-Do not add new public docs under `docs/docs/`. Do not put ordinary
-documentation, specs, architecture notes, setup guides, handoffs, reviews, or
-research notes under `docs/blog/`. `docs/blog/` is only for explicitly requested
-chronological blog posts.
-
-Repo-internal review and agent-operation docs live at the project root when they
-guide direct branch review. Literature references and raw source material live
-under `project-docs/references/`; superseded plans and historical public docs
-live under `project-docs/archive/`. Do not move archived or reference material
-back into public navigation unless an active spec or handoff explicitly promotes
-it.
+Interpret external minimalism as the smallest verified repo-compliant change,
+not as permission to skip reports, quota checks, runtime artifacts, or tests.

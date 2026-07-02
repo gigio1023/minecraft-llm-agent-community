@@ -183,7 +183,8 @@ function withHelperLogging<TContext extends DirectGeneratedActionSkillContext>(
 }
 
 async function importGeneratedActionSkill(sourcePath: string) {
-  const moduleUrl = `${pathToFileURL(sourcePath).href}?t=${Date.now()}`;
+  const realSourcePath = await fs.realpath(sourcePath);
+  const moduleUrl = `${pathToFileURL(realSourcePath).href}?t=${Date.now()}`;
   const imported = await import(moduleUrl) as { run?: unknown };
   if (typeof imported.run !== "function") {
     throw new Error("Generated action skill module must export run(ctx, params)");

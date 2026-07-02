@@ -106,6 +106,7 @@ alive forever.
 
 ## 8. If Asked To Implement
 
-For this project, default to docs/skill/templates first. Do not change runtime
-code unless the user explicitly asks for runtime implementation and the active
-central plan allows it.
+For this project, default to this skill's `assets/` templates and the active
+current-spine docs under `project-docs/research/current-spine/` first. Do not
+change runtime code unless the user explicitly asks for runtime implementation
+and the active central plan allows it.

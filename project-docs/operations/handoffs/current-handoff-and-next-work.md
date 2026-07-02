@@ -1513,7 +1513,7 @@ Documentation changes in this pass:
 - Translated active internal docs and agent-skill docs to English; archived
   research and static exports remain historical material.
 - Updated `README.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`,
-  `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` to describe full-context codegen
+  `AGENTS.md`, and `CLAUDE.md` to describe full-context codegen
   and current Actor Turn authority.
 - Moved dated or archived plans into supporting-doc status in
   `project-docs/orientation/documentation-map.md`.

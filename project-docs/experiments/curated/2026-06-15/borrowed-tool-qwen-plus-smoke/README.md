@@ -51,7 +51,7 @@ Minecraft yet.
 ## Command
 
 ```bash
-.agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
+bun run .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
   --candidate modelscope-api:Qwen-Ambassador/Qwen3.7-Plus \
   --estimate-requests 6 \
   --estimate-total-tokens 60000 \
