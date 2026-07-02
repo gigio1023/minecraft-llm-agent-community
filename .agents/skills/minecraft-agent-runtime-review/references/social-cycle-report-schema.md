@@ -75,7 +75,7 @@ Important subdirectories:
 
 ## Summarizer Output
 
-The bundled `scripts/summarize-social-cycle-report.mjs` emits
+The bundled `scripts/summarize-social-cycle-report.ts` emits
 `minecraft-agent-runtime-review-social-cycle-summary/v1`.
 
 Use these fields as an index before reading individual artifacts:

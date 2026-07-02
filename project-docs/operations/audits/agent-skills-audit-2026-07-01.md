@@ -86,7 +86,7 @@ warnings, but publishable report readiness should fail when preflight evidence i
 missing. Otherwise the report skill can still let agents write budget-safety
 claims that are not backed by the quota gate.
 
-Status: `report-readiness-check.mjs --publishable` now fails missing provider
+Status: `report-readiness-check.ts --publishable` now fails missing provider
 preflight refs and missing transition-row batch audit refs when transition rows
 exist.
 

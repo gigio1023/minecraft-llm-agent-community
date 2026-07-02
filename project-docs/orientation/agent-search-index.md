@@ -85,7 +85,7 @@ guidance.
 | `CONTEXT_COMPACTION` | Preserve evidence-linked state without laundering weak evidence into progress | `SPEC.md`, `project-docs/specification/runtime-evidence-and-action-skills.md`, `probe/src/runtime/goals/socialCycleContextCompaction.ts` |
 | `LIVE_TRANSCRIPT_FIRST` | Runtime value is primarily proven through live transcript and artifact evidence | `project-docs/runtime/evidence-and-verification/transcript-and-runtime-artifacts.md`, `project-docs/operations/handoffs/current-handoff-and-next-work.md` |
 | `VISUAL_EVIDENCE_1_21_4_RULE` | Report-grade Minecraft screenshots must use the supported visual capture protocol, three camera modes, and same-cycle state evidence; pixels never prove block identity alone | `project-docs/runtime/evidence-and-verification/minecraft-visual-evidence-capture-protocol.md`, `AGENTS.md`, `probe/src/runtime/visualEvidence.ts` |
-| `MINECRAFT_RUN_REPORT_AUTHOR` | Evidence-grounded report authoring gate for Minecraft run reports, model comparisons, HTML/static reports, and visual reports | `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-run-report-author/scripts/report-readiness-check.mjs`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md`, `AGENTS.md` |
+| `MINECRAFT_RUN_REPORT_AUTHOR` | Evidence-grounded report authoring gate for Minecraft run reports, model comparisons, HTML/static reports, and visual reports | `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-run-report-author/scripts/report-readiness-check.ts`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md`, `AGENTS.md` |
 
 ## Current Implementation
 

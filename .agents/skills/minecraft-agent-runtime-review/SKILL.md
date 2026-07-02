@@ -29,7 +29,7 @@ the repo term **action skill**.
 3. For `social-cycle-run-report/v1`, run the bundled summarizer first:
 
    ```bash
-   node .agents/skills/minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.mjs <report.json>
+   bun run .agents/skills/minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.ts <report.json>
    ```
 
 4. Reconstruct the actual behavior loop. Include what the human saw, for

@@ -1,5 +1,8 @@
 #!/usr/bin/env bun
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 type Args = {
   providerId: string;
   model: string;
@@ -108,50 +111,67 @@ function parseArgs(argv: string[]): Args {
   return args as Args;
 }
 
-const args = parseArgs(process.argv.slice(2));
-const requests =
-  args.cycles * args.lanes * Math.max(args.requestsPerCycle, args.maxActionsPerCycle);
-const inputTokens = requests * args.inputTokensPerRequest;
-const outputTokens = requests * args.outputTokensPerRequest;
-const thinkingTokens = requests * args.thinkingTokensPerRequest;
-const totalTokens = inputTokens + outputTokens + thinkingTokens;
-const minuteRequests = args.requestsPerMinute;
-const minuteInputTokens = minuteRequests * args.inputTokensPerRequest;
-const minuteOutputTokens = minuteRequests * args.outputTokensPerRequest;
-const minuteThinkingTokens = minuteRequests * args.thinkingTokensPerRequest;
-const minuteTotalTokens = minuteInputTokens + minuteOutputTokens + minuteThinkingTokens;
+export function estimateSocialCycleUsage(argv: string[], options: { now?: Date } = {}) {
+  const args = parseArgs(argv);
+  const requests =
+    args.cycles * args.lanes * Math.max(args.requestsPerCycle, args.maxActionsPerCycle);
+  const inputTokens = requests * args.inputTokensPerRequest;
+  const outputTokens = requests * args.outputTokensPerRequest;
+  const thinkingTokens = requests * args.thinkingTokensPerRequest;
+  const totalTokens = inputTokens + outputTokens + thinkingTokens;
+  const minuteRequests = args.requestsPerMinute;
+  const minuteInputTokens = minuteRequests * args.inputTokensPerRequest;
+  const minuteOutputTokens = minuteRequests * args.outputTokensPerRequest;
+  const minuteThinkingTokens = minuteRequests * args.thinkingTokensPerRequest;
+  const minuteTotalTokens = minuteInputTokens + minuteOutputTokens + minuteThinkingTokens;
 
-const preflightArgs = [
-  "--candidate", `${args.providerId}:${args.model}`,
-  "--estimate-requests", String(requests),
-  "--estimate-input-tokens", String(inputTokens),
-  "--estimate-output-tokens", String(outputTokens),
-  "--estimate-thinking-tokens", String(thinkingTokens),
-  "--estimate-total-tokens", String(totalTokens),
-  "--estimate-requests-per-minute", String(minuteRequests),
-  "--estimate-input-tokens-per-minute", String(minuteInputTokens),
-  "--estimate-output-tokens-per-minute", String(minuteOutputTokens),
-  "--estimate-thinking-tokens-per-minute", String(minuteThinkingTokens),
-  "--estimate-total-tokens-per-minute", String(minuteTotalTokens)
-];
+  const preflightArgs = [
+    "--candidate", `${args.providerId}:${args.model}`,
+    "--estimate-requests", String(requests),
+    "--estimate-input-tokens", String(inputTokens),
+    "--estimate-output-tokens", String(outputTokens),
+    "--estimate-thinking-tokens", String(thinkingTokens),
+    "--estimate-total-tokens", String(totalTokens),
+    "--estimate-requests-per-minute", String(minuteRequests),
+    "--estimate-input-tokens-per-minute", String(minuteInputTokens),
+    "--estimate-output-tokens-per-minute", String(minuteOutputTokens),
+    "--estimate-thinking-tokens-per-minute", String(minuteThinkingTokens),
+    "--estimate-total-tokens-per-minute", String(minuteTotalTokens)
+  ];
 
-console.log(JSON.stringify({
-  schema: "social-cycle-provider-usage-estimate/v1",
-  generated_at: new Date().toISOString(),
-  assumptions: args,
-  estimate: {
-    requests,
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    thinking_tokens: thinkingTokens,
-    total_tokens: totalTokens
-  },
-  minute_estimate: {
-    requests: minuteRequests,
-    input_tokens: minuteInputTokens,
-    output_tokens: minuteOutputTokens,
-    thinking_tokens: minuteThinkingTokens,
-    total_tokens: minuteTotalTokens
-  },
-  provider_quota_preflight_args: preflightArgs
-}, null, 2));
+  const output = {
+    schema: "social-cycle-provider-usage-estimate/v1",
+    generated_at: (options.now ?? new Date()).toISOString(),
+    assumptions: args,
+    estimate: {
+      requests,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      thinking_tokens: thinkingTokens,
+      total_tokens: totalTokens
+    },
+    minute_estimate: {
+      requests: minuteRequests,
+      input_tokens: minuteInputTokens,
+      output_tokens: minuteOutputTokens,
+      thinking_tokens: minuteThinkingTokens,
+      total_tokens: minuteTotalTokens
+    },
+    provider_quota_preflight_args: preflightArgs
+  };
+  return { output, outputJson: `${JSON.stringify(output, null, 2)}\n` };
+}
+
+function isDirectRun() {
+  return Boolean(process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url));
+}
+
+if (isDirectRun()) {
+  try {
+    const { outputJson } = estimateSocialCycleUsage(process.argv.slice(2));
+    console.log(outputJson.trimEnd());
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}

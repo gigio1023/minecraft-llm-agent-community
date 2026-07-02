@@ -23,7 +23,7 @@ refs, and screenshot-only conclusions.
 3. For `social-cycle-run-report/v1`, run the runtime-review summarizer first:
 
    ```bash
-   node .agents/skills/minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.mjs <report.json>
+   bun run .agents/skills/minecraft-agent-runtime-review/scripts/summarize-social-cycle-report.ts <report.json>
    ```
 
 4. Run the readiness check before final report prose. Use `--publishable` for
@@ -31,7 +31,7 @@ refs, and screenshot-only conclusions.
    transition-row batch audit refs should fail instead of warn:
 
    ```bash
-   node .agents/skills/minecraft-run-report-author/scripts/report-readiness-check.mjs <report.json> --publishable
+   bun run .agents/skills/minecraft-run-report-author/scripts/report-readiness-check.ts <report.json> --publishable
    ```
 
 5. If the report will compare models or become a public/HTML artifact, also run

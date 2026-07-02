@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { defaultProviderQuotaPolicies } from "../../../../probe/src/provider/providerQuotaPolicies.ts";
 import type {
@@ -67,17 +68,16 @@ function parseCandidate(value: string): Candidate {
   };
 }
 
-function parseArgs(argv: string[]): Args {
+function parseArgs(argv: string[], cwd = process.cwd()): Args {
   if (argv.includes("--help") || argv.includes("-h")) {
     console.log(usage());
     process.exit(0);
   }
 
-  const repoRoot = process.cwd();
   const args: Args = {
     candidates: [],
-    ledgerPath: path.join(repoRoot, "build", "provider-usage", "provider-usage-ledger.jsonl"),
-    budgetsPath: path.join(repoRoot, "build", "provider-usage", "free-tier-budgets.json"),
+    ledgerPath: path.join(cwd, "build", "provider-usage", "provider-usage-ledger.jsonl"),
+    budgetsPath: path.join(cwd, "build", "provider-usage", "free-tier-budgets.json"),
     outPath: undefined,
     approvalNote: undefined,
     estimate: { ...zero },
@@ -95,19 +95,19 @@ function parseArgs(argv: string[]): Args {
       args.candidates.push(parseCandidate(next));
       index += 1;
     } else if (arg === "--ledger" && hasValue(next)) {
-      args.ledgerPath = path.resolve(next);
+      args.ledgerPath = path.resolve(cwd, next);
       index += 1;
     } else if (arg === "--budgets" && hasValue(next)) {
-      args.budgetsPath = path.resolve(next);
+      args.budgetsPath = path.resolve(cwd, next);
       index += 1;
     } else if (arg === "--out" && hasValue(next)) {
-      args.outPath = path.resolve(next);
+      args.outPath = path.resolve(cwd, next);
       index += 1;
     } else if (arg === "--approval-note" && hasValue(next)) {
       args.approvalNote = next;
       index += 1;
     } else if (arg === "--approval-note-file" && hasValue(next)) {
-      args.approvalNote = fs.readFileSync(path.resolve(next), "utf8").trim();
+      args.approvalNote = fs.readFileSync(path.resolve(cwd, next), "utf8").trim();
       index += 1;
     } else if (arg === "--estimate-requests" && hasValue(next)) {
       args.estimate.requests = parsePositiveInt(next, arg);
@@ -411,38 +411,58 @@ function evaluateCandidate(
   };
 }
 
-const args = parseArgs(process.argv.slice(2));
-const windows = currentWindows(new Date());
-const budgets = readBudgets(args.budgetsPath);
-const records = readLedger(args.ledgerPath);
-const results = args.candidates.map((candidate) =>
-  evaluateCandidate(candidate, budgets, records, args.estimate, args.minuteEstimate, args.operatorApproved, windows)
-);
-const finalStatus = results.some((result) => result.status === "blocked" || result.status === "unbudgeted")
-  ? "blocked"
-  : results.some((result) => result.status === "needs_dashboard_approval")
-    ? "needs_dashboard_approval"
-    : "allowed";
+export function runProviderQuotaPreflight(
+  argv: string[],
+  options: { cwd?: string; now?: Date } = {}
+) {
+  const args = parseArgs(argv, options.cwd ?? process.cwd());
+  const now = options.now ?? new Date();
+  const windows = currentWindows(now);
+  const budgets = readBudgets(args.budgetsPath);
+  const records = readLedger(args.ledgerPath);
+  const results = args.candidates.map((candidate) =>
+    evaluateCandidate(candidate, budgets, records, args.estimate, args.minuteEstimate, args.operatorApproved, windows)
+  );
+  const finalStatus = results.some((result) => result.status === "blocked" || result.status === "unbudgeted")
+    ? "blocked"
+    : results.some((result) => result.status === "needs_dashboard_approval")
+      ? "needs_dashboard_approval"
+      : "allowed";
 
-const output = {
-  schema: "provider-quota-preflight/v1",
-  generated_at: new Date().toISOString(),
-  ledger_path: args.ledgerPath,
-  budgets_path: args.budgetsPath,
-  approval: {
-    operator_approved: args.operatorApproved,
-    approval_note: args.approvalNote ?? null
-  },
-  windows,
-  estimate: args.estimate,
-  minute_estimate: args.minuteEstimate,
-  final_status: finalStatus,
-  results
-};
+  const output = {
+    schema: "provider-quota-preflight/v1",
+    generated_at: now.toISOString(),
+    ledger_path: args.ledgerPath,
+    budgets_path: args.budgetsPath,
+    approval: {
+      operator_approved: args.operatorApproved,
+      approval_note: args.approvalNote ?? null
+    },
+    windows,
+    estimate: args.estimate,
+    minute_estimate: args.minuteEstimate,
+    final_status: finalStatus,
+    results
+  };
 
-const outputJson = `${JSON.stringify(output, null, 2)}\n`;
-if (args.outPath) {
-  fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
-  fs.writeFileSync(args.outPath, outputJson, "utf8");
+  const outputJson = `${JSON.stringify(output, null, 2)}\n`;
+  if (args.outPath) {
+    fs.mkdirSync(path.dirname(args.outPath), { recursive: true });
+    fs.writeFileSync(args.outPath, outputJson, "utf8");
+  }
+  return { output, outputJson };
 }
-console.log(outputJson.trimEnd());
+
+function isDirectRun() {
+  return Boolean(process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url));
+}
+
+if (isDirectRun()) {
+  try {
+    const { outputJson } = runProviderQuotaPreflight(process.argv.slice(2));
+    console.log(outputJson.trimEnd());
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
