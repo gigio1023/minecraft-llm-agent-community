@@ -40,6 +40,10 @@ Mineflayer execution, verifier output, and artifacts.
 Live provider calls require the repo quota preflight. OpenAI API calls require
 dashboard or explicit user approval when the preflight says so.
 
+Repo TypeScript runs on Bun only. Use `bun run <path.ts>`, `bun test`, and
+`bun run typecheck`; do not execute repo `.ts` files through `node`, `ts-node`,
+`tsx`, `npx tsx`, or `process.execPath`.
+
 ## Commit Discipline
 
 After completing requested repo changes, commit the work before the final

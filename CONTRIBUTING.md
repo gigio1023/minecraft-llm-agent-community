@@ -23,6 +23,17 @@ should keep that direction explicit in code, docs, tests, and commit history.
   `project-docs/references/` for literature and external-project material, and
   `project-docs/archive/` for superseded plans and historical public docs.
 
+## TypeScript Runtime
+
+Repo `.ts` entrypoints run on Bun only. Use `bun run <path.ts>`, `bun test`, and
+`bun run typecheck` for TypeScript execution and validation.
+
+Do not document, test, or validate repo `.ts` entrypoints with `node`,
+`ts-node`, `tsx`, `npx tsx`, or child processes derived from `process.execPath`.
+Node/npm may still appear in non-TypeScript host diagnostics or external
+toolchains such as a Docusaurus build, but those are not repo TypeScript
+runtime precedent.
+
 ## Code Comments
 
 Follow the TypeScript commenting rules in `AGENTS.md`.

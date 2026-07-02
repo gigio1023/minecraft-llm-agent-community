@@ -77,6 +77,20 @@ If an external skill says "keep it simple", interpret that as the minimum
 verified substrate that preserves evidence, quota checks, reports, and runtime
 truth. Do not use it to skip required artifacts.
 
+## TypeScript Runtime Rule
+
+This repo is TypeScript-first and Bun is the only runtime for repo TypeScript.
+Run `.ts` entrypoints with `bun run <path.ts>` or executable scripts whose
+shebang is `#!/usr/bin/env bun`.
+
+Do not execute repo `.ts` files with `node`, `ts-node`, `tsx`, `npx tsx`, or a
+child process derived from `process.execPath`. Tests use `cd probe && bun test`;
+type checks use `cd probe && bun run typecheck`.
+
+Node may still be used for non-TypeScript host diagnostics such as
+`node -p "process.platform + '/' + process.arch"` or for toolchains that are not
+repo `.ts` entrypoints, but Node is not a runtime for this repo's TypeScript.
+
 ## Current Direction
 
 This repository is a rebuild staging area for a bounded, observable headless

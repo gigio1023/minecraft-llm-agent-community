@@ -42,7 +42,7 @@ emergency brakes, and operator approval evidence.
 3. For social-cycle runs, optionally create a conservative estimate:
 
    ```bash
-   .agents/skills/provider-quota-preflight/scripts/estimate-social-cycle-usage.ts \
+   bun run .agents/skills/provider-quota-preflight/scripts/estimate-social-cycle-usage.ts \
      --provider gemini-api \
      --model gemma-4-31b-it \
      --cycles 30 \
@@ -54,7 +54,7 @@ emergency brakes, and operator approval evidence.
    to the experiment/report artifacts:
 
    ```bash
-   .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
+   bun run .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
      --candidate openai-api:gpt-5.5 \
      --estimate-requests 80 \
      --estimate-total-tokens 1700000 \

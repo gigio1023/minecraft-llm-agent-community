@@ -52,7 +52,7 @@ function runSummarizer(reportPath) {
   if (!fs.existsSync(script)) {
     return { status: "missing_script", stdout: "", stderr: "" };
   }
-  const result = spawnSync(process.execPath, ["run", script, reportPath], {
+  const result = spawnSync("bun", ["run", script, reportPath], {
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024
   });
