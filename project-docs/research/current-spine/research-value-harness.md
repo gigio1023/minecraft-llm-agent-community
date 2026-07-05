@@ -123,7 +123,7 @@ The harness looks for stronger claims:
 This document supports the active central plan:
 
 ```text
-project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md
+project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md
 ```
 
 The harness does not replace the central plan. It provides the review machinery

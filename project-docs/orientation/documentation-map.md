@@ -104,12 +104,14 @@ Start from:
 Current research direction lives under:
 
 - `project-docs/research/current-spine/research-documentation-hierarchy.md`
-- `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
+- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
 - `project-docs/research/current-spine/research-value-harness.md`
-- `project-docs/research/current-spine/no-regret-core-research-protocol.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
-- `project-docs/research/current-spine/goldilocks-preflight-protocol.md`
+- `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/society-observable-preflight.md`
+
+The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05) and
+carry superseded status headers in place.
 
 Long-term specification files live under:
 

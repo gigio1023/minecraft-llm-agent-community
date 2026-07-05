@@ -1,6 +1,10 @@
 # No-Regret Core Implementation Campaign
 
-Status: active implementation campaign contract.
+Status: SUPERSEDED on 2026-07-05 by
+`central-plan-embodied-co-actor-legibility.md` (build plan in section 9).
+Note: the pipeline this campaign describes as landed exists only on branch
+`backup/no-regret-core-stash-2026-06-30` (recovered from `stash@{0}`,
+commit `87591a2`), not in the working tree. Preserved as audit trail.
 
 Search token: `NO_REGRET_CORE_IMPLEMENTATION_CAMPAIGN`. Related:
 `SHAREABLE_RESEARCH_REPORT`.

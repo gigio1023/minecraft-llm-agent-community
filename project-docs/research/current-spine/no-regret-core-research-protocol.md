@@ -1,7 +1,9 @@
 # No-Regret Core Research Protocol
 
-Status: active research protocol for the no-regret core. This is not an
-implementation campaign and not a paper claim.
+Status: SUPERSEDED on 2026-07-05 by
+`central-plan-embodied-co-actor-legibility.md`. Its data-quality thresholds
+survive as computed per-condition diagnostics (V2 plan section 7), not build
+gates. Preserved as audit trail.
 
 Search token: `NO_REGRET_CORE_RESEARCH_PROTOCOL`.
 

@@ -44,10 +44,12 @@ direction docs should prefer concrete names over the historical **WAM** banner:
   deltas as the object of analysis;
 - `transition-row/v1` when discussing the current no-regret core data unit.
 
-**Advisory social-material WAM** is historical shorthand and a possible F-loop
-branch reference. It should not be used as the current project headline. If it
-appears in older docs, read it through
-`project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`.
+**Advisory social-material WAM** is historical shorthand and a possible
+advisory-use branch reference. It should not be used as the current project
+headline. If it appears in older docs, read it through
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+(the active plan, whose crosswalk also retires the F-native/F-loop/F-society
+branch names).
 
 An advisory consequence predictor predicts deltas before an action and is scored
 after the action against runtime-observed deltas. It does not select the executed

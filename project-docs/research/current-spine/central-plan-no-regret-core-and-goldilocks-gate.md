@@ -1,8 +1,12 @@
 # Central Plan: No-Regret Core and the Goldilocks Gate
 
-Status: ACTIVE central research and implementation plan.
+Status: SUPERSEDED on 2026-07-05 by
+`central-plan-embodied-co-actor-legibility.md` (user-approved direction
+change under `ZERO_COST_IMPLEMENTATION_RULE`). Preserved as audit trail. Do
+not use this file as active direction; its scientific guardrails were
+absorbed into the V2 plan's preregistration, arms, and diagnostics.
 
-Search token: `ACTIVE_CENTRAL_PLAN`. Related: `NO_REGRET_CORE`,
+Search token: `SUPERSEDED_CENTRAL_PLAN_2026_06_29`. Related: `NO_REGRET_CORE`,
 `GOLDILOCKS_GATE`, `TRANSITION_ROW_V1`,
 `NO_REGRET_CORE_RESEARCH_PROTOCOL`, `TRANSITION_ROW_LABEL_CODEBOOK`,
 `SEED_RESET_RECORD_V1`, `GOLDILOCKS_PREFLIGHT_PROTOCOL`,

@@ -6,13 +6,20 @@ sidebar_position: 1
 
 Search token: `ADVISORY_SOCIAL_MATERIAL_WAM`.
 
-Status: active research-direction spec.
+Status: historical reference, soft-archived 2026-07-05. Superseded as
+direction by
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`.
+The "WAM" banner term is retired: by this repo's own literature a World
+Action Model is the joint `p(o', a | o, l)` object, and the term now collides
+with an established robotics usage. The verification-is-hygiene rule in this
+file remains binding and is restated in the active plan.
 
 Recorded: 2026-06-18 (`Asia/Seoul`).
 
 ## Purpose
 
-This is the current research spine for the repository.
+This was the research spine before the 2026-06-29 no-regret reframe and the
+2026-07-05 co-actor legibility redesign.
 
 The project studies whether an advisory World Action Model can predict the
 physical, material, and social consequences of embodied Minecraft actions in

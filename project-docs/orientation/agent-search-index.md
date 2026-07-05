@@ -29,12 +29,13 @@ guidance.
 
 | Search Token | Meaning | Primary References |
 |--------------|---------|--------------------|
-| `ACTIVE_CENTRAL_PLAN` | Current research spine: build the no-regret core first, then use branch gates before selecting F-native, F-loop, or F-society as the headline | `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `AGENTS.md` |
-| `NO_REGRET_CORE` | Immediate target: a non-degenerate small Minecraft runtime that records independent `(state_before, executed_action, observed_delta)` transition rows before larger claims | `project-docs/research/current-spine/no-regret-core-research-protocol.md`, `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`, `project-docs/research/current-spine/no-regret-core-implementation-campaign.md` |
-| `GOLDILOCKS_GATE` | Branch gate for F-native/F-loop: find whether a layer exists where LLM prior is insufficient and observed history adds learnable signal | `project-docs/research/current-spine/goldilocks-preflight-protocol.md`, `project-docs/research/current-spine/research-decision-current-spine-2026-06-29.md`, `project-docs/research/current-spine/research-value-harness.md` |
-| `SOCIETY_OBSERVABLE_PREFLIGHT` | Separate F-society gate: look for recurring social-material patterns under small embodied constraints; prediction lift alone does not decide it | `project-docs/research/current-spine/society-observable-preflight.md`, `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md` |
+| `ACTIVE_CENTRAL_PLAN` | Current research spine: the preregistered embodied co-actor legibility experiment with built-in positive control, null condition, killer baselines, and stop-results | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `AGENTS.md` |
+| `CO_ACTOR_LEGIBILITY` | Can an observer model predict a soul-grounded co-actor's social-material responses from public interaction history alone, across disposition-consistency conditions | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/transition-row-label-codebook.md` |
+| `NO_REGRET_CORE` | Superseded 2026-07-05: the staged substrate program; its data-quality thresholds live on as per-condition diagnostics in the V2 plan | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/no-regret-core-research-protocol.md`, `project-docs/research/current-spine/transition-row-v1-contract.md` |
+| `GOLDILOCKS_GATE` | Superseded 2026-07-05: the branch-triage preflight; absorbed into the V2 plan arms/metrics/stop-results, which add the previously missing shuffled-history, policy-copy, leakage, and held-out-family arms | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/goldilocks-preflight-protocol.md` |
+| `SOCIETY_OBSERVABLE_PREFLIGHT` | Deferred social-pattern branch gate (was F-society): look for recurring social-material patterns under small embodied constraints; prediction lift alone does not decide it | `project-docs/research/current-spine/society-observable-preflight.md`, `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
 | `RESEARCH_VALUE_HARNESS` | Research-planning harness for pressure-testing novelty, closest prior work, falsifiable claims, and experiment sketches before implementation | `project-docs/research/current-spine/research-value-harness.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md`, `project-docs/research/current-spine/prior-work-proximity-current-spine-2026-06-29.md` |
-| `ADVISORY_SOCIAL_MATERIAL_WAM` | Historical/reference framing and possible F-loop branch: advisory consequence prediction is no longer the selected project headline | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md` |
+| `ADVISORY_SOCIAL_MATERIAL_WAM` | Historical/reference framing (soft-archived 2026-07-05) and possible advisory-use branch: advisory consequence prediction is not the project headline; the WAM term is retired | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
 | `TRANSITION_ROW_V1` | Current data unit for no-regret core work: independent state/action/observed-delta rows, separate from actor self-declared expected outcomes | `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/transition-row-label-codebook.md`, `project-docs/research/current-spine/seed-reset-record-v1-contract.md` |
 | `SOCIAL_MATERIAL_TRANSITION` | Older name for related WAM-era dataset thinking; translate active work to `transition-row/v1` unless quoting archive material | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/orientation/terminology.md`, `project-docs/research/current-spine/transition-row-v1-contract.md` |
 | `VERIFICATION_IS_HYGIENE` | Runtime verification, screenshots, logs, ledgers, and scoring scripts are mandatory audit hygiene, not the research contribution by themselves | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/specification/runtime-evidence-and-action-skills.md`, `AGENTS.md`, `project-docs/orientation/terminology.md` |
@@ -131,11 +132,11 @@ For any onboarding developer or agent, read in this order:
 2. `AGENTS.md`
 3. `CLAUDE.md` when using Claude Code
 4. `project-docs/research/current-spine/research-documentation-hierarchy.md`
-5. `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
+5. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
 6. `project-docs/research/current-spine/research-value-harness.md`
-7. `project-docs/research/current-spine/no-regret-core-research-protocol.md`
-8. `project-docs/research/current-spine/transition-row-v1-contract.md`
-9. `project-docs/research/current-spine/goldilocks-preflight-protocol.md`
+7. `project-docs/research/current-spine/transition-row-v1-contract.md`
+8. `project-docs/research/current-spine/transition-row-label-codebook.md`
+9. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
 10. `project-docs/research/current-spine/society-observable-preflight.md`
 11. `README.md`
 12. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`

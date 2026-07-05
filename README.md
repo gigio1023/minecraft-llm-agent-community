@@ -1,20 +1,20 @@
 # minecraft-llm-agent-community
 
-Headless Minecraft runtime-loop research for advisory social-material World
-Action Models in wild Minecraft.
+Headless Minecraft runtime-loop research on the legibility of embodied LLM
+co-actors: can an observer model predict a soul-grounded co-actor's
+social-material responses from public interaction history alone?
 
 This repository is not a Voyager clone, a race-to-diamond benchmark, or a
-house-building planner. Minecraft task completion is a competence gate, not the
-final research target. The target is to study whether an advisory model can
-predict how embodied Minecraft actions change physical state, material access,
-obligations, relationships, and future action opportunities in natural,
-reproducible worlds.
+house-building planner. Minecraft task completion is a competence gate, not
+the final research target. The active plan is
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`;
+the former "advisory social-material WAM" framing is historical and the WAM
+term is retired.
 
 Runtime verification, evidence artifacts, seed/reset records, screenshots, and
 scoring scripts are mandatory experiment hygiene. They are not the research
-claim by themselves. The research claim is about action-conditioned
-social-material consequence prediction, with acting outcome and prediction
-accuracy reported separately.
+claim by themselves. Prediction quality and acting outcome are always reported
+separately.
 
 [Documentation & Web Portal](https://gigio1023.github.io/minecraft-llm-agent-community/)
 
@@ -35,8 +35,9 @@ Near-term proof:
 
 Long-term north star:
 
-- an advisory social-material WAM that predicts physical, material, and social
-  deltas for embodied Minecraft actions;
+- measuring embodied co-actor legibility with disposition consistency as the
+  manipulated variable, held-out-family observer predictors, and
+  policy-fingerprint baselines that can erase the claim;
 - actors with role context, memory, relationships, action skill ownership,
   obligations, material claims, public affordances, weak commons, and visible
   consequences that persist after one immediate task is completed;
@@ -52,10 +53,10 @@ Research framing:
   or task competence, not material claims, obligations, or social consequences;
 - existing LLM social simulations provide useful social vocabulary but often
   resolve outcomes in text rather than through embodied material change;
-- this project aims to measure predicted-vs-observed social-material deltas in
-  natural open-world Minecraft seeds, including possession, access, obligations,
-  public-affordance use, memory continuity, recovery from blockers, and
-  post-goal continuation.
+- this project measures observer-predicted vs runtime-observed social-material
+  responses in natural open-world Minecraft seeds — possession, access,
+  refusal, repair, public-affordance use, and continuation — scored separately
+  from acting success.
 
 ## Runtime Shape
 
@@ -65,31 +66,30 @@ flowchart LR
   Observe["Observation<br/>world, inventory, actors"]
   Workspace["Actor workspace<br/>memory, PlanBeads, evidence"]
   Input["ActorTurnInput<br/>current_state + source_evidence_bundle"]
-  WAM["Advisory WAM<br/>predicted social-material delta"]
+  Predictor["Offline observer predictor<br/>public history only"]
   LLM["Actor Turn LLM<br/>one function tool call"]
   Card["Visible Action Card<br/>strict parameters"]
   Author["author_mineflayer_action<br/>full-context codegen request"]
   Runtime["Runtime gates<br/>schema, permissions, retry, verifier"]
   MC["Mineflayer + Minecraft"]
-  Row["Transition row<br/>predicted vs observed delta"]
+  Row["Transition row<br/>observed delta + locked labels"]
   Evidence["Artifacts<br/>reports, memory, PlanBeads"]
 
   Soul --> Input
   Observe --> Input
   Workspace --> Input
-  Input --> WAM
   Input --> LLM
   LLM --> Card --> Runtime
   LLM --> Author --> Runtime
-  WAM --> Row
   Runtime --> MC --> Row --> Evidence --> Workspace
+  Evidence --> Predictor --> Row
 ```
 
 The LLM chooses directly, but it does not own Minecraft truth. Structured tool
 parameters, generated-source guards, retry constraints, timeouts, Mineflayer
 execution, runtime checks, and actor-workspace artifacts decide what happened.
-The advisory WAM predicts what should change; transition rows compare that
-prediction with what the runtime observed.
+Offline observer predictors see only the exported public history; their
+prediction artifacts join transition rows by `row_id` after labels are locked.
 
 ## Context Philosophy
 
@@ -118,8 +118,9 @@ a typed contract, strict schema, permission gate, retry constraint, or verifier.
 - PlanBeads are passive issue-like actor state, not executable authority.
 - Actor Turn actions are direct tool selections with schema-bound parameters.
 - External Minecraft-agent papers are references to adapt, not product specs.
-- The advisory WAM predicts deltas; it never selects the executed action, fills
-  missing parameters, closes obligations, or overrides runtime checks.
+- Predictor artifacts are offline and advisory; they never select the executed
+  action, fill missing parameters, close obligations, or override runtime
+  checks.
 - Verification is audit hygiene, not a headline contribution.
 
 ## Key Documents
@@ -129,7 +130,7 @@ Read in this order:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/specification/advisory-social-material-wam.md`
+4. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
 5. `project-docs/orientation/documentation-map.md`
 6. `project-docs/orientation/agent-search-index.md`
 7. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`

@@ -1,7 +1,11 @@
 # Qwen And VLA Action-Consequence Composition Proposal
 
-Status: proposal and review artifact. This does not change the active central
-plan, select a research headline, or authorize new provider-backed runs.
+Status: proposal and review artifact, superseded in sequencing by
+`central-plan-embodied-co-actor-legibility.md` (2026-07-05). Its arm-design
+discipline (mandatory nulls, forced-action prediction lanes, policy/prediction
+separation) was absorbed into the active plan; its Qwen/VLA model arms remain
+deferred until the legibility experiment produces a decision. This file does
+not authorize provider-backed runs.
 
 Search token: `QWEN_VLA_ACTION_CONSEQUENCE_COMPOSITION_2026_07_02`.
 

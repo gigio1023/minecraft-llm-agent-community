@@ -913,6 +913,21 @@ The next empirical run should stay small but deliberately create more rows where
 another actor can observe or be affected by possession, access, station
 placement, resource sharing, refusal, repair, or blocked access.
 
+## 2026-07-05 Addendum: Stash Recovery And Supersession
+
+A repo audit on 2026-07-05 found that every runtime artifact family this note
+describes in present tense (`transition-row/v1` writer, response windows,
+seed/reset records, batch audit, run declarations, shared-session smoke CLIs;
+~4,100 LOC plus tests) existed only in unpushed `stash@{0}`
+("wip-before-main-cleanup-2026-06-30", commit `87591a2`), on no branch. The
+stash was preserved as branch `backup/no-regret-core-stash-2026-06-30`. The
+curated 2026-06-30 GPT-5.5 run was produced by that stashed code and is not
+reproducible from any branch.
+
+The staged no-regret/Goldilocks program this note reports on was superseded
+the same day by `central-plan-embodied-co-actor-legibility.md`. Salvage
+verdicts per component live in that plan, section 9.
+
 ## Update Rule
 
 Update this file, a dated audit, or a handoff/status document when implementation

@@ -97,19 +97,30 @@ This repository is a rebuild staging area for a bounded, observable headless
 Minecraft runtime. It is not a Voyager clone, a fastest-tech-tree benchmark, a
 house-building architecture, or a pre-committed village simulator.
 
-The active no-regret core is:
+The active research plan is
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+(2026-07-05, user-approved). One preregistered experiment: can an observer
+model predict a soul-grounded co-actor's next-turn social-response and
+material-access labels from public interaction history alone, across
+disposition-consistency conditions (scripted positive control, stable soul,
+resampled-soul null), with held-out-family predictors and policy-copy /
+leakage baselines that can erase the claim. Stop-results K1-K8 are
+preregistered in that plan.
 
-- reproduce and root-cause the 60-cycle degeneracy;
-- produce truthful `transition-row/v1` records from a non-degenerate 2-3 actor
-  runtime under free-tier discipline;
+Standing requirements:
+
+- produce truthful `transition-row/v1` records; labels come from runtime
+  evidence, never from tool names, scenario text, or actor self-report;
+- social-response windows close only after each other active actor completed
+  at least one subsequent Actor Turn slot or a preregistered timeout;
 - log `(state_before, executed_action, observed_delta)` independently of the
   actor's self-declared expected outcome;
 - keep prediction quality, acting outcome, physical competence, social
   consequence, continuity, robustness, and efficiency separate in reports.
 
-The current research headline is not fixed. F-native, F-loop, and F-society
-remain candidate branches until the Goldilocks and society-observable preflights
-say a meaningful layer exists.
+The old F-native/F-loop/F-society branches are deferred under new names
+(trained-predictor / advisory-use / social-pattern); see the crosswalk in the
+active plan. "WAM" is retired as a banner term.
 
 Runtime evidence, verification, screenshots, ledgers, seed/reset records, and
 scoring scripts are mandatory audit hygiene. Do not present them as the

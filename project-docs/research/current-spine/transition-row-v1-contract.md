@@ -265,6 +265,15 @@ prompt_ref:
 labels after the row is closed. They must never feed post-action label evidence
 back into predictor context.
 
+## Response-Window Minimum Horizon (2026-07-05 amendment)
+
+A social-response window supports labels other than `unknown_social_response`
+only if it closes after every observed other active actor has completed at
+least one subsequent Actor Turn slot, or after a preregistered timeout.
+Windows closed on the immediate post-action observation are structurally
+vacuous and made every earlier control run close as `no_observable_response`.
+See `central-plan-embodied-co-actor-legibility.md` section 3.3.
+
 ## What Not To Do
 
 - Do not build `social-material-transition/v1` as the active no-regret row name.
