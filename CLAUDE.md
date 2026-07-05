@@ -44,6 +44,15 @@ Repo TypeScript runs on Bun only. Use `bun run <path.ts>`, `bun test`, and
 `bun run typecheck`; do not execute repo `.ts` files through `node`, `ts-node`,
 `tsx`, `npx tsx`, or `process.execPath`.
 
+Implementation here is AI-generated; treat marginal implementation cost as
+near zero. "It is already implemented" is never a reason to keep a direction,
+design, schema, or document — sunk implementation is an anti-pattern
+rationale. Argue every direction decision from research value, falsifiability,
+baselines, and current evidence, as if a from-scratch rebuild were free. The
+converse also holds: more code or docs is not more research. Provider tokens,
+quotas, recorded run evidence, and data integrity remain scarce and gated.
+Binding detail: `AGENTS.md` (`ZERO_COST_IMPLEMENTATION_RULE`).
+
 ## Commit Discipline
 
 After completing requested repo changes, commit the work before the final

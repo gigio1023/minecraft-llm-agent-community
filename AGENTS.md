@@ -115,6 +115,33 @@ Runtime evidence, verification, screenshots, ledgers, seed/reset records, and
 scoring scripts are mandatory audit hygiene. Do not present them as the
 research contribution by themselves.
 
+## Zero-Cost Implementation Rule
+
+Search token: `ZERO_COST_IMPLEMENTATION_RULE`.
+
+All repo implementation is produced with AI coding tools. For direction,
+design, and review decisions, treat marginal implementation cost as near zero.
+
+Consequences:
+
+- "It is already implemented / already written / already designed" is never
+  evidence for keeping a direction, architecture, schema, pipeline, protocol,
+  or document. Sunk implementation is an anti-pattern rationale and must be
+  rejected wherever it appears in plans, reviews, or handoffs.
+- Direction and design decisions must be argued from research value,
+  falsifiability, baseline pressure, and current evidence, as if a
+  from-scratch rebuild were free. Re-derive the decision; do not inherit it.
+- Prefer replacing or deleting wrong-shaped artifacts over accreting
+  compatibility layers around them. Preserve the audit trail by superseding
+  and archiving, not by keeping stale artifacts active.
+- The converse guard also holds: free implementation is not license for fake
+  ambition. More code, schemas, protocols, gates, or documents is not more
+  research. Volume earns nothing.
+- Zero cost applies to implementation labor only. Provider tokens, quotas,
+  live-run budgets, recorded run evidence, data integrity, and user attention
+  remain scarce. The provider quota preflight, runtime authority gates, and
+  evidence rules stay fully binding.
+
 ## Runtime Authority Gates
 
 Runtime code owns Minecraft truth. Provider text, memory notes, PlanBeads,
