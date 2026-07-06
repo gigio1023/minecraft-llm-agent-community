@@ -254,6 +254,17 @@ Live C2-2 follow-up status (2026-07-06):
 - [x] receiving observation evidence records
       `loadedWorldScope.absence_claims_exhaustive: false`.
 
+Live C2-7 follow-up status (2026-07-06):
+
+- [x] provider-free C2-7 rehearsal declares `scripted_responder`,
+      `stable_soul`, and `resampled_soul` in one layout and attributes
+      rows by condition through the routing map;
+- [x] `seed-reset-record/v1` creation and validation link
+      `resampled_soul` rows to recorded condition, seed/reset, soul-instance,
+      and held-out-family provenance without private soul text;
+- [x] grep-level guard is covered by
+      `cd probe && bun test test/legibilitySession1.test.ts -t 'C2-7|condition literal'`.
+
 **S1-1. Shared-session scheduler with per-actor provider routing**
 
 - What: the social-cycle runner starts N (2-3) actors in one session,

@@ -275,12 +275,13 @@ file's boxes in the same commit as each slice.
   `resampled_soul`. Condition assignment lives only in the declaration
   and routing map.
 - Acceptance:
-  - [ ] a provider-free rehearsal (deterministic stand-in for the soul
+  - [x] a provider-free rehearsal (deterministic stand-in for the soul
         provider) runs all three conditions in one declared layout with
-        per-condition rows attributed correctly;
-  - [ ] `seed-reset-record/v1` artifacts validate against the contract
-        doc and are referenced by affected rows;
-  - [ ] grep-level check: no `condition ===` branches outside declaration
+        per-condition rows attributed correctly
+        (`cd probe && bun test test/legibilitySession1.test.ts -t 'C2-7|condition literal'`);
+  - [x] `seed-reset-record/v1` artifacts validate against the contract
+        doc and are referenced by affected rows in the C2-7 rehearsal;
+  - [x] grep-level check: no `condition ===` branches outside declaration
         and routing construction.
 - Blocked by: C2-1.
 
