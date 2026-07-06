@@ -10,8 +10,8 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 ## Purpose
 
-`transition-row/v1` is the first research data unit this project needs before it
-can choose a research headline.
+`transition-row/v1` is the first research data unit the active legibility
+experiment needs before it can score any predictor arm.
 
 The row is an independent observation record:
 
@@ -24,15 +24,15 @@ replacement for runtime authority. It exists so later experiments can ask whethe
 an LLM prior, a history-grounded prompt, or a learned model predicts observed
 Minecraft consequences better than a baseline.
 
-Use `No-Regret-Core-Scenario-Catalog.md` when selecting row-producing
-conditions. A Goldilocks-facing batch should include material stake and
-interaction opportunity, not only obvious single-actor Minecraft mechanics.
+Use `no-regret-core-scenario-catalog.md` when selecting row-producing
+conditions. A legibility batch should include material stake and interaction
+opportunity, not only obvious single-actor Minecraft mechanics.
 
-Use `Transition-Row-Label-Codebook.md` when assigning physical, material, and
+Use `transition-row-label-codebook.md` when assigning physical, material, and
 social-response labels. This contract defines the row shape; the codebook defines
 what evidence is sufficient for labels.
 
-Use `Seed-Reset-Record-V1-Contract.md` for world/session provenance. A transition
+Use `seed-reset-record-v1-contract.md` for world/session provenance. A transition
 row may carry a stable seed/reset id, but it should not decide whether a run
 counts as fresh seed/reset coverage.
 
@@ -40,10 +40,10 @@ counts as fresh seed/reset coverage.
 
 `transition-row/v1` must not contain `predicted_delta`.
 
-Prediction records used by the Goldilocks preflight are separate artifacts joined
-to `transition-row/v1` by `row_id` only during analysis. This avoids the live
-re-badging trap where the actor's own `expected_outcome` is renamed into a target
-label.
+Prediction records used by the legibility analysis are separate artifacts joined
+to `transition-row/v1` by `row_id` only after labels are locked. This avoids the
+live re-badging trap where the actor's own `expected_outcome` is renamed into a
+target label.
 
 Forbidden as ground truth:
 
@@ -221,9 +221,9 @@ Recommended tags:
 - `no_response_observed`: response window closed with no observed response;
 - `loaded_world_limited`: absence claims are limited by what Mineflayer loaded.
 
-## No-Regret Core Acceptance
+## Legibility Batch Diagnostics
 
-A no-regret core batch is not ready for the Goldilocks preflight unless it has:
+A legibility batch should meet the K6-style floor from the active central plan:
 
 - at least 2 fresh seeds or reset sessions;
 - 2-3 actors present for the measured window;
@@ -243,28 +243,35 @@ A no-regret core batch is not ready for the Goldilocks preflight unless it has:
 These thresholds prove only that the substrate is not obviously degenerate. They
 do not prove the research claim.
 
-## Preflight Prediction Join
+## Offline Prediction Join
 
-The Goldilocks preflight may create separate prediction artifacts:
+The legibility analysis may create separate prediction artifacts. This is an
+illustrative planning shape, not a runtime row schema:
 
 ```yaml
-schema_version: preflight-prediction/v1
+schema_version: legibility-prediction/v1
 prediction_id:
 row_id:
-predictor_arm: majority | scripted_heuristic | llm_prior | current_observation | history_grounded
+predictor_arm:
+  majority_or_no_response | scripted_heuristic | policy_copy |
+  last_response_carried_forward | llm_prior | current_observation |
+  history_grounded | same_family_predictor | shuffled_history |
+  actor_id_only | first_m_public_responses | action_family_by_responder |
+  public_profile_only
 input_cutoff_timestamp:
-predicted_delta:
-  physical:
-  material:
-  social_response:
-confidence:
+public_history_export_ref:
+predicted_labels:
+  material_access: []
+  social_response: []
+probabilities_ref:
 model:
+model_family:
 prompt_ref:
 ```
 
-`preflight-prediction/v1` records are evaluated against `transition-row/v1`
-labels after the row is closed. They must never feed post-action label evidence
-back into predictor context.
+`legibility-prediction/v1` records are evaluated against locked
+`transition-row/v1` labels after the row is closed. They must never feed
+post-action label evidence back into predictor context.
 
 ## Response-Window Minimum Horizon (2026-07-05 amendment)
 
@@ -279,7 +286,8 @@ See `central-plan-embodied-co-actor-legibility.md` section 3.3.
 
 - Do not build `social-material-transition/v1` as the active no-regret row name.
   That older name referred to a predicted+observed scoring row in WAM-era docs.
-- Do not use the actor's `expected_outcome` as `predicted_delta`.
+- Do not use the actor's `expected_outcome` as a prediction artifact or target
+  label.
 - Do not turn label classes into hidden provider strategy.
 - Do not treat `no_observable_response` as missing data. It is a valid observed
   response class when the response window is defined and closed.

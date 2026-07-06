@@ -8,14 +8,14 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `Transition-Row-V1-Contract.md`
-- `No-Regret-Core-Research-Protocol.md`
-- `No-Regret-Core-Scenario-Catalog.md`
-- `Goldilocks-Preflight-Protocol.md`
-- `Society-Observable-Preflight.md`
+- `central-plan-embodied-co-actor-legibility.md`
+- `embodied-co-actor-legibility-implementation-plan.md`
+- `transition-row-v1-contract.md`
+- `no-regret-core-scenario-catalog.md`
+- `society-observable-preflight.md`
 
 Authority: subordinate to `AGENTS.md`, the active central plan, and
-`Transition-Row-V1-Contract.md`. This file defines how row labels are assigned;
+`transition-row-v1-contract.md`. This file defines how row labels are assigned;
 it does not define a new row schema.
 
 ## Purpose

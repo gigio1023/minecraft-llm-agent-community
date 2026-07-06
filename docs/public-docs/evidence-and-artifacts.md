@@ -8,11 +8,16 @@ The project treats artifacts as audit hygiene. They are the way to check what a
 run did, not the research contribution by themselves. This matters because LLM
 text can sound successful even when Minecraft state did not change.
 
-For the active WAM direction, artifacts should support transition rows:
+For the active legibility experiment, artifacts should support independent
+`transition-row/v1` records:
 
 ```text
-state_before + candidate_action + predicted_delta + observed_delta
+state_before + executed_action + observed_delta + evidence_refs
 ```
+
+Prediction artifacts are separate. They are joined to locked rows by `row_id`
+only during offline analysis, so the actor's expected outcome and provider
+rationale never become ground truth.
 
 ## What Counts As Evidence
 
@@ -25,8 +30,10 @@ Useful evidence includes:
 - world-state scan summaries with explicit scan limits;
 - actor workspace evidence references;
 - provider input/output snapshots;
-- provider usage records when live models are used.
-- predicted-vs-observed transition rows when a WAM is evaluated.
+- provider usage records when live models are used;
+- response-window records showing when another actor had a chance to respond;
+- public-history exports that include only allowlisted runtime evidence;
+- offline prediction/scoring artifacts after label lock.
 
 ## What Does Not Count Alone
 
@@ -46,11 +53,14 @@ reason clearly. A good report should say whether the actor was blocked by
 missing parameters, unavailable world state, repeated target failure, provider
 budget, auth, server lifecycle, or runtime checks.
 
-## Why This Helps Social Simulation
+## Why This Helps The Experiment
 
-Social-material WAM research needs consequences. If an actor promises help,
-fails to gather resources, lends a tool, refuses a request, places a public
-affordance, or repeats an impossible action, the next cycle should see
-artifact-backed consequences instead of relying on a fresh prompt summary. The
-model's predicted consequences should be compared with what the runtime
-observed.
+The active experiment needs consequences that a reviewer can inspect. If an
+actor promises help, fails to gather resources, lends a tool, refuses a request,
+places a public affordance, or repeats an impossible action, later turns should
+see artifact-backed consequences instead of relying on a fresh prompt summary.
+
+The research question is not whether artifacts are neat. It is whether public
+interaction history adds predictive signal for another actor's observable
+social/material response, after simple baselines and leakage checks have had a
+fair chance to erase the claim.

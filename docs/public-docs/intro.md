@@ -5,27 +5,27 @@ sidebar_position: 1
 # Overview
 
 `minecraft-llm-agent-community` is a small headless Minecraft runtime for
-studying advisory social-material consequence prediction for LLM-backed actors
-in a world where actions have concrete consequences.
+studying embodied co-actor legibility: whether an observer model can predict a
+co-actor's next-turn social and material responses from public interaction
+history alone.
 
-The project is not a generic benchmark bot and not a revival of loose
-Voyager-style generated-code execution. The near-term goal is more basic:
-make one Mineflayer actor attempt bounded Minecraft actions, record what
-happened, and leave artifacts that explain success, failure, stalls, and
-reconnects. The longer-term research object is an advisory model that predicts
-what will change before the action happens.
+The project is not a generic benchmark bot, a race-to-diamond agent, a large
+village simulator, or a revival of loose Voyager-style generated-code
+execution. The near-term proof is a bounded 2-3 actor shared session that
+records what each actor could observe, what action executed, what changed, and
+which response window made the result scorable.
 
 ## Why Minecraft
 
 Minecraft is useful because it turns abstract agent behavior into inspectable
-state. An actor can gather resources, craft, move, place blocks, use containers,
-or speak, and the runtime can check whether the world, inventory, position, or
-transcript changed.
+state. Actors can gather resources, craft, move, place blocks, use containers,
+share or refuse items, or speak, and the runtime can check whether the world,
+inventory, position, chat, or transcript changed.
 
-The long-term direction is a social-material WAM for Minecraft. Actors should
-eventually carry role context, memory, relationships, obligations, and
-actor-owned action skills. The first proof is deliberately smaller: competence,
-observability, and transition rows before richer social behavior.
+That material grounding matters. If another actor lends a tool, blocks access,
+ignores a request, repairs a mistake, or uses a public affordance later, the
+project should record evidence for that consequence instead of relying on a
+plausible story in model text.
 
 ## What The Runtime Owns
 
@@ -41,9 +41,14 @@ truth:
 
 Provider text is context, not proof. A confident explanation does not count as
 Minecraft progress unless the runtime records supporting evidence.
-That evidence is experiment hygiene, not the contribution by itself. The
-research question is whether predicted social-material deltas match observed
-Minecraft consequences.
+That evidence is experiment hygiene, not the contribution by itself. The active
+research question is whether public history improves prediction of
+`social_response` and `material_access` labels beyond baselines such as current
+observation, majority/no-response, policy-copy, shuffled-history, and leakage
+controls.
+
+`transition-row/v1` records never contain predicted outcomes. Prediction
+artifacts are joined later by row id after labels are locked.
 
 ## Read Next
 

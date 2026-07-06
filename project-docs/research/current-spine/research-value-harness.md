@@ -9,9 +9,10 @@ Search token: `RESEARCH_VALUE_HARNESS`.
 This harness exists to stop the project from mistaking polished implementation
 language for research value.
 
-It should be used before rewriting the central plan, choosing a research
-headline, proposing a paper framing, or designing an experiment around
-F-native, F-loop, F-society, WAM-era ideas, or the Goldilocks gate.
+It should be used before rewriting the central plan, proposing a paper framing,
+adding a Qwen/VLA/training branch, promoting the deferred social-pattern branch,
+or designing any experiment that might mistake verification hygiene for research
+value.
 
 The associated agent skill is:
 
@@ -47,8 +48,8 @@ Use these as labels, not decoration.
 
 | Gap type | Meaning | Minecraft example |
 | --- | --- | --- |
-| Knowledge gap | We do not know something substantive | Whether observed interaction history adds signal beyond LLM prior for a social-material layer |
-| Methodological gap | Existing methods cannot isolate the target | Existing Minecraft agents measure task success, not action-conditioned social-material consequence |
+| Knowledge gap | We do not know something substantive | Whether public interaction history adds predictive signal for a co-actor's social/material response |
+| Methodological gap | Existing methods cannot isolate the target | Existing Minecraft agents measure task success or policy behavior, not public-history-only co-actor legibility under killer baselines |
 | Evidence gap | A claim is plausible but under-supported | Public Minecraft society claims lack reproducible logs, code, scoring, or independent replication |
 | Contradictory gap | Existing claims conflict | Demos show rich society; controlled runs may collapse into repeated loops |
 | Population/application gap | A finding may not transfer | Dialogue-only social simulation may not transfer to embodied Minecraft constraints |
@@ -82,8 +83,11 @@ The artifacts are documented in:
 
 The current project-level instances are:
 
-- `Prior-Work-Proximity-Current-Spine-2026-06-29.md`
-- `Research-Decision-Current-Spine-2026-06-29.md`
+- `central-plan-embodied-co-actor-legibility.md` sections 11-12
+- `embodied-co-actor-legibility-implementation-plan.md`
+
+The 2026-06-29 prior-work and decision files are superseded audit trail unless a
+current Tier 1 document explicitly cites a detail from them.
 
 ## Decision Labels
 
@@ -91,13 +95,15 @@ Use these labels exactly:
 
 - `kill`: not a research claim yet.
 - `defer`: interesting but not testable now.
-- `core-first`: blocked on the no-regret core.
-- `preflight-ready`: core exists and the candidate can enter Goldilocks
-  preflight.
-- `headline-candidate`: post-preflight evidence supports selecting it.
+- `core-first`: blocked on the legibility substrate or another named core
+  measurement dependency.
+- `preflight-ready`: the required substrate exists and the candidate can enter a
+  preregistered uncertainty-reducing test.
+- `headline-candidate`: evidence after the preregistered test supports selecting
+  or preserving the claim.
 
-Most ambitious claims before non-degenerate 2-3 actor transition rows should be
-`core-first`, not headline candidates.
+Most ambitious claims before the Session 1 smoke and Session 2 preregistered
+batch should be `core-first`, not headline candidates.
 
 ## Minecraft-Specific Pressure
 
@@ -117,6 +123,8 @@ The harness looks for stronger claims:
 - social-material deltas are observable without relying on actor self-report;
 - negative results kill or narrow attractive but weak framings;
 - Minecraft as an embodied substrate changes what can be measured.
+- policy-copy, shuffled-history, leakage, and held-out-family baselines fail to
+  erase the active legibility claim.
 
 ## Relationship To The Central Plan
 
@@ -132,12 +140,14 @@ that should be used before changing it.
 The current order remains:
 
 ```text
-no-regret core -> Goldilocks branch triage -> larger confirming experiment or
-branch deferral
+Session 1 provider-free deterministic smoke -> Session 2 preregistered live
+pilot -> research-decision/v1 -> branch deferral, confirming experiment, or
+preserved negative result
 ```
 
-The harness mainly improves how the project decides whether a proposed headline
-or experiment deserves to pass from one stage to the next.
+The harness mainly improves how the project decides whether a proposed direction
+deserves to change the active central plan or enter a later branch after the
+legibility experiment produces a decision.
 
 ## How To Use
 
@@ -155,5 +165,8 @@ For a new research proposal:
 For the current project, the most important `what_not_to_do_next` is usually:
 
 ```text
-Do not select a headline before the no-regret core and Goldilocks evidence exist.
+Do not add Qwen/VLA arms, model training, society-scale episodes, or new
+protocol layers before the active legibility substrate produces a decision.
+Do not present schemas, logs, tests, or verified actions as the contribution by
+themselves.
 ```

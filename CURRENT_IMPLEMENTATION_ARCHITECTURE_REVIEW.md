@@ -19,13 +19,14 @@ questions quickly:
 3. How do Actor Turn, Action Cards, PlanBeads, and generated action skills fit
    together?
 4. How does the runtime distinguish real Minecraft progress from fake progress?
-5. Where does the advisory WAM prediction layer fit?
+5. Where does the embodied co-actor legibility substrate fit?
 6. What are the largest current implementation risks?
 
-In one sentence: this repository is building a **headless runtime where
-Soul/LifeGoal-grounded actors attempt Minecraft actions while an advisory
-social-material WAM predicts the expected consequences and transition rows
-compare those predictions with observed outcomes**.
+In one sentence: this repository is building a **bounded, observable headless
+Minecraft runtime where Soul/LifeGoal-grounded actors act in a shared 2-3 actor
+session, while independent `transition-row/v1` records, public-history exports,
+and offline predictors make the embodied co-actor legibility experiment
+scorable**.
 
 The important boundary is that the LLM/provider does not own Minecraft truth.
 During Actor Turn, the provider chooses one visible Action Card function tool or
@@ -36,8 +37,11 @@ evidence, memory, PlanBeads, relationships, and generated action-skill state
 into later turns.
 
 Runtime verification is mandatory hygiene, not the research contribution. The
-research object is the advisory prediction of physical, material, and social
-deltas; acting success and prediction quality must be reported separately.
+active research object is whether an observer model can predict a co-actor's
+next-turn `social_response` and `material_access` labels from public
+interaction history alone, with baselines and stop-results that can erase the
+claim. Acting success, physical competence, social consequence, continuity,
+robustness, efficiency, and prediction quality must be reported separately.
 
 ## One-Page Mental Model
 
@@ -47,7 +51,6 @@ flowchart LR
   Workspace["Actor workspace<br/>evidence, memory, PlanBeads, skills"]
   Observe["Observation<br/>world, inventory, actors, transcript"]
   Input["ActorTurnInput<br/>current_state + source_evidence_bundle,<br/>Action Cards, guide"]
-  WAM["Advisory WAM<br/>predicted delta"]
   LLM["Actor Turn LLM<br/>function tool selection"]
   Choice{"Exactly one tool call"}
   Card["Visible Action Card<br/>schema-bound parameters"]
@@ -55,41 +58,48 @@ flowchart LR
   Runtime["Runtime gates<br/>schema, permission, retry, verifier"]
   Codegen["Internal Mineflayer codegen<br/>full ActorTurnInput + raw tool call + skill markdown"]
   MC["Mineflayer + Minecraft"]
-  Row["Transition row<br/>predicted vs observed delta"]
+  Row["transition-row/v1<br/>state_before + executed_action + observed_delta"]
+  Window["response window<br/>other actor subsequent turns or timeout"]
+  Public["public-history export<br/>allowlisted runtime evidence only"]
+  Predict["offline predictor artifacts<br/>joined after label lock"]
+  Score["scorer + research-decision/v1"]
   Evidence["Evidence Trace append<br/>reports and artifacts"]
 
   Soul --> Input
   Workspace --> Input
   Observe --> Input
-  Input --> WAM
   Input --> LLM --> Choice
   Choice --> Card --> Runtime
   Choice --> Author --> Codegen --> Runtime
-  WAM --> Row
-  Runtime --> MC --> Row --> Evidence --> Workspace
+  Runtime --> MC --> Row
+  Row --> Window --> Evidence --> Workspace
+  Evidence --> Public --> Predict --> Score
 ```
 
 Arrows show information and artifact flow, not authority transfer. Provider text
 does not establish execution or success. Only validated runtime actions,
 Mineflayer execution, and runtime-observed evidence create Minecraft progress.
-The WAM predicts expected deltas but does not execute, score itself, or override
-runtime checks.
+Offline predictor artifacts are analysis-only. They do not select actions, fill
+runtime parameters, decide success, mutate actor state, or override runtime
+checks.
 
 ## Current Product Scope
 
-The long-term direction is advisory social-material WAM research in wild
-Minecraft, motivated by Soul-grounded social simulation.
-The current delivery target is deliberately smaller.
+The active direction is the embodied co-actor legibility experiment in
+Minecraft, motivated by Soul/LifeGoal-grounded social-material interaction.
+The current delivery target is Session 1 of the implementation plan:
+provider-free integrated substrate for a 2-actor smoke before any live provider
+pilot.
 
 | Scope | Current target |
 | --- | --- |
-| Actor count | one actor first |
-| Minecraft client | one Mineflayer bot |
-| Runtime loop | observe -> Actor Turn -> gate -> execute/trial -> verify -> record |
-| Provider hot path | one low-cost Actor Turn tool-selection call per ordinary turn |
+| Actor count | 2-3 actors in one shared session; single-actor runs are calibration/smoke only |
+| Minecraft client | multiple Mineflayer bots in one server session |
+| Runtime loop | observe -> Actor Turn slot -> gate -> execute/trial -> verify -> record row -> close response window |
+| Provider hot path | per-actor provider routing; `scripted-social` is a provider behind the same seam |
 | Generated behavior | Actor Turn-only `author_mineflayer_action`, then bounded codegen/trial |
 | Continuity | actor workspace evidence, memory, PlanBeads, relationships, action skill state |
-| WAM layer | not yet implemented; target is predicted-vs-observed transition rows |
+| Research data | `transition-row/v1` observed rows, public-history export, label lock, offline prediction join/scorer |
 
 Current non-goals:
 
@@ -102,6 +112,9 @@ Current non-goals:
 - provider prose being treated as runtime authority;
 - verification, screenshots, logs, or benchmark artifacts being presented as
   the research contribution.
+- Qwen-AgentWorld, JarvisVLA, VLA arms, model training, fine-tuning, or
+  society-scale episodes before the preregistered legibility experiment produces
+  a decision.
 
 ## Actor Perspective
 
@@ -115,7 +128,6 @@ flowchart TD
   Memory["What I remember<br/>evidence-linked memory and recent trace"]
   Work["What remains open<br/>PlanBead hints when any exist"]
   Body["What I can try<br/>Action Cards and generated-action path"]
-  Prediction["What I expect<br/>advisory predicted delta"]
   Turn["What I choose now<br/>one function tool call"]
   World["What actually happens<br/>Mineflayer execution or trial"]
   Consequence["What carries forward<br/>evidence, memory, PlanBeads, skill state"]
@@ -125,9 +137,7 @@ flowchart TD
   Memory --> Turn
   Work --> Turn
   Body --> Turn
-  Turn --> Prediction
   Turn --> World --> Consequence
-  Prediction --> Consequence
   Consequence --> Memory
   Consequence --> Work
 ```
@@ -143,8 +153,8 @@ bounded source layer that keeps observation, world-event, memory, recent-action,
 and PlanBead cards beside those facts. This pairing is intentional: compact
 summaries may help low-cost models, but summary-only observation/social/action
 context loses too much information and recreates a hidden planner bottleneck.
-The advisory WAM uses the same evidence-rich context to predict deltas, but it
-is not an action-selection authority.
+The public-history exporter must derive predictor input only from allowlisted
+runtime evidence, after the runtime has recorded action and observation truth.
 
 ## Core Terms
 
@@ -160,8 +170,10 @@ is not an action-selection authority.
 | PlanBeads | passive actor-owned work graph for open work, blockers, obligations, followups. |
 | Evidence Trace | compact window of runtime-backed action/evidence results for the next Actor Turn. |
 | actor workspace | source of truth for actor artifacts: evidence, memory, PlanBeads, relationships, provider snapshots, generated action skills. |
-| advisory WAM | predictor of physical/material/social deltas for a candidate action; it is not the actor or runtime. |
-| social-material transition | state/action/predicted-delta/observed-delta row used for WAM scoring. |
+| `transition-row/v1` | independent state/action/observed-delta row used for the legibility experiment; no `predicted_delta`. |
+| public-history export | allowlisted predictor-facing artifact derived from runtime evidence; excludes ActorSoul, LifeGoal, memory, PlanBeads, provider IO, and private workspace fields of the target. |
+| response window | bounded post-action period that closes only after every other active actor has completed a subsequent Actor Turn slot or a preregistered timeout fires. |
+| offline predictor artifact | analysis-only prediction joined by `row_id` after labels are locked; it is not runtime authority. |
 
 `agent skill` and `action skill` are different. An `agent skill` is a Codex or
 Claude capability such as `.agents/skills/mineflayer-code-generation/SKILL.md`.
@@ -204,8 +216,8 @@ supply args, clear retry, grant permission, authorize source, or prove success.
 
 Tool calling and schemas/enums define the flow. Runtime validation and evidence
 define execution truth.
-Prediction rows define WAM evaluation; they must not be collapsed into the
-Actor Turn success label.
+Offline predictor artifacts define legibility evaluation; they must not be
+collapsed into the Actor Turn success label or into runtime truth.
 
 ## Runtime Gates
 
@@ -381,22 +393,33 @@ evidence, and persistence stay traceable despite that size.
   Mineflayer call.
 - Generated action candidates now leave source, schema, helper, verifier, trial,
   and promotion artifacts.
+- The active research plan now names the missing substrate explicitly instead of
+  treating verification, row shape, or logs as the research contribution.
 
 ## Current Implementation Risks
 
-1. PlanBeads are wired but did not substantively participate in the latest
-   50-cycle run; empty ready-front packets are not long-term planning.
-2. Active Episode can remain stale after a social request is satisfied; the
-   decision frame may warn the model, but durable work state still needs to be
-   updated.
-3. `socialCycleRunner.ts` is still a large orchestration file.
-4. Some archived planner provider files and report schemas remain for explicit
-   migration or historical artifact readability; they must not be treated as the
-   active Actor Turn contract.
-5. Long-run behavior can still loop on observe/inspect/wait or repeated low-value
-   actions even when runtime status is `passed`.
-6. A docs/test green state is not enough; behavior claims need fresh live-run
-   evidence and artifact review.
+1. The live path is still short of the active experiment: shared 2-3 actor
+   scheduling, cross-actor observation, chat capture, non-vacuous response
+   windows, public-history export, declaration writing, and offline scoring are
+   not yet one integrated runtime path.
+2. Response-window semantics are the highest-risk logic. A window that closes on
+   immediate post-action observation recreates the old `no_observable_response`
+   vacuity and makes social-response labels uninformative.
+3. Public/private separation is not yet enforceable by artifact shape. Predictor
+   inputs must come from an allowlisted public-history export, not from raw actor
+   workspaces or provider snapshots.
+4. `socialCycleRunner.ts` is still a large orchestration file; the architecture
+   risk is not size by itself, but whether slot events, actor routing, row
+   assembly, evidence, and response-window closure remain traceable through it.
+5. PlanBeads are wired but can still be substantively empty; they preserve
+   continuity only when meaningful social requests, blockers, obligations, and
+   repeated no-progress evidence create/update durable records.
+6. Long-run behavior can still loop on observe/inspect/wait or repeated
+   low-value actions even when runtime status is `passed`; K6/K7-style
+   diagnostics must separate substrate failure from research failure.
+7. A docs/test green state is not enough. Session 1 needs a deterministic
+   provider-free end-to-end smoke artifact, and Session 2 needs a preregistered
+   live batch before any legibility claim is made.
 
 ## Documentation Authority
 
@@ -404,11 +427,13 @@ If documents disagree, start from:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-4. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-5. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-6. `project-docs/orientation/documentation-map.md`
-7. `project-docs/orientation/terminology.md`
+3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+4. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+5. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+6. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+7. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+8. `project-docs/orientation/documentation-map.md`
+9. `project-docs/orientation/terminology.md`
 
 Reference docs under `project-docs/references/**` and historical docs under
 `project-docs/archive/**` are not active implementation specs unless a current

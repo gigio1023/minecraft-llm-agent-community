@@ -100,7 +100,7 @@ they are not active headline or implementation order.
 - `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
   - reference status: case library for possession, access, claims, obligations,
     refusal, repair, public affordances, and weak commons;
-  - not active phase order before Goldilocks.
+  - not the active build order for the legibility experiment.
 - `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
   - reference status: provider-free fixture and report sanity check;
   - not evidence of open-world social behavior.

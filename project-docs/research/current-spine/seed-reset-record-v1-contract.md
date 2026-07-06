@@ -11,12 +11,11 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
-- `No-Regret-Core-Research-Protocol.md`
-- `Transition-Row-V1-Contract.md`
-- `No-Regret-Core-Implementation-Campaign.md`
-- `Goldilocks-Preflight-Protocol.md`
-- `Society-Observable-Preflight.md`
+- `central-plan-embodied-co-actor-legibility.md`
+- `embodied-co-actor-legibility-implementation-plan.md`
+- `transition-row-v1-contract.md`
+- `no-regret-core-scenario-catalog.md`
+- `society-observable-preflight.md`
 
 ## Purpose
 
@@ -27,14 +26,15 @@ came from. Its job is narrow:
 prevent hindsight laundering of fresh seeds, reset sessions, and offline controls
 ```
 
-A seed/reset record does not prove the no-regret core, Goldilocks readiness,
-F-native, F-loop, or F-society. It only makes later row batches auditable by
+A seed/reset record does not prove the legibility claim, predictor quality, or
+the deferred social-pattern branch. It only makes later row batches auditable by
 world/setup provenance and counting status.
 
 ## Why It Exists
 
-The no-regret core requires evidence across fresh seeds or auditable reset
-sessions. Without a separate record, these cases can be confused:
+The active legibility experiment requires evidence across declared fresh seeds
+or auditable reset sessions. Without a separate record, these cases can be
+confused:
 
 - a newly generated Minecraft world seed;
 - a restored/reset session from a known setup;
@@ -56,7 +56,7 @@ recorded_at:
 seed_or_reset_id:
 
 session_kind: fresh_seed | reset_session | reused_live_session | deterministic_no_world | offline_control
-counts_toward_no_regret_seed_requirement: true | false
+counts_toward_legibility_seed_requirement: true | false
 counting_rationale:
 
 world:
@@ -108,7 +108,7 @@ from whether the run later looked useful.
 - a newly generated Minecraft world instance for the measured run;
 - has a declared Minecraft seed or equivalent world-instance id;
 - has setup artifacts and loaded-world caveats;
-- may count toward no-regret seed/reset thresholds if declared before outcome
+- may count toward legibility seed/reset thresholds if declared before outcome
   inspection and the measured window has 2-3 active actors.
 
 `reset_session`:
@@ -129,18 +129,18 @@ from whether the run later looked useful.
 
 - schema/linkage/control evidence without live Minecraft world state;
 - useful for tests and artifact wiring;
-- never counts toward live no-regret seed/reset thresholds.
+- never counts toward live legibility seed/reset thresholds.
 
 `offline_control`:
 
 - provider-free or offline competence/control execution;
 - can prove mechanics, report linkage, and failure modes;
-- does not count toward no-regret pilot thresholds unless a future authority doc
+- does not count toward legibility pilot thresholds unless a future authority doc
   explicitly narrows and justifies that rule before outcomes are inspected.
 
 ## Counting Rules
 
-A seed/reset record can count toward the no-regret seed/reset requirement only
+A seed/reset record can count toward the legibility seed/reset requirement only
 when all are true:
 
 - `session_kind` is `fresh_seed` or `reset_session`;
@@ -153,13 +153,13 @@ when all are true:
   declared environment blocker.
 
 If any item is false, keep the record but set
-`counts_toward_no_regret_seed_requirement: false` and write the reason.
+`counts_toward_legibility_seed_requirement: false` and write the reason.
 
 ## Relationship To Other Artifacts
 
-`no-regret-run-declaration/v1` should link planned seed/reset records before
-outcome inspection. The declaration prevents a narrow run from being relabeled
-as broad coverage later.
+`experiment-declaration/v1` should link planned seed/reset records before
+outcome inspection. The declaration prevents a narrow run from being relabeled as
+broad coverage later.
 
 `transition-row/v1` rows should carry a stable `seed_or_reset_id` or equivalent
 metadata so batch audits can group rows by provenance. The row still owns
@@ -171,8 +171,8 @@ not count deterministic/no-world/offline records as live seed coverage.
 
 ## Must Not Claim
 
-- Do not claim no-regret-core completion from seed/reset records alone.
-- Do not claim Goldilocks readiness from deterministic or offline rows.
+- Do not claim legibility-batch completion from seed/reset records alone.
+- Do not claim live pilot readiness from deterministic or offline rows.
 - Do not treat a world scenario id such as `natural-safe-spawn-v1` as a
   scenario-pressure family id.
 - Do not treat a reused live world as a fresh seed without a declared reset
