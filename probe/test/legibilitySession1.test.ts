@@ -9,7 +9,17 @@ import { ResponseWindowTracker } from "../src/legibility/responseWindows.js";
 import { runSession1LegibilitySmoke } from "../src/legibility/session1Smoke.js";
 import { runSharedSessionSchedule } from "../src/legibility/sharedSessionScheduler.js";
 import { scoreLegibilityPredictions } from "../src/legibility/scoring.js";
-import { createExperimentDeclaration } from "../src/legibility/declaration.js";
+import {
+  buildProviderFreeConditionRoutesFromDeclaration,
+  createExperimentDeclaration,
+  requireConditionRouteForActor
+} from "../src/legibility/declaration.js";
+import {
+  conditionProvenanceForSeedReset,
+  createResampledSoulSeedResetRecord,
+  validateSeedResetRecordV1,
+  writeSeedResetRecord
+} from "../src/legibility/seedResetRecord.js";
 import {
   assertLiveSessionEvidenceRefsResolve,
   assertProviderFreeLiveRoutes,
@@ -17,14 +27,18 @@ import {
   computeLiveChatObservedBy,
   defaultLiveSharedActorRoutes
 } from "../src/legibility/liveSharedSession.js";
+import { ensureActorSoul } from "../src/runtime/goals/actorSoulStore.js";
 import { observe } from "../src/tools/observe.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
 import type {
   ActorProviderRoute,
+  ActorTurnSlotCompletionEvent,
   LegibilityPrediction,
   LegibilityScoreReport,
   LegibilitySessionArtifact,
+  ResponseWindowRecord,
+  SeedResetRecordV1,
   StructuredChatEvent,
   TransitionRowV1
 } from "../src/legibility/types.js";
@@ -40,6 +54,18 @@ const routes: ActorProviderRoute[] = [
   { actor_id: "npc_a", provider_id: "deterministic-social", model: "deterministic-social" },
   { actor_id: "npc_b", provider_id: "scripted-social", model: "scripted-social" }
 ];
+
+async function listTypeScriptFiles(dir: string): Promise<string[]> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const nested = await Promise.all(entries.map(async (entry) => {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return listTypeScriptFiles(entryPath);
+    }
+    return entry.isFile() && entry.name.endsWith(".ts") ? [entryPath] : [];
+  }));
+  return nested.flat();
+}
 
 function positionedActor(username: string, x: number) {
   const position = {
@@ -59,6 +85,109 @@ function positionedActor(username: string, x: number) {
     username,
     entity: { position },
     inventory: { items: () => [] }
+  };
+}
+
+function closedRehearsalWindow(input: {
+  sessionId: string;
+  actorId: string;
+  slotIndex: number;
+  turnId: string;
+}): ResponseWindowRecord {
+  return {
+    schema: "response-window/v1",
+    window_id: `${input.turnId}-window`,
+    session_id: input.sessionId,
+    focal_actor_id: input.actorId,
+    focal_turn_id: input.turnId,
+    focal_slot_index: input.slotIndex,
+    required_responder_actor_ids: [],
+    completed_responder_actor_ids: [],
+    opened_at: "2026-07-06T00:00:01.500Z",
+    closed_at: "2026-07-06T00:00:02.500Z",
+    close_reason: "all_other_actor_slots_completed",
+    timeout_after_slots: 1,
+    status: "closed",
+    response_chat_events: [],
+    evidence_refs: []
+  };
+}
+
+function rehearsalRow(input: {
+  event: ActorTurnSlotCompletionEvent;
+  route: ActorProviderRoute & { condition: TransitionRowV1["condition"] };
+  index: number;
+}): TransitionRowV1 {
+  const seedOrResetId = input.route.seed_or_reset_id ?? `c2-7-${input.route.condition}`;
+  const seedResetRefs = input.route.seed_reset_ref ? [input.route.seed_reset_ref] : [];
+  return {
+    schema_version: "transition-row/v1",
+    row_id: `${input.event.turn_id}-row`,
+    session_id: input.event.session_id,
+    seed_or_reset_id: seedOrResetId,
+    cycle_index: input.index + 1,
+    actor_id: input.event.actor_id,
+    condition: input.route.condition,
+    timestamps: {
+      action_selected_at: input.event.started_at,
+      action_started_at: input.event.started_at,
+      action_finished_at: input.event.completed_at,
+      response_window_closed_at: "2026-07-06T00:00:02.500Z",
+      label_locked_at: "2026-07-06T00:00:03.000Z"
+    },
+    state_before: {
+      snapshot_ref: `state-before/${input.event.actor_id}.json`,
+      other_actors: {
+        visible_actor_ids: [],
+        interaction_range_actor_ids: [],
+        loaded_world_caveat:
+          "Provider-free C2-7 routing rehearsal; no live loaded-world absence claim."
+      },
+      social_context_refs: {
+        recent_interaction_refs: []
+      }
+    },
+    executed_action: {
+      action_kind: input.event.action_kind,
+      runtime_action_id: input.event.turn_id,
+      validation_status: "passed",
+      permission_status: "passed",
+      action_started: true
+    },
+    observed_delta: {
+      physical: {
+        classes: ["no_physical_delta"],
+        evidence_refs: []
+      },
+      material: {
+        classes: ["no_material_delta"],
+        evidence_refs: []
+      },
+      social_response: {
+        response_window: closedRehearsalWindow({
+          sessionId: input.event.session_id,
+          actorId: input.event.actor_id,
+          slotIndex: input.event.slot_index,
+          turnId: input.event.turn_id
+        }),
+        classes: ["no_observable_response"],
+        evidence_refs: []
+      },
+      exclusions: []
+    },
+    row_quality: {
+      verdict: "valid",
+      inclusion_tags: ["condition_routing_rehearsal"],
+      exclusion_reasons: [],
+      notes: ["Provider-free C2-7 condition machinery rehearsal row."]
+    },
+    metadata: {
+      provider: input.event.provider_id,
+      model: input.event.model,
+      scenario_family_id: "c2-7-condition-machinery-rehearsal",
+      scenario_family_ids: ["c2-7-condition-machinery-rehearsal"],
+      artifact_refs: [...input.event.evidence_refs, ...seedResetRefs]
+    }
   };
 }
 
@@ -96,6 +225,298 @@ test("live shared-session route guard blocks provider spend", () => {
     ]),
     /provider-free/
   );
+});
+
+test("C2-7 condition routing covers scripted, stable soul, and resampled soul provider-free", async () => {
+  const outputDir = path.join(rootDir, "c2-7-condition-machinery");
+  const seedResetRef = path.join("seed-reset", "c2-7-resampled-soul-001.json");
+  const declaration = createExperimentDeclaration({
+    experimentId: "c2-7-condition-rehearsal",
+    actorAssignments: [
+      {
+        condition: "scripted_responder",
+        actorIds: ["npc_a"],
+        seedOrResetId: "c2-7-scripted-provider-free-001",
+        counterbalancing: "provider-free scripted responder positive-control route"
+      },
+      {
+        condition: "stable_soul",
+        actorIds: ["npc_b"],
+        responderActorIds: ["npc_b"],
+        seedOrResetId: "c2-7-stable-soul-001",
+        counterbalancing: "provider-free deterministic stand-in through existing ActorSoul"
+      },
+      {
+        condition: "resampled_soul",
+        actorIds: ["npc_c"],
+        responderActorIds: ["npc_c"],
+        seedOrResetId: "c2-7-resampled-soul-001",
+        seedResetRef,
+        resetIndex: 1,
+        counterbalancing: "provider-free deterministic stand-in with resampled seed/reset record"
+      }
+    ],
+    scenarioFamilies: ["c2-7-condition-machinery-rehearsal"],
+    seedResetRefs: [seedResetRef],
+    providerFree: true,
+    writtenAt: "2026-07-06T00:00:00.000Z"
+  });
+  const stableCondition = declaration.conditions.find((condition) => condition.condition === "stable_soul");
+  const resampledCondition = declaration.conditions.find((condition) => condition.condition === "resampled_soul");
+  assert.ok(stableCondition);
+  assert.ok(resampledCondition);
+  assert.equal(stableCondition.soul_provenance.actor_soul_route, "stable_actor_soul");
+  assert.equal(stableCondition.soul_provenance.family_holdout.held_out_family_satisfied, true);
+  assert.equal(resampledCondition.seed_reset.seed_reset_ref, seedResetRef);
+  assert.equal(resampledCondition.soul_provenance.actor_soul_route, "resampled_actor_soul");
+  assert.equal(resampledCondition.soul_provenance.private_soul_text_in_declaration, false);
+
+  const seedResetRecord = createResampledSoulSeedResetRecord({
+    recordId: "seed-reset-c2-7-resampled-001",
+    runId: "c2-7-condition-rehearsal",
+    seedOrResetId: "c2-7-resampled-soul-001",
+    recordedAt: "2026-07-06T00:00:00.000Z",
+    activeActorIds: ["npc_a", "npc_b", "npc_c"],
+    scenarioFamilyIdsDeclared: ["c2-7-condition-machinery-rehearsal"],
+    preRunDeclarationRef: "experiment-declaration.json",
+    transitionRowBatchRef: "transition-rows/",
+    providerUsageRef: "provider-free",
+    conditionProvenance: conditionProvenanceForSeedReset(resampledCondition)
+  });
+  const seedResetPath = await writeSeedResetRecord(
+    path.join(outputDir, seedResetRef),
+    seedResetRecord
+  );
+  assert.equal(path.relative(outputDir, seedResetPath), seedResetRef);
+  const writtenRecord = await readJson<SeedResetRecordV1>(seedResetPath);
+  const validation = validateSeedResetRecordV1(writtenRecord);
+  assert.equal(validation.ok, true);
+  assert.equal(writtenRecord.counts_toward_legibility_seed_requirement, false);
+  assert.equal(writtenRecord.session_kind, "deterministic_no_world");
+  assert.equal(writtenRecord.condition_provenance?.condition, "resampled_soul");
+  assert.equal(
+    writtenRecord.condition_provenance?.soul_instance_id,
+    resampledCondition.soul_provenance.soul_instance_id
+  );
+
+  const actorRoutes = buildProviderFreeConditionRoutesFromDeclaration({
+    declaration
+  });
+
+  assertProviderFreeLiveRoutes(actorRoutes);
+  assert.deepEqual(actorRoutes.map((route) => route.condition), [
+    "scripted_responder",
+    "stable_soul",
+    "resampled_soul"
+  ]);
+  assert.equal(requireConditionRouteForActor({ actorRoutes, actorId: "npc_a" }).provider_id, "scripted-social");
+  const stableRoute = requireConditionRouteForActor({ actorRoutes, actorId: "npc_b" });
+  const resampledRoute = requireConditionRouteForActor({ actorRoutes, actorId: "npc_c" });
+  assert.equal(stableRoute.provider_id, "deterministic-social");
+  assert.equal(stableRoute.actor_soul_route, "stable_actor_soul");
+  assert.equal(stableRoute.soul_instance_id, stableCondition.soul_provenance.soul_instance_id);
+  assert.equal(resampledRoute.provider_id, "deterministic-social");
+  assert.equal(resampledRoute.actor_soul_route, "resampled_actor_soul");
+  assert.equal(resampledRoute.seed_or_reset_id, seedResetRecord.seed_or_reset_id);
+  assert.equal(resampledRoute.seed_reset_ref, seedResetRef);
+
+  const actorWorkspaceRoot = path.join(outputDir, "actor-workspaces");
+  const stableSoul = await ensureActorSoul(actorWorkspaceRoot, "npc_b");
+  const resampledSoul = await ensureActorSoul(actorWorkspaceRoot, "npc_c");
+  assert.equal(stableSoul.schema, "actor-soul/v1");
+  assert.equal(resampledSoul.schema, "actor-soul/v1");
+
+  const slotEvents = await runSharedSessionSchedule({
+    session_id: "c2-7-condition-rehearsal",
+    actorRoutes,
+    slotsPerActor: 1,
+    turnHandler({ actor_id, route, slot_index }) {
+      return {
+        action_kind: route.provider_id === "scripted-social" ? "say" : "observe",
+        evidence_refs: [`evidence/${actor_id}-${slot_index}.json`],
+        started_at: `2026-07-06T00:00:0${slot_index}.000Z`,
+        completed_at: `2026-07-06T00:00:0${slot_index}.500Z`
+      };
+    }
+  });
+  const rows = slotEvents.map((event, index) =>
+    rehearsalRow({
+      event,
+      route: requireConditionRouteForActor({ actorRoutes, actorId: event.actor_id }),
+      index
+    })
+  );
+
+  assert.deepEqual(rows.map((row) => row.condition), [
+    "scripted_responder",
+    "stable_soul",
+    "resampled_soul"
+  ]);
+  const resampledRow = rows.find((row) => row.seed_or_reset_id === seedResetRecord.seed_or_reset_id);
+  assert.ok(resampledRow);
+  assert.equal(resampledRow.condition, "resampled_soul");
+  assert.ok(resampledRow.metadata.artifact_refs.includes(seedResetRef));
+});
+
+test("C2-7 declarations keep stable soul identity and resample reset identity explicitly", () => {
+  const stableInput = {
+    scenarioFamilies: ["c2-7-condition-machinery-rehearsal"],
+    seedResetRefs: [] as string[],
+    providerFree: true,
+    actorAssignments: [
+      {
+        condition: "stable_soul" as const,
+        actorIds: ["npc_b"],
+        responderActorIds: ["npc_b"],
+        seedOrResetId: "stable-world-reset-001",
+        counterbalancing: "repeat stable responder declaration"
+      }
+    ]
+  };
+  const stableFirst = createExperimentDeclaration({
+    ...stableInput,
+    experimentId: "stable-repeat-a",
+    writtenAt: "2026-07-06T00:00:00.000Z"
+  });
+  const stableSecond = createExperimentDeclaration({
+    ...stableInput,
+    experimentId: "stable-repeat-b",
+    writtenAt: "2026-07-06T00:10:00.000Z"
+  });
+  assert.equal(
+    stableFirst.conditions[0]?.soul_provenance.soul_family_id,
+    stableSecond.conditions[0]?.soul_provenance.soul_family_id
+  );
+  assert.equal(
+    stableFirst.conditions[0]?.soul_provenance.soul_instance_id,
+    stableSecond.conditions[0]?.soul_provenance.soul_instance_id
+  );
+
+  const resampledFirst = createExperimentDeclaration({
+    experimentId: "resampled-repeat-a",
+    actorAssignments: [
+      {
+        condition: "resampled_soul",
+        actorIds: ["npc_c"],
+        responderActorIds: ["npc_c"],
+        seedOrResetId: "resampled-reset-001",
+        seedResetRef: "seed-reset/resampled-reset-001.json",
+        resetIndex: 1,
+        counterbalancing: "first resampled responder reset"
+      }
+    ],
+    scenarioFamilies: ["c2-7-condition-machinery-rehearsal"],
+    seedResetRefs: ["seed-reset/resampled-reset-001.json"],
+    providerFree: true,
+    writtenAt: "2026-07-06T00:00:00.000Z"
+  });
+  const resampledSecond = createExperimentDeclaration({
+    experimentId: "resampled-repeat-b",
+    actorAssignments: [
+      {
+        condition: "resampled_soul",
+        actorIds: ["npc_c"],
+        responderActorIds: ["npc_c"],
+        seedOrResetId: "resampled-reset-002",
+        seedResetRef: "seed-reset/resampled-reset-002.json",
+        resetIndex: 2,
+        counterbalancing: "second resampled responder reset"
+      }
+    ],
+    scenarioFamilies: ["c2-7-condition-machinery-rehearsal"],
+    seedResetRefs: ["seed-reset/resampled-reset-002.json"],
+    providerFree: true,
+    writtenAt: "2026-07-06T00:10:00.000Z"
+  });
+  assert.equal(
+    resampledFirst.conditions[0]?.soul_provenance.soul_family_id,
+    resampledSecond.conditions[0]?.soul_provenance.soul_family_id
+  );
+  assert.notEqual(
+    resampledFirst.conditions[0]?.soul_provenance.soul_instance_id,
+    resampledSecond.conditions[0]?.soul_provenance.soul_instance_id
+  );
+  assert.notEqual(
+    resampledFirst.conditions[0]?.seed_reset.seed_or_reset_id,
+    resampledSecond.conditions[0]?.seed_reset.seed_or_reset_id
+  );
+  assert.equal(resampledSecond.conditions[0]?.seed_reset.provenance_path.includes("resampled-reset-002"), true);
+});
+
+test("C2-7 declarations reject unknown or under-specified conditions", () => {
+  assert.throws(
+    () => createExperimentDeclaration({
+      experimentId: "invalid-condition",
+      actorAssignments: [
+        {
+          condition: "mystery_condition" as never,
+          actorIds: ["npc_x"]
+        }
+      ],
+      scenarioFamilies: ["fixture"],
+      seedResetRefs: [],
+      providerFree: true,
+      writtenAt: "2026-07-06T00:00:00.000Z"
+    }),
+    /Unknown legibility condition/
+  );
+
+  assert.throws(
+    () => createExperimentDeclaration({
+      experimentId: "missing-resampled-ref",
+      actorAssignments: [
+        {
+          condition: "resampled_soul",
+          actorIds: ["npc_c"],
+          seedOrResetId: "resampled-reset-missing-ref"
+        }
+      ],
+      scenarioFamilies: ["fixture"],
+      seedResetRefs: [],
+      providerFree: true,
+      writtenAt: "2026-07-06T00:00:00.000Z"
+    }),
+    /requires an explicit seedResetRef/
+  );
+
+  assert.throws(
+    () => buildProviderFreeConditionRoutesFromDeclaration({
+      declaration: {
+        schema_version: "experiment-declaration/v1",
+        experiment_id: "invalid-route-condition",
+        written_at: "2026-07-06T00:00:00.000Z",
+        conditions: [
+          {
+            condition: "mystery_condition",
+            actor_ids: ["npc_x"],
+            seed_reset: { seed_or_reset_id: "seed", declared_before_outcome: true },
+            soul_provenance: {}
+          }
+        ]
+      } as never
+    }),
+    /Unknown legibility condition/
+  );
+});
+
+test("condition literal branches stay inside declaration routing construction", async () => {
+  const srcDir = path.resolve(here, "..", "src");
+  const allowedRoutingFile = path.join(srcDir, "legibility", "declaration.ts");
+  const conditionLiteralBranch =
+    /\bcondition\s*(?:===|!==)\s*["'](?:scripted_responder|stable_soul|resampled_soul)["']|["'](?:scripted_responder|stable_soul|resampled_soul)["']\s*(?:===|!==)\s*\bcondition\b/;
+  const offenders: string[] = [];
+
+  for (const filePath of await listTypeScriptFiles(srcDir)) {
+    if (filePath === allowedRoutingFile) {
+      continue;
+    }
+    const source = await fs.readFile(filePath, "utf8");
+    if (conditionLiteralBranch.test(source)) {
+      offenders.push(path.relative(path.resolve(here, ".."), filePath));
+    }
+  }
+
+  assert.deepEqual(offenders, []);
 });
 
 test("live shared-session slot evidence refs must resolve", async () => {
