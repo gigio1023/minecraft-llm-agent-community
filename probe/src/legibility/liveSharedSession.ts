@@ -40,11 +40,15 @@ import {
   loadPlanBeadGraphSnapshot
 } from "../runtime/goals/planBeads/index.js";
 import { runSharedSessionSchedule } from "./sharedSessionScheduler.js";
+import { ResponseWindowTracker } from "./responseWindows.js";
 import type {
   ActorProviderRoute,
   ActorTurnSlotCompletionEvent,
   LegibilitySessionArtifact,
-  StructuredChatEvent
+  LegibilitySocialResponseLabel,
+  ResponseWindowRecord,
+  StructuredChatEvent,
+  TransitionRowV1
 } from "./types.js";
 
 export type LiveSharedLegibilitySessionResult = {
@@ -68,18 +72,28 @@ const PROVIDER_FREE_LIVE_ROUTE_IDS: ReadonlySet<SocialCycleProviderId> = new Set
 const LIVE_CHAT_OBSERVATION_RADIUS_BLOCKS = 32;
 const LIVE_CHAT_DUPLICATE_WINDOW_MS = 500;
 const LIVE_CHAT_SETTLE_MS = 200;
+const LIVE_RESPONSE_WINDOW_TIMEOUT_AFTER_SLOTS = 2;
+const NON_FOCAL_RESPONSE_WINDOW_ACTION_KINDS = new Set(["observe", "wait"]);
 
 export function defaultLiveSharedActorRoutes(): ActorProviderRoute[] {
   return [
     {
       actor_id: "npc_a",
       provider_id: "deterministic-social",
-      model: "deterministic-social"
+      model: "deterministic-social",
+      condition: "scripted_responder",
+      condition_id: "c2-live-provider-free-scripted-responder",
+      actor_soul_route: "not_applicable",
+      seed_or_reset_id: "c2-live-provider-free-scripted-responder"
     },
     {
       actor_id: "npc_b",
       provider_id: "scripted-social",
-      model: "scripted-social"
+      model: "scripted-social",
+      condition: "scripted_responder",
+      condition_id: "c2-live-provider-free-scripted-responder",
+      actor_soul_route: "not_applicable",
+      seed_or_reset_id: "c2-live-provider-free-scripted-responder"
     }
   ];
 }
@@ -142,6 +156,10 @@ function filterActionSkillsForAllowedPrimitives(
   return records.filter((record) =>
     record.required_primitives.every((primitive) => allowedPrimitiveSet.has(primitive))
   );
+}
+
+export function isLiveResponseWindowFocalTurn(event: ActorTurnSlotCompletionEvent) {
+  return !NON_FOCAL_RESPONSE_WINDOW_ACTION_KINDS.has(event.action_kind);
 }
 
 export type LiveChatActorRangeState = {
@@ -409,6 +427,81 @@ function targetActorIdFor(input: {
   return input.actorIds.find((actorId) => actorId !== input.actorId);
 }
 
+function visibleActorIdsFromObservation(observation: unknown) {
+  if (!observation || typeof observation !== "object") {
+    return [];
+  }
+  const visibleActors = (observation as { visibleActors?: unknown }).visibleActors;
+  if (!Array.isArray(visibleActors)) {
+    return [];
+  }
+  return visibleActors
+    .map((actor) =>
+      actor &&
+      typeof actor === "object" &&
+      typeof (actor as { id?: unknown }).id === "string"
+        ? (actor as { id: string }).id
+        : null
+    )
+    .filter((actorId): actorId is string => Boolean(actorId))
+    .sort();
+}
+
+function loadedWorldCaveatFromObservation(observation: unknown) {
+  if (!observation || typeof observation !== "object") {
+    return "Live C2-3 row: state-before observation was not available as a structured object.";
+  }
+  const loadedWorldScope = (observation as { loadedWorldScope?: unknown }).loadedWorldScope;
+  if (
+    loadedWorldScope &&
+    typeof loadedWorldScope === "object" &&
+    typeof (loadedWorldScope as { caveat?: unknown }).caveat === "string"
+  ) {
+    return (loadedWorldScope as { caveat: string }).caveat;
+  }
+  return "Live C2-3 row: loaded-world absence claims are scoped to Mineflayer observation limits.";
+}
+
+function requireClosedNonVacuousWindow(window: ResponseWindowRecord) {
+  if (
+    window.status !== "closed" ||
+    !window.closed_at ||
+    !window.close_reason ||
+    window.required_responder_actor_ids.length === 0
+  ) {
+    throw new Error(`Cannot materialize transition row from non-closed or vacuous window ${window.window_id}`);
+  }
+}
+
+function socialLabelsForClosedLiveWindow(
+  window: ResponseWindowRecord
+): LegibilitySocialResponseLabel[] {
+  requireClosedNonVacuousWindow(window);
+  return window.response_chat_events.length === 0
+    ? ["no_observable_response"]
+    : ["unknown_social_response"];
+}
+
+function requireRouteForClosedWindow(input: {
+  actorRoutes: readonly ActorProviderRoute[];
+  event: ActorTurnSlotCompletionEvent;
+}) {
+  const route = input.actorRoutes.find((candidate) => candidate.actor_id === input.event.actor_id);
+  if (!route) {
+    throw new Error(`Missing provider route for closed response-window actor ${input.event.actor_id}`);
+  }
+  if (!route.condition) {
+    throw new Error(`Provider route for actor ${input.event.actor_id} has no condition metadata`);
+  }
+  if (!route.seed_or_reset_id) {
+    throw new Error(`Provider route for actor ${input.event.actor_id} has no seed/reset metadata`);
+  }
+  return route as ActorProviderRoute & {
+    condition: NonNullable<ActorProviderRoute["condition"]>;
+    seed_or_reset_id: string;
+  };
+}
+
 async function initializeActorRuntimeState(input: {
   actorWorkspaceRootDir: string;
   actorRoutes: readonly ActorProviderRoute[];
@@ -517,6 +610,7 @@ export async function runLiveSharedLegibilitySession(input: {
   outputDir: string;
   actorRoutes?: readonly ActorProviderRoute[];
   slotsPerActor?: number;
+  responseWindowTimeoutAfterSlots?: number;
   cleanOutputDir?: boolean;
   writtenAt?: string;
   worldSeed?: string;
@@ -533,6 +627,17 @@ export async function runLiveSharedLegibilitySession(input: {
   const sessionId = `c2-live-shared-session-${randomUUID()}`;
   const createdAt = input.writtenAt ?? new Date().toISOString();
   const actorWorkspaceRootDir = path.join(outputDir, "actor-workspaces");
+  const responseTracker = new ResponseWindowTracker({
+    sessionId,
+    activeActorIds: actorIds,
+    timeoutAfterSlots: input.responseWindowTimeoutAfterSlots ?? LIVE_RESPONSE_WINDOW_TIMEOUT_AFTER_SLOTS
+  });
+  const pendingByWindow = new Map<string, ActorTurnSlotCompletionEvent>();
+  const stateBeforeRefsByTurn = new Map<string, string>();
+  const visibleActorIdsByTurn = new Map<string, string[]>();
+  const loadedWorldCaveatByTurn = new Map<string, string>();
+  const rows: TransitionRowV1[] = [];
+  let chatEventCursor = 0;
   const loadedConfig = loadProbeConfig();
   const config: ProbeConfig = {
     ...loadedConfig,
@@ -567,6 +672,130 @@ export async function runLiveSharedLegibilitySession(input: {
       session_id: sessionId,
       actorRoutes,
       slotsPerActor: input.slotsPerActor ?? 1,
+      onSlotCompleted: async (event) => {
+        for (const chatEvent of chatCapture!.events.slice(chatEventCursor)) {
+          responseTracker.recordChatEvent(chatEvent);
+        }
+        chatEventCursor = chatCapture!.events.length;
+
+        const timedOut = responseTracker.closeTimedOut(event.slot_index, event.completed_at);
+        const closedBySlotCompletion = responseTracker.recordSlotCompletion(event);
+        for (const window of [...timedOut, ...closedBySlotCompletion]) {
+          const focalEvent = pendingByWindow.get(window.window_id);
+          if (!focalEvent) {
+            continue;
+          }
+          const route = requireRouteForClosedWindow({ actorRoutes, event: focalEvent });
+          const stateBeforeRef = stateBeforeRefsByTurn.get(focalEvent.turn_id);
+          if (!stateBeforeRef) {
+            throw new Error(`Missing state-before ref for closed response window ${window.window_id}`);
+          }
+          const closeReason = window.close_reason;
+          if (!closeReason) {
+            throw new Error(`Closed response window ${window.window_id} has no close reason`);
+          }
+          const socialLabels = socialLabelsForClosedLiveWindow(window);
+          const socialResponseEvidenceRefs = window.response_chat_events.length === 0
+            ? [...window.evidence_refs]
+            : window.response_chat_events.flatMap((chatEvent) => chatEvent.evidence_refs);
+          const row: TransitionRowV1 = {
+            schema_version: "transition-row/v1",
+            row_id: `${window.window_id}-row`,
+            session_id: sessionId,
+            seed_or_reset_id: route.seed_or_reset_id,
+            cycle_index: rows.length + 1,
+            actor_id: focalEvent.actor_id,
+            condition: route.condition,
+            timestamps: {
+              action_selected_at: focalEvent.started_at,
+              action_started_at: focalEvent.started_at,
+              action_finished_at: focalEvent.completed_at,
+              response_window_closed_at: window.closed_at,
+              label_locked_at: window.closed_at
+            },
+            state_before: {
+              snapshot_ref: stateBeforeRef,
+              other_actors: {
+                visible_actor_ids: visibleActorIdsByTurn.get(focalEvent.turn_id) ?? [],
+                interaction_range_actor_ids: visibleActorIdsByTurn.get(focalEvent.turn_id) ?? [],
+                loaded_world_caveat: loadedWorldCaveatByTurn.get(focalEvent.turn_id) ??
+                  "Live C2-3 row: loaded-world absence claims are scoped to Mineflayer observation limits."
+              },
+              social_context_refs: {
+                recent_interaction_refs: focalEvent.evidence_refs
+              }
+            },
+            executed_action: {
+              action_kind: focalEvent.action_kind,
+              ...(focalEvent.action_ref ? { action_card_id: focalEvent.action_ref } : {}),
+              runtime_action_id: focalEvent.turn_id,
+              validation_status: "passed",
+              permission_status: "passed",
+              action_started: true
+            },
+            observed_delta: {
+              physical: {
+                classes: focalEvent.action_kind === "say" ? ["no_physical_delta"] : ["unknown_physical_delta"],
+                evidence_refs: focalEvent.evidence_refs
+              },
+              material: {
+                classes: ["unknown_material_delta"],
+                evidence_refs: []
+              },
+              social_response: {
+                response_window: window,
+                classes: socialLabels,
+                evidence_refs: socialResponseEvidenceRefs
+              },
+              exclusions: []
+            },
+            row_quality: {
+              verdict: "partial",
+              inclusion_tags: [
+                "live_response_window_closed",
+                closeReason,
+                ...(socialLabels.includes("no_observable_response")
+                  ? ["non_vacuous_absence_label"]
+                  : ["response_observed_unclassified"])
+              ],
+              exclusion_reasons: [],
+              notes: [
+                "C2-3 live row materializes closed response-window lifecycle only; C2-4 owns evidence-grounded social/material classification."
+              ]
+            },
+            metadata: {
+              provider: focalEvent.provider_id,
+              model: focalEvent.model,
+              scenario_family_id: "c2-live-shared-session-response-window",
+              scenario_family_ids: ["c2-live-shared-session-response-window"],
+              artifact_refs: Array.from(new Set([
+                stateBeforeRef,
+                ...(focalEvent.action_ref ? [focalEvent.action_ref] : []),
+                ...focalEvent.evidence_refs,
+                ...window.evidence_refs,
+                ...(route.seed_reset_ref ? [route.seed_reset_ref] : [])
+              ]))
+            }
+          };
+          rows.push(row);
+          await writeJson(path.join(outputDir, "transition-rows", `${row.row_id}.json`), row);
+          pendingByWindow.delete(window.window_id);
+        }
+
+        if (isLiveResponseWindowFocalTurn(event)) {
+          const openedWindow = responseTracker.open({
+            focalActorId: event.actor_id,
+            focalTurnId: event.turn_id,
+            focalSlotIndex: event.slot_index,
+            openedAt: event.completed_at,
+            evidenceRefs: [
+              ...(event.action_ref ? [event.action_ref] : []),
+              ...event.evidence_refs
+            ]
+          });
+          pendingByWindow.set(openedWindow.window_id, event);
+        }
+      },
       turnHandler: async ({ actor_id, route, turn_id, cycle_id, slot_index }) => {
         const state = statesByActor.get(actor_id);
         if (!state) {
@@ -589,6 +818,24 @@ export async function runLiveSharedLegibilitySession(input: {
           state,
           maxActionsPerCycle: 1
         });
+        const stateBeforeRef = outputRelative(
+          outputDir,
+          await writeJson(path.join(outputDir, "state-before", `${turn_id}.json`), {
+            schema: "live-shared-session-state-before/v1",
+            session_id: sessionId,
+            turn_id,
+            cycle_id,
+            slot_index,
+            actor_id,
+            visible_actor_ids: visibleActorIdsFromObservation(context.observation),
+            observed_chat_event_refs: observedChatEvents.flatMap((event) => event.evidence_refs),
+            loaded_world_caveat: loadedWorldCaveatFromObservation(context.observation),
+            observation: context.observation
+          })
+        );
+        stateBeforeRefsByTurn.set(turn_id, stateBeforeRef);
+        visibleActorIdsByTurn.set(turn_id, visibleActorIdsFromObservation(context.observation));
+        loadedWorldCaveatByTurn.set(turn_id, loadedWorldCaveatFromObservation(context.observation));
         const cycleGoal = buildProviderFreeCycleGoal({
           actorId: actor_id,
           cycleId: cycle_id,
@@ -676,8 +923,8 @@ export async function runLiveSharedLegibilitySession(input: {
       actor_routes: [...actorRoutes],
       slot_events: slotEvents,
       chat_events: [...chatCapture.events],
-      response_windows: [],
-      transition_rows: []
+      response_windows: responseTracker.all(),
+      transition_rows: rows
     };
     const sessionPath = await writeJson(path.join(outputDir, "session.json"), session);
     return { outputDir, sessionPath, session };

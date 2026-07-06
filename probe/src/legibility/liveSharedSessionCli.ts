@@ -7,6 +7,7 @@ function parseArgs(argv: string[]) {
   const options: {
     outputDir?: string;
     slotsPerActor?: number;
+    responseWindowTimeoutAfterSlots?: number;
     worldSeed?: string;
   } = {};
   for (let index = 0; index < argv.length; index++) {
@@ -17,6 +18,9 @@ function parseArgs(argv: string[]) {
       index++;
     } else if (arg === "--slots-per-actor" && next) {
       options.slotsPerActor = Number(next);
+      index++;
+    } else if (arg === "--response-window-timeout-slots" && next) {
+      options.responseWindowTimeoutAfterSlots = Number(next);
       index++;
     } else if (arg === "--world-seed" && next) {
       options.worldSeed = next;
@@ -48,6 +52,7 @@ async function main() {
   const result = await runLiveSharedLegibilitySession({
     outputDir,
     slotsPerActor: positiveInteger(parsed.slotsPerActor, 1),
+    responseWindowTimeoutAfterSlots: positiveInteger(parsed.responseWindowTimeoutAfterSlots, 2),
     worldSeed: parsed.worldSeed
   });
   console.log(JSON.stringify({
@@ -55,6 +60,8 @@ async function main() {
     output_dir: result.outputDir,
     session_path: result.sessionPath,
     slot_count: result.session.slot_events.length,
+    response_window_count: result.session.response_windows.length,
+    transition_row_count: result.session.transition_rows.length,
     actor_routes: result.session.actor_routes.map((route) => ({
       actor_id: route.actor_id,
       provider_id: route.provider_id,

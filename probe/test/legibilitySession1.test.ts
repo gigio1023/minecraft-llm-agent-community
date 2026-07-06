@@ -29,7 +29,8 @@ import {
   assertProviderFreeLiveRoutes,
   chatEventsForActor,
   computeLiveChatObservedBy,
-  defaultLiveSharedActorRoutes
+  defaultLiveSharedActorRoutes,
+  isLiveResponseWindowFocalTurn
 } from "../src/legibility/liveSharedSession.js";
 import { ensureActorSoul } from "../src/runtime/goals/actorSoulStore.js";
 import { observe } from "../src/tools/observe.js";
@@ -41,6 +42,7 @@ import type {
   LegibilityPrediction,
   LegibilityScoreReport,
   LegibilitySessionArtifact,
+  LegibilitySocialResponseLabel,
   PublicHistoryArtifact,
   PublicHistoryEvent,
   ResponseWindowRecord,
@@ -634,6 +636,193 @@ test("response window closes only after other active actor slot completion", () 
   assert.equal(closed[0]?.window_id, window.window_id);
   assert.equal(closed[0]?.close_reason, "all_other_actor_slots_completed");
   assert.equal(closed[0]?.response_chat_events[0]?.message, "I can make oak_log available.");
+});
+
+test("C2-3 live-shaped lifecycle opens by focal action and materializes only closed windows", async () => {
+  const actorRoutes = defaultLiveSharedActorRoutes();
+  const tracker = new ResponseWindowTracker({
+    sessionId: "c2-3-live-shaped",
+    activeActorIds: actorRoutes.map((route) => route.actor_id),
+    timeoutAfterSlots: 3
+  });
+  const pendingByWindow = new Map<string, ActorTurnSlotCompletionEvent>();
+  const rows: Array<{
+    focal_actor_id: string;
+    close_reason: ResponseWindowRecord["close_reason"];
+    social_labels: LegibilitySocialResponseLabel[];
+    response_chat_event_count: number;
+  }> = [];
+  const chatEvents: StructuredChatEvent[] = [];
+  let chatEventCursor = 0;
+
+  const closeAndMaterialize = (windows: ResponseWindowRecord[]) => {
+    for (const window of windows) {
+      const focalEvent = pendingByWindow.get(window.window_id);
+      assert.ok(focalEvent);
+      assert.equal(window.status, "closed");
+      assert.ok(window.close_reason);
+      assert.ok(window.required_responder_actor_ids.length > 0);
+      const socialLabels: LegibilitySocialResponseLabel[] = window.response_chat_events.length === 0
+        ? ["no_observable_response"]
+        : ["unknown_social_response"];
+      rows.push({
+        focal_actor_id: focalEvent.actor_id,
+        close_reason: window.close_reason,
+        social_labels: socialLabels,
+        response_chat_event_count: window.response_chat_events.length
+      });
+      pendingByWindow.delete(window.window_id);
+    }
+  };
+
+  await runSharedSessionSchedule({
+    session_id: "c2-3-live-shaped",
+    actorRoutes,
+    slotsPerActor: 1,
+    turnHandler({ actor_id, slot_index }) {
+      const actionKind = "say";
+      if (actor_id === "npc_b") {
+        chatEvents.push({
+          schema: "structured-chat-event/v1",
+          session_id: "c2-3-live-shaped",
+          speaker_id: actor_id,
+          message: "I can respond from the second actor slot.",
+          observed_by: ["npc_a"],
+          slot_index,
+          observed_at: "2026-07-06T00:00:02.000Z",
+          evidence_refs: ["chat-events/npc-b-say.json"]
+        });
+      }
+      return {
+        action_kind: actionKind,
+        evidence_refs: [`evidence/${actor_id}-${slot_index}.json`],
+        started_at: `2026-07-06T00:00:0${slot_index}.000Z`,
+        completed_at: `2026-07-06T00:00:0${slot_index}.500Z`
+      };
+    },
+    onSlotCompleted(event) {
+      for (const chatEvent of chatEvents.slice(chatEventCursor)) {
+        tracker.recordChatEvent(chatEvent);
+      }
+      chatEventCursor = chatEvents.length;
+      closeAndMaterialize(tracker.closeTimedOut(event.slot_index, event.completed_at));
+      closeAndMaterialize(tracker.recordSlotCompletion(event));
+      if (isLiveResponseWindowFocalTurn(event)) {
+        const opened = tracker.open({
+          focalActorId: event.actor_id,
+          focalTurnId: event.turn_id,
+          focalSlotIndex: event.slot_index,
+          openedAt: event.completed_at,
+          evidenceRefs: event.evidence_refs
+        });
+        pendingByWindow.set(opened.window_id, event);
+      }
+    }
+  });
+
+  const windows = tracker.all();
+  assert.equal(rows.length, windows.filter((window) => window.status === "closed").length);
+  assert.equal(windows.some((window) => window.focal_actor_id === "npc_b" && window.status === "open"), true);
+  assert.deepEqual(rows.map((row) => row.close_reason), ["all_other_actor_slots_completed"]);
+  assert.deepEqual(rows.map((row) => row.social_labels), [["unknown_social_response"]]);
+  assert.equal(rows[0]?.response_chat_event_count, 1);
+  assert.equal(isLiveResponseWindowFocalTurn({
+    schema: "actor-turn-slot-completion/v1",
+    session_id: "c2-3-live-shaped",
+    slot_index: 99,
+    actor_id: "npc_b",
+    provider_id: "scripted-social",
+    model: "scripted-social",
+    turn_id: "actor-b-focal",
+    cycle_id: "cycle",
+    action_kind: "say",
+    started_at: "2026-07-06T00:00:09.000Z",
+    completed_at: "2026-07-06T00:00:09.500Z",
+    evidence_refs: []
+  }), true);
+  assert.equal(isLiveResponseWindowFocalTurn({
+    schema: "actor-turn-slot-completion/v1",
+    session_id: "c2-3-live-shaped",
+    slot_index: 100,
+    actor_id: "npc_a",
+    provider_id: "deterministic-social",
+    model: "deterministic-social",
+    turn_id: "actor-a-observe",
+    cycle_id: "cycle",
+    action_kind: "observe",
+    started_at: "2026-07-06T00:00:10.000Z",
+    completed_at: "2026-07-06T00:00:10.500Z",
+    evidence_refs: []
+  }), false);
+});
+
+test("C2-3 slot boundary records timeout before observe-only responder slot completion", async () => {
+  const actorRoutes = defaultLiveSharedActorRoutes();
+  const tracker = new ResponseWindowTracker({
+    sessionId: "c2-3-timeout",
+    activeActorIds: actorRoutes.map((route) => route.actor_id),
+    timeoutAfterSlots: 1
+  });
+  const pendingByWindow = new Map<string, ActorTurnSlotCompletionEvent>();
+  const rows: Array<{
+    close_reason: ResponseWindowRecord["close_reason"];
+    social_labels: LegibilitySocialResponseLabel[];
+    completed_responder_actor_ids: string[];
+  }> = [];
+
+  const closeAndMaterialize = (windows: ResponseWindowRecord[]) => {
+    for (const window of windows) {
+      assert.ok(pendingByWindow.get(window.window_id));
+      assert.equal(window.status, "closed");
+      assert.ok(window.close_reason);
+      assert.ok(window.required_responder_actor_ids.length > 0);
+      rows.push({
+        close_reason: window.close_reason,
+        social_labels: window.response_chat_events.length === 0
+          ? ["no_observable_response"]
+          : ["unknown_social_response"],
+        completed_responder_actor_ids: window.completed_responder_actor_ids
+      });
+      pendingByWindow.delete(window.window_id);
+    }
+  };
+
+  await runSharedSessionSchedule({
+    session_id: "c2-3-timeout",
+    actorRoutes,
+    slotsPerActor: 1,
+    turnHandler({ actor_id, slot_index }) {
+      return {
+        action_kind: actor_id === "npc_a" ? "say" : "observe",
+        evidence_refs: [`evidence/${actor_id}-${slot_index}.json`],
+        started_at: `2026-07-06T00:00:0${slot_index}.000Z`,
+        completed_at: `2026-07-06T00:00:0${slot_index}.500Z`
+      };
+    },
+    onSlotCompleted(event) {
+      closeAndMaterialize(tracker.closeTimedOut(event.slot_index, event.completed_at));
+      closeAndMaterialize(tracker.recordSlotCompletion(event));
+      if (isLiveResponseWindowFocalTurn(event)) {
+        const opened = tracker.open({
+          focalActorId: event.actor_id,
+          focalTurnId: event.turn_id,
+          focalSlotIndex: event.slot_index,
+          openedAt: event.completed_at,
+          evidenceRefs: event.evidence_refs
+        });
+        pendingByWindow.set(opened.window_id, event);
+      }
+    }
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.close_reason, "timeout");
+  assert.deepEqual(rows[0]?.social_labels, ["no_observable_response"]);
+  assert.deepEqual(rows[0]?.completed_responder_actor_ids, []);
+  assert.equal(
+    tracker.all().some((window) => window.close_reason === "all_other_actor_slots_completed"),
+    false
+  );
 });
 
 test("observe carries cross-actor visibility, structured chat, and loaded-world scope", async () => {

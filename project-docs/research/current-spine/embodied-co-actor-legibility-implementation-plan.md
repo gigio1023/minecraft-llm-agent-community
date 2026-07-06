@@ -254,6 +254,16 @@ Live C2-2 follow-up status (2026-07-06):
 - [x] receiving observation evidence records
       `loadedWorldScope.absence_claims_exhaustive: false`.
 
+Live C2-3 follow-up status (2026-07-06):
+
+- [x] provider-free live timeout fixture records a closed
+      `response-window/v1` with `close_reason: timeout`, distinct from the
+      slot-completion closure path:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-3-timeout/`;
+- [x] transition rows are materialized only from closed, non-vacuous windows;
+- [x] live window opening is keyed by focal-turn action properties
+      (`say` opens, `observe`/`wait` do not), not by a hardcoded actor id.
+
 Live C2-7 follow-up status (2026-07-06):
 
 - [x] provider-free C2-7 rehearsal declares `scripted_responder`,

@@ -202,12 +202,13 @@ file's boxes in the same commit as each slice.
   `closeTimedOut` on every slot boundary, and materializes rows only from
   closed windows.
 - Acceptance:
-  - [ ] a deterministic stall fixture (responder that only observes)
+  - [x] a deterministic stall fixture (responder that only observes)
         produces a `timeout` closure in a live session artifact, distinct
-        from slot-completion closure;
-  - [ ] `no_observable_response` labels appear only on non-vacuously
+        from slot-completion closure:
+        `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-3-timeout/`;
+  - [x] `no_observable_response` labels appear only on non-vacuously
         closed windows;
-  - [ ] window opening is driven by focal-turn properties, not a
+  - [x] window opening is driven by focal-turn properties, not a
         hardcoded actor id.
 - Blocked by: C2-1, C2-2.
 
