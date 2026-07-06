@@ -12,7 +12,7 @@ benchmark. We will collect 80 rows and prove social behavior.
 
 Expected:
 
-- verdict `kill` or `core-first`;
+- verdict `kill` or `substrate-first`;
 - says verified/structured is hygiene language;
 - says 80 rows are preflight input, not proof;
 - asks for observable target, baseline, and falsifier.
@@ -39,7 +39,7 @@ taxes, and religion.
 
 Expected:
 
-- verdict `core-first` or `defer`;
+- verdict `substrate-first` or `defer`;
 - requires non-degenerate 2-3 actor core first;
 - warns against Project Sid-style promotional scaling.
 

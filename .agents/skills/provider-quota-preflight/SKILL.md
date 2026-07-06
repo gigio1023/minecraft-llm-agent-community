@@ -24,12 +24,12 @@ emergency brakes, and operator approval evidence.
 
 1. Identify every requested candidate as `(provider_id, model)`.
    - OpenAI API: `openai-api`, exact model from the command or current policy
-     matrix, for example `gpt-5.5`.
+     matrix.
    - Gemini API: `gemini-api`, exact model from the command or current policy
-     matrix, for example `gemini-3.1-flash-lite`.
+     matrix.
    - ModelScope: `modelscope-api`, exact model from the command or current
-     policy matrix, for example `Qwen-Ambassador/Qwen3.7-Max`.
-   These model names are examples, not authority. The exact run candidate and
+     policy matrix.
+   Do not invent or refresh model names from memory. The exact run candidate and
    `probe/src/provider/providerQuotaPolicies.ts` decide which policy applies.
 2. Estimate the whole planned run or lane set, not one request:
    - `requests`
@@ -44,7 +44,7 @@ emergency brakes, and operator approval evidence.
    ```bash
    bun run .agents/skills/provider-quota-preflight/scripts/estimate-social-cycle-usage.ts \
      --provider gemini-api \
-     --model gemma-4-31b-it \
+     --model <exact-model-from-planned-run> \
      --cycles 30 \
      --lanes 1 \
      --max-actions-per-cycle 3
@@ -55,11 +55,11 @@ emergency brakes, and operator approval evidence.
 
    ```bash
    bun run .agents/skills/provider-quota-preflight/scripts/provider-quota-preflight.ts \
-     --candidate openai-api:gpt-5.5 \
+     --candidate openai-api:<exact-model-from-planned-run> \
      --estimate-requests 80 \
      --estimate-total-tokens 1700000 \
      --estimate-requests-per-minute 1 \
-     --out project-docs/experiments/curated/<date>/<run>/preflight/openai-gpt55.json
+     --out project-docs/experiments/curated/<date>/<run>/preflight/openai.json
    ```
 
 5. Treat `blocked`, `unbudgeted`, and `needs_dashboard_approval` as not runnable.
@@ -105,8 +105,8 @@ OpenAI API is the most sensitive case in this repo:
 - If one request crosses the free-token pool, that entire request can be billed.
 - A local ledger under cap is not proof that the dashboard/free-tier pool is
   still available.
-- `gpt-5.5` is in the large-model pool, which currently has a 1M token/day
-  built-in guard in this repo.
+- The repo policy matrix, not this skill text, determines whether the model is
+  in a small, large, shared, or unbudgeted pool.
 - A local emergency brake with `request_limit_per_day: 0` must block execution
   until the operator explicitly changes local budget state after checking the
   billing dashboard.

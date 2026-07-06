@@ -97,23 +97,75 @@ This repository is a rebuild staging area for a bounded, observable headless
 Minecraft runtime. It is not a Voyager clone, a fastest-tech-tree benchmark, a
 house-building architecture, or a pre-committed village simulator.
 
-The active no-regret core is:
+The active research plan is
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+(2026-07-05, user-approved; amended 2026-07-06 with the depth-not-scale
+premise). One preregistered experiment: can an observer model predict a
+soul-grounded co-actor's next-turn social-response and material-access
+labels from public interaction history alone, across
+disposition-consistency conditions (scripted positive control, stable soul,
+resampled-soul null), with held-out-family predictors and policy-copy /
+leakage baselines that can erase the claim. Stop-results K1-K8 are
+preregistered in that plan. The build order, seams, vertical slices, and
+acceptance gates live in
+`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+(`LEGIBILITY_IMPLEMENTATION_PLAN`).
 
-- reproduce and root-cause the 60-cycle degeneracy;
-- produce truthful `transition-row/v1` records from a non-degenerate 2-3 actor
-  runtime under free-tier discipline;
+Substrate premise (`DEPTH_NOT_SCALE`): the experiment presupposes a working
+2-3 actor shared session with cross-actor observation and chat capture,
+interaction density at the K6 floor, and longitudinal public history
+accumulated per responder. Actor-count scale is not a premise and never a
+remedy for weak signal: do not scale actor count to hide a weak small-run
+result. Scale re-enters only as the deferred social-pattern branch (gated
+by `society-observable-preflight.md`) or as a post-positive-result
+generalization axis. Structurally information-poor small-N interaction is a
+K6/K7-shaped substrate failure, not a scale-up signal.
+
+Standing requirements:
+
+- produce truthful `transition-row/v1` records; labels come from runtime
+  evidence, never from tool names, scenario text, or actor self-report;
+- social-response windows close only after each other active actor completed
+  at least one subsequent Actor Turn slot or a preregistered timeout;
 - log `(state_before, executed_action, observed_delta)` independently of the
   actor's self-declared expected outcome;
 - keep prediction quality, acting outcome, physical competence, social
   consequence, continuity, robustness, and efficiency separate in reports.
 
-The current research headline is not fixed. F-native, F-loop, and F-society
-remain candidate branches until the Goldilocks and society-observable preflights
-say a meaningful layer exists.
+The old F-native/F-loop/F-society branches are deferred under new names
+(trained-predictor / advisory-use / social-pattern); see the crosswalk in the
+active plan. "WAM" is retired as a banner term.
 
 Runtime evidence, verification, screenshots, ledgers, seed/reset records, and
 scoring scripts are mandatory audit hygiene. Do not present them as the
 research contribution by themselves.
+
+## Zero-Cost Implementation Rule
+
+Search token: `ZERO_COST_IMPLEMENTATION_RULE`.
+
+All repo implementation is produced with AI coding tools. For direction,
+design, and review decisions, treat marginal implementation cost as near zero.
+
+Consequences:
+
+- "It is already implemented / already written / already designed" is never
+  evidence for keeping a direction, architecture, schema, pipeline, protocol,
+  or document. Sunk implementation is an anti-pattern rationale and must be
+  rejected wherever it appears in plans, reviews, or handoffs.
+- Direction and design decisions must be argued from research value,
+  falsifiability, baseline pressure, and current evidence, as if a
+  from-scratch rebuild were free. Re-derive the decision; do not inherit it.
+- Prefer replacing or deleting wrong-shaped artifacts over accreting
+  compatibility layers around them. Preserve the audit trail by superseding
+  and archiving, not by keeping stale artifacts active.
+- The converse guard also holds: free implementation is not license for fake
+  ambition. More code, schemas, protocols, gates, or documents is not more
+  research. Volume earns nothing.
+- Zero cost applies to implementation labor only. Provider tokens, quotas,
+  live-run budgets, recorded run evidence, data integrity, and user attention
+  remain scarce. The provider quota preflight, runtime authority gates, and
+  evidence rules stay fully binding.
 
 ## Runtime Authority Gates
 

@@ -3,6 +3,13 @@
 Use this when deciding whether something is a meaningful research direction or
 just polished implementation work.
 
+## Table Of Contents
+
+- Research Gap Types
+- Other Value Types
+- Soundness Scores
+- Kill Signals
+
 ## Research Gap Types
 
 ### Knowledge Gap

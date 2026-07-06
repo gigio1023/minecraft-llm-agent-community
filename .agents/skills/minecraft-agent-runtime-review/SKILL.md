@@ -10,7 +10,7 @@ description: >
   "the matrix broke at 12/12", "collectLogs stopped at 3/4", "the screenshots
   look wrong", "review visual evidence", or "use Langfuse traces to propose
   runtime fixes" after Minecraft runtime, action-skill, Actor Turn, generated
-  Mineflayer, or social-cycle runs.
+  Mineflayer, social-cycle runs, or embodied co-actor legibility session runs.
 ---
 
 # Minecraft Agent Runtime Review
@@ -43,11 +43,13 @@ the repo term **action skill**.
    verdict. It covers current `action_ref` artifacts, `author_mineflayer_action`
    failure modes, screenshot renderer artifacts, and product-objective gaps.
 7. When the run includes `transition-row/v1` or
-   `transition-row-batch-audit/v1`, read
-   `project-docs/research/current-spine/transition-row-v1-contract.md`,
-   `project-docs/research/current-spine/transition-row-label-codebook.md`, and
-   `project-docs/research/current-spine/no-regret-core-research-protocol.md`
-   before making no-regret or Goldilocks claims.
+   `legibility-session/v1`, read
+   `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`,
+   `project-docs/research/current-spine/transition-row-v1-contract.md`, and
+   `project-docs/research/current-spine/transition-row-label-codebook.md`
+   before making prediction, social-material, or lift claims. For historical
+   `transition-row-batch-audit/v1` bundles, read the matching archived protocol
+   only as legacy context.
 8. Decide the behavior verdict:
    - `VALID_PROGRESS`: world or inventory state proves progress.
    - `DIAGNOSABLE_FAILURE`: no success, but artifacts explain the next fix.
@@ -100,13 +102,13 @@ runs, generated Mineflayer action authoring, tool-call contract rejections,
 PlanBeads boundaries, screenshots, prismarine-viewer captures, or user comments
 about weird visible blocks/camera output.
 
-For no-regret-core row batches, prefer the current-spine contracts over older
-social-cycle summary habits:
+For co-actor legibility row batches, prefer the current-spine contracts over
+older social-cycle summary habits:
 
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`
-- `project-docs/research/current-spine/no-regret-core-research-protocol.md`
+- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
 
 ## Review Workflow
 

@@ -3,17 +3,18 @@ name: minecraft-research-value-harness
 description: >
   Judge and design meaningful research directions for this Minecraft LLM-agent
   project before implementation. Use for prompts about "research direction",
-  "research gap", "paper-worthy", "experiment design", "Goldilocks gate",
-  "WAM/F-native/F-loop/F-society", "논문감", "연구 가치", "실험 설계",
-  "유의미한 연구 주제", or when a plan risks hiding behind words like
-  verified/structured/validated instead of proving a substantive claim.
+  "research gap", "paper-worthy", "experiment design", "legibility",
+  "co-actor", "observer prediction", "논문감", "연구 가치", "실험 설계",
+  "유의미한 연구 주제", or historical WAM/F-native/F-loop/F-society plans that
+  need re-evaluation under the current active plan. Trigger when a plan hides
+  behind verified/structured/validated instead of proving a substantive claim.
 ---
 
 # Minecraft Research Value Harness
 
 Use this skill to decide whether a proposed Minecraft agent direction is a real
 research target, a weak slogan, ordinary engineering hygiene, or a deferred idea
-waiting on the no-regret core.
+blocked on the active embodied co-actor legibility substrate.
 
 This is an **agent skill** for research judgment. It is not a runtime action
 skill, benchmark runner, paper generator, or permission for model text to bypass
@@ -22,13 +23,16 @@ runtime authority.
 ## Quick Start
 
 1. Read the active central plan:
-   `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`.
+   `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+   and its build companion
+   `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
 2. Read `references/protocol.md` for the end-to-end workflow.
 3. If the task asks "is this paper-worthy?", "what is the research gap?", or
    "what experiment should we run?", read `references/research-value-rubric.md`.
 4. If the task concerns Minecraft, Mineflayer code generation, action generation,
-   LLM Minecraft prior knowledge, F-native/F-loop/F-society, or Goldilocks
-   preflight, read `references/minecraft-specific-pressure.md`.
+   LLM Minecraft prior knowledge, historical WAM/F-native/F-loop/F-society
+   plans, or current co-actor legibility preflight, read
+   `references/minecraft-specific-pressure.md`.
 5. If current literature or papers matter, use web search and the installed `hf`
    CLI as described in `references/source-and-hf-research.md`.
 6. Produce the requested artifact using `references/artifact-templates.md`:
@@ -54,9 +58,9 @@ Use the verdict labels exactly:
 
 - `kill`: not a research claim yet.
 - `defer`: interesting but not testable now.
-- `core-first`: blocked on non-degenerate no-regret core.
-- `preflight-ready`: no-regret core exists and the candidate can enter
-  Goldilocks preflight.
+- `substrate-first`: blocked on truthful 2-3 actor legibility substrate.
+- `preflight-ready`: the substrate exists and the candidate can enter a narrow
+  active-plan preflight.
 - `headline-candidate`: evidence after preflight supports choosing it.
 
 ## Core Rules
@@ -92,12 +96,16 @@ Use the verdict labels exactly:
 - If Mineflayer code generation enables new actions, ask what consequence target
   becomes measurable because of it.
 - If an LLM already knows enough Minecraft mechanics to predict the delta, the
-  layer may be too easy for F-native/F-loop and should be treated as a control.
+  layer may be too easy for trained-predictor/advisory-use claims and should be
+  treated as a control.
 - If a proposal needs many actors, institutions, laws, religion, taxes, or big
-  society claims before 2-3 actors are non-degenerate, label it `core-first` or
-  `defer`.
+  society claims before 2-3 actors are non-degenerate, label it
+  `substrate-first` or `defer`.
 - If Project Sid-style material is used, separate useful case ideas from
   unverified promotional claims.
 - If a model-generated review approves the idea, still run baseline pressure and
   execution-collapse analysis. Optimistic research self-evaluation is a known
   failure mode.
+- Historical WAM/F-native/F-loop/F-society names are translation inputs, not
+  active contribution labels. Map them to trained-predictor, advisory-use, or
+  social-pattern only when the active plan makes that mapping explicit.

@@ -3,6 +3,17 @@
 This protocol turns a vague research direction into a decision record. Keep the
 work source-grounded and explicit enough that another reviewer can challenge it.
 
+## Table Of Contents
+
+- 1. Intake
+- 2. Classify The Value
+- 3. Prior-Work Proximity
+- 4. Baseline Pressure
+- 5. Soundness Review
+- 6. Experiment Sketch
+- 7. Decision
+- 8. If Asked To Implement
+
 ## 1. Intake
 
 Collect:
@@ -97,7 +108,7 @@ Use one of:
 
 - `kill`;
 - `defer`;
-- `core-first`;
+- `substrate-first`;
 - `preflight-ready`;
 - `headline-candidate`.
 

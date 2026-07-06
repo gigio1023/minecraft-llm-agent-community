@@ -39,23 +39,35 @@ that work as historical context or the F-loop branch.
 Read these before planning implementation, experiments, benchmarks, or research
 claims.
 
-- `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
+Active:
+
+- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+  (build order, seams, vertical slices, and acceptance gates for the central
+  plan; added 2026-07-06)
 - `project-docs/research/current-spine/research-value-harness.md`
-- `project-docs/research/current-spine/prior-work-proximity-current-spine-2026-06-29.md`
-- `project-docs/research/current-spine/no-regret-core-research-protocol.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
-- `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
+- `project-docs/research/current-spine/no-regret-core-scenario-catalog.md` (scenario reference)
+- `project-docs/research/current-spine/society-observable-preflight.md` (deferred social-pattern branch gate)
+
+Superseded on 2026-07-05, preserved as audit trail:
+
+- `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`
+- `project-docs/research/current-spine/no-regret-core-research-protocol.md`
 - `project-docs/research/current-spine/goldilocks-preflight-protocol.md`
-- `project-docs/research/current-spine/society-observable-preflight.md`
+- `project-docs/research/current-spine/no-regret-core-implementation-campaign.md`
+- `project-docs/research/current-spine/prior-work-proximity-current-spine-2026-06-29.md`
+  (proximity refreshed inside the V2 plan, section 11)
 - `project-docs/research/current-spine/research-decision-current-spine-2026-06-29.md`
 
 Tier 1 owns the current sequence:
 
 ```text
-no-regret core -> prediction and/or society-observable branch triage -> larger
-confirming experiment or branch deferral
+one preregistered co-actor legibility experiment (conditions, arms, metrics,
+stop-results built in) -> research-decision/v1 -> deferred branch promotion
+or preserved negative result
 ```
 
 ## Tier 2 - Active Runtime Support
@@ -88,7 +100,7 @@ they are not active headline or implementation order.
 - `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
   - reference status: case library for possession, access, claims, obligations,
     refusal, repair, public affordances, and weak commons;
-  - not active phase order before Goldilocks.
+  - not the active build order for the legibility experiment.
 - `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
   - reference status: provider-free fixture and report sanity check;
   - not evidence of open-world social behavior.

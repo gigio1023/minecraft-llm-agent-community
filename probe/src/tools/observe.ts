@@ -36,6 +36,7 @@ type PositionedActor = {
     count: number;
   }) => WorldStatePosition[];
   blockAt?: (position: WorldStatePosition, extraInfos?: boolean) => { name: string } | null;
+  entities?: Record<string, unknown>;
 };
 
 export type ObserveResult = {
@@ -47,6 +48,21 @@ export type ObserveResult = {
     distance: number;
     busy: boolean;
   }>;
+  chatEvents?: Array<{
+    speaker_id: string;
+    message: string;
+    observed_at: string;
+    tick?: number;
+    position?: { x: number; y: number; z: number };
+  }>;
+  loadedWorldScope?: {
+    schema: "loaded-world-observation-scope/v1";
+    observer_id: string;
+    radius_blocks: number;
+    visible_actor_scan: "provided_actor_roster" | "bot_entities";
+    absence_claims_exhaustive: false;
+    caveat: string;
+  };
   memory: string[];
   inventory?: Array<{ name: string; count: number }>;
   vitals?: {
@@ -99,6 +115,8 @@ export type ObserveResult = {
 type ObserveArgs = {
   actor: PositionedActor;
   target: PositionedActor;
+  otherActors?: PositionedActor[];
+  chatEvents?: ObserveResult["chatEvents"];
   dialogueState: DialogueState;
   memory: MemoryStore;
   sharedChest?: {
@@ -106,6 +124,8 @@ type ObserveArgs = {
     inspect(): Promise<ItemStack[] | null> | ItemStack[] | null;
   };
 };
+
+type VisibleActorScanSource = "provided_actor_roster" | "bot_entities";
 
 function roundDistance(distance: number) {
   return Number(distance.toFixed(2));
@@ -206,9 +226,91 @@ function scanNearbyBlocks(actor: PositionedActor) {
     .slice(0, 12);
 }
 
+function entityUsername(entity: unknown) {
+  if (!entity || typeof entity !== "object" || Array.isArray(entity)) {
+    return undefined;
+  }
+  const record = entity as Record<string, unknown>;
+  const username = record.username ?? record.name;
+  return typeof username === "string" && username.trim().length > 0
+    ? username
+    : undefined;
+}
+
+function entityPosition(entity: unknown): PositionedActor["entity"]["position"] | undefined {
+  if (!entity || typeof entity !== "object" || Array.isArray(entity)) {
+    return undefined;
+  }
+  const position = (entity as Record<string, unknown>).position;
+  if (!position || typeof position !== "object" || Array.isArray(position)) {
+    return undefined;
+  }
+  const record = position as Record<string, unknown>;
+  if (
+    typeof record.x !== "number" ||
+    typeof record.y !== "number" ||
+    typeof record.z !== "number" ||
+    typeof (position as { distanceTo?: unknown }).distanceTo !== "function"
+  ) {
+    return undefined;
+  }
+  return position as PositionedActor["entity"]["position"];
+}
+
+function visibleActorsForBot(input: {
+  actor: PositionedActor;
+  target: PositionedActor;
+  otherActors?: PositionedActor[];
+  dialogueState: DialogueState;
+}): {
+  actors: ObserveResult["visibleActors"];
+  scan: VisibleActorScanSource;
+} {
+  const roster = input.otherActors?.length
+    ? input.otherActors
+    : input.target.username === input.actor.username
+      ? []
+      : [input.target];
+  if (roster.length > 0) {
+    return {
+      scan: "provided_actor_roster",
+      actors: roster
+        .filter((candidate) => candidate.username !== input.actor.username)
+        .map((candidate) => ({
+          id: candidate.username,
+          distance: roundDistance(input.actor.entity.position.distanceTo(candidate.entity.position)),
+          busy: input.dialogueState.peek(candidate.username) === "busy"
+        }))
+        .sort((left, right) => left.distance - right.distance)
+        .slice(0, 8)
+    };
+  }
+
+  const entities = input.actor.entities ?? {};
+  const visibleActors = Object.values(entities)
+    .map((entity) => {
+      const username = entityUsername(entity);
+      const position = entityPosition(entity);
+      if (!username || username === input.actor.username || !position) {
+        return null;
+      }
+      return {
+        id: username,
+        distance: roundDistance(input.actor.entity.position.distanceTo(position)),
+        busy: input.dialogueState.peek(username) === "busy"
+      };
+    })
+    .filter((actor): actor is ObserveResult["visibleActors"][number] => actor !== null)
+    .sort((left, right) => left.distance - right.distance)
+    .slice(0, 8);
+  return { scan: "bot_entities", actors: visibleActors };
+}
+
 export async function observe({
   actor,
   target,
+  otherActors,
+  chatEvents,
   dialogueState,
   memory,
   sharedChest
@@ -228,6 +330,7 @@ export async function observe({
   const sharedChestItems = sharedChest
     ? await Promise.resolve(sharedChest.inspect()).catch(() => null)
     : null;
+  const visibleActors = visibleActorsForBot({ actor, target, otherActors, dialogueState });
 
   // Observe is the transcript-facing state boundary. Optional capabilities stay
   // optional so the same primitive can run against Mineflayer bots and narrow
@@ -238,16 +341,17 @@ export async function observe({
     status: "ok",
     observerId: actor.username,
     position: roundPosition(actor.entity.position),
-    visibleActors:
-      target.username === actor.username
-        ? []
-        : [
-            {
-              id: target.username,
-              distance: roundDistance(actor.entity.position.distanceTo(target.entity.position)),
-              busy: dialogueState.peek(target.username) === "busy"
-            }
-          ],
+    visibleActors: visibleActors.actors,
+    ...(chatEvents && chatEvents.length > 0 ? { chatEvents: chatEvents.slice(-24) } : {}),
+    loadedWorldScope: {
+      schema: "loaded-world-observation-scope/v1",
+      observer_id: actor.username,
+      radius_blocks: 32,
+      visible_actor_scan: visibleActors.scan,
+      absence_claims_exhaustive: false,
+      caveat:
+        "Visible actors and absence claims are limited to currently loaded Mineflayer entity/chunk state for this observer."
+    },
     memory: memory.list(),
     ...(inventory ? { inventory } : {}),
     ...(vitals ? { vitals } : {}),

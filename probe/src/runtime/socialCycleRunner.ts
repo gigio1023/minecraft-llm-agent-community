@@ -873,7 +873,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     model: input.model,
     reasoning
   });
-  report.agency_status.builtin_execution_source = input.providerId === "deterministic-social";
+  report.agency_status.builtin_execution_source =
+    input.providerId === "deterministic-social" || input.providerId === "scripted-social";
   report.actor_workspace_root_dir = rootDir;
   report.server = {
     mode: useFreshWorld ? "fresh_world" : "live_smoke",
@@ -1437,7 +1438,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         activeEpisodeRefForCycle = activeEpisodeState.ref;
         report.agency_status.strategic_goal_source = "runtime_rule";
         report.agency_status.cycle_goal_source = cycleGoal.source;
-        report.agency_status.builtin_goal_authority = input.providerId === "deterministic-social";
+        report.agency_status.builtin_goal_authority =
+          input.providerId === "deterministic-social" || input.providerId === "scripted-social";
       } else if (activeEpisodeState && pendingDeliberationBranch) {
         const deliberation = await runSocialDeliberationProvider({
           providerId: input.providerId,
@@ -1510,7 +1512,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.active_episode_refs = pushUniqueRef(report.active_episode_refs, activeEpisodeRefForCycle);
         report.agency_status.strategic_goal_source = "runtime_rule";
         report.agency_status.cycle_goal_source = cycleGoal.source;
-        report.agency_status.builtin_goal_authority = input.providerId === "deterministic-social";
+        report.agency_status.builtin_goal_authority =
+          input.providerId === "deterministic-social" || input.providerId === "scripted-social";
       } else if (input.benchmarkTask?.trim()) {
         cycleGoal = buildBenchmarkTaskCycleGoal({
           actorId: input.actorId,

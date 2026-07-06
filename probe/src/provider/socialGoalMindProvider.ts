@@ -201,12 +201,12 @@ export async function runSocialCycleGoalProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? "deterministic-social",
+    model: input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId,
     created_at: new Date().toISOString(),
     input: providerInput
   });
 
-  if (input.providerId === "deterministic-social") {
+  if (input.providerId === "deterministic-social" || input.providerId === "scripted-social") {
     const strategic = buildDeterministicStrategicGoal({
       soul: input.context.ActorSoul,
       lifeGoal: input.context.ActorLifeGoal,
@@ -244,7 +244,7 @@ export async function runSocialCycleGoalProvider(input: {
       actor_id: input.actorId,
       turn_id: turnId,
       provider_id: input.providerId,
-      model: "deterministic-social",
+      model: input.providerId,
       created_at: new Date().toISOString(),
       raw_output_text: JSON.stringify({ strategic, cycleGoal }),
       parsed_output: { strategic, cycleGoal },

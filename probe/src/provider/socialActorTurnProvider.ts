@@ -138,6 +138,8 @@ function deterministicActorTurn(input: {
       ? { note: "actor turn deterministic baseline" }
       : preferredPrimitive === "move_to"
         ? { x: 1, y: 0, z: 0 }
+      : preferredPrimitive === "say"
+        ? { text: "Can you make one starter material available for this shared task?" }
       : {};
 
   return {
@@ -151,6 +153,86 @@ function deterministicActorTurn(input: {
     why_this_action: "Deterministic Actor Turn baseline chooses one mapped Action Card.",
     expected_evidence: ["runtime evidence"],
     fallback_if_blocked: "choose another mapped Action Card"
+  };
+}
+
+function mappingForPrimitive(input: {
+  actionCardProjection: ActionCardProjection;
+  primitiveId: string;
+}) {
+  return input.actionCardProjection.runtime_mappings.find((mapping) =>
+    mapping.kind === "use_primitive" && mapping.primitive_id === input.primitiveId
+  );
+}
+
+function scriptedSocialMaterialHint(input: ActorTurnInput) {
+  const counts = input.current_state.inventory_counts;
+  const usefulItem = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([name]) => name)
+    .find((name) =>
+      name.includes("log") ||
+      name.includes("planks") ||
+      name === "stick" ||
+      name === "crafting_table" ||
+      name.includes("pickaxe") ||
+      name.includes("food")
+    );
+  return usefulItem
+    ? `I can make ${usefulItem} available if the next step needs it.`
+    : "I can help, but I need a visible material stake before I move items.";
+}
+
+function scriptedSocialActorTurn(input: {
+  actorTurnInput: ActorTurnInput;
+  actionCardProjection: ActionCardProjection;
+}): ActorTurnExecutionDraft {
+  const visibleActor = input.actorTurnInput.current_state.visible_actors[0];
+  const sayMapping = mappingForPrimitive({
+    actionCardProjection: input.actionCardProjection,
+    primitiveId: "say"
+  });
+  if (visibleActor && sayMapping) {
+    const text = [
+      `${visibleActor.id}, acknowledged.`,
+      scriptedSocialMaterialHint(input.actorTurnInput)
+    ].join(" ");
+    return {
+      schema: "actor-turn-execution-draft/v1",
+      choice: "use_existing_action",
+      action_card_id: sayMapping.action_card_id,
+      parameters: { text },
+      expected_outcome: defaultExpectedOutcomeForPrimitive("say"),
+      why_this_action:
+        "Scripted-social positive-control responder emits a deterministic content-conditioned reply through the normal Actor Turn provider seam.",
+      expected_evidence: ["runtime chat evidence", "response-window evidence"],
+      fallback_if_blocked: "observe the co-actor again before replying"
+    };
+  }
+
+  const observeMapping = mappingForPrimitive({
+    actionCardProjection: input.actionCardProjection,
+    primitiveId: "observe"
+  });
+  const waitMapping = mappingForPrimitive({
+    actionCardProjection: input.actionCardProjection,
+    primitiveId: "wait"
+  });
+  const fallbackMapping = observeMapping ?? waitMapping ?? input.actionCardProjection.runtime_mappings[0];
+  const primitiveId = fallbackMapping?.kind === "use_primitive" ? fallbackMapping.primitive_id : "observe";
+  return {
+    schema: "actor-turn-execution-draft/v1",
+    choice: "use_existing_action",
+    action_card_id:
+      fallbackMapping?.action_card_id ??
+      input.actorTurnInput.action_cards[0]?.action_card_id ??
+      "missing-card",
+    parameters: primitiveId === "wait" ? { ticks: 20 } : {},
+    expected_outcome: defaultExpectedOutcomeForPrimitive(primitiveId),
+    why_this_action:
+      "Scripted-social positive-control responder found no visible co-actor and chose a deterministic sensing/control fallback.",
+    expected_evidence: ["runtime evidence"],
+    fallback_if_blocked: "wait briefly and observe again"
   };
 }
 
@@ -636,12 +718,17 @@ async function requestActorTurn(input: {
     snapshotId: input.snapshotId
   });
 
-  if (input.providerId === "deterministic-social") {
-    const actorTurn = deterministicActorTurn({
-      actorTurnInput: input.actorTurnInput,
-      actionCardProjection: input.actionCardProjection,
-      defaultPrimitive: input.defaultPrimitive
-    });
+  if (input.providerId === "deterministic-social" || input.providerId === "scripted-social") {
+    const actorTurn = input.providerId === "scripted-social"
+      ? scriptedSocialActorTurn({
+          actorTurnInput: input.actorTurnInput,
+          actionCardProjection: input.actionCardProjection
+        })
+      : deterministicActorTurn({
+          actorTurnInput: input.actorTurnInput,
+          actionCardProjection: input.actionCardProjection,
+          defaultPrimitive: input.defaultPrimitive
+        });
     return {
       ok: true,
       actorTurn,
@@ -691,7 +778,7 @@ export async function runSocialActorTurnProvider(input: {
   runId?: string;
 }): Promise<ActorTurnProviderResult> {
   const snapshotId = `actor-turn-${input.actorTurnInput.turn_id}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? "deterministic-social";
+  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId;
   let actorTurnInput = input.actorTurnInput;
   let actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
   const intermediateInputRefs: string[] = [];

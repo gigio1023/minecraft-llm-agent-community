@@ -1,8 +1,9 @@
 # No-Regret Core Scenario Catalog
 
-Status: active planning catalog for row-producing scenario pressure. This is not
-a benchmark ladder, not a society demo script, and not a runtime implementation
-plan.
+Status: active planning catalog for row-producing scenario pressure, serving
+the embodied co-actor legibility experiment (`ACTIVE_CENTRAL_PLAN`). This is
+not a benchmark ladder, not a society demo script, and not a runtime
+implementation plan.
 
 Search token: `NO_REGRET_SCENARIO_CATALOG`.
 
@@ -10,25 +11,26 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 ## Purpose
 
-The no-regret core needs more than non-repeating actions. It needs small
-Minecraft situations that can produce informative `transition-row/v1` rows
+The active legibility experiment needs more than non-repeating actions. It needs
+small Minecraft situations that can produce informative `transition-row/v1` rows
 without scripting the outcome.
 
 This catalog defines scenario pressure families for the first 2-3 actor runs.
 The goal is not to prove social intelligence. The goal is to create enough
 material stake, interaction opportunity, and bounded response windows for the
-Goldilocks prediction preflight to test whether any layer has learnable signal
-beyond an LLM prior, and enough repeated observables for the society-observable
-preflight to test F-society separately.
+embodied co-actor legibility experiment to test whether public history adds
+predictive signal beyond current observation, policy-copy, shuffled-history, and
+leakage baselines. The same families can later serve the deferred
+society-observable preflight, but they do not select that branch.
 
 Use with:
 
-- `Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
-- `Transition-Row-V1-Contract.md`
-- `Transition-Row-Label-Codebook.md`
-- `Goldilocks-Preflight-Protocol.md`
-- `Society-Observable-Preflight.md`
-- `Research-Value-Harness.md`
+- `central-plan-embodied-co-actor-legibility.md`
+- `embodied-co-actor-legibility-implementation-plan.md`
+- `transition-row-v1-contract.md`
+- `transition-row-label-codebook.md`
+- `society-observable-preflight.md`
+- `research-value-harness.md`
 
 ## Design Rules
 
@@ -42,8 +44,8 @@ Each scenario family must satisfy these constraints:
 - the family can generate both positive and negative rows;
 - the setup stays small enough for free-tier provider discipline.
 
-Each family should also name at least one control shape when it is used for a
-preflight:
+Each family should also name at least one control shape when it is used for the
+legibility experiment or the deferred social-pattern branch:
 
 - same action family without material stake;
 - material stake without interaction opportunity;
@@ -151,7 +153,7 @@ confounds_to_report:
   physical placement is likely easy for LLM prior; social value depends on later
   other-actor use or avoidance.
 negative_result_value:
-  If public affordances do not affect another actor's behavior, early F-society
+  If public affordances do not affect another actor's behavior, social-pattern
   claims should be deferred.
 ```
 
@@ -261,15 +263,16 @@ confounds_to_report:
   movement/pathfinding noise can dominate; no-response is a valid label.
 negative_result_value:
   If co-presence is mostly random or pathing-driven, do not use it as the
-  F-society target.
+  social-pattern target.
 ```
 
-## Minimum Coverage For The First No-Regret Batch
+## Minimum Coverage For The First Legibility Batch
 
-The first no-regret batch should try to cover at least three scenario-pressure
-families, not just three item/action classes.
+The first legibility batch should try to cover at least three scenario-pressure
+families, not just three item/action classes. The central plan's K6 floor still
+decides whether the batch is usable for the active experiment.
 
-Recommended coverage before Goldilocks branch triage:
+Recommended coverage before a preregistered live pilot:
 
 - at least one borrow/refuse/return or scarcity/allocation family;
 - at least one public-affordance or blocked-access/repair family;
@@ -283,14 +286,15 @@ These numbers are not paper claims. They are pressure checks so the row batch is
 not merely a set of obvious single-actor Minecraft mechanics.
 
 Matched controls do not need perfect balance in the first pilot, but they must be
-declared or explicitly deferred. If the project cannot define a no-stake or
-same-action/different-history comparison for a scenario, that limitation belongs
-in the batch audit.
+declared or explicitly deferred. If the project cannot define a no-stake,
+same-action/different-history, shuffled-history, or policy-copy comparison for a
+scenario, that limitation belongs in the batch audit.
 
-## F-Society Target Candidates
+## Deferred Social-Pattern Target Candidates
 
-F-society cannot be selected by the predictor preflight alone. It needs separate
-observable targets. Candidate targets include:
+The deferred social-pattern branch (old name: F-society) cannot be selected by
+the legibility experiment alone. It needs separate observable targets. Candidate
+targets include:
 
 - repeated access negotiation around the same object, station, or place;
 - refusal followed by repair, compensation, avoidance, or changed future request;
@@ -301,7 +305,7 @@ observable targets. Candidate targets include:
 - obligation-like event lifecycle with evidence refs, without treating prose as
   ground truth.
 
-Before any F-society headline, write a separate `research-claim/v1` and
+Before any social-pattern headline, write a separate `research-claim/v1` and
 `experiment-sketch/v1` for one of these targets.
 
 ## What Not To Do

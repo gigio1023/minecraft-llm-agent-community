@@ -3,6 +3,15 @@
 Use these as output contracts. Fill only fields supported by evidence or clearly
 marked inference.
 
+## Table Of Contents
+
+- `research-claim/v1`
+- `prior-work-proximity/v1`
+- `proposal-soundness-review/v1`
+- `experiment-sketch/v1`
+- `negative-result-ledger/v1`
+- `research-decision/v1`
+
 ## `research-claim/v1`
 
 ```yaml
@@ -45,7 +54,7 @@ weakening_evidence:
 
 ```yaml
 schema_version: proposal-soundness-review/v1
-verdict: kill | defer | core-first | preflight-ready | headline-candidate
+verdict: kill | defer | substrate-first | preflight-ready | headline-candidate
 scores:
   object_clarity:
   gap_quality:
@@ -89,7 +98,7 @@ result:
 what_failed:
 what_it_rules_out:
 what_it_does_not_rule_out:
-next_decision: kill | defer | core-first | collect-more | revise-labels
+next_decision: kill | defer | substrate-first | collect-more | revise-labels
 archive_tag:
 evidence_refs:
 ```
@@ -99,7 +108,7 @@ evidence_refs:
 ```yaml
 schema_version: research-decision/v1
 decision:
-verdict: kill | defer | core-first | preflight-ready | headline-candidate
+verdict: kill | defer | substrate-first | preflight-ready | headline-candidate
 evidence_used:
 alternatives_considered:
 strongest_objection:

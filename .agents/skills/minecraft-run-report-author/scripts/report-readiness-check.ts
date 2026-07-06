@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 function usage() {
-  return "usage: report-readiness-check.ts <report.json> [--json] [--publishable]";
+  return "usage: report-readiness-check.ts <report-or-session.json> [--json] [--publishable]";
 }
 
 function readJson(filePath) {
@@ -64,6 +64,187 @@ function runSummarizer(reportPath) {
   };
 }
 
+function recursivelyHasKey(value, key) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => recursivelyHasKey(item, key));
+  }
+  return Object.prototype.hasOwnProperty.call(value, key)
+    || Object.values(value).some((item) => recursivelyHasKey(item, key));
+}
+
+function readSiblingJson(baseDir, fileName) {
+  const filePath = path.join(baseDir, fileName);
+  if (!fs.existsSync(filePath)) {
+    return { filePath, value: null };
+  }
+  return { filePath, value: readJson(filePath) };
+}
+
+function allLeakageChecksPassed(publicHistory) {
+  const checks = publicHistory?.leakage_checks;
+  if (!checks || typeof checks !== "object") {
+    return false;
+  }
+  return Object.values(checks)
+    .filter((value) => value && typeof value === "object" && "status" in value)
+    .every((value) => value.status === "passed");
+}
+
+function buildOutput({ jsonMode, result, checks, summarizer }) {
+  return jsonMode
+    ? JSON.stringify(result, null, 2)
+    : [
+      `Report readiness: ${result.final_status}`,
+      ...checks.map((check) => {
+        const detail = Array.isArray(check.detail) && check.detail.length > 0
+          ? ` (${check.detail.length} issue(s))`
+          : "";
+        return `- ${check.status}: ${check.name}${detail}`;
+      }),
+      ...(summarizer?.stdout ? ["", "Summarizer output:", summarizer.stdout.trim()] : [])
+    ].join("\n");
+}
+
+function checkLegibilitySessionReadiness({ artifactPath, artifactDir, session, jsonMode, publishableMode, now }) {
+  const rows = Array.isArray(session.transition_rows) ? session.transition_rows : [];
+  const publicHistory = readSiblingJson(artifactDir, "public-history.json");
+  const declaration = readSiblingJson(artifactDir, "experiment-declaration.json");
+  const predictions = readSiblingJson(artifactDir, "predictions.json");
+  const scoreReport = readSiblingJson(artifactDir, "score-report.json");
+  const missingLabelLocks = rows
+    .filter((row) => typeof row?.timestamps?.label_locked_at !== "string")
+    .map((row) => row?.row_id ?? "<missing-row-id>");
+  const rowsWithPredictedDelta = rows
+    .filter((row) => recursivelyHasKey(row, "predicted_delta"))
+    .map((row) => row?.row_id ?? "<missing-row-id>");
+  const unclosedWindows = rows
+    .filter((row) => row?.observed_delta?.social_response?.response_window?.status !== "closed")
+    .map((row) => row?.row_id ?? "<missing-row-id>");
+  const rowsMissingLayerEvidence = rows
+    .filter((row) =>
+      !row?.observed_delta?.social_response?.classes
+      || !row?.observed_delta?.material?.classes
+      || !row?.observed_delta?.physical?.classes
+    )
+    .map((row) => row?.row_id ?? "<missing-row-id>");
+  const actorRoutes = Array.isArray(session.actor_routes) ? session.actor_routes : [];
+  const providerBacked = actorRoutes.some((route) => {
+    const providerId = route?.provider_id ?? "";
+    return providerId
+      && !providerId.startsWith("deterministic")
+      && providerId !== "scripted-social"
+      && providerId !== "builtin-planner";
+  });
+  const checks = [
+    {
+      name: "legibility_session_schema",
+      status: session.schema === "legibility-session/v1" ? "passed" : "failed",
+      detail: session.schema ?? "missing"
+    },
+    {
+      name: "transition_rows_present",
+      status: rows.length > 0 ? "passed" : "failed",
+      detail: rows.length
+    },
+    {
+      name: "transition_rows_no_predicted_delta",
+      status: rowsWithPredictedDelta.length === 0 ? "passed" : "failed",
+      detail: rowsWithPredictedDelta
+    },
+    {
+      name: "transition_rows_label_locked",
+      status: missingLabelLocks.length === 0 ? "passed" : "failed",
+      detail: missingLabelLocks
+    },
+    {
+      name: "transition_rows_layered_observed_delta",
+      status: rowsMissingLayerEvidence.length === 0 ? "passed" : "failed",
+      detail: rowsMissingLayerEvidence
+    },
+    {
+      name: "response_windows_closed",
+      status: unclosedWindows.length === 0 ? "passed" : "failed",
+      detail: unclosedWindows
+    },
+    {
+      name: "public_history_exists",
+      status: publicHistory.value ? "passed" : "failed",
+      detail: path.basename(publicHistory.filePath)
+    },
+    {
+      name: "public_history_leakage_checks_passed",
+      status: publicHistory.value
+        ? allLeakageChecksPassed(publicHistory.value) ? "passed" : "failed"
+        : "failed",
+      detail: publicHistory.value?.leakage_checks ?? "missing"
+    },
+    {
+      name: "experiment_declaration_exists",
+      status: declaration.value ? "passed" : "failed",
+      detail: path.basename(declaration.filePath)
+    },
+    {
+      name: "predictions_exist",
+      status: predictions.value ? "passed" : publishableMode ? "failed" : "warning",
+      detail: path.basename(predictions.filePath)
+    },
+    {
+      name: "score_report_exists",
+      status: scoreReport.value ? "passed" : publishableMode ? "failed" : "warning",
+      detail: path.basename(scoreReport.filePath)
+    },
+    {
+      name: "score_report_row_count_matches",
+      status: scoreReport.value
+        ? scoreReport.value.row_count === rows.length ? "passed" : "failed"
+        : "not_applicable",
+      detail: scoreReport.value?.row_count ?? "missing"
+    },
+    {
+      name: "score_report_joined_predictions",
+      status: scoreReport.value
+        ? scoreReport.value.joined_prediction_count > 0 ? "passed" : "warning"
+        : "not_applicable",
+      detail: scoreReport.value?.joined_prediction_count ?? "missing"
+    },
+    {
+      name: "provider_preflight_present",
+      status: providerBacked
+        ? Array.isArray(session.preflight_refs) && session.preflight_refs.length > 0
+          ? "passed"
+          : publishableMode ? "failed" : "warning"
+        : "not_applicable",
+      detail: session.preflight_refs ?? []
+    }
+  ];
+  const failed = checks.filter((check) => check.status === "failed");
+  const warnings = checks.filter((check) => check.status === "warning");
+  const result = {
+    schema: "minecraft-run-report-readiness/v1",
+    report_path: artifactPath,
+    generated_at: (now ?? new Date()).toISOString(),
+    provider_backed: Boolean(providerBacked),
+    publishable_mode: publishableMode,
+    checks,
+    final_status: failed.length > 0 ? "failed" : warnings.length > 0 ? "warning" : "passed",
+    report_claim_requirements: [
+      "state this is a legibility-session bundle, not a live Minecraft proof unless live evidence exists",
+      "separate transition-row observed_delta from predictor outputs",
+      "mention public-history leakage checks before claiming predictor fairness",
+      "report support counts before lift, AUC, or RER claims",
+      "state provider-free fixture limitations explicitly"
+    ]
+  };
+  return {
+    result,
+    outputText: buildOutput({ jsonMode, result, checks, summarizer: null }),
+    exitCode: failed.length > 0 ? 1 : 0
+  };
+}
+
 export function checkReportReadiness(argv, options = {}) {
   const args = argv;
   if (args.includes("--help") || args.includes("-h")) {
@@ -81,6 +262,18 @@ export function checkReportReadiness(argv, options = {}) {
   const reportPath = path.resolve(cwd, reportArg);
   const reportDir = path.dirname(reportPath);
   const report = readJson(reportPath);
+
+  if (report.schema === "legibility-session/v1") {
+    return checkLegibilitySessionReadiness({
+      artifactPath: reportPath,
+      artifactDir: reportDir,
+      session: report,
+      jsonMode,
+      publishableMode,
+      now: options.now
+    });
+  }
+
   const actorWorkspaceRoot = resolveMaybe(
     reportDir,
     report.actor_workspace_root_dir ?? path.join("..", "data", "actors", "social-runs", report.run_id ?? "")
@@ -108,9 +301,11 @@ export function checkReportReadiness(argv, options = {}) {
     report.batch_audit_ref,
     report.batch_audit_refs
   );
-  const noRegretRefs = stringRefs(
+  const researchDeclarationRefs = stringRefs(
     report.no_regret_run_declaration_ref,
     report.no_regret_run_declaration_refs,
+    report.experiment_declaration_ref,
+    report.experiment_declaration_refs,
     report.seed_reset_record_ref,
     report.seed_reset_record_refs,
     report.seed_reset_records_ref,
@@ -129,7 +324,7 @@ export function checkReportReadiness(argv, options = {}) {
   const refScopes = [actorDir, reportDir].filter(Boolean);
   const missingTransitionRowRefs = transitionRowRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
   const missingTransitionBatchAuditRefs = transitionBatchAuditRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
-  const missingNoRegretRefs = noRegretRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
+  const missingResearchDeclarationRefs = researchDeclarationRefs.filter((ref) => !refExistsInScopes(ref, refScopes));
 
   const providerId = report.provider?.provider_id ?? "";
   const providerBacked = providerId && !providerId.startsWith("deterministic") && providerId !== "builtin-planner";
@@ -204,11 +399,11 @@ export function checkReportReadiness(argv, options = {}) {
       detail: missingTransitionBatchAuditRefs
     },
     {
-      name: "no_regret_refs_exist",
-      status: noRegretRefs.length === 0
+      name: "research_declaration_refs_exist",
+      status: researchDeclarationRefs.length === 0
         ? "not_applicable"
-        : missingNoRegretRefs.length === 0 ? "passed" : "failed",
-      detail: missingNoRegretRefs
+        : missingResearchDeclarationRefs.length === 0 ? "passed" : "failed",
+      detail: missingResearchDeclarationRefs
     }
   ];
 
@@ -235,24 +430,13 @@ export function checkReportReadiness(argv, options = {}) {
       "separate Recording verdict from Experiment verdict",
       "include a claim table with artifact refs",
       "for transition-row reports, separate observed_delta evidence from actor expected_outcome",
-      "state whether transition-row-batch-audit/v1 passes no-regret thresholds",
+      "state whether transition-row-batch-audit/v1 or legibility-session scoring passed the relevant active-plan gate",
       "treat screenshots as review-only evidence",
       "state unsupported research, leaderboard, sociality, and budget claims explicitly"
     ]
   };
 
-  const outputText = jsonMode
-    ? JSON.stringify(result, null, 2)
-    : [
-      `Report readiness: ${result.final_status}`,
-      ...checks.map((check) => {
-        const detail = Array.isArray(check.detail) && check.detail.length > 0
-          ? ` (${check.detail.length} issue(s))`
-          : "";
-        return `- ${check.status}: ${check.name}${detail}`;
-      }),
-      ...(summarizer.stdout ? ["", "Summarizer output:", summarizer.stdout.trim()] : [])
-    ].join("\n");
+  const outputText = buildOutput({ jsonMode, result, checks, summarizer });
 
   return {
     result,

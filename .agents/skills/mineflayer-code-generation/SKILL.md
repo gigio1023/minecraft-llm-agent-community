@@ -18,6 +18,13 @@ runtime, recorded as evidence, and later promoted only after lifecycle checks.
 
 ## Required Output Shape
 
+Before generating or reviewing a candidate, inspect the current runtime contract
+when the task may depend on helper names, verifier vocabulary, or output fields:
+
+- `probe/src/runtime/goals/actorEpisode/mineflayerCodegenSkill.ts`
+- `probe/src/runtime/goals/actorEpisode/validators.ts`
+- `probe/src/provider/socialActorTurnCodegenContract.ts`
+
 The provider output must include:
 
 - `proposed_action_skill_id`: stable lower-camel identifier for the candidate.
@@ -98,9 +105,8 @@ cover.
 ## Mineflayer Notes
 
 These notes are adapted from upstream `PrismarineJS/mineflayer` at commit
-`03eba44f`. A local clone such as `~/git/mineflayer` can be used for inspection,
-but the committed reference is the upstream repo and commit, not a device-local
-path.
+`03eba44f`. If a local clone is available, it may be inspected, but the
+committed reference is the upstream repo and commit, not a device-local path.
 
 Keep this skill aligned with
 `probe/src/runtime/goals/actorEpisode/mineflayerCodegenSkill.ts`,
@@ -147,6 +153,7 @@ Good authoring cases:
 Bad authoring cases:
 
 - choosing codegen to avoid filling required parameters;
+- generating code to translate vague prose into missing runtime arguments;
 - probing chest openability when Inspect Chest is visible;
 - probing crafting-table reachability when Craft With Table, Place Crafting
   Table, or Craft Crafting Table is visible;

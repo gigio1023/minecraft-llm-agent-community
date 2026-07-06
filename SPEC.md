@@ -4,10 +4,22 @@ Updated: 2026-06-18
 
 This is the canonical gateway spec for the current rebuild.
 
-The long-term research direction is an **advisory social-material World Action
-Model (WAM) for wild Minecraft**. The motivating domain remains Soul-grounded
-Minecraft social simulation, but the concrete research object is a predictor of
-action-conditioned physical, material, and social consequences.
+The active research direction is the **embodied co-actor legibility
+experiment**, defined in
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`:
+measuring whether observer models can predict soul-grounded co-actors'
+social-material responses from public interaction history alone, with
+disposition consistency as the manipulated variable. The build order and
+acceptance gates live in
+`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+The substrate premise is depth, not scale (`DEPTH_NOT_SCALE`): a working
+2-3 actor shared session with dense, attributable, longitudinally
+accumulated interaction. Actor-count scale is not a premise and never a
+remedy for weak signal. The motivating domain
+remains Soul-grounded Minecraft social simulation. The former "advisory
+social-material WAM" framing is historical; the WAM banner term was retired
+on 2026-07-05 with user approval (it collides with the robotics World Action
+Model term and misdescribed the prediction-only object).
 
 Minecraft is the embodied substrate: raw world state, inventory, entities,
 positions, chat, blocks, tool results, and artifact refs should be preserved
@@ -63,17 +75,18 @@ and social consequences. It is not the top-level objective by itself.
 The current research object is separate from the actor:
 
 ```text
-state_before + actor frame + candidate action
--> advisory predicted_delta
--> Mineflayer execution
--> observed_delta
--> transition row for scoring and analysis
+public interaction history + state_before + executed_action
+-> observer-predicted social_response / material_access labels
+   (separate artifacts, joined by row_id after labels are locked)
+-> scored against runtime-observed transition-row/v1 deltas
 ```
 
-The advisory WAM predicts what should change. It never selects the executed
-action, fills missing runtime parameters, decides success, closes obligations,
-mutates actor truth, or overrides runtime checks. Actor Turn remains the action
-selection path and the runtime remains the execution boundary.
+Predictor artifacts are strictly offline and advisory. They never select the
+executed action, fill missing runtime parameters, decide success, close
+obligations, mutate actor truth, or override runtime checks. `transition-row/v1`
+never contains `predicted_delta`, and the actor's `expected_outcome` is never
+a target label. Actor Turn remains the action selection path and the runtime
+remains the execution boundary.
 
 Read the product identity spec:
 
@@ -217,10 +230,14 @@ Read these documents to understand the full spec:
 2. `project-docs/specification/soul-grounded-social-simulation.md`
    - Soul/ActorSoul identity, LifeGoal continuity, social context, and why
      Minecraft actions matter for social-material consequences.
-3. `project-docs/specification/advisory-social-material-wam.md`
-   - current research spine: advisory WAM object, social-material transition
-     rows, prediction-vs-acting separation, autoresearch loop boundary, and
-     verification-as-hygiene rule.
+3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+   - active research plan: co-actor legibility experiment, conditions, arms,
+     metrics, stop-results, and build plan.
+     (`project-docs/specification/advisory-social-material-wam.md` is
+     historical; its verification-as-hygiene rule remains binding.)
+   - `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+     expands the build plan into seams, vertical slices, acceptance
+     criteria, and testing rules.
 4. `project-docs/specification/runtime-evidence-and-action-skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.
@@ -280,8 +297,10 @@ Setup docs:
 ## 4. Non-Negotiable Direction
 
 - Soul/LifeGoal continuity is the top-level simulation frame.
-- The active research spine is advisory social-material consequence prediction,
-  not task completion, evidence-first benchmarking, or civilization spectacle.
+- The active research spine is the embodied co-actor legibility experiment
+  (`central-plan-embodied-co-actor-legibility.md`), not task completion,
+  evidence-first benchmarking, world-model branding, or civilization
+  spectacle.
 - WorldEvents are event/context records, not raw observation and not a direct
   replacement for LifeGoal.
 - Runtime owns physical truth: validation, timeout, cancellation, execution,
@@ -289,8 +308,8 @@ Setup docs:
 - Verification is expected hygiene and must not be presented as the
   differentiating research claim.
 - Providers propose goals and actions. They do not decide success.
-- The advisory WAM predicts deltas. It does not execute, score itself, or
-  override runtime checks.
+- Predictor artifacts are offline and advisory. They do not execute, score
+  themselves, or override runtime checks.
 - Reviewers explain and propose repairs. They do not mutate actor truth directly.
 - Action skills are Minecraft/Mineflayer runtime behaviors, not Codex/Claude
   agent skills.
@@ -329,7 +348,9 @@ Setup docs:
 
 The first meaningful proof is small:
 
-- one bounded actor;
+- a bounded 2-3 actor shared session (one focal actor plus 1-2 responders)
+  with cross-actor observation and chat capture; single-actor runs remain
+  valid for calibration and substrate smoke tests;
 - real Minecraft actions such as gathering, crafting, storage, movement,
   block placement, communication, or settlement maintenance;
 - action attempts recorded whether passed, blocked, failed, or no-progress;

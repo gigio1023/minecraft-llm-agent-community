@@ -4,6 +4,15 @@ Use this when a current-run action-skill matrix fails, a single-skill probe
 passes but the full matrix fails, or a boring Minecraft action appears to work
 once and then regresses under sequential probes.
 
+## Table Of Contents
+
+- Core Rule
+- Review Order
+- Failure Mechanisms From Recent Runs
+- Implementation Principles
+- Done Criteria
+- Gotchas
+
 ## Core Rule
 
 The full deterministic action-skill matrix is the current capability gate.

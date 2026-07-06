@@ -32,22 +32,30 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
    they were the research contribution. Runtime checking and audit artifacts are
    experiment hygiene unless the project is explicitly studying verifier models.
 
-## Action-Consequence And Advisory Predictor Names
+## Legibility, Action-Consequence, And Advisory Predictor Names
 
-The active central plan has not selected one research headline yet. New active
-direction docs should prefer concrete names over the historical **WAM** banner:
+The active research headline is the **embodied co-actor legibility experiment**:
+whether public interaction history improves prediction of a co-actor's
+`social_response` and `material_access` labels under the conditions, baselines,
+and stop-results in
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`.
+
+For deferred branches and historical references, prefer concrete names over the
+historical **WAM** banner:
 
 - **action-consequence model** for F-native style action -> consequence learning;
 - **advisory consequence predictor** for F-loop style prediction outside
   runtime authority;
 - **social-material transition model** when discussing physical/material/social
   deltas as the object of analysis;
-- `transition-row/v1` when discussing the current no-regret core data unit.
+- `transition-row/v1` when discussing the current legibility data unit.
 
-**Advisory social-material WAM** is historical shorthand and a possible F-loop
-branch reference. It should not be used as the current project headline. If it
-appears in older docs, read it through
-`project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`.
+**Advisory social-material WAM** is historical shorthand and a possible
+advisory-use branch reference. It should not be used as the current project
+headline. If it appears in older docs, read it through
+`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+(the active plan, whose crosswalk also retires the F-native/F-loop/F-society
+branch names).
 
 An advisory consequence predictor predicts deltas before an action and is scored
 after the action against runtime-observed deltas. It does not select the executed
@@ -59,7 +67,7 @@ representation choice, not the research contribution.
 
 ## Transition Row
 
-A **transition row** is the current no-regret core data unit. It is an
+A **transition row** is the current legibility experiment data unit. It is an
 independent before/action/after record for one executed Minecraft action:
 
 ```text
@@ -74,11 +82,11 @@ cost/latency/token/action-count metadata
 
 Use `transition-row/v1` for current docs and runtime artifacts.
 
-A transition row may later support social-material consequence modeling when an
-embodied Minecraft action changes physical state, possession, access, claims,
+A transition row supports legibility analysis only when an embodied Minecraft
+action changes or fails to change physical state, possession, access, claims,
 public affordances, obligations, relationship state, memory commitments, or
-future action opportunities. Do not use the actor's self-declared
-`expected_outcome` as the target label.
+future action opportunities in a way the runtime can observe. Do not use the
+actor's self-declared `expected_outcome` as the target label.
 
 `social-material-transition/v1` is an older WAM-era dataset name. Keep it in
 archive references, but translate new work to `transition-row/v1`.

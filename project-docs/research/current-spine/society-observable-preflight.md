@@ -1,7 +1,9 @@
 # Society Observable Preflight
 
-Status: active planning protocol for the F-society branch. This does not select
-F-society as the headline.
+Status: active gate for the deferred social-pattern branch (old name:
+F-society). This does not select the branch as the headline; under
+`DEPTH_NOT_SCALE`, actor-count scale stays banned as a remedy for weak
+small-run results.
 
 Search token: `SOCIETY_OBSERVABLE_PREFLIGHT`.
 
@@ -9,19 +11,19 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `Central-Plan-No-Regret-Core-And-Goldilocks-Gate.md`
-- `No-Regret-Core-Research-Protocol.md`
-- `No-Regret-Core-Scenario-Catalog.md`
-- `Transition-Row-Label-Codebook.md`
-- `Goldilocks-Preflight-Protocol.md`
+- `central-plan-embodied-co-actor-legibility.md`
+- `embodied-co-actor-legibility-implementation-plan.md`
+- `no-regret-core-scenario-catalog.md`
+- `transition-row-label-codebook.md`
 - `project-docs/specification/evidence-grounded-minecraft-society.md`
 
 ## Purpose
 
-The Goldilocks prediction preflight can weaken or promote F-native/F-loop. It
-cannot by itself prove or kill F-society.
+The active embodied co-actor legibility experiment can weaken or motivate later
+predictor/advisory-use branches. It cannot by itself prove or kill the deferred
+social-pattern branch.
 
-F-society needs a different question:
+The social-pattern branch needs a different question:
 
 ```text
 Do small embodied Minecraft actors form observable, recurring social-material
@@ -50,7 +52,7 @@ The unit of review is a small episode, not a single transcript quote.
 
 ## Candidate Observables
 
-F-society candidates must use observable targets such as:
+Social-pattern candidates must use observable targets such as:
 
 - repeated access negotiation around the same item, station, container, or place;
 - refusal followed by repair, compensation, avoidance, retry, or changed future
@@ -69,8 +71,8 @@ friendship, culture, law, religion, or role identity.
 
 ## Required Inputs
 
-The preflight may start only after the no-regret core has produced an auditable
-batch.
+The preflight may start only after the active legibility substrate has produced
+an auditable small-N batch with non-vacuous response windows.
 
 Minimum smoke input:
 
@@ -85,7 +87,7 @@ Minimum smoke input:
 - label decisions follow `Transition-Row-Label-Codebook.md`.
 
 Smoke input can expose obvious negative results or broken observables. It cannot
-promote F-society beyond `core-first` or `defer`.
+promote the social-pattern branch beyond `core-first` or `defer`.
 
 Minimum branch-triage input:
 
@@ -144,7 +146,7 @@ Use controls that can erase the claim:
   pattern survives unchanged, it may not depend on relationship or role context.
 
 If the candidate observable survives only when fixture text tells the actors what
-social result should occur, the result is not F-society evidence.
+social result should occur, the result is not social-pattern evidence.
 
 ## Metrics
 
@@ -165,7 +167,7 @@ Do not collapse these into one society score.
 
 ## Falsifiers
 
-F-society is weakened when:
+The social-pattern branch is weakened when:
 
 - behavior is explainable by scenario script text;
 - actors only produce chat with no material or future-action consequence;
@@ -184,7 +186,8 @@ F-society is weakened when:
 - Public affordances are ignored.
 - Actor memory records events but later action does not use them.
 - Co-presence cannot be distinguished from pathing or loaded-world artifacts.
-- F-society needs a different observable target than the current row labels.
+- The social-pattern branch needs a different observable target than the current
+  row labels.
 
 These are useful results. They stop the project from scaling a weak demo.
 
@@ -215,10 +218,10 @@ This table is a branch-triage rule, not a paper result.
 
 ```text
 Substrate still weak
-  no-regret core thresholds fail
+  legibility substrate thresholds fail
   or response windows are mostly undefined
   or active actor count is below 2
-  -> core-first; do not evaluate F-society from the transcript.
+  -> core-first; do not evaluate the social-pattern branch from the transcript.
 
 Observable absent
   chosen primary observable appears in fewer than 3 closed episodes
@@ -244,7 +247,8 @@ Concrete repeated pattern exists
 
 Confirming experiment also passes
   the larger batch repeats the result under declared controls
-  and the decision record names what F-society still does not claim
+  and the decision record names what the social-pattern branch still does not
+  claim
   -> headline_candidate_only_after_confirming_experiment.
 ```
 
@@ -252,26 +256,26 @@ The first positive society-observable preflight should still produce a next
 experiment, not a society headline. The claim becomes stronger only when the
 observable repeats under controls that could have erased it.
 
-## Relationship To Goldilocks Prediction Preflight
+## Relationship To The Active Legibility Experiment
 
-The two gates answer different questions.
+The active experiment and this deferred gate answer different questions.
 
 | Gate | Main question | Can select |
 | --- | --- | --- |
-| Goldilocks prediction preflight | Does history improve consequence prediction beyond LLM prior? | F-native/F-loop candidate |
-| Society observable preflight | Do recurring social-material patterns appear under small embodied constraints? | F-society candidate |
+| Embodied co-actor legibility | Does public history improve prediction of a co-actor's response beyond baselines? | current research decision |
+| Society observable preflight | Do recurring social-material patterns appear under small embodied constraints? | deferred social-pattern candidate |
 
 One gate can be positive while the other is negative. A strong prediction result
-does not prove society. A weak prediction result does not kill F-society unless
-the society observable also fails.
+does not prove society. A weak prediction result does not kill the social-pattern
+branch unless the society observable also fails.
 
 Decision interaction:
 
 | Prediction gate | Society gate | Result |
 | --- | --- | --- |
 | positive | positive | both branches may deserve separate confirming experiments |
-| positive | negative | pursue predictor branch, defer F-society |
-| negative | positive | F-society remains alive under its own target |
+| positive | negative | pursue predictor/advisory-use follow-up, defer social-pattern |
+| negative | positive | social-pattern remains alive under its own target |
 | negative | negative | preserve negative result, revise labels/scenarios, or defer |
 
 ## What Not To Do

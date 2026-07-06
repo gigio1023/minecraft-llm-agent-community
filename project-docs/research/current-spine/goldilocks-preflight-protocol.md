@@ -1,7 +1,11 @@
 # Goldilocks Prediction Preflight Protocol
 
-Status: active planning protocol for F-native/F-loop branch triage. Do not run a
-Goldilocks prediction preflight without this protocol or a documented successor.
+Status: SUPERSEDED on 2026-07-05 by
+`central-plan-embodied-co-actor-legibility.md` (sections 3-7), which absorbs
+this protocol's arms, metrics, and decision discipline and adds the arms this
+file omitted from its promotion criterion: `shuffled_history`, `policy_copy`,
+`last_response_carried_forward`, leakage arms, and the held-out-family
+predictor requirement. Preserved as audit trail.
 
 Search token: `GOLDILOCKS_PREFLIGHT_PROTOCOL`.
 

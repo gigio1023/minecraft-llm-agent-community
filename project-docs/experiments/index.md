@@ -55,6 +55,12 @@ Current curated reports:
 - `2026-06-15/grounded-social-trajectory-smoke/index.html`
 - `2026-06-15/borrowed-tool-qwen-plus-smoke/index.html`
 
+Current raw research-substrate artifacts:
+
+- `raw/2026-07-06/session1-legibility-smoke/session.json`
+- `raw/2026-07-06/session1-legibility-smoke/public-history.json`
+- `raw/2026-07-06/session1-legibility-smoke/score-report.json`
+
 ## Required Run Metadata
 
 Every new benchmark run should record:

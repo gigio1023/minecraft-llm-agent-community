@@ -802,7 +802,7 @@ export async function runSocialDeliberationProvider(input: {
 }): Promise<DeliberationProviderResult> {
   const turnId = `${input.cycleId}-deliberation`;
   const snapshotId = `deliberation-${turnId}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? "deterministic-social";
+  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId;
   const providerInput = buildDeliberationProviderInput({
     branch: input.branch,
     currentEpisode: input.currentEpisode,
@@ -823,7 +823,7 @@ export async function runSocialDeliberationProvider(input: {
   let deliberation: DeliberationOutput;
   let rawText = "";
   let usageRecord: ProviderUsageRecord | undefined;
-  if (input.providerId === "deterministic-social") {
+  if (input.providerId === "deterministic-social" || input.providerId === "scripted-social") {
     deliberation = sanitizeDeliberationForCurrentState({
       output: deterministicDeliberation({
         branch: input.branch,

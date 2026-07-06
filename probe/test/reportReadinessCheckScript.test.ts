@@ -48,8 +48,8 @@ test("report readiness resolves helper scripts independently of cwd and checks t
       schema_version: "transition-row-batch-audit/v1",
       verdict: "core-inconclusive"
     });
-    await writeJson(path.join(actorDir, "reviews/no-regret-declaration.json"), {
-      schema_version: "no-regret-run-declaration/v1"
+    await writeJson(path.join(actorDir, "reviews/experiment-declaration.json"), {
+      schema_version: "experiment-declaration/v1"
     });
     await writeJson(path.join(actorDir, "reviews/seed-reset.json"), {
       schema_version: "seed-reset-record/v1"
@@ -70,7 +70,7 @@ test("report readiness resolves helper scripts independently of cwd and checks t
         }]
       }],
       transition_row_batch_audit_ref: "reviews/batch-audit.json",
-      no_regret_run_declaration_ref: "reviews/no-regret-declaration.json",
+      experiment_declaration_ref: "reviews/experiment-declaration.json",
       seed_reset_record_ref: "reviews/seed-reset.json"
     });
 
@@ -102,7 +102,7 @@ test("publishable provider-backed reports fail when preflight evidence is missin
       run_id: "run-2",
       actor_id: "npc_b",
       actor_workspace_root_dir: actorRoot,
-      provider: { provider_id: "openai-api", model: "gpt-5.5" },
+      provider: { provider_id: "openai-api", model: "fixture-openai-model" },
       provider_usage: { budget_status: [{ status: "allowed" }] },
       cycles: []
     });
@@ -115,6 +115,79 @@ test("publishable provider-backed reports fail when preflight evidence is missin
       result.checks.find((check: { name: string }) => check.name === "preflight_ref_present")?.status,
       "failed"
     );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("legibility session readiness checks label locks, public history, and score bundle", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "legibility-readiness-"));
+  try {
+    const sessionPath = path.join(dir, "session.json");
+    const row = {
+      schema_version: "transition-row/v1",
+      row_id: "row-1",
+      session_id: "session-1",
+      timestamps: {
+        action_started_at: "2026-07-06T00:00:01.000Z",
+        label_locked_at: "2026-07-06T00:00:03.000Z"
+      },
+      observed_delta: {
+        physical: { classes: ["no_physical_delta"], evidence_refs: [] },
+        material: { classes: ["possession_or_access_granted"], evidence_refs: ["evidence/material.json"] },
+        social_response: {
+          classes: ["reply_accept_or_acknowledge"],
+          evidence_refs: ["evidence/chat.json"],
+          response_window: {
+            schema: "response-window/v1",
+            status: "closed"
+          }
+        }
+      }
+    };
+    await writeJson(sessionPath, {
+      schema: "legibility-session/v1",
+      session_id: "session-1",
+      actor_routes: [
+        { actor_id: "npc_a", provider_id: "deterministic-social", model: "deterministic-social" },
+        { actor_id: "npc_b", provider_id: "scripted-social", model: "scripted-social" }
+      ],
+      transition_rows: [row]
+    });
+    await writeJson(path.join(dir, "public-history.json"), {
+      schema: "public-history/v1",
+      leakage_checks: {
+        identity_permutation: { status: "passed" },
+        prompt_shape: { status: "passed" },
+        private_field_scan: { status: "passed" }
+      }
+    });
+    await writeJson(path.join(dir, "experiment-declaration.json"), {
+      schema_version: "experiment-declaration/v1"
+    });
+    await writeJson(path.join(dir, "predictions.json"), []);
+    await writeJson(path.join(dir, "score-report.json"), {
+      schema: "legibility-score-report/v1",
+      row_count: 1,
+      joined_prediction_count: 1
+    });
+
+    const { exitCode, outputText } = await runReadiness(sessionPath, ["--publishable"]);
+    assert.equal(exitCode, 0);
+    const result = JSON.parse(outputText);
+    assert.equal(result.final_status, "passed");
+    assert.equal(
+      result.checks.find((check: { name: string }) => check.name === "transition_rows_no_predicted_delta")?.status,
+      "passed"
+    );
+
+    await writeJson(sessionPath, {
+      schema: "legibility-session/v1",
+      transition_rows: [{ ...row, predicted_delta: { social_response: "leaked" } }]
+    });
+    const failed = await runReadiness(sessionPath, ["--publishable"]);
+    assert.equal(failed.exitCode, 1);
+    assert.equal(JSON.parse(failed.outputText).final_status, "failed");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
