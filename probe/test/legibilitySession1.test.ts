@@ -213,6 +213,16 @@ test("Session 1 smoke writes rows, public history, and positive scripted history
   const result = await runSession1LegibilitySmoke({ outputDir });
   assert.equal(result.rows.length, 2);
   assert.ok(result.rows.every((row) => row.observed_delta.social_response.response_window.status === "closed"));
+  assert.equal(result.rows[0]?.observed_delta.social_response.response_window.response_chat_events.length, 1);
+  assert.match(
+    result.rows[0]?.observed_delta.social_response.response_window.response_chat_events[0]?.message ?? "",
+    /make oak_log available/
+  );
+  assert.equal(result.rows[1]?.observed_delta.social_response.response_window.response_chat_events.length, 1);
+  assert.match(
+    result.rows[1]?.observed_delta.social_response.response_window.response_chat_events[0]?.message ?? "",
+    /visible material stake/
+  );
   assert.ok(
     result.rows.some((row) =>
       row.observed_delta.material.classes.includes("possession_or_access_granted")

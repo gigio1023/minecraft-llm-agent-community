@@ -312,6 +312,107 @@ export async function runSession1LegibilitySmoke(input: {
   const pendingByWindow = new Map<string, PendingFocalAction>();
   const providerWorkspaceRoot = path.join(outputDir, "actor-workspaces");
 
+  const materializeClosedWindow = async (window: ResponseWindowRecord) => {
+    const pending = pendingByWindow.get(window.window_id);
+    if (!pending) {
+      return;
+    }
+    const response = window.response_chat_events[0];
+    const message = response?.message ?? "";
+    const responderHasMaterial = /make oak_log available/i.test(message);
+    const materialLabel = materialLabelForResponder({ message, responderHasMaterial });
+    const materialEvidencePath = await writeJson(
+      path.join(outputDir, "evidence", `${window.window_id}-material-access.json`),
+      {
+        schema: "material-access-fixture-event/v1",
+        window_id: window.window_id,
+        actor_id: "npc_b",
+        target_actor_id: "npc_a",
+        item_name: "oak_log",
+        status: materialLabel,
+        evidence_basis:
+          materialLabel === "possession_or_access_granted"
+            ? "scripted responder had oak_log inventory in state_before and emitted runtime say evidence"
+            : "scripted responder lacked material inventory in state_before and emitted runtime refusal evidence"
+      }
+    );
+    const labelLockedAt = `2026-07-06T00:00:${10 + rows.length}.000Z`;
+    const row: TransitionRowV1 = {
+      schema_version: "transition-row/v1",
+      row_id: `${window.window_id}-row`,
+      session_id: sessionId,
+      seed_or_reset_id: "session1-provider-free-fixture",
+      cycle_index: rows.length + 1,
+      actor_id: pending.slot.actor_id,
+      condition: "scripted_responder",
+      timestamps: {
+        action_selected_at: pending.slot.started_at,
+        action_started_at: pending.slot.started_at,
+        action_finished_at: pending.slot.completed_at,
+        response_window_closed_at: window.closed_at,
+        label_locked_at: labelLockedAt
+      },
+      state_before: {
+        snapshot_ref: pending.stateBeforeRef,
+        other_actors: {
+          visible_actor_ids: pending.visibleActorIds,
+          interaction_range_actor_ids: pending.visibleActorIds,
+          loaded_world_caveat:
+            "Provider-free Session 1 fixture; live loaded-world absence claims are not inferred."
+        },
+        social_context_refs: {
+          recent_interaction_refs: []
+        }
+      },
+      executed_action: {
+        action_kind: pending.slot.action_kind,
+        ...(pending.action.kind !== "author_mineflayer_action"
+          ? { action_card_id: pending.action.action_card_id }
+          : {}),
+        runtime_action_id: pending.slot.turn_id,
+        validation_status: "passed",
+        permission_status: "passed",
+        action_started: true
+      },
+      observed_delta: {
+        physical: {
+          classes: ["no_physical_delta"],
+          evidence_refs: []
+        },
+        material: {
+          classes: [materialLabel],
+          evidence_refs: [relative(outputDir, materialEvidencePath)]
+        },
+        social_response: {
+          response_window: window,
+          classes: [socialLabelForChat(message)],
+          evidence_refs: response?.evidence_refs ?? []
+        },
+        exclusions: []
+      },
+      row_quality: {
+        verdict: "valid",
+        inclusion_tags: ["interaction_opportunity", "material_stake"],
+        exclusion_reasons: [],
+        notes: ["Session 1 provider-free fixture row; not a live Minecraft evidence claim."]
+      },
+      metadata: {
+        provider: pending.slot.provider_id,
+        model: pending.slot.model,
+        scenario_family_id: "session1-scripted-material-request",
+        scenario_family_ids: ["session1-scripted-material-request"],
+        artifact_refs: [
+          pending.stateBeforeRef,
+          ...pending.slot.evidence_refs,
+          relative(outputDir, materialEvidencePath)
+        ]
+      }
+    };
+    rows.push(row);
+    await writeJson(path.join(outputDir, "transition-rows", `${row.row_id}.json`), row);
+    pendingByWindow.delete(window.window_id);
+  };
+
   const slotEvents = await runSharedSessionSchedule({
     session_id: sessionId,
     actorRoutes,
@@ -405,6 +506,21 @@ export async function runSession1LegibilitySmoke(input: {
         started_at: startedAt,
         completed_at: completedAt
       };
+      const slotCompletion: ActorTurnSlotCompletionEvent = {
+        schema: "actor-turn-slot-completion/v1",
+        session_id: sessionId,
+        slot_index,
+        actor_id,
+        provider_id: route.provider_id,
+        model: route.model,
+        turn_id,
+        cycle_id,
+        action_kind: actionKind,
+        action_ref: provider.actionRef,
+        started_at: startedAt,
+        completed_at: completedAt,
+        evidence_refs: evidenceRefs
+      };
 
       if (actor_id === "npc_a") {
         const openedWindow = responseTracker.open({
@@ -415,21 +531,7 @@ export async function runSession1LegibilitySmoke(input: {
           evidenceRefs
         });
         pendingByWindow.set(openedWindow.window_id, {
-          slot: {
-            schema: "actor-turn-slot-completion/v1",
-            session_id: sessionId,
-            slot_index,
-            actor_id,
-            provider_id: route.provider_id,
-            model: route.model,
-            turn_id,
-            cycle_id,
-            action_kind: actionKind,
-            action_ref: provider.actionRef,
-            started_at: startedAt,
-            completed_at: completedAt,
-            evidence_refs: evidenceRefs
-          },
+          slot: slotCompletion,
           action: provider.action,
           stateBeforeRef: relative(outputDir, stateBeforePath),
           visibleActorIds: [targetActorId],
@@ -437,112 +539,14 @@ export async function runSession1LegibilitySmoke(input: {
         });
       }
 
+      const closedWindows = responseTracker.recordSlotCompletion(slotCompletion);
+      for (const window of closedWindows) {
+        await materializeClosedWindow(window);
+      }
+
       return result;
     }
   });
-
-  for (const slot of slotEvents) {
-    const closedWindows = responseTracker.recordSlotCompletion(slot);
-    for (const window of closedWindows) {
-      const pending = pendingByWindow.get(window.window_id);
-      if (!pending) {
-        continue;
-      }
-      const response = window.response_chat_events[0];
-      const message = response?.message ?? "";
-      const responderHasMaterial = /make oak_log available/i.test(message);
-      const materialLabel = materialLabelForResponder({ message, responderHasMaterial });
-      const materialEvidencePath = await writeJson(
-        path.join(outputDir, "evidence", `${window.window_id}-material-access.json`),
-        {
-          schema: "material-access-fixture-event/v1",
-          window_id: window.window_id,
-          actor_id: "npc_b",
-          target_actor_id: "npc_a",
-          item_name: "oak_log",
-          status: materialLabel,
-          evidence_basis:
-            materialLabel === "possession_or_access_granted"
-              ? "scripted responder had oak_log inventory in state_before and emitted runtime say evidence"
-              : "scripted responder lacked material inventory in state_before and emitted runtime refusal evidence"
-        }
-      );
-      const labelLockedAt = `2026-07-06T00:00:${10 + rows.length}.000Z`;
-      const row: TransitionRowV1 = {
-        schema_version: "transition-row/v1",
-        row_id: `${window.window_id}-row`,
-        session_id: sessionId,
-        seed_or_reset_id: "session1-provider-free-fixture",
-        cycle_index: rows.length + 1,
-        actor_id: pending.slot.actor_id,
-        condition: "scripted_responder",
-        timestamps: {
-          action_selected_at: pending.slot.started_at,
-          action_started_at: pending.slot.started_at,
-          action_finished_at: pending.slot.completed_at,
-          response_window_closed_at: window.closed_at,
-          label_locked_at: labelLockedAt
-        },
-        state_before: {
-          snapshot_ref: pending.stateBeforeRef,
-          other_actors: {
-            visible_actor_ids: pending.visibleActorIds,
-            interaction_range_actor_ids: pending.visibleActorIds,
-            loaded_world_caveat:
-              "Provider-free Session 1 fixture; live loaded-world absence claims are not inferred."
-          },
-          social_context_refs: {
-            recent_interaction_refs: []
-          }
-        },
-        executed_action: {
-          action_kind: pending.slot.action_kind,
-          ...(pending.action.kind !== "author_mineflayer_action"
-            ? { action_card_id: pending.action.action_card_id }
-            : {}),
-          runtime_action_id: pending.slot.turn_id,
-          validation_status: "passed",
-          permission_status: "passed",
-          action_started: true
-        },
-        observed_delta: {
-          physical: {
-            classes: ["no_physical_delta"],
-            evidence_refs: []
-          },
-          material: {
-            classes: [materialLabel],
-            evidence_refs: [relative(outputDir, materialEvidencePath)]
-          },
-          social_response: {
-            response_window: window,
-            classes: [socialLabelForChat(message)],
-            evidence_refs: response?.evidence_refs ?? []
-          },
-          exclusions: []
-        },
-        row_quality: {
-          verdict: "valid",
-          inclusion_tags: ["interaction_opportunity", "material_stake"],
-          exclusion_reasons: [],
-          notes: ["Session 1 provider-free fixture row; not a live Minecraft evidence claim."]
-        },
-        metadata: {
-          provider: pending.slot.provider_id,
-          model: pending.slot.model,
-          scenario_family_id: "session1-scripted-material-request",
-          scenario_family_ids: ["session1-scripted-material-request"],
-          artifact_refs: [
-            pending.stateBeforeRef,
-            ...pending.slot.evidence_refs,
-            relative(outputDir, materialEvidencePath)
-          ]
-        }
-      };
-      rows.push(row);
-      await writeJson(path.join(outputDir, "transition-rows", `${row.row_id}.json`), row);
-    }
-  }
 
   const windows = responseTracker.all();
   const session: LegibilitySessionArtifact = {
