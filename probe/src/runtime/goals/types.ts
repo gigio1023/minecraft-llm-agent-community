@@ -254,7 +254,8 @@ export type SocialCycleProviderId =
   | "openai-api"
   | "gemini-api"
   | "modelscope-api"
-  | "deterministic-social";
+  | "deterministic-social"
+  | "scripted-social";
 
 export type SocialCycleVisualEvidenceCapture = {
   schema: "visual-evidence-capture/v1";

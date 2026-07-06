@@ -148,7 +148,8 @@ function normalizeSocialCycleProvider(value: string | undefined): SocialCyclePro
     value === "openai-api" ||
     value === "gemini-api" ||
     value === "modelscope-api" ||
-    value === "deterministic-social"
+    value === "deterministic-social" ||
+    value === "scripted-social"
   ) {
     return value;
   }
@@ -185,7 +186,7 @@ function resolveModelForProvider(input: {
     }
     return explicitModel;
   }
-  return "deterministic-social";
+  return input.providerId === "scripted-social" ? "scripted-social" : "deterministic-social";
 }
 
 async function main() {

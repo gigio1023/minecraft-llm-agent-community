@@ -214,17 +214,26 @@ criterion on every slice.
 
 ### Session 1 — integrated pipeline, provider-free
 
+Implementation status (2026-07-06): landed as the provider-free legibility
+entrypoint `probe:legibility-session1-smoke`, backed by
+`probe/src/legibility/*`, `probe/test/legibilitySession1.test.ts`, and raw
+artifacts under
+`project-docs/experiments/raw/2026-07-06/session1-legibility-smoke/`.
+The legacy `probe:social-cycle` single-actor runner remains available for
+older runtime work; it is not the Session 1 legibility entrypoint.
+
 **S1-1. Shared-session scheduler with per-actor provider routing**
 
 - What: the social-cycle runner starts N (2-3) actors in one session,
   schedules Actor Turn slots round-robin, and resolves each actor's
   provider through the routing map.
 - Acceptance:
-  - [ ] a deterministic 2-actor session runs to completion with distinct
+  - [x] a deterministic 2-actor session runs to completion with distinct
         `providerId` per actor recorded in run artifacts;
-  - [ ] Actor Turn slot completion events are recorded per actor (needed
+  - [x] Actor Turn slot completion events are recorded per actor (needed
         by S1-4);
-  - [ ] no single-bot code path remains the default live entrypoint.
+  - [x] the Session 1 legibility entrypoint is a shared-session path, not
+        the legacy single-bot `probe:social-cycle` path.
 - Blocked by: none — can start immediately.
 
 **S1-2. Cross-actor observation and chat capture**
@@ -234,12 +243,12 @@ criterion on every slice.
   Without this slice public history does not exist; it is the premise-1
   gap from section 2.1.
 - Acceptance:
-  - [ ] in a 2-actor deterministic session, each actor's observation
+  - [x] in a 2-actor deterministic session, each actor's observation
         evidence contains the other actor's presence and movements when in
         range, with scan-limit scoping recorded;
-  - [ ] chat sent by one actor appears as a structured event in the other
+  - [x] chat sent by one actor appears as a structured event in the other
         actor's observation evidence;
-  - [ ] absence claims remain scoped (no implied observation of unloaded
+  - [x] absence claims remain scoped (no implied observation of unloaded
         chunks).
 - Blocked by: S1-1.
 
@@ -249,11 +258,11 @@ criterion on every slice.
   standard provider interface, wired into the ActorSoul pipeline; this is
   the positive-control condition (K1's subject).
 - Acceptance:
-  - [ ] identical inputs produce identical responses across reruns (seeded
+  - [x] identical inputs produce identical responses across reruns (seeded
         determinism);
-  - [ ] responses are conditioned on observed content (focal action kind,
+  - [x] responses are conditioned on observed content (focal action kind,
         material stake), not on private fields;
-  - [ ] the runner treats it as an ordinary provider via routing — no
+  - [x] the runner treats it as an ordinary provider via routing — no
         conditional branches keyed on condition names.
 - Blocked by: S1-1.
 
@@ -262,11 +271,11 @@ criterion on every slice.
 - What: windows close only after every other active actor completed at
   least one subsequent Actor Turn slot, or a preregistered timeout fires.
 - Acceptance:
-  - [ ] a window in a 2-actor session stays open across the responder's
+  - [x] a window in a 2-actor session stays open across the responder's
         next slot and captures a response occurring in that slot;
-  - [ ] timeout closure is recorded as timeout, distinct from
+  - [x] timeout closure is recorded as timeout, distinct from
         slot-completion closure;
-  - [ ] `no_observable_response` can only be assigned from a non-vacuously
+  - [x] `no_observable_response` can only be assigned from a non-vacuously
         closed window (the vacuity bug class from prior runs is
         structurally impossible).
 - Blocked by: S1-1 (slot events), S1-2 (response evidence).
@@ -276,12 +285,12 @@ criterion on every slice.
 - What: the exporter produces the predictor-facing artifact from runtime
   evidence under an explicit allowlist; leakage checks ship with it.
 - Acceptance:
-  - [ ] export of a session containing soul text, memory, PlanBeads, and
+  - [x] export of a session containing soul text, memory, PlanBeads, and
         provider IO yields an artifact containing none of them (negative
         test on real workspace fixtures);
-  - [ ] unknown/new evidence fields cause a hard export failure, not
+  - [x] unknown/new evidence fields cause a hard export failure, not
         pass-through;
-  - [ ] identity-permutation and prompt-shape checks run and their results
+  - [x] identity-permutation and prompt-shape checks run and their results
         are artifacts.
 - Blocked by: S1-2, S1-4.
 
@@ -291,11 +300,11 @@ criterion on every slice.
   artifacts to locked rows by `row_id`; scorer emitting the full 3.5
   metric set per condition and arm.
 - Acceptance:
-  - [ ] scoring refuses to run without a declaration written before
+  - [x] scoring refuses to run without a declaration written before
         outcome inspection (enforced by artifact timestamps);
-  - [ ] rows never contain `predicted_delta`; joins happen only by
+  - [x] rows never contain `predicted_delta`; joins happen only by
         `row_id` after label lock;
-  - [ ] scorer output includes per-condition lift, RER, matched-stratum,
+  - [x] scorer output includes per-condition lift, RER, matched-stratum,
         AUC, and grouped-bootstrap CI tables for every declared arm,
         including leakage arms.
 - Blocked by: S1-5.
@@ -307,12 +316,12 @@ criterion on every slice.
   lift table. This is the cheap disambiguating test from the central
   plan's soundness review.
 - Acceptance:
-  - [ ] rows produced with non-vacuous windows and >= 1 materially
+  - [x] rows produced with non-vacuous windows and >= 1 materially
         grounded response label;
-  - [ ] a trivial offline history predictor shows lift over
+  - [x] a trivial offline history predictor shows lift over
         per-condition majority on the scripted responder — if it cannot,
         that is K1-shaped and blocks Session 2;
-  - [ ] the smoke is a repo script runnable via `bun run`, and its
+  - [x] the smoke is a repo script runnable via `bun run`, and its
         artifacts land under the experiments tree.
 - Blocked by: S1-3, S1-6.
 
