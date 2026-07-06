@@ -32,6 +32,7 @@ guidance.
 | `ACTIVE_CENTRAL_PLAN` | Current research spine: the preregistered embodied co-actor legibility experiment with built-in positive control, null condition, killer baselines, and stop-results | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `AGENTS.md` |
 | `CO_ACTOR_LEGIBILITY` | Can an observer model predict a soul-grounded co-actor's social-material responses from public interaction history alone, across disposition-consistency conditions | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/transition-row-label-codebook.md` |
 | `LEGIBILITY_IMPLEMENTATION_PLAN` | Active build order for the legibility experiment: seams, salvage verdicts, vertical slices with acceptance criteria, testing rules, and the Session 1 / Session 2 gates | `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
+| `LEGIBILITY_CYCLE_2_WORK_PLAN` | Issue-level work order after the cycle 1 merge review: honest gap audit of the provider-free smoke, Phase A live-substrate slices (C2-1..C2-7 plus the C2-G gate), Phase B Session 2 pilot (C2-8..C2-11), and the K6 clock statement | `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md`, `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md` |
 | `DEPTH_NOT_SCALE` | Binding substrate premise: 2-3 actors with dense attributable interaction and longitudinal per-responder public history; actor-count scale is never a remedy for weak signal | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `AGENTS.md`, `README.md` |
 | `NO_REGRET_CORE` | Superseded 2026-07-05: the staged substrate program; its data-quality thresholds live on as per-condition diagnostics in the V2 plan | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/no-regret-core-research-protocol.md`, `project-docs/research/current-spine/transition-row-v1-contract.md` |
 | `GOLDILOCKS_GATE` | Superseded 2026-07-05: the branch-triage preflight; absorbed into the V2 plan arms/metrics/stop-results, which add the previously missing shuffled-history, policy-copy, leakage, and held-out-family arms | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/goldilocks-preflight-protocol.md` |
@@ -136,43 +137,44 @@ For any onboarding developer or agent, read in this order:
 4. `project-docs/research/current-spine/research-documentation-hierarchy.md`
 5. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
 6. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-7. `project-docs/research/current-spine/research-value-harness.md`
-8. `project-docs/research/current-spine/transition-row-v1-contract.md`
-9. `project-docs/research/current-spine/transition-row-label-codebook.md`
-10. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
-11. `project-docs/research/current-spine/society-observable-preflight.md`
-12. `README.md`
-13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-14. `project-docs/orientation/documentation-map.md`
-15. `project-docs/orientation/terminology.md`
-16. `project-docs/specification/advisory-social-material-wam.md`
-17. `project-docs/specification/soul-grounded-social-simulation.md`
-18. `project-docs/specification/evidence-grounded-minecraft-society.md`
-19. `project-docs/specification/runtime-evidence-and-action-skills.md`
-20. `project-docs/specification/engineering-governance-and-testing.md`
-21. `project-docs/specification/reference-adaptation-guide.md`
-22. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
-23. `project-docs/runtime/overview/runtime-loop-and-verification.md`
-24. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
-25. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-26. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-27. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-28. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
-29. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
-30. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-31. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-32. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
-33. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
-34. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-35. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
-36. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
-37. `project-docs/runtime/overview/minecraft-basic-guide.md`
-38. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
-39. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-40. `project-docs/operations/setup/headless-server.md`
-41. `project-docs/operations/setup/provider-setup.md`
-42. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
-43. `project-docs/operations/setup/modelscope-qwen-api-access.md`
+7. `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md`
+8. `project-docs/research/current-spine/research-value-harness.md`
+9. `project-docs/research/current-spine/transition-row-v1-contract.md`
+10. `project-docs/research/current-spine/transition-row-label-codebook.md`
+11. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
+12. `project-docs/research/current-spine/society-observable-preflight.md`
+13. `README.md`
+14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+15. `project-docs/orientation/documentation-map.md`
+16. `project-docs/orientation/terminology.md`
+17. `project-docs/specification/advisory-social-material-wam.md`
+18. `project-docs/specification/soul-grounded-social-simulation.md`
+19. `project-docs/specification/evidence-grounded-minecraft-society.md`
+20. `project-docs/specification/runtime-evidence-and-action-skills.md`
+21. `project-docs/specification/engineering-governance-and-testing.md`
+22. `project-docs/specification/reference-adaptation-guide.md`
+23. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
+24. `project-docs/runtime/overview/runtime-loop-and-verification.md`
+25. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
+26. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+27. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+28. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+29. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
+30. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
+31. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+32. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+33. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
+34. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
+35. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+36. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
+37. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
+38. `project-docs/runtime/overview/minecraft-basic-guide.md`
+39. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
+40. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+41. `project-docs/operations/setup/headless-server.md`
+42. `project-docs/operations/setup/provider-setup.md`
+43. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
+44. `project-docs/operations/setup/modelscope-qwen-api-access.md`
 
 ## Active vs Archived
 

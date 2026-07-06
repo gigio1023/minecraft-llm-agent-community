@@ -45,6 +45,9 @@ Active:
 - `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
   (build order, seams, vertical slices, and acceptance gates for the central
   plan; added 2026-07-06)
+- `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md`
+  (issue-level work order for the remaining slices: live substrate Phase A,
+  Session 2 pilot Phase B; added 2026-07-06 after the cycle 1 merge review)
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`

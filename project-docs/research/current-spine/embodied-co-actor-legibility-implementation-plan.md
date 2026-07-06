@@ -222,6 +222,16 @@ artifacts under
 The legacy `probe:social-cycle` single-actor runner remains available for
 older runtime work; it is not the Session 1 legibility entrypoint.
 
+Status caveat (2026-07-06, post-merge review): the S1 boxes below were
+satisfied under **fixture semantics** — the smoke's actors are in-memory
+stubs, labels come from fixture heuristics, and the smoke's
+`history_grounded` arm is a placeholder. The live counterparts (real
+2-3 bot shared session, evidence-grounded labeling, real predictor arms,
+real leakage checks) are broken down as Phase A of
+`legibility-cycle-2-live-substrate-work-plan.md`
+(`LEGIBILITY_CYCLE_2_WORK_PLAN`); Session 2 below starts only after that
+plan's C2-G live provider-free gate holds.
+
 **S1-1. Shared-session scheduler with per-actor provider routing**
 
 - What: the social-cycle runner starts N (2-3) actors in one session,
