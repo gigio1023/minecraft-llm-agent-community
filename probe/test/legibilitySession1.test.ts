@@ -4,7 +4,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { exportPublicHistory } from "../src/legibility/publicHistory.js";
+import {
+  assertPublicHistoryChecksPassed,
+  exportPublicHistory
+} from "../src/legibility/publicHistory.js";
+import { createPublicHistoryPredictions } from "../src/legibility/predictors.js";
 import { ResponseWindowTracker } from "../src/legibility/responseWindows.js";
 import { runSession1LegibilitySmoke } from "../src/legibility/session1Smoke.js";
 import { runSharedSessionSchedule } from "../src/legibility/sharedSessionScheduler.js";
@@ -37,6 +41,8 @@ import type {
   LegibilityPrediction,
   LegibilityScoreReport,
   LegibilitySessionArtifact,
+  PublicHistoryArtifact,
+  PublicHistoryEvent,
   ResponseWindowRecord,
   SeedResetRecordV1,
   StructuredChatEvent,
@@ -706,14 +712,40 @@ test("live chat observed_by is computed from roster range instead of assuming al
   assert.equal(chatEventsForActor(chatEvents, "npc_c").length, 0);
 });
 
-test("public-history export omits known private fields and rejects unknown evidence fields", () => {
+test("public-history export fails closed and keeps prompt-shape checks off message values", () => {
   const baseSession: LegibilitySessionArtifact = {
     schema: "legibility-session/v1",
     session_id: "test-session",
     created_at: "2026-07-06T00:00:00.000Z",
     actor_routes: routes,
-    slot_events: [],
-    chat_events: [],
+    slot_events: [
+      {
+        schema: "actor-turn-slot-completion/v1",
+        session_id: "test-session",
+        slot_index: 1,
+        actor_id: "npc_a",
+        provider_id: "deterministic-social",
+        model: "deterministic-social",
+        turn_id: "turn-a",
+        cycle_id: "cycle-1",
+        action_kind: "say",
+        started_at: "2026-07-06T00:00:01.000Z",
+        completed_at: "2026-07-06T00:00:01.500Z",
+        evidence_refs: []
+      }
+    ],
+    chat_events: [
+      {
+        schema: "structured-chat-event/v1",
+        session_id: "test-session",
+        speaker_id: "npc_b",
+        message: "I remember the provider said memory is only chat text here.",
+        observed_by: ["npc_a"],
+        slot_index: 2,
+        observed_at: "2026-07-06T00:00:02.000Z",
+        evidence_refs: []
+      }
+    ],
     response_windows: [],
     transition_rows: []
   };
@@ -721,9 +753,18 @@ test("public-history export omits known private fields and rejects unknown evide
     ...baseSession,
     soul_text: "private soul text"
   } as unknown as LegibilitySessionArtifact;
-  const exported = exportPublicHistory(withPrivate);
-  assert.equal(exported.leakage_checks.private_field_scan.omitted_private_key_count, 1);
-  assert.equal(JSON.stringify(exported).includes("private soul text"), false);
+  assert.throws(
+    () => exportPublicHistory(withPrivate, { createdAt: "2026-07-06T00:00:05.000Z" }),
+    /rejected private fields/
+  );
+
+  const exported = exportPublicHistory(baseSession, { createdAt: "2026-07-06T00:00:05.000Z" });
+  const exportedAgain = exportPublicHistory(baseSession, { createdAt: "2026-07-06T00:00:05.000Z" });
+  assert.equal(exported.created_at, "2026-07-06T00:00:05.000Z");
+  assert.equal(JSON.stringify(exported), JSON.stringify(exportedAgain));
+  assert.equal(exported.leakage_checks.identity_permutation.status, "passed");
+  assert.equal(exported.leakage_checks.prompt_shape.status, "passed");
+  assert.equal(exported.leakage_checks.private_field_scan.omitted_private_key_count, 0);
 
   const withUnknown = {
     ...baseSession,
@@ -745,7 +786,172 @@ test("public-history export omits known private fields and rejects unknown evide
       }
     ]
   } as unknown as LegibilitySessionArtifact;
-  assert.throws(() => exportPublicHistory(withUnknown), /rejected unknown fields/);
+  assert.throws(
+    () => exportPublicHistory(withUnknown, { createdAt: "2026-07-06T00:00:05.000Z" }),
+    /rejected unknown fields/
+  );
+});
+
+test("public-history validation and scoring reject failed leakage checks", () => {
+  const declaration = createExperimentDeclaration({
+    experimentId: "public-history-negative",
+    actorAssignments: [{ condition: "scripted_responder", actorIds: ["npc_b"] }],
+    scenarioFamilies: ["fixture"],
+    seedResetRefs: ["seed-reset/test.json"],
+    providerFree: true,
+    writtenAt: "2026-07-06T00:00:00.000Z"
+  });
+  const failedPublicHistory: PublicHistoryArtifact = {
+    schema: "public-history/v1",
+    session_id: "test-session",
+    created_at: "2026-07-06T00:00:05.000Z",
+    allowlist_version: "public-history-allowlist/v1",
+    allowlisted_fields: [],
+    events: [],
+    leakage_checks: {
+      schema: "public-history-leakage-checks/v1",
+      identity_permutation: { status: "failed", reason: "fixture failure" },
+      prompt_shape: { status: "passed", reason: "fixture" },
+      private_field_scan: {
+        status: "passed",
+        omitted_private_key_count: 0,
+        unknown_key_failures: []
+      }
+    }
+  };
+  assert.throws(
+    () => scoreLegibilityPredictions({
+      declaration,
+      declarationRef: "experiment-declaration.json",
+      publicHistory: failedPublicHistory,
+      rows: [],
+      predictions: []
+    }),
+    /rejected public history leakage checks/
+  );
+
+  const promptShapeLeak: PublicHistoryArtifact = {
+    ...failedPublicHistory,
+    leakage_checks: {
+      ...failedPublicHistory.leakage_checks,
+      identity_permutation: { status: "passed", reason: "fixture" }
+    },
+    events: [
+      {
+        event_id: "event-1",
+        session_id: "test-session",
+        slot_index: 1,
+        actor_id: "npc_a",
+        event_kind: "chat_observed",
+        public_payload: {
+          speaker_id: "npc_a",
+          provider_id: "leaked-key"
+        },
+        evidence_refs: []
+      } as unknown as PublicHistoryEvent
+    ]
+  };
+  assert.throws(
+    () => assertPublicHistoryChecksPassed(promptShapeLeak),
+    /prompt_shape/
+  );
+});
+
+test("public-history predictor arms use prior public labels without target-label oracle", () => {
+  const declaration = createExperimentDeclaration({
+    experimentId: "predictor-fixture",
+    actorAssignments: [{ condition: "scripted_responder", actorIds: ["npc_b"] }],
+    scenarioFamilies: ["fixture"],
+    seedResetRefs: ["seed-reset/test.json"],
+    providerFree: true,
+    writtenAt: "2026-07-06T00:00:00.000Z"
+  });
+  const responseEvent = (
+    rowId: string,
+    slotIndex: number,
+    label: string
+  ): PublicHistoryEvent => ({
+    event_id: `${rowId}-social`,
+    session_id: "test-session",
+    slot_index: slotIndex,
+    actor_id: "npc_a",
+    event_kind: "response_window_closed",
+    public_payload: {
+      row_id: rowId,
+      action_kind: "say",
+      social_response_label: label,
+      window_id: `${rowId}-window`,
+      focal_actor_id: "npc_a",
+      required_responder_actor_ids: ["npc_b"],
+      completed_responder_actor_ids: ["npc_b"],
+      close_reason: "all_other_actor_slots_completed",
+      response_chat_event_count: 1,
+      scenario_family_id: "fixture",
+      inclusion_tags: ["interaction_opportunity"]
+    },
+    evidence_refs: []
+  });
+  const publicHistory: PublicHistoryArtifact = {
+    schema: "public-history/v1",
+    session_id: "test-session",
+    created_at: "2026-07-06T00:00:05.000Z",
+    allowlist_version: "public-history-allowlist/v1",
+    allowlisted_fields: [],
+    events: [
+      responseEvent("row-1", 1, "reply_accept_or_acknowledge"),
+      responseEvent("row-2", 2, "reply_accept_or_acknowledge"),
+      responseEvent("row-3", 3, "reply_refuse_or_disagree")
+    ],
+    leakage_checks: {
+      schema: "public-history-leakage-checks/v1",
+      identity_permutation: { status: "passed", reason: "fixture" },
+      prompt_shape: { status: "passed", reason: "fixture" },
+      private_field_scan: {
+        status: "passed",
+        omitted_private_key_count: 0,
+        unknown_key_failures: []
+      }
+    }
+  };
+  const predictions = createPublicHistoryPredictions({
+    publicHistory,
+    declaration,
+    createdAt: "2026-07-06T00:01:00.000Z",
+    arms: [
+      "history_grounded",
+      "majority_or_no_response",
+      "last_response_carried_forward",
+      "policy_copy",
+      "actor_id_only",
+      "first_m_public_responses",
+      "action_family_by_responder",
+      "public_profile_only"
+    ],
+    policyCopyMinCount: 1
+  });
+  const row3History = predictions.find((prediction) =>
+    prediction.row_id === "row-3" &&
+    prediction.layer === "social_response" &&
+    prediction.predictor_arm === "history_grounded"
+  );
+  assert.ok(row3History);
+  assert.equal(row3History.predicted_label, "reply_accept_or_acknowledge");
+  assert.notEqual(row3History.predicted_label, "reply_refuse_or_disagree");
+  assert.deepEqual(
+    new Set(predictions.filter((prediction) =>
+      prediction.row_id === "row-3" && prediction.layer === "social_response"
+    ).map((prediction) => prediction.predictor_arm)),
+    new Set([
+      "history_grounded",
+      "majority_or_no_response",
+      "last_response_carried_forward",
+      "policy_copy",
+      "actor_id_only",
+      "first_m_public_responses",
+      "action_family_by_responder",
+      "public_profile_only"
+    ])
+  );
 });
 
 test("Session 1 smoke writes rows, public history, and positive scripted history lift", async () => {
@@ -787,8 +993,10 @@ test("Session 1 smoke writes rows, public history, and positive scripted history
   assert.ok(socialHistory.lift > 0);
   assert.ok(materialHistory.lift > 0);
 
-  const publicHistory = await readJson<LegibilitySessionArtifact>(result.publicHistoryPath);
+  const publicHistory = await readJson<PublicHistoryArtifact>(result.publicHistoryPath);
   assert.equal(JSON.stringify(publicHistory).includes("provider-output"), false);
+  assert.equal(publicHistory.leakage_checks.identity_permutation.status, "passed");
+  assert.equal(publicHistory.leakage_checks.prompt_shape.status, "passed");
 });
 
 test("scoring refuses predicted_delta rows and pre-lock predictions", () => {

@@ -5,8 +5,10 @@ import type {
   LegibilityPrediction,
   LegibilityScoreReport,
   LegibilityLabel,
+  PublicHistoryArtifact,
   TransitionRowV1
 } from "./types.js";
+import { assertPublicHistoryChecksPassed } from "./publicHistory.js";
 
 function timestamp(value: string | undefined) {
   const time = value ? Date.parse(value) : Number.NaN;
@@ -48,11 +50,15 @@ function stratumId(row: TransitionRowV1) {
 
 export function joinPredictionsAfterLabelLock(input: {
   declaration: ExperimentDeclarationV1;
+  publicHistory?: PublicHistoryArtifact;
   rows: readonly TransitionRowV1[];
   predictions: readonly LegibilityPrediction[];
 }): JoinedLegibilityPrediction[] {
   if (!input.declaration || input.declaration.schema_version !== "experiment-declaration/v1") {
     throw new Error("Scoring requires an experiment-declaration/v1 artifact");
+  }
+  if (input.publicHistory) {
+    assertPublicHistoryChecksPassed(input.publicHistory);
   }
   const declarationTime = timestamp(input.declaration.written_at);
   if (declarationTime === undefined) {
@@ -239,6 +245,7 @@ function groupedBootstrapLift(input: {
 export function scoreLegibilityPredictions(input: {
   declaration: ExperimentDeclarationV1;
   declarationRef: string;
+  publicHistory?: PublicHistoryArtifact;
   rows: readonly TransitionRowV1[];
   predictions: readonly LegibilityPrediction[];
   scoredAt?: string;
