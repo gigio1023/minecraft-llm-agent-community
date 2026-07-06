@@ -13,6 +13,8 @@ import { createExperimentDeclaration } from "../src/legibility/declaration.js";
 import {
   assertLiveSessionEvidenceRefsResolve,
   assertProviderFreeLiveRoutes,
+  chatEventsForActor,
+  computeLiveChatObservedBy,
   defaultLiveSharedActorRoutes
 } from "../src/legibility/liveSharedSession.js";
 import { observe } from "../src/tools/observe.js";
@@ -218,19 +220,69 @@ test("observe carries cross-actor visibility, structured chat, and loaded-world 
     memory: createMemory(4),
     chatEvents: [
       {
+        schema: "structured-chat-event/v1",
+        session_id: "test-session",
         speaker_id: "npc_b",
         message: "I can make oak_log available.",
+        observed_by: ["npc_a"],
+        slot_index: 2,
         observed_at: "2026-07-06T00:00:02.000Z",
-        tick: 2
+        tick: 2,
+        evidence_refs: ["chat-events/0001-npc_b.json"]
       }
     ]
   });
 
   assert.equal(result.visibleActors[0]?.id, "npc_b");
   assert.equal(result.visibleActors[0]?.distance, 3);
+  assert.equal(result.chatEvents?.[0]?.schema, "structured-chat-event/v1");
   assert.equal(result.chatEvents?.[0]?.speaker_id, "npc_b");
+  assert.deepEqual(result.chatEvents?.[0]?.observed_by, ["npc_a"]);
+  assert.deepEqual(result.chatEvents?.[0]?.evidence_refs, ["chat-events/0001-npc_b.json"]);
+  assert.equal(result.loadedWorldScope?.visible_actor_scan, "provided_actor_roster");
   assert.equal(result.loadedWorldScope?.absence_claims_exhaustive, false);
   assert.match(result.loadedWorldScope?.caveat ?? "", /loaded Mineflayer/);
+});
+
+test("live chat observed_by is computed from roster range instead of assuming all actors hear it", () => {
+  const roster = [
+    { actor_id: "npc_a", connected: true, position: { x: 0, y: 64, z: 0 } },
+    { actor_id: "npc_b", connected: true, position: { x: 10, y: 64, z: 0 } },
+    { actor_id: "npc_c", connected: true, position: { x: 48, y: 64, z: 0 } },
+    { actor_id: "npc_d", connected: false, position: null }
+  ];
+
+  assert.deepEqual(
+    computeLiveChatObservedBy({
+      speaker_id: "npc_a",
+      roster,
+      radiusBlocks: 32
+    }),
+    ["npc_b"]
+  );
+  assert.deepEqual(
+    computeLiveChatObservedBy({
+      speaker_id: "npc_missing",
+      roster,
+      radiusBlocks: 32
+    }),
+    []
+  );
+
+  const chatEvents: StructuredChatEvent[] = [
+    {
+      schema: "structured-chat-event/v1",
+      session_id: "test-session",
+      speaker_id: "npc_a",
+      message: "near actor only",
+      observed_by: ["npc_b"],
+      slot_index: 1,
+      observed_at: "2026-07-06T00:00:01.000Z",
+      evidence_refs: ["chat-events/0001-npc_a.json"]
+    }
+  ];
+  assert.equal(chatEventsForActor(chatEvents, "npc_b").length, 1);
+  assert.equal(chatEventsForActor(chatEvents, "npc_c").length, 0);
 });
 
 test("public-history export omits known private fields and rejects unknown evidence fields", () => {

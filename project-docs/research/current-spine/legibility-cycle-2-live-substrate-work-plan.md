@@ -186,12 +186,13 @@ file's boxes in the same commit as each slice.
   become `structured-chat-event/v1` records with `observed_by` derived
   from the runtime range policy, feeding the window tracker.
 - Acceptance:
-  - [ ] in a live 2-bot session, chat sent by bot A appears as a
-        structured event in bot B's observation evidence artifact with
-        `loadedWorldScope` recorded;
-  - [ ] `observed_by` is computed from typed runtime state (range/roster),
+  - [x] in a live 2-bot session, chat sent by one bot appears as a
+        structured event in the other bot's observation evidence artifact
+        with `loadedWorldScope` recorded:
+        `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-2-slots2/`;
+  - [x] `observed_by` is computed from typed runtime state (range/roster),
         not assumed;
-  - [ ] absence claims stay scoped (`absence_claims_exhaustive: false`).
+  - [x] absence claims stay scoped (`absence_claims_exhaustive: false`).
 - Blocked by: C2-1.
 
 **C2-3. Live window lifecycle (closes G7)**

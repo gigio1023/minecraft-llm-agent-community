@@ -243,6 +243,17 @@ Live C2-1 follow-up status (2026-07-06):
 - [x] the live runner consumes provider routes without condition-keyed runtime
       branches.
 
+Live C2-2 follow-up status (2026-07-06):
+
+- [x] provider-free 2-bot live session with two slots per actor records a
+      Mineflayer chat event as `structured-chat-event/v1`, then carries that
+      event into the receiving actor's later `observe` evidence:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-2-slots2/`;
+- [x] `observed_by` is derived from the typed live roster/range policy stored
+      with the chat-event evidence, not assumed from the actor list;
+- [x] receiving observation evidence records
+      `loadedWorldScope.absence_claims_exhaustive: false`.
+
 **S1-1. Shared-session scheduler with per-actor provider routing**
 
 - What: the social-cycle runner starts N (2-3) actors in one session,

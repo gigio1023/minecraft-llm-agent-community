@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { Bot } from "mineflayer";
 
 import { loadProbeConfig, type ProbeConfig } from "../config.js";
 import { assignSeedActionSkillOwnership } from "../skills/ownership.js";
@@ -42,7 +43,8 @@ import { runSharedSessionSchedule } from "./sharedSessionScheduler.js";
 import type {
   ActorProviderRoute,
   ActorTurnSlotCompletionEvent,
-  LegibilitySessionArtifact
+  LegibilitySessionArtifact,
+  StructuredChatEvent
 } from "./types.js";
 
 export type LiveSharedLegibilitySessionResult = {
@@ -63,6 +65,9 @@ const PROVIDER_FREE_LIVE_ROUTE_IDS: ReadonlySet<SocialCycleProviderId> = new Set
   "deterministic-social",
   "scripted-social"
 ]);
+const LIVE_CHAT_OBSERVATION_RADIUS_BLOCKS = 32;
+const LIVE_CHAT_DUPLICATE_WINDOW_MS = 500;
+const LIVE_CHAT_SETTLE_MS = 200;
 
 export function defaultLiveSharedActorRoutes(): ActorProviderRoute[] {
   return [
@@ -137,6 +142,205 @@ function filterActionSkillsForAllowedPrimitives(
   return records.filter((record) =>
     record.required_primitives.every((primitive) => allowedPrimitiveSet.has(primitive))
   );
+}
+
+export type LiveChatActorRangeState = {
+  actor_id: string;
+  connected: boolean;
+  position: { x: number; y: number; z: number } | null;
+};
+
+function roundPosition(position: { x: number; y: number; z: number }) {
+  return {
+    x: Number(position.x.toFixed(2)),
+    y: Number(position.y.toFixed(2)),
+    z: Number(position.z.toFixed(2))
+  };
+}
+
+function botPosition(bot: Bot | undefined) {
+  const position = bot?.entity?.position;
+  if (
+    !position ||
+    typeof position.x !== "number" ||
+    typeof position.y !== "number" ||
+    typeof position.z !== "number"
+  ) {
+    return null;
+  }
+  return roundPosition(position);
+}
+
+export function liveActorRangeStateFromBots(input: {
+  actorIds: readonly string[];
+  bots: ProbeBots;
+}): LiveChatActorRangeState[] {
+  return input.actorIds.map((actorId) => {
+    const position = botPosition(input.bots[actorId]);
+    return {
+      actor_id: actorId,
+      connected: Boolean(position),
+      position
+    };
+  });
+}
+
+function distanceBetween(
+  left: { x: number; y: number; z: number },
+  right: { x: number; y: number; z: number }
+) {
+  return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
+}
+
+export function computeLiveChatObservedBy(input: {
+  speaker_id: string;
+  roster: readonly LiveChatActorRangeState[];
+  radiusBlocks?: number;
+}): string[] {
+  const radiusBlocks = input.radiusBlocks ?? LIVE_CHAT_OBSERVATION_RADIUS_BLOCKS;
+  const speaker = input.roster.find((actor) => actor.actor_id === input.speaker_id);
+  if (!speaker?.connected || !speaker.position) {
+    return [];
+  }
+  const speakerPosition = speaker.position;
+  return input.roster
+    .flatMap((actor) => {
+      if (
+        actor.actor_id === input.speaker_id ||
+        !actor.connected ||
+        !actor.position ||
+        distanceBetween(speakerPosition, actor.position) > radiusBlocks
+      ) {
+        return [];
+      }
+      return [actor.actor_id];
+    })
+    .sort();
+}
+
+export function chatEventsForActor(
+  events: readonly StructuredChatEvent[],
+  actorId: string
+): StructuredChatEvent[] {
+  return events.filter((event) => event.observed_by.includes(actorId));
+}
+
+function botTick(bot: Bot | undefined) {
+  return typeof bot?.time?.age === "number" ? bot.time.age : undefined;
+}
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function createLiveMineflayerChatCapture(input: {
+  sessionId: string;
+  outputDir: string;
+  actorIds: readonly string[];
+  bots: ProbeBots;
+}) {
+  const actorIdSet = new Set(input.actorIds);
+  const events: StructuredChatEvent[] = [];
+  const pendingWrites: Promise<unknown>[] = [];
+  const writeErrors: string[] = [];
+  const recentEventMsByKey = new Map<string, number>();
+  const listeners: Array<{ bot: Bot; listener: (...args: unknown[]) => void }> = [];
+  let activeSlotIndex = 0;
+  let sequence = 0;
+
+  const recordChat = (username: string, message: string) => {
+    const speakerId = username.trim();
+    const text = message.trim();
+    if (!actorIdSet.has(speakerId) || text.length === 0) {
+      return;
+    }
+
+    const nowMs = Date.now();
+    const duplicateKey = `${speakerId}\u0000${text}`;
+    const previousMs = recentEventMsByKey.get(duplicateKey);
+    if (previousMs !== undefined && nowMs - previousMs < LIVE_CHAT_DUPLICATE_WINDOW_MS) {
+      return;
+    }
+    recentEventMsByKey.set(duplicateKey, nowMs);
+
+    const roster = liveActorRangeStateFromBots({
+      actorIds: input.actorIds,
+      bots: input.bots
+    });
+    const observedBy = computeLiveChatObservedBy({
+      speaker_id: speakerId,
+      roster,
+      radiusBlocks: LIVE_CHAT_OBSERVATION_RADIUS_BLOCKS
+    });
+    const tick = botTick(input.bots[speakerId]);
+    const position = botPosition(input.bots[speakerId]);
+    const eventRef = path.join(
+      "chat-events",
+      `${String(++sequence).padStart(4, "0")}-${sanitizeWorkspaceFileId(speakerId)}.json`
+    );
+    const event: StructuredChatEvent = {
+      schema: "structured-chat-event/v1",
+      session_id: input.sessionId,
+      speaker_id: speakerId,
+      message: text,
+      observed_by: observedBy,
+      slot_index: activeSlotIndex,
+      observed_at: new Date(nowMs).toISOString(),
+      ...(tick !== undefined ? { tick } : {}),
+      ...(position ? { position } : {}),
+      evidence_refs: [eventRef]
+    };
+    events.push(event);
+    pendingWrites.push(
+      writeJson(path.join(input.outputDir, eventRef), {
+        ...event,
+        observation_policy: {
+          schema: "live-chat-observation-range-policy/v1",
+          radius_blocks: LIVE_CHAT_OBSERVATION_RADIUS_BLOCKS,
+          roster_state: roster
+        }
+      }).catch((error: unknown) => {
+        writeErrors.push(error instanceof Error ? error.message : String(error));
+      })
+    );
+  };
+
+  for (const bot of Object.values(input.bots)) {
+    const listener = (...args: unknown[]) => {
+      const [username, message] = args;
+      if (typeof username === "string" && typeof message === "string") {
+        recordChat(username, message);
+      }
+    };
+    bot.on("chat", listener);
+    listeners.push({ bot, listener });
+  }
+
+  return {
+    events,
+    setActiveSlot(slotIndex: number) {
+      activeSlotIndex = slotIndex;
+    },
+    eventsForActor(actorId: string) {
+      return chatEventsForActor(events, actorId);
+    },
+    async settle() {
+      await delay(LIVE_CHAT_SETTLE_MS);
+    },
+    async flush() {
+      await Promise.all(pendingWrites);
+      if (writeErrors.length > 0) {
+        throw new Error(`Failed to write live chat event evidence: ${writeErrors.join("; ")}`);
+      }
+    },
+    dispose() {
+      for (const { bot, listener } of listeners) {
+        bot.off("chat", listener);
+      }
+    }
+  };
 }
 
 function buildProviderFreeCycleGoal(input: {
@@ -251,6 +455,8 @@ async function buildActorTurnContext(input: {
   slotIndex: number;
   bots: ProbeBots;
   actorIds: readonly string[];
+  otherBots: readonly Bot[];
+  chatEvents: readonly StructuredChatEvent[];
   state: ActorRuntimeState;
   maxActionsPerCycle: number;
 }) {
@@ -258,7 +464,9 @@ async function buildActorTurnContext(input: {
   const observation = await observeActorWorld({
     actorId: input.actorId,
     bot: input.bots[input.actorId],
-    ...(targetActorId ? { targetBot: input.bots[targetActorId] } : {})
+    ...(targetActorId ? { targetBot: input.bots[targetActorId] } : {}),
+    otherBots: input.otherBots,
+    chatEvents: input.chatEvents
   });
   const strategicGoals = await listStrategicGoals(input.actorWorkspaceRootDir, input.actorId);
   const planBeadGraph = await loadPlanBeadGraphSnapshot(input.actorWorkspaceRootDir, input.actorId);
@@ -337,6 +545,7 @@ export async function runLiveSharedLegibilitySession(input: {
 
   let server: ServerEndpoint | null = null;
   let bots: ProbeBots | null = null;
+  let chatCapture: ReturnType<typeof createLiveMineflayerChatCapture> | null = null;
   try {
     const statesByActor = await initializeActorRuntimeState({
       actorWorkspaceRootDir,
@@ -347,6 +556,12 @@ export async function runLiveSharedLegibilitySession(input: {
       throw new Error("No joinable Minecraft endpoint for live shared legibility session");
     }
     bots = await createBots(config, server);
+    chatCapture = createLiveMineflayerChatCapture({
+      sessionId,
+      outputDir,
+      actorIds,
+      bots
+    });
 
     const slotEvents = await runSharedSessionSchedule({
       session_id: sessionId,
@@ -357,6 +572,11 @@ export async function runLiveSharedLegibilitySession(input: {
         if (!state) {
           throw new Error(`Missing actor runtime state for ${actor_id}`);
         }
+        const otherBots = actorIds
+          .filter((otherActorId) => otherActorId !== actor_id)
+          .map((otherActorId) => bots![otherActorId])
+          .filter((bot): bot is Bot => Boolean(bot));
+        const observedChatEvents = chatCapture!.eventsForActor(actor_id);
         const context: SocialCycleContextPacket = await buildActorTurnContext({
           actorWorkspaceRootDir,
           actorId: actor_id,
@@ -364,6 +584,8 @@ export async function runLiveSharedLegibilitySession(input: {
           slotIndex: slot_index,
           bots: bots!,
           actorIds,
+          otherBots,
+          chatEvents: observedChatEvents,
           state,
           maxActionsPerCycle: 1
         });
@@ -396,6 +618,7 @@ export async function runLiveSharedLegibilitySession(input: {
         });
         const startedAt = new Date().toISOString();
         const targetActorId = targetActorIdFor({ actorId: actor_id, actorIds });
+        chatCapture!.setActiveSlot(slot_index);
         const turnCore = await runSocialCycleTurnCore({
           providerId: route.provider_id,
           actorWorkspaceRootDir,
@@ -417,8 +640,11 @@ export async function runLiveSharedLegibilitySession(input: {
           }),
           defaultPrimitive: defaultPrimitiveForRoute(route),
           bot: bots![actor_id],
-          ...(targetActorId ? { targetBot: bots![targetActorId] } : {})
+          ...(targetActorId ? { targetBot: bots![targetActorId] } : {}),
+          otherBots,
+          chatEvents: observedChatEvents
         });
+        await chatCapture!.settle();
         if (turnCore.status !== "completed") {
           throw new Error(`Live shared-session turn ${turn_id} did not complete: ${turnCore.status}`);
         }
@@ -441,6 +667,7 @@ export async function runLiveSharedLegibilitySession(input: {
     });
 
     await assertLiveSessionEvidenceRefsResolve({ outputDir, slotEvents });
+    await chatCapture.flush();
 
     const session: LegibilitySessionArtifact = {
       schema: "legibility-session/v1",
@@ -448,7 +675,7 @@ export async function runLiveSharedLegibilitySession(input: {
       created_at: createdAt,
       actor_routes: [...actorRoutes],
       slot_events: slotEvents,
-      chat_events: [],
+      chat_events: [...chatCapture.events],
       response_windows: [],
       transition_rows: []
     };
@@ -458,6 +685,7 @@ export async function runLiveSharedLegibilitySession(input: {
     await writeEnvironmentBlocker({ outputDir, sessionId, error });
     throw error;
   } finally {
+    chatCapture?.dispose();
     if (bots) {
       await closeBots(bots);
     }

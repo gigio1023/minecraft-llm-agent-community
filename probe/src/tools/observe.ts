@@ -39,6 +39,19 @@ type PositionedActor = {
   entities?: Record<string, unknown>;
 };
 
+export type ObserveChatEvent = {
+  schema?: "structured-chat-event/v1";
+  session_id?: string;
+  speaker_id: string;
+  message: string;
+  observed_by?: string[];
+  slot_index?: number;
+  observed_at: string;
+  tick?: number;
+  position?: { x: number; y: number; z: number };
+  evidence_refs?: string[];
+};
+
 export type ObserveResult = {
   status: "ok";
   observerId: string;
@@ -48,13 +61,7 @@ export type ObserveResult = {
     distance: number;
     busy: boolean;
   }>;
-  chatEvents?: Array<{
-    speaker_id: string;
-    message: string;
-    observed_at: string;
-    tick?: number;
-    position?: { x: number; y: number; z: number };
-  }>;
+  chatEvents?: ObserveChatEvent[];
   loadedWorldScope?: {
     schema: "loaded-world-observation-scope/v1";
     observer_id: string;
@@ -116,7 +123,7 @@ type ObserveArgs = {
   actor: PositionedActor;
   target: PositionedActor;
   otherActors?: PositionedActor[];
-  chatEvents?: ObserveResult["chatEvents"];
+  chatEvents?: ObserveChatEvent[];
   dialogueState: DialogueState;
   memory: MemoryStore;
   sharedChest?: {

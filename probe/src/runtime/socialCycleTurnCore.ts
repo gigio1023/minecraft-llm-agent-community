@@ -35,6 +35,7 @@ import {
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 import type { SocialPrimitiveAttemptStatus } from "./socialCycleProgress.js";
 import type { ActionSkillPostconditionResult } from "./settlement/settlementState.js";
+import type { ObserveChatEvent } from "../tools/observe.js";
 
 export type SocialCycleActionAttemptReport = {
   attempt_id: string;
@@ -276,6 +277,8 @@ export async function runSocialCycleTurnCore(input: {
   defaultPrimitive?: string;
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
   providerConfig?: TurnProviderConfig;
 }): Promise<SocialCycleTurnCoreResult> {
   const planner = await runSocialActorTurnProvider({
@@ -330,7 +333,9 @@ export async function runSocialCycleTurnCore(input: {
     activeActionSkills: input.activeActionSkills,
     runtimeRetryConstraints: input.runtimeRetryConstraints,
     bot: input.bot,
-    targetBot: input.targetBot
+    targetBot: input.targetBot,
+    ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+    ...(input.chatEvents ? { chatEvents: input.chatEvents } : {})
   });
   const retryAttempt = buildRuntimeRetryAttempt({
     actorId: input.actorId,

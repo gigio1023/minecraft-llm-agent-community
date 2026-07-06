@@ -34,7 +34,7 @@ import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
 import type { ActorEvidenceCategory } from "./evidence/actorEvidence.js";
 import { createDialogueState } from "./dialogueState.js";
 import { createMemory } from "./memory.js";
-import { observe, type ObserveResult } from "../tools/observe.js";
+import { observe, type ObserveChatEvent, type ObserveResult } from "../tools/observe.js";
 import { wait } from "../tools/wait.js";
 import { remember } from "../tools/remember.js";
 import { collectLogs } from "../tools/collectLogs.js";
@@ -173,6 +173,8 @@ export async function observeActorWorld(input: {
   actorId: string;
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
 }): Promise<ObserveResult | Record<string, unknown>> {
   if (!input.bot) {
     return syntheticObservation(input.actorId);
@@ -184,6 +186,12 @@ export async function observeActorWorld(input: {
   return observe({
     actor: asObserveActor(input.bot),
     target: asObserveActor(target),
+    ...(input.otherBots && input.otherBots.length > 0
+      ? { otherActors: input.otherBots.map(asObserveActor) }
+      : {}),
+    ...(input.chatEvents && input.chatEvents.length > 0
+      ? { chatEvents: [...input.chatEvents] }
+      : {}),
     dialogueState,
     memory
   });
@@ -769,6 +777,8 @@ async function runSocialPrimitive(input: {
   args: Record<string, unknown>;
   bot: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
   signal?: AbortSignal;
 }): Promise<JsonValue> {
   const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 0 });
@@ -780,7 +790,18 @@ async function runSocialPrimitive(input: {
 
   switch (proposal.tool) {
     case "observe": {
-      const observed = await observe({ actor, target, dialogueState, memory });
+      const observed = await observe({
+        actor,
+        target,
+        ...(input.otherBots && input.otherBots.length > 0
+          ? { otherActors: input.otherBots.map(asObserveActor) }
+          : {}),
+        ...(input.chatEvents && input.chatEvents.length > 0
+          ? { chatEvents: [...input.chatEvents] }
+          : {}),
+        dialogueState,
+        memory
+      });
       return observed as unknown as JsonValue;
     }
     case "move_to":
@@ -1004,6 +1025,8 @@ async function executePrimitiveWithEvidence(input: {
   args: Record<string, unknown>;
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
   gate: ActiveActionSkillGate;
   allowActionSkillFallback: boolean;
 }): Promise<{
@@ -1153,6 +1176,8 @@ async function executePrimitiveWithEvidence(input: {
         args: input.args,
         bot: input.bot!,
         targetBot: input.targetBot,
+        ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+        ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
         signal
       })
   });
@@ -1636,11 +1661,15 @@ export async function executeActorTurnAction(input: {
   runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
 }): Promise<SocialCycleExecutionResult> {
   const observation = await observeActorWorld({
     actorId: input.actorId,
     bot: input.bot,
-    targetBot: input.targetBot
+    targetBot: input.targetBot,
+    ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+    ...(input.chatEvents ? { chatEvents: input.chatEvents } : {})
   });
 
   const evidenceRefs: string[] = [];
@@ -1987,6 +2016,8 @@ export async function executeActorTurnAction(input: {
       args: argsForPrimitive(input.action, primitive, selectedActionSkill),
       bot: input.bot,
       targetBot: input.targetBot,
+      ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+      ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
       gate,
       allowActionSkillFallback: input.action.kind === "use_action_skill"
     });

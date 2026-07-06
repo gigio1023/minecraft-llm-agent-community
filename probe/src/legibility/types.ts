@@ -68,6 +68,7 @@ export type StructuredChatEvent = {
   observed_by: string[];
   slot_index: number;
   observed_at: string;
+  tick?: number;
   position?: { x: number; y: number; z: number };
   evidence_refs: string[];
 };
