@@ -19,6 +19,11 @@ import {
   requireConditionRouteForActor
 } from "../src/legibility/declaration.js";
 import {
+  labelMaterialAccessFromEvidence,
+  labelSocialResponseFromWindow,
+  type MaterialAccessEvidenceEvent
+} from "../src/legibility/evidenceLabeler.js";
+import {
   conditionProvenanceForSeedReset,
   createResampledSoulSeedResetRecord,
   validateSeedResetRecordV1,
@@ -825,6 +830,93 @@ test("C2-3 slot boundary records timeout before observe-only responder slot comp
   );
 });
 
+test("C2-4 evidence labeler does not derive material access from chat keywords", () => {
+  const window: ResponseWindowRecord = {
+    schema: "response-window/v1",
+    window_id: "c2-4-keyword-window",
+    session_id: "c2-4-labeler",
+    focal_actor_id: "npc_b",
+    focal_turn_id: "turn-b-say",
+    focal_slot_index: 2,
+    required_responder_actor_ids: ["npc_a"],
+    completed_responder_actor_ids: ["npc_a"],
+    opened_at: "2026-07-06T00:00:02.500Z",
+    closed_at: "2026-07-06T00:00:03.500Z",
+    close_reason: "all_other_actor_slots_completed",
+    timeout_after_slots: 2,
+    status: "closed",
+    response_chat_events: [
+      {
+        schema: "structured-chat-event/v1",
+        session_id: "c2-4-labeler",
+        speaker_id: "npc_a",
+        message: "available cannot grant inventory words are not material evidence",
+        observed_by: ["npc_b"],
+        slot_index: 3,
+        observed_at: "2026-07-06T00:00:03.000Z",
+        evidence_refs: ["chat-events/keyword-message.json"]
+      }
+    ],
+    evidence_refs: ["actor-workspaces/npc_b/evidence/turn-b-say.json", "chat-events/keyword-message.json"]
+  };
+
+  const social = labelSocialResponseFromWindow(window);
+  assert.deepEqual(social.classes, ["unknown_social_response"]);
+  assert.deepEqual(social.evidence_refs, ["chat-events/keyword-message.json"]);
+
+  const material = labelMaterialAccessFromEvidence({
+    materialEvidence: [],
+    fallbackEvidenceRefs: ["actor-workspaces/npc_b/evidence/turn-b-say.json"]
+  });
+  assert.deepEqual(material.classes, ["unknown_material_delta"]);
+  assert.deepEqual(material.evidence_refs, ["actor-workspaces/npc_b/evidence/turn-b-say.json"]);
+  assert.equal(material.classes.includes("possession_or_access_granted"), false);
+  assert.equal(material.classes.includes("possession_or_access_refused"), false);
+});
+
+test("C2-4 typed material evidence controls material labels and requires refs", () => {
+  const materialEvidence: MaterialAccessEvidenceEvent[] = [
+    {
+      schema: "material-access-evidence/v1",
+      event_kind: "inventory_delta",
+      classes: ["inventory_gain", "possession_or_access_granted"],
+      evidence_refs: ["evidence/inventory-delta.json"]
+    }
+  ];
+  const labeled = labelMaterialAccessFromEvidence({
+    materialEvidence,
+    fallbackEvidenceRefs: ["evidence/fallback-action.json"]
+  });
+
+  assert.deepEqual(labeled.classes, ["inventory_gain", "possession_or_access_granted"]);
+  assert.deepEqual(labeled.evidence_refs, ["evidence/inventory-delta.json"]);
+  assert.throws(
+    () => labelMaterialAccessFromEvidence({
+      materialEvidence: [],
+      fallbackEvidenceRefs: []
+    }),
+    /no evidence refs/
+  );
+  assert.throws(
+    () => labelSocialResponseFromWindow({
+      schema: "response-window/v1",
+      window_id: "open-window",
+      session_id: "c2-4-labeler",
+      focal_actor_id: "npc_a",
+      focal_turn_id: "turn-a",
+      focal_slot_index: 1,
+      required_responder_actor_ids: ["npc_b"],
+      completed_responder_actor_ids: [],
+      opened_at: "2026-07-06T00:00:01.000Z",
+      timeout_after_slots: 2,
+      status: "open",
+      response_chat_events: [],
+      evidence_refs: ["evidence/open-window.json"]
+    }),
+    /non-closed or vacuous/
+  );
+});
+
 test("observe carries cross-actor visibility, structured chat, and loaded-world scope", async () => {
   const actor = positionedActor("npc_a", 0);
   const other = positionedActor("npc_b", 3);
@@ -1163,6 +1255,21 @@ test("Session 1 smoke writes rows, public history, and positive scripted history
       row.observed_delta.material.classes.includes("possession_or_access_granted")
     )
   );
+  const fixtureMaterialRow = result.rows.find((row) =>
+    row.observed_delta.material.classes.includes("possession_or_access_granted")
+  );
+  assert.ok(fixtureMaterialRow);
+  const fixtureMaterialRef = fixtureMaterialRow.observed_delta.material.evidence_refs[0];
+  assert.ok(fixtureMaterialRef);
+  const fixtureMaterialEvidence = await readJson<Record<string, unknown>>(
+    path.join(outputDir, fixtureMaterialRef)
+  );
+  assert.deepEqual(fixtureMaterialEvidence.labeler_scope, {
+    schema: "session1-fixture-labeler/v1",
+    live_labeler: false,
+    quarantine_reason:
+      "Session 1 smoke keeps regex fixture labels for legacy positive-control coverage; live C2-4 rows use evidenceLabeler.ts."
+  });
 
   const session = await readJson<LegibilitySessionArtifact>(result.sessionPath);
   assert.equal(session.slot_events.some((event) => event.provider_id === "scripted-social"), true);

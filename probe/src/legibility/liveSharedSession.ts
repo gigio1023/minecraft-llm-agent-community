@@ -41,12 +41,14 @@ import {
 } from "../runtime/goals/planBeads/index.js";
 import { runSharedSessionSchedule } from "./sharedSessionScheduler.js";
 import { ResponseWindowTracker } from "./responseWindows.js";
+import {
+  labelMaterialAccessFromEvidence,
+  labelSocialResponseFromWindow
+} from "./evidenceLabeler.js";
 import type {
   ActorProviderRoute,
   ActorTurnSlotCompletionEvent,
   LegibilitySessionArtifact,
-  LegibilitySocialResponseLabel,
-  ResponseWindowRecord,
   StructuredChatEvent,
   TransitionRowV1
 } from "./types.js";
@@ -462,26 +464,6 @@ function loadedWorldCaveatFromObservation(observation: unknown) {
   return "Live C2-3 row: loaded-world absence claims are scoped to Mineflayer observation limits.";
 }
 
-function requireClosedNonVacuousWindow(window: ResponseWindowRecord) {
-  if (
-    window.status !== "closed" ||
-    !window.closed_at ||
-    !window.close_reason ||
-    window.required_responder_actor_ids.length === 0
-  ) {
-    throw new Error(`Cannot materialize transition row from non-closed or vacuous window ${window.window_id}`);
-  }
-}
-
-function socialLabelsForClosedLiveWindow(
-  window: ResponseWindowRecord
-): LegibilitySocialResponseLabel[] {
-  requireClosedNonVacuousWindow(window);
-  return window.response_chat_events.length === 0
-    ? ["no_observable_response"]
-    : ["unknown_social_response"];
-}
-
 function requireRouteForClosedWindow(input: {
   actorRoutes: readonly ActorProviderRoute[];
   event: ActorTurnSlotCompletionEvent;
@@ -694,10 +676,11 @@ export async function runLiveSharedLegibilitySession(input: {
           if (!closeReason) {
             throw new Error(`Closed response window ${window.window_id} has no close reason`);
           }
-          const socialLabels = socialLabelsForClosedLiveWindow(window);
-          const socialResponseEvidenceRefs = window.response_chat_events.length === 0
-            ? [...window.evidence_refs]
-            : window.response_chat_events.flatMap((chatEvent) => chatEvent.evidence_refs);
+          const socialLabelDecision = labelSocialResponseFromWindow(window);
+          const materialLabelDecision = labelMaterialAccessFromEvidence({
+            materialEvidence: [],
+            fallbackEvidenceRefs: focalEvent.evidence_refs
+          });
           const row: TransitionRowV1 = {
             schema_version: "transition-row/v1",
             row_id: `${window.window_id}-row`,
@@ -739,13 +722,13 @@ export async function runLiveSharedLegibilitySession(input: {
                 evidence_refs: focalEvent.evidence_refs
               },
               material: {
-                classes: ["unknown_material_delta"],
-                evidence_refs: []
+                classes: materialLabelDecision.classes,
+                evidence_refs: materialLabelDecision.evidence_refs
               },
               social_response: {
                 response_window: window,
-                classes: socialLabels,
-                evidence_refs: socialResponseEvidenceRefs
+                classes: socialLabelDecision.classes,
+                evidence_refs: socialLabelDecision.evidence_refs
               },
               exclusions: []
             },
@@ -754,13 +737,13 @@ export async function runLiveSharedLegibilitySession(input: {
               inclusion_tags: [
                 "live_response_window_closed",
                 closeReason,
-                ...(socialLabels.includes("no_observable_response")
+                ...(socialLabelDecision.classes.includes("no_observable_response")
                   ? ["non_vacuous_absence_label"]
                   : ["response_observed_unclassified"])
               ],
               exclusion_reasons: [],
               notes: [
-                "C2-3 live row materializes closed response-window lifecycle only; C2-4 owns evidence-grounded social/material classification."
+                "C2-4 evidence-grounded labeler applied; material remains unknown unless typed material evidence exists."
               ]
             },
             metadata: {
@@ -773,6 +756,8 @@ export async function runLiveSharedLegibilitySession(input: {
                 ...(focalEvent.action_ref ? [focalEvent.action_ref] : []),
                 ...focalEvent.evidence_refs,
                 ...window.evidence_refs,
+                ...materialLabelDecision.evidence_refs,
+                ...socialLabelDecision.evidence_refs,
                 ...(route.seed_reset_ref ? [route.seed_reset_ref] : [])
               ]))
             }

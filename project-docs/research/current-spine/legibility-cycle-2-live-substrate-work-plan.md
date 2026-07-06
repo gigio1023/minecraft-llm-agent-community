@@ -221,14 +221,15 @@ file's boxes in the same commit as each slice.
   deleted or quarantined to the fixture with a non-live marker; live rows
   never touch them.
 - Acceptance:
-  - [ ] material labels change only when typed material evidence exists
+  - [x] material labels change only when typed material evidence exists
         (inventory delta, container access, verified transfer), never
         from chat text alone;
-  - [ ] negative test: a chat message containing label keywords
+  - [x] negative test: a chat message containing label keywords
         ("available", "cannot") without matching runtime evidence does
         not flip any label;
-  - [ ] every label carries `evidence_refs` to the runtime artifacts that
-        grounded it.
+  - [x] every label carries `evidence_refs` to the runtime artifacts that
+        grounded it:
+        `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-4-labeler/`.
 - Blocked by: C2-2, C2-3.
 
 **C2-5. Real leakage checks, fail closed (closes G4, G5, G9)**

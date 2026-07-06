@@ -264,6 +264,19 @@ Live C2-3 follow-up status (2026-07-06):
 - [x] live window opening is keyed by focal-turn action properties
       (`say` opens, `observe`/`wait` do not), not by a hardcoded actor id.
 
+Live C2-4 follow-up status (2026-07-06):
+
+- [x] live rows use the evidence-grounded C2-4 labeler; in the provider-free
+      C2-4 artifact, material remains `unknown_material_delta` because no
+      typed material evidence exists:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-4-labeler/`;
+- [x] a negative unit test verifies chat containing material-label keywords
+      (`available`, `cannot`) cannot create material access labels without
+      typed runtime evidence;
+- [x] social and material label decisions carry nonempty `evidence_refs`; the
+      legacy Session 1 regex labelers are marked `session1-fixture-labeler/v1`
+      and are not live-label authority.
+
 Live C2-7 follow-up status (2026-07-06):
 
 - [x] provider-free C2-7 rehearsal declares `scripted_responder`,
