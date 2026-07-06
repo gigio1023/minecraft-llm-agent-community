@@ -10,6 +10,11 @@ import { runSession1LegibilitySmoke } from "../src/legibility/session1Smoke.js";
 import { runSharedSessionSchedule } from "../src/legibility/sharedSessionScheduler.js";
 import { scoreLegibilityPredictions } from "../src/legibility/scoring.js";
 import { createExperimentDeclaration } from "../src/legibility/declaration.js";
+import {
+  assertLiveSessionEvidenceRefsResolve,
+  assertProviderFreeLiveRoutes,
+  defaultLiveSharedActorRoutes
+} from "../src/legibility/liveSharedSession.js";
 import { observe } from "../src/tools/observe.js";
 import { createDialogueState } from "../src/runtime/dialogueState.js";
 import { createMemory } from "../src/runtime/memory.js";
@@ -78,6 +83,68 @@ test("shared-session scheduler records round-robin provider-routed Actor Turn sl
     "scripted-social"
   ]);
   assert.equal(events[1]?.schema, "actor-turn-slot-completion/v1");
+});
+
+test("live shared-session route guard blocks provider spend", () => {
+  assert.doesNotThrow(() => assertProviderFreeLiveRoutes(defaultLiveSharedActorRoutes()));
+  assert.throws(
+    () => assertProviderFreeLiveRoutes([
+      { actor_id: "npc_a", provider_id: "deterministic-social", model: "deterministic-social" },
+      { actor_id: "npc_b", provider_id: "openai-api", model: "gpt-live" }
+    ]),
+    /provider-free/
+  );
+});
+
+test("live shared-session slot evidence refs must resolve", async () => {
+  const outputDir = path.join(rootDir, "live-ref-check");
+  await fs.mkdir(path.join(outputDir, "actor-workspaces", "npc_a", "evidence"), { recursive: true });
+  await fs.writeFile(
+    path.join(outputDir, "actor-workspaces", "npc_a", "evidence", "turn.json"),
+    "{}\n",
+    "utf8"
+  );
+  await assertLiveSessionEvidenceRefsResolve({
+    outputDir,
+    slotEvents: [
+      {
+        schema: "actor-turn-slot-completion/v1",
+        session_id: "live-test",
+        slot_index: 1,
+        actor_id: "npc_a",
+        provider_id: "deterministic-social",
+        model: "deterministic-social",
+        turn_id: "turn-a",
+        cycle_id: "cycle-a",
+        action_kind: "observe",
+        started_at: "2026-07-06T00:00:00.000Z",
+        completed_at: "2026-07-06T00:00:01.000Z",
+        evidence_refs: ["actor-workspaces/npc_a/evidence/turn.json"]
+      }
+    ]
+  });
+  await assert.rejects(
+    () => assertLiveSessionEvidenceRefsResolve({
+      outputDir,
+      slotEvents: [
+        {
+          schema: "actor-turn-slot-completion/v1",
+          session_id: "live-test",
+          slot_index: 2,
+          actor_id: "npc_a",
+          provider_id: "deterministic-social",
+          model: "deterministic-social",
+          turn_id: "turn-b",
+          cycle_id: "cycle-b",
+          action_kind: "observe",
+          started_at: "2026-07-06T00:00:00.000Z",
+          completed_at: "2026-07-06T00:00:01.000Z",
+          evidence_refs: ["actor-workspaces/npc_a/evidence/missing.json"]
+        }
+      ]
+    }),
+    /missing evidence refs/
+  );
 });
 
 test("response window closes only after other active actor slot completion", () => {

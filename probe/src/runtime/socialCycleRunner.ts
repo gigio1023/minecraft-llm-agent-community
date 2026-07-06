@@ -119,7 +119,7 @@ import {
   type RuntimeSessionLifecycleTracker
 } from "./sessionLifecycle.js";
 
-type ServerEndpoint = {
+export type ServerEndpoint = {
   host: string;
   port: number;
   mode: "manual" | "live_smoke" | "fresh_world";
@@ -334,7 +334,7 @@ function actorTurnDefaultPrimitive(input: {
   return input.configured?.[linearIndex] ?? (input.actionIndex === 0 ? "observe" : "wait");
 }
 
-async function resolveServerEndpoint(
+export async function resolveServerEndpoint(
   config: ProbeConfig,
   options: { freshWorld?: boolean } = {}
 ): Promise<ServerEndpoint | null> {

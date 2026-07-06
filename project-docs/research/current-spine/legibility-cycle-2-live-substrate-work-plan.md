@@ -168,13 +168,13 @@ file's boxes in the same commit as each slice.
   round-robin, resolves each actor's provider through the routing map,
   and writes `legibility-session/v1` plus per-actor workspaces.
 - Acceptance:
-  - [ ] a provider-free 2-bot live session on `fresh_world` runs to
+  - [x] a provider-free 2-bot live session on `fresh_world` runs to
         completion and writes slot-completion events with distinct
         `provider_id` per actor, with evidence refs that resolve to real
         runtime files;
-  - [ ] `probe:social-cycle` still passes its existing suite unchanged
+  - [x] `probe:social-cycle` still passes its existing suite unchanged
         after the extraction (behavior lock);
-  - [ ] no condition-keyed branches: the runner consumes routes only.
+  - [x] no condition-keyed branches: the runner consumes routes only.
 - Blocked by: none — can start immediately.
 - Test focus: extraction behavior lock; scheduler-to-live-turn adapter
   unit tests; live smoke is the integration truth, not mocks.

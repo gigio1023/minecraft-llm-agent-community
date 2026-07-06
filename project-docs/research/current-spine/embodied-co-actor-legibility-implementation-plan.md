@@ -232,6 +232,17 @@ real leakage checks) are broken down as Phase A of
 (`LEGIBILITY_CYCLE_2_WORK_PLAN`); Session 2 below starts only after that
 plan's C2-G live provider-free gate holds.
 
+Live C2-1 follow-up status (2026-07-06):
+
+- [x] provider-free 2-bot `fresh_world` live session runs through
+      `probe:legibility-live-session` with distinct per-actor provider routes
+      and resolvable runtime evidence refs:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-1/`;
+- [x] `probe:social-cycle` behavior-lock tests and the full `probe` Bun suite
+      still pass after the per-turn core extraction;
+- [x] the live runner consumes provider routes without condition-keyed runtime
+      branches.
+
 **S1-1. Shared-session scheduler with per-actor provider routing**
 
 - What: the social-cycle runner starts N (2-3) actors in one session,
