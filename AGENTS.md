@@ -99,13 +99,27 @@ house-building architecture, or a pre-committed village simulator.
 
 The active research plan is
 `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-(2026-07-05, user-approved). One preregistered experiment: can an observer
-model predict a soul-grounded co-actor's next-turn social-response and
-material-access labels from public interaction history alone, across
+(2026-07-05, user-approved; amended 2026-07-06 with the depth-not-scale
+premise). One preregistered experiment: can an observer model predict a
+soul-grounded co-actor's next-turn social-response and material-access
+labels from public interaction history alone, across
 disposition-consistency conditions (scripted positive control, stable soul,
 resampled-soul null), with held-out-family predictors and policy-copy /
 leakage baselines that can erase the claim. Stop-results K1-K8 are
-preregistered in that plan.
+preregistered in that plan. The build order, seams, vertical slices, and
+acceptance gates live in
+`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+(`LEGIBILITY_IMPLEMENTATION_PLAN`).
+
+Substrate premise (`DEPTH_NOT_SCALE`): the experiment presupposes a working
+2-3 actor shared session with cross-actor observation and chat capture,
+interaction density at the K6 floor, and longitudinal public history
+accumulated per responder. Actor-count scale is not a premise and never a
+remedy for weak signal: do not scale actor count to hide a weak small-run
+result. Scale re-enters only as the deferred social-pattern branch (gated
+by `society-observable-preflight.md`) or as a post-positive-result
+generalization axis. Structurally information-poor small-N interaction is a
+K6/K7-shaped substrate failure, not a scale-up signal.
 
 Standing requirements:
 

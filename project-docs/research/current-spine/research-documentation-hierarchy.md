@@ -42,6 +42,9 @@ claims.
 Active:
 
 - `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+  (build order, seams, vertical slices, and acceptance gates for the central
+  plan; added 2026-07-06)
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`

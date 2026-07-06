@@ -105,6 +105,7 @@ Current research direction lives under:
 
 - `project-docs/research/current-spine/research-documentation-hierarchy.md`
 - `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`

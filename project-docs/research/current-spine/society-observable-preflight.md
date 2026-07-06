@@ -1,7 +1,9 @@
 # Society Observable Preflight
 
-Status: active planning protocol for the F-society branch. This does not select
-F-society as the headline.
+Status: active gate for the deferred social-pattern branch (old name:
+F-society). This does not select the branch as the headline; under
+`DEPTH_NOT_SCALE`, actor-count scale stays banned as a remedy for weak
+small-run results.
 
 Search token: `SOCIETY_OBSERVABLE_PREFLIGHT`.
 

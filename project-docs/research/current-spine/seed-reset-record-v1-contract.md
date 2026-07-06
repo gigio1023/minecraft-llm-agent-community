@@ -1,7 +1,9 @@
 # Seed Reset Record V1 Contract
 
-Status: active planning contract for no-regret-core seed/reset provenance. This
-is not a runtime schema yet and not a research contribution by itself.
+Status: active planning contract for seed/reset provenance under the embodied
+co-actor legibility experiment (`ACTIVE_CENTRAL_PLAN`; kept from the
+superseded no-regret program as load-bearing). This is not a runtime schema
+yet and not a research contribution by itself.
 
 Search token: `SEED_RESET_RECORD_V1`.
 

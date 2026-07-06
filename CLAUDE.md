@@ -8,13 +8,25 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/orientation/documentation-map.md`
-5. `project-docs/orientation/agent-search-index.md`
-6. `project-docs/orientation/terminology.md`
-7. Task-relevant docs routed by the search index or repo-local agent skills.
+3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+4. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+6. `project-docs/orientation/documentation-map.md`
+7. `project-docs/orientation/agent-search-index.md`
+8. `project-docs/orientation/terminology.md`
+9. Task-relevant docs routed by the search index or repo-local agent skills.
 
 `GEMINI.md` no longer exists and is not part of the active guidance surface.
+
+## Current Direction (pointer)
+
+Active target: the preregistered embodied co-actor legibility experiment
+(`ACTIVE_CENTRAL_PLAN`), built per the implementation plan
+(`LEGIBILITY_IMPLEMENTATION_PLAN`). Substrate premise is depth, not scale
+(`DEPTH_NOT_SCALE`): 2-3 actors, dense attributable interaction,
+longitudinal per-responder public history. Never scale actor count to
+rescue weak signal. Standing requirements live in `AGENTS.md` (Current
+Direction) and the two plan docs above.
 
 ## Use Repo-Local Agent Skills
 

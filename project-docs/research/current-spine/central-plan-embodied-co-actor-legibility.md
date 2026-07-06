@@ -5,7 +5,10 @@ Status: ACTIVE central research and implementation plan.
 Search token: `ACTIVE_CENTRAL_PLAN`. Also: `CO_ACTOR_LEGIBILITY`,
 `EXPERIMENT_DECLARATION_V1`, `SELF_SIMULATION_GAP`, `POLICY_COPY_BASELINE`.
 
-Recorded: 2026-07-05 (`Asia/Seoul`).
+Recorded: 2026-07-05 (`Asia/Seoul`). Amended: 2026-07-06 (section 8.1
+depth-not-scale substrate premise, user-confirmed in-session; build plan in
+section 9 expanded into
+`embodied-co-actor-legibility-implementation-plan.md`).
 
 Authority: subordinate to `AGENTS.md`. This plan supersedes
 `central-plan-no-regret-core-and-goldilocks-gate.md`,
@@ -300,7 +303,48 @@ environment is the honest home for what remains, and the Minecraft claim is
 dropped rather than decorated. A gridworld replica MAY be built as a cheap
 falsification control at any time; it never substitutes for the final claim.
 
+### 8.1 Depth-Not-Scale Premise (amendment 2026-07-06)
+
+Search token: `DEPTH_NOT_SCALE`.
+
+The experiment presupposes exactly three substrate facts, and none of them
+is simulation scale:
+
+1. a working small-N multi-actor substrate: 2-3 concurrent actors with
+   cross-actor observation and chat capture wired into runtime evidence
+   (public history has no raw material without it);
+2. interaction density: rows carrying `material_stake` and
+   `interaction_opportunity` at the K6 floor, not observe/wait filler;
+3. longitudinal responder depth: accumulated public history about the same
+   responder across repeated episodes — rows per responder per condition is
+   the quantity that must grow, because that is the only channel through
+   which a fixed private ActorSoul can become legible.
+
+Actor-count scale is explicitly not a premise, and not a remedy:
+
+- power comes from rows per responder x conditions; more actors at fixed
+  budget dilutes rows per responder;
+- more actors blurs response-window attribution and inflates label noise
+  and pathing confounds;
+- dose-response condition control requires precise responder composition,
+  which only 1-2 responders allow.
+
+Binding rule (carried from the superseded 2026-06-29 protocol into active
+authority): do not scale actor count to hide a weak small-run result. Scale
+re-enters only as the deferred social-pattern branch (gated by
+`society-observable-preflight.md`) or as a post-positive-result
+generalization axis. If 2-3 actor interaction cannot carry disposition
+information, that is a K6/K7-shaped substrate failure: fix scenario
+pressure and window design inside the small-N design, or preserve the
+negative result and stop.
+
 ## 9. Build Plan (zero-cost, two sessions)
+
+The full work breakdown — seams, implementation decisions, vertical slices,
+acceptance criteria, testing rules, and the K6 clock — lives in
+`embodied-co-actor-legibility-implementation-plan.md`
+(`LEGIBILITY_IMPLEMENTATION_PLAN`). This section stays as the summary; if
+they disagree, this plan wins and the implementation plan must be updated.
 
 Salvage from `backup/no-regret-core-stash-2026-06-30` strictly by design fit:
 

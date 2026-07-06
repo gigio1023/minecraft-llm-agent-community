@@ -22,7 +22,12 @@ runtime authority.
 ## Quick Start
 
 1. Read the active central plan:
-   `project-docs/research/current-spine/central-plan-no-regret-core-and-goldilocks-gate.md`.
+   `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+   and its build companion
+   `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+   (The no-regret/Goldilocks plan was superseded 2026-07-05; its staged
+   verdict labels below map onto the V2 plan's decision rules and
+   stop-results K1-K8.)
 2. Read `references/protocol.md` for the end-to-end workflow.
 3. If the task asks "is this paper-worthy?", "what is the research gap?", or
    "what experiment should we run?", read `references/research-value-rubric.md`.

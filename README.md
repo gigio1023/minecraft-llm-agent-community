@@ -20,9 +20,35 @@ separately.
 
 ## Current Direction
 
+Goal — one preregistered experiment, both outcomes informative:
+
+- measure whether an observer model, given only public interaction history,
+  predicts a soul-grounded co-actor's next-turn social-response and
+  material-access labels better than baselines that can erase the claim
+  (policy-copy, leakage, shuffled-history, current-observation), across
+  disposition-consistency conditions (scripted positive control, stable
+  soul, resampled-soul null), with preregistered stop-results K1-K8;
+- active plan:
+  `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`;
+- build order and acceptance gates:
+  `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+
+Substrate premise — depth, not scale (`DEPTH_NOT_SCALE`):
+
+- the experiment presupposes a working 2-3 actor shared session with
+  cross-actor observation and chat capture, interaction density at the K6
+  floor, and longitudinal history accumulated per responder;
+- actor-count scale is not a premise and never a remedy: power comes from
+  rows per responder x conditions, and more actors dilutes attribution and
+  power at fixed budget;
+- do not scale actor count to hide a weak small-run result; scale re-enters
+  only as the deferred social-pattern branch or a post-result
+  generalization axis.
+
 Near-term proof:
 
-- one actor, one Mineflayer bot;
+- a 2-3 actor shared session: one focal actor plus 1-2 responders on
+  per-actor provider routing;
 - ActorSoul and LifeGoal shape intent, but do not replace runtime observation;
 - Actor Turn is the ordinary decision hot path;
 - Action Cards expose what the actor can try now;
@@ -30,8 +56,10 @@ Near-term proof:
   `author_mineflayer_action`;
 - PlanBeads preserve passive open work, blockers, obligations, and followups;
 - Minecraft progress requires runtime execution and ordinary runtime checks;
-- simple target-state benchmarks remain calibration gates before transition
-  prediction and social-material trajectory evaluation.
+- response windows close only after every other active actor completed a
+  subsequent Actor Turn slot or a preregistered timeout;
+- a deterministic provider-free end-to-end smoke gates any live provider
+  spend.
 
 Long-term north star:
 
@@ -131,17 +159,18 @@ Read in this order:
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 4. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-5. `project-docs/orientation/documentation-map.md`
-6. `project-docs/orientation/agent-search-index.md`
-7. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-8. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-9. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-10. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-11. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-12. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-13. `project-docs/runtime/overview/minecraft-basic-guide.md`
-14. `project-docs/operations/setup/headless-server.md`
-15. `project-docs/operations/setup/provider-setup.md`
+5. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+6. `project-docs/orientation/documentation-map.md`
+7. `project-docs/orientation/agent-search-index.md`
+8. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+9. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+10. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+11. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+12. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+13. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+14. `project-docs/runtime/overview/minecraft-basic-guide.md`
+15. `project-docs/operations/setup/headless-server.md`
+16. `project-docs/operations/setup/provider-setup.md`
 
 ## Running Checks
 

@@ -1,8 +1,9 @@
 # No-Regret Core Scenario Catalog
 
-Status: active planning catalog for row-producing scenario pressure. This is not
-a benchmark ladder, not a society demo script, and not a runtime implementation
-plan.
+Status: active planning catalog for row-producing scenario pressure, serving
+the embodied co-actor legibility experiment (`ACTIVE_CENTRAL_PLAN`). This is
+not a benchmark ladder, not a society demo script, and not a runtime
+implementation plan.
 
 Search token: `NO_REGRET_SCENARIO_CATALOG`.
 

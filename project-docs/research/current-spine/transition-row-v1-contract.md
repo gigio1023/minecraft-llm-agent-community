@@ -1,7 +1,8 @@
 # Transition Row V1 Contract
 
-Status: active planning contract for the no-regret core. This is not yet a
-runtime schema.
+Status: active planning contract for the embodied co-actor legibility
+experiment (`ACTIVE_CENTRAL_PLAN`; kept from the superseded no-regret program
+as load-bearing). This is not yet a runtime schema.
 
 Search token: `TRANSITION_ROW_V1`.
 

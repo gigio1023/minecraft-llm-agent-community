@@ -9,7 +9,13 @@ experiment**, defined in
 `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`:
 measuring whether observer models can predict soul-grounded co-actors'
 social-material responses from public interaction history alone, with
-disposition consistency as the manipulated variable. The motivating domain
+disposition consistency as the manipulated variable. The build order and
+acceptance gates live in
+`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+The substrate premise is depth, not scale (`DEPTH_NOT_SCALE`): a working
+2-3 actor shared session with dense, attributable, longitudinally
+accumulated interaction. Actor-count scale is not a premise and never a
+remedy for weak signal. The motivating domain
 remains Soul-grounded Minecraft social simulation. The former "advisory
 social-material WAM" framing is historical; the WAM banner term was retired
 on 2026-07-05 with user approval (it collides with the robotics World Action
@@ -229,6 +235,9 @@ Read these documents to understand the full spec:
      metrics, stop-results, and build plan.
      (`project-docs/specification/advisory-social-material-wam.md` is
      historical; its verification-as-hygiene rule remains binding.)
+   - `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+     expands the build plan into seams, vertical slices, acceptance
+     criteria, and testing rules.
 4. `project-docs/specification/runtime-evidence-and-action-skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.
@@ -339,7 +348,9 @@ Setup docs:
 
 The first meaningful proof is small:
 
-- one bounded actor;
+- a bounded 2-3 actor shared session (one focal actor plus 1-2 responders)
+  with cross-actor observation and chat capture; single-actor runs remain
+  valid for calibration and substrate smoke tests;
 - real Minecraft actions such as gathering, crafting, storage, movement,
   block placement, communication, or settlement maintenance;
 - action attempts recorded whether passed, blocked, failed, or no-progress;
