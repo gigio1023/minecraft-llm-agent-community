@@ -4,6 +4,17 @@ This reference describes the artifact shape used by
 `social-cycle-run-report/v1`. Treat `SPEC.md` and repo TypeScript types as
 canonical if this map drifts.
 
+## Table Of Contents
+
+- Top-Level Report
+- Cycle Records
+- Actor Workspace
+- Summarizer Output
+- Evidence Artifacts
+- Provider Output Snapshots
+- Retry Constraints
+- Provider Usage
+
 ## Top-Level Report
 
 Core fields:

@@ -1,5 +1,14 @@
 # Analysis Rubric
 
+## Table Of Contents
+
+- Evidence Order
+- Behavior Questions
+- Useful Metrics
+- Finding Priorities
+- Interpretation Traps
+- Output Template
+
 ## Evidence Order
 
 Prefer evidence in this order:

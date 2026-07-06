@@ -5,6 +5,17 @@ Mineflayer can execute code, the actor can author new action skills, and LLMs
 already know many Minecraft mechanics. A useful harness must account for all of
 that instead of pretending every verified action is research.
 
+## Table Of Contents
+
+- What Is Easy Here
+- What Could Be Research Value
+- Required Separations
+- Baselines For This Project
+- The Active Legibility Substrate Constraint
+- Mineflayer Code Generation Pressure
+- LLM Minecraft Prior Pressure
+- Project Sid And Viral Society Claims
+
 ## What Is Easy Here
 
 These can be important engineering milestones, but they are weak research
@@ -63,17 +74,19 @@ Use at least one relevant baseline in every research claim:
 - `dialogue-only`: if social interpretation could come only from chat.
 - `actor-success`: acting outcome without prediction, reported separately.
 
-## The No-Regret Core Constraint
+## The Active Legibility Substrate Constraint
 
-Before the Goldilocks preflight, the correct verdict for most ambitious claims
-is `core-first`.
+Before a narrow active-plan preflight, the correct verdict for most ambitious
+claims is `substrate-first`.
 
 Do not select a headline until:
 
-- 2-3 actors run without 60-cycle degeneracy;
+- 2-3 actors can run in a shared session with dense attributable interaction;
 - `transition-row/v1` rows are independent of `expected_outcome`;
 - observed deltas are layer-tagged;
 - other-actor response windows are captured;
+- public-history exports pass leakage checks;
+- predictions join only by `row_id` after labels are locked;
 - cost discipline is respected.
 
 The preflight thresholds are inputs to a gate, not proof of the final project.

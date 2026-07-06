@@ -3,7 +3,7 @@
 ```yaml
 schema_version: research-decision/v1
 decision:
-verdict: kill | defer | core-first | preflight-ready | headline-candidate
+verdict: kill | defer | substrate-first | preflight-ready | headline-candidate
 evidence_used:
 alternatives_considered:
 strongest_objection:

@@ -4,6 +4,17 @@ Use this when reviewing `probe/src/gameplay/seedSkills/registry.ts`, runtime
 primitives, Mineflayer tools, or any claim that a bot can perform a Minecraft
 task.
 
+## Table Of Contents
+
+- Core Rule
+- Early-Game Progression Reality
+- Mineflayer-Specific Checks
+- Action Skill Status
+- Common False Capabilities
+- Reference-Derived Initial Ability Candidates
+- Audit Output
+- Gotchas
+
 ## Core Rule
 
 Do not accept a seed action skill because it sounds like a Minecraft task. A

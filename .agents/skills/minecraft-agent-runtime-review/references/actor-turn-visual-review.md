@@ -4,6 +4,15 @@ Use this reference for current social-cycle runs that use Actor Turn,
 `author_mineflayer_action`, generated Mineflayer candidates, PlanBeads, or
 bot-view screenshots.
 
+## Table Of Contents
+
+- Current Actor Turn Artifact Map
+- Verdict Split
+- Visual Evidence Triage
+- Actor Turn Failure Modes
+- Review Questions For Generated Mineflayer Runs
+- Output Addendum
+
 ## Current Actor Turn Artifact Map
 
 Do not rely on archived `action_intent_ref` for current reports. Current Actor

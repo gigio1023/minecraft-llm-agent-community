@@ -3,6 +3,16 @@
 Use this when the reviewer has watched the bot in Minecraft or described
 concrete behavior that is not fully captured by transcript fields.
 
+## Table Of Contents
+
+- Core Principle
+- Human Observation Is Evidence
+- Mechanism Mapping
+- Review Steps
+- Required Output
+- Missing Artifact Fields To Request Or Add
+- Gotchas
+
 ## Core Principle
 
 The purpose of a runtime review is not to summarize artifacts. It is to turn
