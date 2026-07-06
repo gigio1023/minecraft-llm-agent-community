@@ -242,12 +242,15 @@ file's boxes in the same commit as each slice.
   that artifact) refuse, not annotate. Exporter `created_at` becomes an
   injected timestamp.
 - Acceptance:
-  - [ ] a fixture with a leaked private field fails export with a thrown
+  - [x] a fixture with a leaked private field fails export with a thrown
         error, and the scorer refuses a public history whose checks are
         not `passed`;
-  - [ ] an actor chat message containing "provider" or "memory" does not
+  - [x] an actor chat message containing "provider" or "memory" does not
         fail the prompt-shape check (false-positive test);
-  - [ ] exporter output is byte-deterministic given injected timestamps.
+  - [x] exporter output is byte-deterministic given injected timestamps.
+- Evidence: `cd probe && bun test test/legibilitySession1.test.ts -t 'public-history'`.
+  The live C2-G smoke also caught an unknown structured chat `tick` field
+  and forced the allowlist to be updated instead of passing it through.
 - Blocked by: C2-3 (needs realistic live-shaped fixtures).
 
 **C2-6. Real offline predictor arms (closes G3)**
@@ -266,6 +269,12 @@ file's boxes in the same commit as each slice.
         majority on scripted-responder rows from the live provider-free
         smoke — if it cannot, that is K1-shaped and Phase B is blocked;
   - [ ] the oracle placeholder is gone from the smoke.
+- Status 2026-07-06: public-history-only predictor arms are implemented
+  and the C2-G live smoke uses them without the Session 1 fixture oracle.
+  Acceptance remains open because the live C2-G artifact failed the K1
+  lift gate: `history_grounded` max lift was `-0.15000000000000002`
+  over per-condition majority on
+  `project-docs/experiments/raw/2026-07-06/c2-g-live-provider-free-smoke/`.
 - Blocked by: C2-5 (buildable earlier against cycle 1 artifacts, but
   acceptance is judged on checked live-smoke artifacts).
 
@@ -294,13 +303,20 @@ file's boxes in the same commit as each slice.
   labels, checked export, real predictor arms, full score report;
   artifacts land under `project-docs/experiments/raw/`.
 - Acceptance:
-  - [ ] one command produces the full artifact chain from a live session
+  - [x] one command produces the full artifact chain from a live session
         with zero provider spend;
-  - [ ] rows are non-vacuous with >= 1 materially grounded label;
+  - [x] rows are non-vacuous with >= 1 materially grounded label;
   - [ ] the K1-shaped lift gate (C2-6) passes on these artifacts;
   - [ ] rerun stability: substantive artifact content is identical across
         reruns up to session ids and timestamps.
-- Blocked by: C2-1 .. C2-7. Phase B does not start until this gate holds.
+- Evidence: `cd probe && bun run probe:legibility-live-smoke -- --output-dir ../project-docs/experiments/raw/2026-07-06/c2-g-live-provider-free-smoke --allow-failing-gate`
+  wrote declaration, live session, public history, predictions, score
+  report, and gate summary with `provider_spend: 0`, `row_count: 3`,
+  and `material_grounded_row_count: 1`.
+- Blocked by: C2-6 K1 lift failure and rerun stability. The gate summary
+  at
+  `project-docs/experiments/raw/2026-07-06/c2-g-live-provider-free-smoke/c2-g-gate-summary.json`
+  records `status: failed`; Phase B does not start until this gate holds.
 
 ## 6. Phase B — Session 2 Pilot (provider spend)
 

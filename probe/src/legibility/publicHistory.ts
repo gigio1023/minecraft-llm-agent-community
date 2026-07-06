@@ -61,6 +61,7 @@ const chatEventKeys = new Set<keyof StructuredChatEvent>([
   "observed_by",
   "slot_index",
   "observed_at",
+  "tick",
   "position",
   "evidence_refs"
 ]);

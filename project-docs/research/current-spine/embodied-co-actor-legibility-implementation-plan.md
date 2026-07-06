@@ -391,6 +391,17 @@ Live C2-7 follow-up status (2026-07-06):
         artifacts land under the experiments tree.
 - Blocked by: S1-3, S1-6.
 
+Cycle 2 live-substrate status (2026-07-06): the provider-free live C2-G
+smoke now writes the full live artifact chain under
+`project-docs/experiments/raw/2026-07-06/c2-g-live-provider-free-smoke/`
+with checked public history, real public-history predictor arms, and one
+typed material-access label from `material-access-evidence/v1`. The live
+exit gate remains failed because `history_grounded` lift over
+per-condition majority is negative (`max_lift:
+-0.15000000000000002`), recorded in
+`c2-g-gate-summary.json`. Treat this as a K1-shaped Phase B blocker, not
+as a provider-budget or environment blocker.
+
 ### Session 2 — preregistered live pilot
 
 **S2-1. Provider quota preflight and declaration**

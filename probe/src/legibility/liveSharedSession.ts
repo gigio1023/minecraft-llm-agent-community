@@ -43,7 +43,8 @@ import { runSharedSessionSchedule } from "./sharedSessionScheduler.js";
 import { ResponseWindowTracker } from "./responseWindows.js";
 import {
   labelMaterialAccessFromEvidence,
-  labelSocialResponseFromWindow
+  labelSocialResponseFromWindow,
+  type MaterialAccessEvidenceEvent
 } from "./evidenceLabeler.js";
 import type {
   ActorProviderRoute,
@@ -58,6 +59,8 @@ export type LiveSharedLegibilitySessionResult = {
   sessionPath: string;
   session: LegibilitySessionArtifact;
 };
+
+export type LiveSharedDefaultPrimitiveMap = Record<string, string>;
 
 type ActorRuntimeState = {
   soul: Awaited<ReturnType<typeof ensureActorSoul>>;
@@ -418,7 +421,14 @@ function actionKindFor(action: ActorTurnResolvedAction) {
   return action.kind;
 }
 
-function defaultPrimitiveForRoute(route: ActorProviderRoute) {
+function defaultPrimitiveForRoute(
+  route: ActorProviderRoute,
+  defaultPrimitivesByActor?: LiveSharedDefaultPrimitiveMap
+) {
+  const explicit = defaultPrimitivesByActor?.[route.actor_id]?.trim();
+  if (explicit) {
+    return explicit;
+  }
   return route.provider_id === "deterministic-social" ? "observe" : undefined;
 }
 
@@ -462,6 +472,103 @@ function loadedWorldCaveatFromObservation(observation: unknown) {
     return (loadedWorldScope as { caveat: string }).caveat;
   }
   return "Live C2-3 row: loaded-world absence claims are scoped to Mineflayer observation limits.";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringField(value: unknown, key: string) {
+  return isRecord(value) && typeof value[key] === "string" ? value[key] : undefined;
+}
+
+function numberField(value: unknown, key: string) {
+  return isRecord(value) && typeof value[key] === "number" && Number.isFinite(value[key])
+    ? value[key]
+    : undefined;
+}
+
+function classesForMaterialToolResult(input: {
+  tool: string;
+  status: string;
+  result: unknown;
+}): MaterialAccessEvidenceEvent["classes"] {
+  const inventoryDelta = numberField(input.result, "inventoryDelta");
+  const movedCount = numberField(input.result, "movedCount");
+  if (
+    ["collect_logs", "craft_item", "craft_with_table", "consume_item"].includes(input.tool) &&
+    inventoryDelta !== undefined &&
+    inventoryDelta > 0
+  ) {
+    return ["inventory_gain"];
+  }
+  if (
+    ["place_block", "consume_item"].includes(input.tool) &&
+    inventoryDelta !== undefined &&
+    inventoryDelta < 0
+  ) {
+    return ["inventory_loss"];
+  }
+  if (input.tool === "deposit_shared" && input.status === "deposited" && (movedCount ?? 0) > 0) {
+    return ["container_gain", "inventory_loss"];
+  }
+  if (input.tool === "withdraw_shared" && input.status === "withdrew" && (movedCount ?? 0) > 0) {
+    return ["container_loss", "inventory_gain"];
+  }
+  return [];
+}
+
+async function materialEvidenceFromTurn(input: {
+  outputDir: string;
+  sessionId: string;
+  actorId: string;
+  turnId: string;
+  toolResults: readonly {
+    tool: string;
+    status: string;
+    result: unknown;
+    evidence_ref?: string;
+  }[];
+}) {
+  const events: MaterialAccessEvidenceEvent[] = [];
+  for (const [index, toolResult] of input.toolResults.entries()) {
+    const classes = classesForMaterialToolResult(toolResult);
+    if (classes.length === 0 || !toolResult.evidence_ref) {
+      continue;
+    }
+    const materialRef = path.join(
+      "material-evidence",
+      `${sanitizeWorkspaceFileId(input.turnId)}-${String(index + 1).padStart(2, "0")}-${sanitizeWorkspaceFileId(toolResult.tool)}.json`
+    );
+    const event = {
+      schema: "material-access-evidence/v1" as const,
+      event_kind: toolResult.tool === "deposit_shared" || toolResult.tool === "withdraw_shared"
+        ? "container_delta" as const
+        : "inventory_delta" as const,
+      classes,
+      evidence_refs: [
+        materialRef,
+        actorWorkspaceRef(input.actorId, toolResult.evidence_ref)
+      ]
+    };
+    await writeJson(path.join(input.outputDir, materialRef), {
+      ...event,
+      session_id: input.sessionId,
+      actor_id: input.actorId,
+      turn_id: input.turnId,
+      tool: toolResult.tool,
+      status: toolResult.status,
+      runtime_status: stringField(toolResult.result, "status"),
+      runtime_evidence_ref: actorWorkspaceRef(input.actorId, toolResult.evidence_ref),
+      label_source_policy: {
+        schema: "material-access-label-source-policy/v1",
+        source: "typed_social_cycle_tool_result",
+        chat_text_used_for_material_label: false
+      }
+    });
+    events.push(event);
+  }
+  return events;
 }
 
 function requireRouteForClosedWindow(input: {
@@ -593,6 +700,7 @@ export async function runLiveSharedLegibilitySession(input: {
   actorRoutes?: readonly ActorProviderRoute[];
   slotsPerActor?: number;
   responseWindowTimeoutAfterSlots?: number;
+  defaultPrimitivesByActor?: LiveSharedDefaultPrimitiveMap;
   cleanOutputDir?: boolean;
   writtenAt?: string;
   worldSeed?: string;
@@ -618,6 +726,7 @@ export async function runLiveSharedLegibilitySession(input: {
   const stateBeforeRefsByTurn = new Map<string, string>();
   const visibleActorIdsByTurn = new Map<string, string[]>();
   const loadedWorldCaveatByTurn = new Map<string, string>();
+  const materialEvidenceByTurn = new Map<string, MaterialAccessEvidenceEvent[]>();
   const rows: TransitionRowV1[] = [];
   let chatEventCursor = 0;
   const loadedConfig = loadProbeConfig();
@@ -678,7 +787,7 @@ export async function runLiveSharedLegibilitySession(input: {
           }
           const socialLabelDecision = labelSocialResponseFromWindow(window);
           const materialLabelDecision = labelMaterialAccessFromEvidence({
-            materialEvidence: [],
+            materialEvidence: materialEvidenceByTurn.get(focalEvent.turn_id) ?? [],
             fallbackEvidenceRefs: focalEvent.evidence_refs
           });
           const row: TransitionRowV1 = {
@@ -850,6 +959,26 @@ export async function runLiveSharedLegibilitySession(input: {
         });
         const startedAt = new Date().toISOString();
         const targetActorId = targetActorIdFor({ actorId: actor_id, actorIds });
+        const routeDefaultPrimitive = defaultPrimitiveForRoute(route, input.defaultPrimitivesByActor);
+        const explicitDefaultPrimitive = input.defaultPrimitivesByActor?.[actor_id]?.trim();
+        if (
+          explicitDefaultPrimitive &&
+          !state.allowedPrimitiveIds.includes(explicitDefaultPrimitive)
+        ) {
+          throw new Error(
+            `Explicit live shared-session primitive ${explicitDefaultPrimitive} is not allowed for ${actor_id}`
+          );
+        }
+        if (
+          explicitDefaultPrimitive &&
+          !actionCardProjection.runtime_mappings.some((mapping) =>
+            mapping.kind === "use_primitive" && mapping.primitive_id === explicitDefaultPrimitive
+          )
+        ) {
+          throw new Error(
+            `Explicit live shared-session primitive ${explicitDefaultPrimitive} is not exposed as an Action Card for ${actor_id}`
+          );
+        }
         chatCapture!.setActiveSlot(slot_index);
         const turnCore = await runSocialCycleTurnCore({
           providerId: route.provider_id,
@@ -870,7 +999,7 @@ export async function runLiveSharedLegibilitySession(input: {
             actorId: actor_id,
             attempts: state.retryAttempts
           }),
-          defaultPrimitive: defaultPrimitiveForRoute(route),
+          defaultPrimitive: routeDefaultPrimitive,
           bot: bots![actor_id],
           ...(targetActorId ? { targetBot: bots![targetActorId] } : {}),
           otherBots,
@@ -883,6 +1012,13 @@ export async function runLiveSharedLegibilitySession(input: {
         if (turnCore.retryAttempt) {
           state.retryAttempts.push(turnCore.retryAttempt);
         }
+        materialEvidenceByTurn.set(turn_id, await materialEvidenceFromTurn({
+          outputDir,
+          sessionId,
+          actorId: actor_id,
+          turnId: turn_id,
+          toolResults: turnCore.execution.toolResults
+        }));
         const completedAt = new Date().toISOString();
         const evidenceRefs = turnCore.execution.evidenceRefs.map((ref) => actorWorkspaceRef(actor_id, ref));
         return {
