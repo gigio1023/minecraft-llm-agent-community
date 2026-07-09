@@ -41,19 +41,24 @@ claims.
 
 Active:
 
-- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+- `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+  (V3 central plan; added 2026-07-10)
+- `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
   (build order, seams, vertical slices, and acceptance gates for the central
-  plan; added 2026-07-06)
-- `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md`
-  (issue-level work order for the remaining slices: live substrate Phase A,
-  Session 2 pilot Phase B; added 2026-07-06 after the cycle 1 merge review)
+  plan; added 2026-07-10)
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/no-regret-core-scenario-catalog.md` (scenario reference)
 - `project-docs/research/current-spine/society-observable-preflight.md` (deferred social-pattern branch gate)
+
+Superseded on 2026-07-10, preserved as audit trail:
+
+- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+  (V2 central plan; killed on verified defects — see its status header)
+- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+- `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md`
 
 Superseded on 2026-07-05, preserved as audit trail:
 
@@ -68,9 +73,10 @@ Superseded on 2026-07-05, preserved as audit trail:
 Tier 1 owns the current sequence:
 
 ```text
-one preregistered co-actor legibility experiment (conditions, arms, metrics,
-stop-results built in) -> research-decision/v1 -> deferred branch promotion
-or preserved negative result
+one preregistered lived-vs-told experiment (history families, delivery
+ladder, observer arms, statistics, stop-results built in) ->
+research-decision/v1 -> deferred branch promotion or preserved negative
+result
 ```
 
 ## Tier 2 - Active Runtime Support

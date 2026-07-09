@@ -34,10 +34,34 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
 
 ## Legibility, Action-Consequence, And Advisory Predictor Names
 
-The active research headline is the **embodied co-actor legibility experiment**:
-whether public interaction history improves prediction of a co-actor's
-`social_response` and `material_access` labels under the conditions, baselines,
-and stop-results in
+The active research headline is the **lived-vs-told experiment**: whether
+manipulated partner-directed social history, delivered as enacted episodes
+versus information-equivalent narration against an equivalent decision
+state, changes a co-actor's `material_follow_through` — and whether a
+raw-event observer can predict it — under the history families, delivery
+ladder, baselines, and stop-results in
+`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`.
+
+Lived-vs-told terms:
+
+- **history family**: a matched valence pair of partner behavior toward the
+  responder (`prior_help`, `permission`, `promise`);
+- **delivery rung**: how history reaches the responder (`no_history`,
+  `narrated_summary`, `narrated_verbatim`, `enacted`); the four rungs form
+  the **history delivery ladder** (`HISTORY_DELIVERY_LADDER`);
+- **enacted history**: the responder actually played the history episode;
+  only its own memory artifacts carry it;
+- **narrated history**: a deterministic, audited narration generated from
+  the enacted episode's public event log;
+- **material follow-through** (`MATERIAL_FOLLOW_THROUGH`): the binary
+  primary target — the requested material act toward the partner, read only
+  from typed `material-access-evidence/v1`, with intent (chosen action) and
+  execution (tool result) recorded separately;
+- **same-model rule** (`SAME_MODEL_RULE`): all conditions run one base
+  model and one fixed ActorSoul; soul text is never an independent variable.
+
+The **embodied co-actor legibility experiment** (V2) is superseded
+2026-07-10; read it only as audit trail in
 `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`.
 
 For deferred branches and historical references, prefer concrete names over the
@@ -53,9 +77,9 @@ historical **WAM** banner:
 **Advisory social-material WAM** is historical shorthand and a possible
 advisory-use branch reference. It should not be used as the current project
 headline. If it appears in older docs, read it through
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-(the active plan, whose crosswalk also retires the F-native/F-loop/F-society
-branch names).
+`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+(the active plan; its crosswalk and the superseded V2 plan retire the
+F-native/F-loop/F-society branch names).
 
 An advisory consequence predictor predicts deltas before an action and is scored
 after the action against runtime-observed deltas. It does not select the executed
@@ -67,7 +91,7 @@ representation choice, not the research contribution.
 
 ## Transition Row
 
-A **transition row** is the current legibility experiment data unit. It is an
+A **transition row** is the current experiment data unit. It is an
 independent before/action/after record for one executed Minecraft action:
 
 ```text

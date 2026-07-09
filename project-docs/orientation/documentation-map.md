@@ -104,16 +104,17 @@ Start from:
 Current research direction lives under:
 
 - `project-docs/research/current-spine/research-documentation-hierarchy.md`
-- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-- `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md`
+- `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+- `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/society-observable-preflight.md`
 
-The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05) and
-carry superseded status headers in place.
+The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05), and
+the V2 co-actor legibility docs (central plan, implementation plan, cycle 2
+work plan) are superseded (2026-07-10); all carry superseded status headers
+in place.
 
 Long-term specification files live under:
 

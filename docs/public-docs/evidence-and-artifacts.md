@@ -8,7 +8,7 @@ The project treats artifacts as audit hygiene. They are the way to check what a
 run did, not the research contribution by themselves. This matters because LLM
 text can sound successful even when Minecraft state did not change.
 
-For the active legibility experiment, artifacts should support independent
+For the active lived-vs-told experiment, artifacts should support independent
 `transition-row/v1` records:
 
 ```text

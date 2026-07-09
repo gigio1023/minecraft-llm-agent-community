@@ -1,15 +1,18 @@
 # minecraft-llm-agent-community
 
-Headless Minecraft runtime-loop research on the legibility of embodied LLM
-co-actors: can an observer model predict a soul-grounded co-actor's
-social-material responses from public interaction history alone?
+Headless Minecraft runtime-loop research on causal social memory in
+embodied LLM co-actors: holding the current world state equivalent, does
+changing only a co-actor's social history with a partner change its actual
+material behavior — does it matter whether that history was lived or
+merely told — and can an outside observer read the effect from public
+events alone?
 
 This repository is not a Voyager clone, a race-to-diamond benchmark, or a
 house-building planner. Minecraft task completion is a competence gate, not
 the final research target. The active plan is
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`;
-the former "advisory social-material WAM" framing is historical and the WAM
-term is retired.
+`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`;
+the V2 co-actor legibility plan and the former "advisory social-material
+WAM" framing are historical.
 
 Runtime verification, evidence artifacts, seed/reset records, screenshots, and
 scoring scripts are mandatory experiment hygiene. They are not the research
@@ -20,24 +23,30 @@ separately.
 
 ## Current Direction
 
-Goal — one preregistered experiment, both outcomes informative:
+Goal — one preregistered experiment, all outcomes informative:
 
-- measure whether an observer model, given only public interaction history,
-  predicts a soul-grounded co-actor's next-turn social-response and
-  material-access labels better than baselines that can erase the claim
-  (policy-copy, leakage, shuffled-history, current-observation), across
-  disposition-consistency conditions (scripted positive control, stable
-  soul, resampled-soul null), with preregistered stop-results K1-K8;
+- manipulate a co-actor's partner-directed social history (prior help,
+  permission, promise) against a state-equivalent matched pair, delivered
+  at four rungs (`no_history` / `narrated_summary` / `narrated_verbatim` /
+  `enacted`), and measure materially verified follow-through with intent
+  and execution separated;
+- headline 1: the lived-vs-told gap — does enacted history (real episodes,
+  agent-written memory) move behavior differently than an
+  information-equivalent narration?
+- headline 2: observer legibility — can a held-out-family observer reading
+  only raw public events (never prior labels) beat state-only, actor-id,
+  policy-copy, and shuffled-history baselines? Preregistered stop-results
+  L1-L8;
 - active plan:
-  `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`;
+  `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`;
 - build order and acceptance gates:
-  `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+  `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`.
 
 Substrate premise — depth, not scale (`DEPTH_NOT_SCALE`):
 
 - the experiment presupposes a working 2-3 actor shared session with
-  cross-actor observation and chat capture, interaction density at the K6
-  floor, and longitudinal history accumulated per responder;
+  cross-actor observation and chat capture, material-stake interaction
+  density, and matched history pairs accumulated per responder;
 - actor-count scale is not a premise and never a remedy: power comes from
   rows per responder x conditions, and more actors dilutes attribution and
   power at fixed budget;
@@ -63,9 +72,10 @@ Near-term proof:
 
 Long-term north star:
 
-- measuring embodied co-actor legibility with disposition consistency as the
-  manipulated variable, held-out-family observer predictors, and
-  policy-fingerprint baselines that can erase the claim;
+- measuring causal social memory and its public legibility in embodied
+  LLM co-actors, with manipulated history as the independent variable,
+  held-out-family raw-event observers, and policy-fingerprint baselines
+  that can erase the claim;
 - actors with role context, memory, relationships, action skill ownership,
   obligations, material claims, public affordances, weak commons, and visible
   consequences that persist after one immediate task is completed;
@@ -158,8 +168,8 @@ Read in this order:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-5. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+4. `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+5. `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
 6. `project-docs/orientation/documentation-map.md`
 7. `project-docs/orientation/agent-search-index.md`
 8. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`

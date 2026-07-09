@@ -19,14 +19,13 @@ questions quickly:
 3. How do Actor Turn, Action Cards, PlanBeads, and generated action skills fit
    together?
 4. How does the runtime distinguish real Minecraft progress from fake progress?
-5. Where does the embodied co-actor legibility substrate fit?
+5. Where does the shared-session experiment substrate fit?
 6. What are the largest current implementation risks?
 
 In one sentence: this repository is building a **bounded, observable headless
 Minecraft runtime where Soul/LifeGoal-grounded actors act in a shared 2-3 actor
 session, while independent `transition-row/v1` records, public-history exports,
-and offline predictors make the embodied co-actor legibility experiment
-scorable**.
+and offline observers make the lived-vs-told experiment scorable**.
 
 The important boundary is that the LLM/provider does not own Minecraft truth.
 During Actor Turn, the provider chooses one visible Action Card function tool or
@@ -85,11 +84,13 @@ checks.
 
 ## Current Product Scope
 
-The active direction is the embodied co-actor legibility experiment in
-Minecraft, motivated by Soul/LifeGoal-grounded social-material interaction.
-The current delivery target is Session 1 of the implementation plan:
-provider-free integrated substrate for a 2-actor smoke before any live provider
-pilot.
+The active direction is the lived-vs-told experiment in Minecraft
+(`central-plan-lived-vs-told-social-history.md`), motivated by
+Soul/LifeGoal-grounded social-material interaction. The current delivery
+target is Session A of the implementation plan: provider-free
+history-dependent positive control, matched-pair fixtures, delivery
+ladder, and raw-event observer arms gated by the L1 smoke before any live
+provider pilot.
 
 | Scope | Current target |
 | --- | --- |
@@ -427,8 +428,8 @@ If documents disagree, start from:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-4. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+3. `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+4. `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
 5. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
 6. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
 7. `project-docs/operations/handoffs/current-handoff-and-next-work.md`

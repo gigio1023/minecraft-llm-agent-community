@@ -5,22 +5,25 @@ sidebar_position: 1
 # Overview
 
 **minecraft-llm-agent-community** is a headless Mineflayer runtime built to
-run one preregistered experiment: embodied co-actor legibility. The question
-is whether an observer model, given only public interaction history, can
-predict a soul-grounded co-actor's next-turn social-response and
-material-access labels better than baselines that can erase the claim — and
-whether that predictability tracks how consistent the co-actor's private
-disposition actually is.
+run one preregistered experiment: lived vs told. Holding the current
+decision state equivalent, does changing only a co-actor's social history
+with a partner change its materially verified behavior; does the effect
+differ between history the actor LIVED (enacted episodes, agent-written
+memory) and history it was TOLD (an information-equivalent narration); and
+can an external observer, reading only raw public events, predict that
+behavior better than baselines that can erase the claim?
 
 Minecraft provides embodied actions and runtime-verified material
 consequences (possession, access, refusal, repair, public-affordance use).
-The runtime exists so those consequences are recorded truthfully enough to
-score predictions against.
+Only an embodied persistent world can separate lived from told history —
+in text games, history is narration. The runtime exists so material
+consequences are recorded truthfully enough to score both the actor-side
+effect and observer predictions against.
 
-Active plan: `../research/current-spine/central-plan-embodied-co-actor-legibility.md`
+Active plan: `../research/current-spine/central-plan-lived-vs-told-social-history.md`
 (`ACTIVE_CENTRAL_PLAN`). Build order:
-`../research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-(`LEGIBILITY_IMPLEMENTATION_PLAN`).
+`../research/current-spine/lived-vs-told-implementation-plan.md`
+(`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`).
 
 ## Substrate Premise: Depth, Not Scale
 
@@ -31,9 +34,9 @@ a budget compromise (`DEPTH_NOT_SCALE`):
   and chat capture wired into runtime evidence;
 - interaction density: rows must carry material stake and interaction
   opportunity, not observe/wait filler;
-- longitudinal depth: public history accumulates about the same responder
-  across repeated episodes, because rows per responder is what makes a
-  fixed private ActorSoul legible.
+- longitudinal depth: matched history pairs accumulate per responder per
+  history family, because pairs — not cast size — carry the statistical
+  power of the matched-pair design.
 
 Actor-count scale is never a remedy for weak signal. Scale re-enters only
 as the deferred social-pattern branch or as a post-positive-result
@@ -126,8 +129,9 @@ parameters, close obligations, or override runtime checks.
 
 ## Read Next
 
-- [Central Plan V2: Embodied Co-Actor Legibility](../research/current-spine/central-plan-embodied-co-actor-legibility.md)
-- [Implementation Plan](../research/current-spine/embodied-co-actor-legibility-implementation-plan.md)
+- [Central Plan V3: Lived Vs Told](../research/current-spine/central-plan-lived-vs-told-social-history.md)
+- [Implementation Plan](../research/current-spine/lived-vs-told-implementation-plan.md)
+- [Central Plan V2: Embodied Co-Actor Legibility (superseded)](../research/current-spine/central-plan-embodied-co-actor-legibility.md)
 - [Research Documentation Hierarchy](../research/current-spine/research-documentation-hierarchy.md)
 - [Transition Row v1 Contract](../research/current-spine/transition-row-v1-contract.md)
 - [Transition Row Label Codebook](../research/current-spine/transition-row-label-codebook.md)

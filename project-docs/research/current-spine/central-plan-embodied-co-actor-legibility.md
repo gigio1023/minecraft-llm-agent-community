@@ -1,9 +1,20 @@
 # Central Plan V2: Embodied Co-Actor Legibility
 
-Status: ACTIVE central research and implementation plan.
+Status: SUPERSEDED on 2026-07-10 by
+`central-plan-lived-vs-told-social-history.md` (V3), which now carries the
+`ACTIVE_CENTRAL_PLAN` token. Preserved as audit trail; do not build from
+this document. Reasons for supersession (verified 2026-07-10): the
+declared positive control ("history MUST help") contradicted the
+implemented memoryless scripted responder; every implemented predictor arm
+including the treatment consumed prior locked labels, collapsing the
+design into labeled K-shot adaptation (occupied by arXiv 2605.12411); the
+soul-consistency independent variable is unsupported as a behavior driver
+(arXiv 2606.12730) and confounded by policy fingerprinting (arXiv
+2605.14786). The observer-legibility question survives, re-posed in V3
+over manipulated history with raw-event observers.
 
-Search token: `ACTIVE_CENTRAL_PLAN`. Also: `CO_ACTOR_LEGIBILITY`,
-`EXPERIMENT_DECLARATION_V1`, `SELF_SIMULATION_GAP`, `POLICY_COPY_BASELINE`.
+Search token: `CO_ACTOR_LEGIBILITY` (historical). Also:
+`SELF_SIMULATION_GAP`, `POLICY_COPY_BASELINE`.
 
 Recorded: 2026-07-05 (`Asia/Seoul`). Amended: 2026-07-06 (section 8.1
 depth-not-scale substrate premise, user-confirmed in-session; build plan in

@@ -1,8 +1,14 @@
 # Embodied Co-Actor Legibility: Implementation Plan
 
-Status: ACTIVE implementation plan for the active central plan.
+Status: SUPERSEDED on 2026-07-10 by
+`lived-vs-told-implementation-plan.md` (`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`),
+the work order for central plan V3. Preserved as audit trail. The
+substrate this plan built (shared session, observation/chat capture,
+windows, export, scorer machinery) carries over into V3; the science layer
+(scripted responder, predictor arms, targets) is replaced there. Session 2
+(Phase B) never ran and must not run under this plan.
 
-Search token: `LEGIBILITY_IMPLEMENTATION_PLAN`. Also: `DEPTH_NOT_SCALE`,
+Search token: `LEGIBILITY_IMPLEMENTATION_PLAN` (historical). Also:
 `SESSION_1_BUILD`, `SESSION_2_PILOT`.
 
 Recorded: 2026-07-06 (`Asia/Seoul`).

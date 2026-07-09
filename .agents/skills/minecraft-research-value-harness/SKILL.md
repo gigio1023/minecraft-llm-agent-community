@@ -23,9 +23,10 @@ runtime authority.
 ## Quick Start
 
 1. Read the active central plan:
-   `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
+   `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
    and its build companion
-   `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+   `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`.
+   (The V2 co-actor legibility plan is superseded audit trail.)
 2. Read `references/protocol.md` for the end-to-end workflow.
 3. If the task asks "is this paper-worthy?", "what is the research gap?", or
    "what experiment should we run?", read `references/research-value-rubric.md`.

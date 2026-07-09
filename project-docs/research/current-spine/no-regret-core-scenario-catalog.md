@@ -1,7 +1,7 @@
 # No-Regret Core Scenario Catalog
 
 Status: active planning catalog for row-producing scenario pressure, serving
-the embodied co-actor legibility experiment (`ACTIVE_CENTRAL_PLAN`). This is
+the lived-vs-told experiment (`ACTIVE_CENTRAL_PLAN`). This is
 not a benchmark ladder, not a society demo script, and not a runtime
 implementation plan.
 
@@ -25,8 +25,8 @@ society-observable preflight, but they do not select that branch.
 
 Use with:
 
-- `central-plan-embodied-co-actor-legibility.md`
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-lived-vs-told-social-history.md`
+- `lived-vs-told-implementation-plan.md`
 - `transition-row-v1-contract.md`
 - `transition-row-label-codebook.md`
 - `society-observable-preflight.md`

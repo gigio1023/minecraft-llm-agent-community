@@ -1,10 +1,14 @@
 # Legibility Cycle 2 Work Plan — Live Substrate And Session 2 Pilot
 
-Status: active Tier 1 work order for the remaining
-`LEGIBILITY_IMPLEMENTATION_PLAN` slices.
+Status: SUPERSEDED on 2026-07-10 together with central plan V2. The Phase A
+substrate slices (C2-1..C2-7) landed and carry over into the V3 direction;
+Phase B (C2-8..C2-11, the Session 2 pilot) is cancelled and must not run.
+The C2-G gate failure is recorded as a verified V2 design defect, not a
+provider or environment blocker. Active work order:
+`lived-vs-told-implementation-plan.md`. Preserved as audit trail.
 
-Search token: `LEGIBILITY_CYCLE_2_WORK_PLAN`. Related: `DEPTH_NOT_SCALE`,
-`ACTIVE_CENTRAL_PLAN`, `SESSION_2_PILOT`.
+Search token: `LEGIBILITY_CYCLE_2_WORK_PLAN` (historical). Related:
+`DEPTH_NOT_SCALE`, `SESSION_2_PILOT`.
 
 Recorded: 2026-07-06 (`Asia/Seoul`), after verifying the merged cycle 1
 substrate (`feat: add co-actor legibility session substrate`).

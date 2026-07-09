@@ -11,8 +11,8 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `central-plan-embodied-co-actor-legibility.md`
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-lived-vs-told-social-history.md`
+- `lived-vs-told-implementation-plan.md`
 - `no-regret-core-scenario-catalog.md`
 - `transition-row-label-codebook.md`
 - `project-docs/specification/evidence-grounded-minecraft-society.md`

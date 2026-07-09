@@ -5,9 +5,12 @@ sidebar_position: 1
 # Overview
 
 `minecraft-llm-agent-community` is a small headless Minecraft runtime for
-studying embodied co-actor legibility: whether an observer model can predict a
-co-actor's next-turn social and material responses from public interaction
-history alone.
+studying causal social memory in embodied LLM co-actors: holding the current
+world state equivalent, does changing only an actor's social history with a
+partner change its actual material behavior; does it matter whether that
+history was lived (real episodes in its own memory) or merely told (an
+equivalent written summary); and can an outside observer read the effect
+from public events alone?
 
 The project is not a generic benchmark bot, a race-to-diamond agent, a large
 village simulator, or a revival of loose Voyager-style generated-code

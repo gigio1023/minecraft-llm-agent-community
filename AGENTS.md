@@ -98,39 +98,55 @@ Minecraft runtime. It is not a Voyager clone, a fastest-tech-tree benchmark, a
 house-building architecture, or a pre-committed village simulator.
 
 The active research plan is
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-(2026-07-05, user-approved; amended 2026-07-06 with the depth-not-scale
-premise). One preregistered experiment: can an observer model predict a
-soul-grounded co-actor's next-turn social-response and material-access
-labels from public interaction history alone, across
-disposition-consistency conditions (scripted positive control, stable soul,
-resampled-soul null), with held-out-family predictors and policy-copy /
-leakage baselines that can erase the claim. Stop-results K1-K8 are
-preregistered in that plan. The build order, seams, vertical slices, and
-acceptance gates live in
-`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-(`LEGIBILITY_IMPLEMENTATION_PLAN`).
+`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+(V3, 2026-07-10, user-approved; supersedes the 2026-07-05 co-actor
+legibility plan V2). One preregistered experiment with two coupled
+questions: holding the current Minecraft decision state equivalent, does
+changing ONLY a co-actor's partner-directed social history (prior help,
+permission, promise families) change its materially verified
+follow-through — and does the effect differ between ENACTED history (lived
+episodes, agent-written memory) and an information-equivalent NARRATED
+history? And can a held-out-family observer reading only raw public events
+(never prior labels) predict that behavior better than state-only,
+actor-id, policy-copy, and shuffled-history baselines? The actor-side
+history effect is a manipulation check (established in text-game
+literature); the headlines are the lived-vs-told gap and observer
+legibility. Stop-results L1-L8 are preregistered in that plan. The build
+order and acceptance gates live in
+`project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
+(`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`).
 
 Substrate premise (`DEPTH_NOT_SCALE`): the experiment presupposes a working
 2-3 actor shared session with cross-actor observation and chat capture,
-interaction density at the K6 floor, and longitudinal public history
-accumulated per responder. Actor-count scale is not a premise and never a
+material-stake interaction density, and matched history pairs accumulated
+per responder. Actor-count scale is not a premise and never a
 remedy for weak signal: do not scale actor count to hide a weak small-run
 result. Scale re-enters only as the deferred social-pattern branch (gated
 by `society-observable-preflight.md`) or as a post-positive-result
-generalization axis. Structurally information-poor small-N interaction is a
-K6/K7-shaped substrate failure, not a scale-up signal.
+generalization axis. Structurally information-poor small-N interaction is
+an L3/L7-shaped substrate failure, not a scale-up signal.
 
 Standing requirements:
 
 - produce truthful `transition-row/v1` records; labels come from runtime
   evidence, never from tool names, scenario text, or actor self-report;
+- `material_follow_through` flips only on typed
+  `material-access-evidence/v1`; chat, tool names, and prose never flip it;
+- matched pairs are interpreted only after the `state-equivalence/v1` hash
+  audit passes; deviations exclude the pair and are reported;
+- observers receive raw allowlisted public events strictly before the
+  decision slot; locked labels, predictions, and condition identifiers
+  never enter observer context;
+- all conditions within an experiment run the same base model and the same
+  fixed ActorSoul (`SAME_MODEL_RULE`); soul text is never an independent
+  variable;
 - social-response windows close only after each other active actor completed
   at least one subsequent Actor Turn slot or a preregistered timeout;
 - log `(state_before, executed_action, observed_delta)` independently of the
   actor's self-declared expected outcome;
-- keep prediction quality, acting outcome, physical competence, social
-  consequence, continuity, robustness, and efficiency separate in reports.
+- keep prediction quality, acting outcome (intent), physical competence
+  (execution), social consequence, continuity, robustness, and efficiency
+  separate in reports.
 
 The old F-native/F-loop/F-society branches are deferred under new names
 (trained-predictor / advisory-use / social-pattern); see the crosswalk in the

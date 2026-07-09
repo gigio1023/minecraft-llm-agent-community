@@ -5,32 +5,41 @@ sidebar_position: 5
 # Roadmap
 
 The project is rebuilding from a small reliable core rather than starting with a
-large village simulation. The active research target is embodied co-actor
-legibility: whether public interaction history makes another actor's
-social/material response more predictable than strong baselines.
+large village simulation. The active research target is lived-vs-told causal
+social memory: holding the current world state equivalent, does changing only
+an actor's social history with a partner change its material behavior; does
+lived history (enacted episodes) act differently than told history (an
+equivalent narration); and can an observer read the effect from public events
+alone?
 
 ## Current Target
 
 - a 2-3 actor shared Minecraft session;
-- per-actor provider routing, including deterministic scripted responders;
+- per-actor provider routing, including a history-dependent scripted
+  responder as the positive control;
 - cross-actor observation and chat capture;
-- response windows that close only after other actors have a real turn to
-  respond or a declared timeout fires;
+- matched-pair fixtures whose state equivalence is verified by hash before
+  interpretation;
+- history delivery at four rungs: none, narrated summary, narrated verbatim
+  log, and enacted episodes;
 - truthful `transition-row/v1` rows with observed deltas and evidence refs;
+- a binary material follow-through target read only from typed runtime
+  evidence, with intent and execution separated;
 - public-history export that excludes private ActorSoul, memory, PlanBeads, and
   provider IO;
-- offline prediction join and scoring after labels are locked.
+- observers that read raw public events only — never previously locked labels.
 
 ## Next Layer
 
-- Session 1: a provider-free deterministic end-to-end smoke with a scripted
-  responder and a trivial history predictor that should show lift;
-- Session 2: a preregistered live pilot across scripted, stable-soul, and
-  resampled-soul conditions;
+- Session A: a provider-free deterministic end-to-end smoke where the
+  history-dependent scripted responder must flip its behavior across matched
+  histories and a trivial raw-event observer must recover the flip;
+- Session B: a preregistered live pilot — narrated rungs first, then the
+  enacted rung, then held-out-family observer scoring;
 - decision artifacts that apply the preregistered stop-results before any public
   claim;
-- richer ActorSoul, memory, relationship, and generated action-skill work only
-  where it feeds the measured experiment.
+- richer memory, relationship, and generated action-skill work only where it
+  feeds the measured experiment.
 
 ## Deferred Investigation
 
@@ -51,7 +60,7 @@ social/material response more predictable than strong baselines.
 - hidden planner heuristics that make the actor look smarter than the evidence
   supports;
 - Qwen-AgentWorld, JarvisVLA, VLA, model training, or society-scale branches
-  before the legibility substrate produces a decision.
+  before the lived-vs-told experiment produces a decision.
 
 The public milestone is simple: a small runtime where observers can inspect what
 was public before an action, what happened afterward, which labels were locked,

@@ -83,11 +83,12 @@ The artifacts are documented in:
 
 The current project-level instances are:
 
-- `central-plan-embodied-co-actor-legibility.md` sections 11-12
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-lived-vs-told-social-history.md` sections 11-12
+- `lived-vs-told-implementation-plan.md`
 
-The 2026-06-29 prior-work and decision files are superseded audit trail unless a
-current Tier 1 document explicitly cites a detail from them.
+The 2026-06-29 prior-work and decision files, and the V2 instances inside
+`central-plan-embodied-co-actor-legibility.md`, are superseded audit trail
+unless a current Tier 1 document explicitly cites a detail from them.
 
 ## Decision Labels
 
@@ -102,7 +103,7 @@ Use these labels exactly:
 - `headline-candidate`: evidence after the preregistered test supports selecting
   or preserving the claim.
 
-Most ambitious claims before the Session 1 smoke and Session 2 preregistered
+Most ambitious claims before the Session A smoke and Session B preregistered
 batch should be `core-first`, not headline candidates.
 
 ## Minecraft-Specific Pressure
@@ -131,7 +132,7 @@ The harness looks for stronger claims:
 This document supports the active central plan:
 
 ```text
-project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md
+project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md
 ```
 
 The harness does not replace the central plan. It provides the review machinery
@@ -140,9 +141,9 @@ that should be used before changing it.
 The current order remains:
 
 ```text
-Session 1 provider-free deterministic smoke -> Session 2 preregistered live
-pilot -> research-decision/v1 -> branch deferral, confirming experiment, or
-preserved negative result
+Session A provider-free deterministic smoke (L1 gate) -> Session B
+preregistered live pilot -> research-decision/v1 -> branch deferral,
+confirming experiment, or preserved negative result
 ```
 
 The harness mainly improves how the project decides whether a proposed direction

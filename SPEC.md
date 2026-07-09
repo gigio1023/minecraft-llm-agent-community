@@ -1,17 +1,20 @@
 # SPEC
 
-Updated: 2026-06-18
+Updated: 2026-07-10
 
 This is the canonical gateway spec for the current rebuild.
 
-The active research direction is the **embodied co-actor legibility
-experiment**, defined in
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`:
-measuring whether observer models can predict soul-grounded co-actors'
-social-material responses from public interaction history alone, with
-disposition consistency as the manipulated variable. The build order and
+The active research direction is the **lived-vs-told experiment**
+(V3, 2026-07-10), defined in
+`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`:
+manipulating a co-actor's partner-directed social history against an
+equivalent Minecraft decision state, measuring materially verified
+follow-through, with the enacted-vs-narrated delivery gap and raw-event
+observer legibility as the two headline questions. The build order and
 acceptance gates live in
-`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+`project-docs/research/current-spine/lived-vs-told-implementation-plan.md`.
+The V2 co-actor legibility plan
+(`central-plan-embodied-co-actor-legibility.md`) is superseded audit trail.
 The substrate premise is depth, not scale (`DEPTH_NOT_SCALE`): a working
 2-3 actor shared session with dense, attributable, longitudinally
 accumulated interaction. Actor-count scale is not a premise and never a
@@ -230,12 +233,13 @@ Read these documents to understand the full spec:
 2. `project-docs/specification/soul-grounded-social-simulation.md`
    - Soul/ActorSoul identity, LifeGoal continuity, social context, and why
      Minecraft actions matter for social-material consequences.
-3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-   - active research plan: co-actor legibility experiment, conditions, arms,
-     metrics, stop-results, and build plan.
-     (`project-docs/specification/advisory-social-material-wam.md` is
-     historical; its verification-as-hygiene rule remains binding.)
-   - `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+3. `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+   - active research plan: lived-vs-told experiment, history families,
+     delivery ladder, observer arms, statistics, stop-results, and build
+     plan. (`central-plan-embodied-co-actor-legibility.md` and
+     `project-docs/specification/advisory-social-material-wam.md` are
+     historical; the verification-as-hygiene rule remains binding.)
+   - `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
      expands the build plan into seams, vertical slices, acceptance
      criteria, and testing rules.
 4. `project-docs/specification/runtime-evidence-and-action-skills.md`
@@ -297,10 +301,10 @@ Setup docs:
 ## 4. Non-Negotiable Direction
 
 - Soul/LifeGoal continuity is the top-level simulation frame.
-- The active research spine is the embodied co-actor legibility experiment
-  (`central-plan-embodied-co-actor-legibility.md`), not task completion,
-  evidence-first benchmarking, world-model branding, or civilization
-  spectacle.
+- The active research spine is the lived-vs-told experiment
+  (`central-plan-lived-vs-told-social-history.md`), not task completion,
+  evidence-first benchmarking, world-model branding, persona evaluation,
+  or civilization spectacle.
 - WorldEvents are event/context records, not raw observation and not a direct
   replacement for LifeGoal.
 - Runtime owns physical truth: validation, timeout, cancellation, execution,

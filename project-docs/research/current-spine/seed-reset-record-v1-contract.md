@@ -1,8 +1,8 @@
 # Seed Reset Record V1 Contract
 
-Status: active planning contract for seed/reset provenance under the embodied
-co-actor legibility experiment (`ACTIVE_CENTRAL_PLAN`; kept from the
-superseded no-regret program as load-bearing). This is not a runtime schema
+Status: active planning contract for seed/reset provenance under the
+lived-vs-told experiment (`ACTIVE_CENTRAL_PLAN`; kept as load-bearing
+across the superseded no-regret and V2 co-actor legibility programs). This is not a runtime schema
 yet and not a research contribution by itself.
 
 Search token: `SEED_RESET_RECORD_V1`.
@@ -11,8 +11,8 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `central-plan-embodied-co-actor-legibility.md`
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-lived-vs-told-social-history.md`
+- `lived-vs-told-implementation-plan.md`
 - `transition-row-v1-contract.md`
 - `no-regret-core-scenario-catalog.md`
 - `society-observable-preflight.md`

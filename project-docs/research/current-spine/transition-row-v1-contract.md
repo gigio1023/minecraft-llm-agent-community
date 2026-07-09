@@ -1,8 +1,8 @@
 # Transition Row V1 Contract
 
-Status: active planning contract for the embodied co-actor legibility
-experiment (`ACTIVE_CENTRAL_PLAN`; kept from the superseded no-regret program
-as load-bearing). This is not yet a runtime schema.
+Status: active planning contract for the lived-vs-told experiment
+(`ACTIVE_CENTRAL_PLAN`; kept as load-bearing across the superseded
+no-regret and V2 co-actor legibility programs). This is not yet a runtime schema.
 
 Search token: `TRANSITION_ROW_V1`.
 
@@ -280,7 +280,9 @@ only if it closes after every observed other active actor has completed at
 least one subsequent Actor Turn slot, or after a preregistered timeout.
 Windows closed on the immediate post-action observation are structurally
 vacuous and made every earlier control run close as `no_observable_response`.
-See `central-plan-embodied-co-actor-legibility.md` section 3.3.
+See `central-plan-lived-vs-told-social-history.md` (response windows are
+substrate hygiene and diagnostics under the V3 plan; the closure rule is
+unchanged).
 
 ## What Not To Do
 

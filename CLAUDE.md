@@ -8,8 +8,8 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-4. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+3. `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+4. `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
 5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 6. `project-docs/orientation/documentation-map.md`
 7. `project-docs/orientation/agent-search-index.md`
@@ -20,13 +20,17 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 
 ## Current Direction (pointer)
 
-Active target: the preregistered embodied co-actor legibility experiment
-(`ACTIVE_CENTRAL_PLAN`), built per the implementation plan
-(`LEGIBILITY_IMPLEMENTATION_PLAN`). Substrate premise is depth, not scale
-(`DEPTH_NOT_SCALE`): 2-3 actors, dense attributable interaction,
-longitudinal per-responder public history. Never scale actor count to
+Active target: the preregistered lived-vs-told experiment
+(`ACTIVE_CENTRAL_PLAN`, V3 2026-07-10): manipulated partner-directed
+social history against equivalent Minecraft decision state, with the
+enacted-vs-narrated delivery gap and raw-event observer legibility as the
+two headlines, built per the implementation plan
+(`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`). Substrate premise is depth, not
+scale (`DEPTH_NOT_SCALE`): 2-3 actors, dense attributable interaction,
+matched history pairs per responder. Never scale actor count to
 rescue weak signal. Standing requirements live in `AGENTS.md` (Current
-Direction) and the two plan docs above.
+Direction) and the two plan docs above. The V2 co-actor legibility plan is
+superseded audit trail; do not build or run from it.
 
 ## Use Repo-Local Agent Skills
 
