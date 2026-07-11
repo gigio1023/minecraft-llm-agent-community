@@ -7,6 +7,7 @@
  */
 
 import type { CapabilityPredicateResultV1 } from "./types.js";
+import type { CapabilityProgressSummary } from "../../runtime/goals/types.js";
 
 export const CAPABILITY_INTERPRETATION_STATUSES = [
   "passed",
@@ -121,6 +122,11 @@ export type IndividualCapabilityReportV1 = {
    * `runtime_status === "passed"` does not imply capability success.
    */
   runtime_status: CapabilityRuntimeStatusV1;
+  /**
+   * Runtime-recorded progress measurements copied from the raw social-cycle
+   * report. Never recomputed from provider prose.
+   */
+  capability_progress?: CapabilityProgressSummary;
   /** Capability evaluation status after target/milestone predicates. */
   interpretation_status: CapabilityInterpretationStatusV1;
   failure_class?: CapabilityFailureClassV1;

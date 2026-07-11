@@ -21,6 +21,8 @@ import { createEmptySocialCycleReport, finalizeRuntimeStatus } from "./goals/cyc
 import type {
   ActorCycleGoal,
   CapabilityCaseContext,
+  CapabilityProgressMeasurement,
+  CapabilityProgressSummary,
   CycleJudgment,
   SocialCycleProviderId,
   SocialCycleRunReport,
@@ -390,6 +392,13 @@ export type SocialCycleCaseBudgetStop = {
   };
 };
 
+/** Observer output only: no measurement counts or stop policy. */
+export type SocialCycleCapabilityProgressObservation = {
+  targetStatus: "passed" | "failed" | "unknown";
+  passedMilestoneIds: string[];
+  evidenceRefs: string[];
+};
+
 export type SocialCycleRunOptions = {
   actorId: string;
   providerId: SocialCycleProviderId;
@@ -448,6 +457,17 @@ export type SocialCycleRunOptions = {
     total_tokens: number;
     estimated_cost?: number;
   }>;
+  /**
+   * Optional progress observer for capability early completion. Called after a
+   * completed cycle is appended and before the next cycle starts. Must not own
+   * measurement persistence or stop policy.
+   */
+  observeCapabilityProgress?: (input: {
+    report: SocialCycleRunReport;
+    actorWorkspaceDir: string;
+  }) =>
+    | SocialCycleCapabilityProgressObservation
+    | Promise<SocialCycleCapabilityProgressObservation>;
   /** Test/debug hook invoked before starting a cycle or action; must honor signal. */
   beforeProviderOrRuntimeAction?: (input: {
     signal: AbortSignal;
@@ -771,6 +791,49 @@ function countReportRuntimeActions(report: SocialCycleRunReport): number {
     }
   }
   return count;
+}
+
+function sortUniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+}
+
+function applyCapabilityProgressObservation(input: {
+  report: SocialCycleRunReport;
+  observation: SocialCycleCapabilityProgressObservation;
+  measurement: Omit<CapabilityProgressMeasurement, "passed_milestone_ids" | "evidence_refs">;
+}): void {
+  const passedMilestoneIds = sortUniqueStrings(input.observation.passedMilestoneIds);
+  const evidenceRefs = sortUniqueStrings(input.observation.evidenceRefs);
+  const previous = input.report.capability_progress;
+  const summary: CapabilityProgressSummary = {
+    schema: "capability-progress-summary/v1",
+    latest_target_status: input.observation.targetStatus,
+    latest_passed_milestone_ids: passedMilestoneIds,
+    ...(previous?.first_measurable_progress
+      ? { first_measurable_progress: previous.first_measurable_progress }
+      : {}),
+    ...(previous?.target_completion ? { target_completion: previous.target_completion } : {})
+  };
+
+  const measurable =
+    input.observation.targetStatus === "passed" || passedMilestoneIds.length > 0;
+  if (measurable && !summary.first_measurable_progress) {
+    summary.first_measurable_progress = {
+      ...input.measurement,
+      passed_milestone_ids: passedMilestoneIds,
+      evidence_refs: evidenceRefs
+    };
+  }
+  if (input.observation.targetStatus === "passed" && !summary.target_completion) {
+    summary.target_completion = {
+      ...input.measurement,
+      passed_milestone_ids: passedMilestoneIds,
+      evidence_refs: evidenceRefs
+    };
+  }
+  input.report.capability_progress = summary;
 }
 
 async function defaultObserveCaseUsage(input: {
@@ -1228,6 +1291,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   let providerFailed = false;
   let anyMeaningfulProgress = false;
   let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
+  let earlyTargetCompleted = false;
   const nowMs = input.nowMs ?? (() => Date.now());
   const caseBudgetStartedAtMs = input.caseStartedAtMs ?? nowMs();
   const caseBudgetController = new AbortController();
@@ -2126,8 +2190,36 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.visual_evidence = visualEvidenceRecorder.manifest;
       }
 
-      // Long runs flush after each cycle so partial progress stays reviewable on failure.
+      // Flush the completed cycle before optional progress observation so a
+      // predicate/adapter failure cannot hide the appended cycle.
       await writeJson(input.reportPath, report);
+
+      if (input.observeCapabilityProgress) {
+        const actorWorkspaceDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
+        const progressObservation = await input.observeCapabilityProgress({
+          report,
+          actorWorkspaceDir
+        });
+        const observed = await collectCaseBudgetObserved();
+        applyCapabilityProgressObservation({
+          report,
+          observation: progressObservation,
+          measurement: {
+            cycle_count: observed.cycles,
+            runtime_action_count: observed.runtime_actions,
+            wall_time_ms: observed.wall_time_ms,
+            provider_requests: observed.provider_requests,
+            total_tokens: observed.total_tokens
+          }
+        });
+        await writeJson(input.reportPath, report);
+        // Budget stop retains priority when already recorded before target observation.
+        if (progressObservation.targetStatus === "passed" && !caseBudgetStop) {
+          earlyTargetCompleted = true;
+          anyMeaningfulProgress = true;
+          break;
+        }
+      }
     }
   } finally {
     const cleanupErrors: string[] = [];
@@ -2189,6 +2281,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     report.runtime_status = "timeout";
   } else if (providerFailed) {
     report.runtime_status = "failed";
+  } else if (earlyTargetCompleted && !environmentBlocked) {
+    // Target evidence stopped the case early; not a budget timeout or blocked exit.
+    report.runtime_status = "passed";
   }
 
   report.provider_usage = await summarizeProviderUsage({ repoRoot, runId });

@@ -13,11 +13,19 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { runSocialCycle } from "../../runtime/socialCycleRunner.js";
-import type { SocialCycleProviderId } from "../../runtime/goals/types.js";
+import type {
+  SocialCycleProviderId,
+  SocialCycleRunReport
+} from "../../runtime/goals/types.js";
+import type { SocialCycleCapabilityProgressObservation } from "../../runtime/socialCycleRunner.js";
 import { parseWorldScenarioId } from "../../server/worldScenarios.js";
 import { adaptSocialCycleReportToEvidenceBag } from "./evidenceBagAdapter.js";
 import { applyFurnaceObservationAdapter } from "./furnaceObservationAdapter.js";
 import { loadIndividualCapabilityManifestFromFile } from "./loader.js";
+import {
+  evaluateCapabilityMilestone,
+  evaluateCapabilityPredicate
+} from "./predicates.js";
 import { buildIndividualCapabilityReport } from "./report.js";
 import type { IndividualCapabilityReportV1 } from "./reportTypes.js";
 import type {
@@ -170,6 +178,16 @@ export type RunCapabilityCaseInput = {
       total_tokens: number;
       estimated_cost?: number;
     }>;
+    /**
+     * Test-only progress observer override. Production always uses
+     * `evaluateCapabilityCaseProgress`.
+     */
+    observeCapabilityProgress?: (input: {
+      report: SocialCycleRunReport;
+      actorWorkspaceDir: string;
+    }) =>
+      | SocialCycleCapabilityProgressObservation
+      | Promise<SocialCycleCapabilityProgressObservation>;
   };
 };
 
@@ -279,6 +297,55 @@ export function countRuntimeActions(report: {
     }
   }
   return count;
+}
+
+function sortUniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+}
+
+/**
+ * Production capability progress observer body. Adapts the current report,
+ * applies the furnace adapter, and returns only passed target/milestone facts.
+ * Provider prose, tool names, and scenario text are irrelevant.
+ */
+export function evaluateCapabilityCaseProgress(input: {
+  capabilityCase: IndividualCapabilityCaseV1;
+  report: SocialCycleRunReport;
+  actorDir: string;
+  artifactsByRef?: ReadonlyMap<string, unknown> | Record<string, unknown>;
+}): SocialCycleCapabilityProgressObservation {
+  const adaptInput = {
+    report: input.report,
+    actorDir: input.actorDir,
+    ...(input.artifactsByRef ? { artifactsByRef: input.artifactsByRef } : {})
+  };
+  const evidenceBag = applyFurnaceObservationAdapter(
+    adaptSocialCycleReportToEvidenceBag(adaptInput),
+    adaptInput
+  );
+  const target = evaluateCapabilityPredicate(input.capabilityCase.target, evidenceBag);
+  const milestoneResults = input.capabilityCase.milestones.map((milestone) => ({
+    milestone_id: milestone.milestone_id,
+    result: evaluateCapabilityMilestone(milestone, evidenceBag)
+  }));
+  const passedMilestoneIds = sortUniqueStrings(
+    milestoneResults
+      .filter((entry) => entry.result.status === "passed")
+      .map((entry) => entry.milestone_id)
+  );
+  const evidenceRefs = sortUniqueStrings([
+    ...(target.status === "passed" ? target.evidence_refs : []),
+    ...milestoneResults
+      .filter((entry) => entry.result.status === "passed")
+      .flatMap((entry) => entry.result.evidence_refs)
+  ]);
+  return {
+    targetStatus: target.status,
+    passedMilestoneIds,
+    evidenceRefs
+  };
 }
 
 /**
@@ -593,6 +660,14 @@ export async function runCapabilityCase(
     () => caseController.abort(),
     effectiveBudgets.max_wall_time_ms
   );
+  const observeCapabilityProgress =
+    input.testHooks?.observeCapabilityProgress ??
+    ((progressInput: { report: SocialCycleRunReport; actorWorkspaceDir: string }) =>
+      evaluateCapabilityCaseProgress({
+        capabilityCase,
+        report: progressInput.report,
+        actorDir: progressInput.actorWorkspaceDir
+      }));
   let socialResult: Awaited<ReturnType<typeof runSocialCycle>>;
   try {
     socialResult = await runSocialCycle({
@@ -628,6 +703,7 @@ export async function runCapabilityCase(
           ? { max_estimated_cost: effectiveBudgets.max_estimated_cost }
           : {})
       },
+      observeCapabilityProgress,
       ...(input.testHooks?.nowMs ? { nowMs: input.testHooks.nowMs } : {}),
       ...(input.testHooks?.beforeProviderOrRuntimeAction
         ? { beforeProviderOrRuntimeAction: input.testHooks.beforeProviderOrRuntimeAction }

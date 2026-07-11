@@ -158,6 +158,29 @@ export type CapabilityCaseContext = {
   manifest_hash: string;
 };
 
+/** Usage and evidence snapshot recorded when capability progress is first observed. */
+export type CapabilityProgressMeasurement = {
+  cycle_count: number;
+  runtime_action_count: number;
+  wall_time_ms: number;
+  provider_requests: number;
+  total_tokens: number;
+  passed_milestone_ids: string[];
+  evidence_refs: string[];
+};
+
+/**
+ * Raw-report progress summary for early completion measurement.
+ * First measurement points are write-once; latest_* may update later.
+ */
+export type CapabilityProgressSummary = {
+  schema: "capability-progress-summary/v1";
+  latest_target_status: "passed" | "failed" | "unknown";
+  latest_passed_milestone_ids: string[];
+  first_measurable_progress?: CapabilityProgressMeasurement;
+  target_completion?: CapabilityProgressMeasurement;
+};
+
 export type GeneratedActionSkillCandidate = {
   schema: "generated-action-skill-candidate/v1";
   proposed_skill_id: string;
@@ -310,6 +333,8 @@ export type SocialCycleRunReport = {
     reasoning: string;
   };
   capability_case_context?: CapabilityCaseContext;
+  /** Runtime-recorded capability progress; never derived from provider prose. */
+  capability_progress?: CapabilityProgressSummary;
   action_hot_path?: "actor_turn";
   provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";

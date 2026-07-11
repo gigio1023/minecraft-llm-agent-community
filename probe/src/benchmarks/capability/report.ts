@@ -427,6 +427,9 @@ export function buildIndividualCapabilityReport(
     target,
     milestones,
     runtime_status: report.runtime_status,
+    ...(report.capability_progress
+      ? { capability_progress: report.capability_progress }
+      : {}),
     interpretation_status,
     ...(failure_class ? { failure_class } : {}),
     ...(interpretation.next_diagnostic_action

@@ -78,6 +78,7 @@ export {
   deriveMaxActionsPerCycle,
   evaluateBudgetExhaustion,
   evaluateCaseBudgetCeilings,
+  evaluateCapabilityCaseProgress,
   hashCapabilityManifest,
   isProviderFree,
   readImplementationRevision,
