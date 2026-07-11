@@ -22,6 +22,13 @@ export type RunActionInput<TValue> = {
   action: (signal: AbortSignal) => Promise<TValue> | TValue;
   timeoutPolicy?: ActionTimeoutPolicy;
   timeoutMs?: number;
+  /**
+   * Case/run abort. On external abort, abort the action and await its settlement
+   * instead of returning while Minecraft/provider work continues.
+   * Tool-timeout still uses Promise.race (existing behavior); case budgets must
+   * not copy that early-return pattern at the runner level.
+   */
+  externalSignal?: AbortSignal;
 };
 
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -80,7 +87,8 @@ export async function runAction<TValue>({
   tool,
   action,
   timeoutPolicy = DEFAULT_TIMEOUT_POLICY,
-  timeoutMs = timeoutForTool(tool, timeoutPolicy)
+  timeoutMs = timeoutForTool(tool, timeoutPolicy),
+  externalSignal
 }: RunActionInput<TValue>): Promise<ActionRunnerResult<TValue>> {
   const startTime = Date.now();
   const controller = new AbortController();
@@ -93,6 +101,22 @@ export async function runAction<TValue>({
     durationMs: Date.now() - startTime,
     timeoutMs
   });
+
+  if (externalSignal?.aborted) {
+    return finish({
+      tool,
+      ok: false,
+      status: "cancelled",
+      message: "Action cancelled by external abort signal before start",
+      timedOut: false,
+      cancelled: true
+    });
+  }
+
+  const onExternalAbort = () => {
+    controller.abort();
+  };
+  externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
 
   try {
     const timeout = new Promise<ActionRunnerResult<TValue>>((resolve) => {
@@ -136,10 +160,17 @@ export async function runAction<TValue>({
         })
       );
 
-    return await Promise.race([execution, timeout]);
+    const result = await Promise.race([execution, timeout]);
+    // Case-budget external abort: await in-flight cleanup instead of returning
+    // while the primitive continues. Tool-timeout early return is unchanged.
+    if (externalSignal?.aborted) {
+      await execution.catch(() => undefined);
+    }
+    return result;
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
+    externalSignal?.removeEventListener("abort", onExternalAbort);
   }
 }

@@ -280,6 +280,8 @@ export async function runSocialCycleTurnCore(input: {
   otherBots?: readonly Bot[];
   chatEvents?: readonly ObserveChatEvent[];
   providerConfig?: TurnProviderConfig;
+  /** Case-budget abort; threaded into action execution for abort+await cleanup. */
+  signal?: AbortSignal;
 }): Promise<SocialCycleTurnCoreResult> {
   const planner = await runSocialActorTurnProvider({
     providerId: input.providerId,
@@ -335,7 +337,8 @@ export async function runSocialCycleTurnCore(input: {
     bot: input.bot,
     targetBot: input.targetBot,
     ...(input.otherBots ? { otherBots: input.otherBots } : {}),
-    ...(input.chatEvents ? { chatEvents: input.chatEvents } : {})
+    ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
+    ...(input.signal ? { signal: input.signal } : {})
   });
   const retryAttempt = buildRuntimeRetryAttempt({
     actorId: input.actorId,

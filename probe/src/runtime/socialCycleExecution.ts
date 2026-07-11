@@ -1029,6 +1029,7 @@ async function executePrimitiveWithEvidence(input: {
   chatEvents?: readonly ObserveChatEvent[];
   gate: ActiveActionSkillGate;
   allowActionSkillFallback: boolean;
+  signal?: AbortSignal;
 }): Promise<{
   toolResult: JsonValue;
   evidenceRef: string;
@@ -1179,7 +1180,8 @@ async function executePrimitiveWithEvidence(input: {
         ...(input.otherBots ? { otherBots: input.otherBots } : {}),
         ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
         signal
-      })
+      }),
+    ...(input.signal ? { externalSignal: input.signal } : {})
   });
   const toolResult = actionResult.ok
     ? (actionResult.value as JsonValue)
@@ -1663,6 +1665,8 @@ export async function executeActorTurnAction(input: {
   targetBot?: Bot;
   otherBots?: readonly Bot[];
   chatEvents?: readonly ObserveChatEvent[];
+  /** Case-budget abort threaded into runAction for abort+await cleanup. */
+  signal?: AbortSignal;
 }): Promise<SocialCycleExecutionResult> {
   const observation = await observeActorWorld({
     actorId: input.actorId,
@@ -2019,7 +2023,8 @@ export async function executeActorTurnAction(input: {
       ...(input.otherBots ? { otherBots: input.otherBots } : {}),
       ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
       gate,
-      allowActionSkillFallback: input.action.kind === "use_action_skill"
+      allowActionSkillFallback: input.action.kind === "use_action_skill",
+      ...(input.signal ? { signal: input.signal } : {})
     });
     evidenceRefs.push(step.evidenceRef);
     executedTools.push(primitive);

@@ -72,9 +72,11 @@ export {
   CAPABILITY_CASE_DECLARATION_SCHEMA,
   CAPABILITY_SUITE_INDEX_SCHEMA,
   CapabilityRunnerError,
+  applyCapabilityBudgetOverrides,
   countRuntimeActions,
   deriveMaxActionsPerCycle,
   evaluateBudgetExhaustion,
+  evaluateCaseBudgetCeilings,
   hashCapabilityManifest,
   isProviderFree,
   readImplementationRevision,
@@ -86,6 +88,8 @@ export {
   stableJsonStringify
 } from "./runner.js";
 export type {
+  CapabilityBudgetDimensionV1,
+  CapabilityBudgetObservedCountsV1,
   CapabilityBudgetStatusV1,
   CapabilityCaseDeclarationV1,
   CapabilitySuiteIndexRunV1,

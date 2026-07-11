@@ -362,6 +362,33 @@ export async function resolveServerEndpoint(
   return { host: live.host, port: live.port, mode: "live_smoke", stop: async () => {} };
 }
 
+export type SocialCycleCaseBudgets = {
+  max_wall_time_ms: number;
+  max_provider_requests?: number;
+  max_total_tokens?: number;
+  max_estimated_cost?: number;
+};
+
+export type SocialCycleCaseBudgetStop = {
+  exhausted_dimensions: Array<
+    | "wall_time"
+    | "provider_requests"
+    | "total_tokens"
+    | "estimated_cost"
+    | "cycles"
+    | "runtime_actions"
+  >;
+  cost_unverifiable: boolean;
+  observed: {
+    cycles: number;
+    runtime_actions: number;
+    wall_time_ms: number;
+    provider_requests: number;
+    total_tokens: number;
+    estimated_cost?: number;
+  };
+};
+
 export type SocialCycleRunOptions = {
   actorId: string;
   providerId: SocialCycleProviderId;
@@ -397,11 +424,38 @@ export type SocialCycleRunOptions = {
   deterministicActorTurnPrimitives?: string[];
   /** Optional bot-view screenshots for human review; visual evidence never grants progress authority. */
   visualEvidence?: VisualEvidenceOptions;
+  /**
+   * External abort for case-level budget stopping. Prefer abort + await in-flight
+   * work; do not race the whole run against a timer that returns early.
+   */
+  signal?: AbortSignal;
+  /** Manifest/case ceilings checked before each new provider or runtime action. */
+  caseBudgets?: SocialCycleCaseBudgets;
+  /** Optional clock for deterministic wall-time tests. */
+  nowMs?: () => number;
+  /**
+   * Optional usage observer. Default reads run-scoped ledger totals.
+   * estimated_cost is omitted unless a real normalized cost source exists.
+   * ponytail: no USD invention; replace when provider usage gains a cost field.
+   */
+  observeCaseUsage?: () => Promise<{
+    requests: number;
+    total_tokens: number;
+    estimated_cost?: number;
+  }>;
+  /** Test/debug hook invoked before starting a cycle or action; must honor signal. */
+  beforeProviderOrRuntimeAction?: (input: {
+    signal: AbortSignal;
+    phase: "cycle" | "action";
+    cycleIndex: number;
+    actionIndex?: number;
+  }) => Promise<void>;
 };
 
 export type SocialCycleRunResult = {
   report: SocialCycleRunReport;
   reportPath: string;
+  caseBudgetStop?: SocialCycleCaseBudgetStop;
 };
 
 export function selectGeminiModelForCall(input: {
@@ -653,6 +707,75 @@ async function seedSharedStorageSocialSmokeInventory(input: {
 
 function sharedStorageSocialSmokeSummary(actorId: string) {
   return `npc_a requests that ${actorId} deposit one oak_log into shared storage before npc_a trusts ${actorId}'s next progress claim.`;
+}
+
+function countReportRuntimeActions(report: SocialCycleRunReport): number {
+  let count = 0;
+  for (const cycle of report.cycles) {
+    if (cycle.action_attempts && cycle.action_attempts.length > 0) {
+      count += cycle.action_attempts.length;
+    }
+  }
+  return count;
+}
+
+async function defaultObserveCaseUsage(input: {
+  repoRoot: string;
+  runId: string;
+}): Promise<{ requests: number; total_tokens: number; estimated_cost?: number }> {
+  const summary = await summarizeProviderUsage({
+    repoRoot: input.repoRoot,
+    runId: input.runId
+  });
+  let requests = 0;
+  let total_tokens = 0;
+  for (const entry of summary.totals) {
+    requests += entry.usage.requests;
+    total_tokens += entry.usage.total_tokens;
+  }
+  // ProviderUsageRecord has no cost field — never invent USD here.
+  return { requests, total_tokens };
+}
+
+function evaluateRuntimeCaseBudgetStop(input: {
+  caseBudgets: SocialCycleCaseBudgets;
+  observed: SocialCycleCaseBudgetStop["observed"];
+}): SocialCycleCaseBudgetStop | null {
+  const exhausted_dimensions: SocialCycleCaseBudgetStop["exhausted_dimensions"] = [];
+  let cost_unverifiable = false;
+
+  if (input.observed.wall_time_ms >= input.caseBudgets.max_wall_time_ms) {
+    exhausted_dimensions.push("wall_time");
+  }
+  if (
+    input.caseBudgets.max_provider_requests !== undefined &&
+    input.observed.provider_requests >= input.caseBudgets.max_provider_requests
+  ) {
+    exhausted_dimensions.push("provider_requests");
+  }
+  if (
+    input.caseBudgets.max_total_tokens !== undefined &&
+    input.observed.total_tokens >= input.caseBudgets.max_total_tokens
+  ) {
+    exhausted_dimensions.push("total_tokens");
+  }
+  if (input.caseBudgets.max_estimated_cost !== undefined) {
+    if (input.observed.estimated_cost === undefined) {
+      cost_unverifiable = true;
+      exhausted_dimensions.push("estimated_cost");
+    } else if (input.observed.estimated_cost >= input.caseBudgets.max_estimated_cost) {
+      exhausted_dimensions.push("estimated_cost");
+    }
+  }
+
+  if (exhausted_dimensions.length === 0) {
+    return null;
+  }
+  return {
+    exhausted_dimensions,
+    cost_unverifiable,
+    observed: input.observed
+  };
 }
 
 export async function runSocialCycle(input: SocialCycleRunOptions): Promise<SocialCycleRunResult> {
@@ -1047,6 +1170,99 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
   let providerFailed = false;
   let anyMeaningfulProgress = false;
+  let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
+  let wallTimeStopped = false;
+  const nowMs = input.nowMs ?? (() => Date.now());
+  const caseBudgetStartedAtMs = nowMs();
+  const caseBudgetController = new AbortController();
+  const onExternalAbort = () => {
+    if (!caseBudgetController.signal.aborted) {
+      caseBudgetController.abort();
+    }
+  };
+  if (input.signal?.aborted) {
+    caseBudgetController.abort();
+  } else if (input.signal) {
+    input.signal.addEventListener("abort", onExternalAbort, { once: true });
+  }
+  let wallDeadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  if (input.caseBudgets?.max_wall_time_ms !== undefined) {
+    wallDeadlineTimer = setTimeout(() => {
+      if (!caseBudgetController.signal.aborted) {
+        caseBudgetController.abort();
+      }
+    }, input.caseBudgets.max_wall_time_ms);
+  }
+  const observeUsage =
+    input.observeCaseUsage ??
+    (() => defaultObserveCaseUsage({ repoRoot, runId }));
+
+  const collectCaseBudgetObserved = async (): Promise<
+    SocialCycleCaseBudgetStop["observed"]
+  > => {
+    const usage = await observeUsage();
+    return {
+      cycles: report.cycles.length,
+      runtime_actions: countReportRuntimeActions(report),
+      wall_time_ms: Math.max(0, nowMs() - caseBudgetStartedAtMs),
+      provider_requests: usage.requests,
+      total_tokens: usage.total_tokens,
+      ...(usage.estimated_cost !== undefined
+        ? { estimated_cost: usage.estimated_cost }
+        : {})
+    };
+  };
+
+  const checkCaseBudgetBeforeWork = async (): Promise<boolean> => {
+    if (!input.caseBudgets) {
+      return caseBudgetController.signal.aborted;
+    }
+    const observed = await collectCaseBudgetObserved();
+    const stop = evaluateRuntimeCaseBudgetStop({
+      caseBudgets: input.caseBudgets,
+      observed
+    });
+    if (stop) {
+      caseBudgetStop = stop;
+      if (stop.exhausted_dimensions.includes("wall_time")) {
+        wallTimeStopped = true;
+      }
+      if (!caseBudgetController.signal.aborted) {
+        caseBudgetController.abort();
+      }
+      return true;
+    }
+    if (caseBudgetController.signal.aborted) {
+      // Deadline/external abort without a prior ceiling snapshot.
+      const abortedStop = evaluateRuntimeCaseBudgetStop({
+        caseBudgets: input.caseBudgets,
+        observed: {
+          ...observed,
+          wall_time_ms: Math.max(
+            observed.wall_time_ms,
+            input.caseBudgets.max_wall_time_ms
+          )
+        }
+      });
+      caseBudgetStop =
+        abortedStop ??
+        ({
+          exhausted_dimensions: ["wall_time"],
+          cost_unverifiable: false,
+          observed: {
+            ...observed,
+            wall_time_ms: Math.max(
+              observed.wall_time_ms,
+              input.caseBudgets.max_wall_time_ms
+            )
+          }
+        } satisfies SocialCycleCaseBudgetStop);
+      wallTimeStopped = true;
+      return true;
+    }
+    return false;
+  };
+
   let previousCycleJudgment: {
     ref: string;
     judgment: CycleJudgment;
@@ -1073,6 +1289,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     const allowedSkillIds = executableActiveSkills.map((s) => s.skill_id);
 
     for (let cycleIndex = 0; !environmentBlocked && cycleIndex < input.cycles; cycleIndex++) {
+      if (await checkCaseBudgetBeforeWork()) {
+        break;
+      }
+      if (input.beforeProviderOrRuntimeAction) {
+        await input.beforeProviderOrRuntimeAction({
+          signal: caseBudgetController.signal,
+          phase: "cycle",
+          cycleIndex
+        });
+        if (await checkCaseBudgetBeforeWork()) {
+          break;
+        }
+      }
       const cycleId = `cycle-${String(cycleIndex + 1).padStart(4, "0")}`;
       const worldEvents = await listWorldEvents(rootDir, input.actorId, { runId });
       const strategicGoals = await listStrategicGoals(rootDir, input.actorId);
@@ -1439,6 +1668,20 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       const actionAttempts: SocialCycleActionAttemptReport[] = [];
 
       for (let actionIndex = 0; actionIndex < input.maxActionsPerCycle; actionIndex++) {
+        if (await checkCaseBudgetBeforeWork()) {
+          break;
+        }
+        if (input.beforeProviderOrRuntimeAction) {
+          await input.beforeProviderOrRuntimeAction({
+            signal: caseBudgetController.signal,
+            phase: "action",
+            cycleIndex,
+            actionIndex
+          });
+          if (await checkCaseBudgetBeforeWork()) {
+            break;
+          }
+        }
         const actionTurnId = `${cycleId}-action-${String(actionIndex + 1).padStart(2, "0")}`;
         const actionRetryConstraints = deriveRuntimeRetryConstraints({
           actorId: input.actorId,
@@ -1502,6 +1745,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             status: "unknown"
           }
         });
+        // Abort + await: never Promise.race the turn against the case deadline.
         const turnCore = await runSocialCycleTurnCore({
           providerId: input.providerId,
           actorWorkspaceRootDir: rootDir,
@@ -1529,8 +1773,12 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             openAi,
             gemini: geminiForProviderCall(),
             modelScope
-          }
+          },
+          signal: caseBudgetController.signal
         });
+        if (caseBudgetController.signal.aborted) {
+          await checkCaseBudgetBeforeWork();
+        }
 
         if (turnCore.status === "provider_contract_rejection") {
           lastActionRef = turnCore.attempt.action_ref;
@@ -1813,6 +2061,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         error: `Post-run cleanup failed: ${cleanupErrors.join("; ")}`
       };
     }
+    if (wallDeadlineTimer) {
+      clearTimeout(wallDeadlineTimer);
+      wallDeadlineTimer = undefined;
+    }
+    input.signal?.removeEventListener("abort", onExternalAbort);
   }
 
   report.agency_status.gameplay_progress_verified = anyMeaningfulProgress;
@@ -1827,9 +2080,16 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
   if (providerFailed) {
     report.runtime_status = "failed";
+  } else if (wallTimeStopped || caseBudgetStop?.exhausted_dimensions.includes("wall_time")) {
+    // Case wall-time stop is distinct from actor incompetence or provider failure.
+    report.runtime_status = "timeout";
   }
 
   report.provider_usage = await summarizeProviderUsage({ repoRoot, runId });
   await writeJson(input.reportPath, report);
-  return { report, reportPath: input.reportPath };
+  return {
+    report,
+    reportPath: input.reportPath,
+    ...(caseBudgetStop ? { caseBudgetStop } : {})
+  };
 }

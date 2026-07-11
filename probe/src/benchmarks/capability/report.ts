@@ -95,17 +95,20 @@ function providerUsageTotals(
 
 function observedBudgets(
   report: SocialCycleRunReport,
-  usage: CapabilityProviderUsageTotalsV1 | undefined
+  usage: CapabilityProviderUsageTotalsV1 | undefined,
+  wallTimeMs?: number
 ): CapabilityBudgetObservedV1 {
   return {
     cycles: report.cycles.length,
     runtime_actions: countRuntimeActions(report),
+    ...(wallTimeMs !== undefined ? { wall_time_ms: wallTimeMs } : {}),
     ...(usage
       ? {
           provider_requests: usage.requests,
           total_tokens: usage.total_tokens
         }
       : {})
+    // estimated_cost omitted unless a real normalized cost source exists.
   };
 }
 

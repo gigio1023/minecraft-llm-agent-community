@@ -61,18 +61,34 @@ export type CapabilityCaseDeclarationV1 = {
   declared_at: string;
 };
 
+export type CapabilityBudgetDimensionV1 =
+  | "cycles"
+  | "runtime_actions"
+  | "wall_time"
+  | "provider_requests"
+  | "total_tokens"
+  | "estimated_cost";
+
+export type CapabilityBudgetObservedCountsV1 = {
+  cycles: number;
+  runtime_actions: number;
+  wall_time_ms?: number;
+  provider_requests?: number;
+  total_tokens?: number;
+  estimated_cost?: number;
+};
+
 export type CapabilityBudgetStatusV1 = {
   schema: typeof CAPABILITY_BUDGET_STATUS_SCHEMA;
   case_id: string;
   capability_run_id: string;
   budget_exhausted: boolean;
-  exhausted_dimensions: Array<"cycles" | "runtime_actions">;
+  exhausted_dimensions: CapabilityBudgetDimensionV1[];
+  /** True when max_estimated_cost is declared but USD cannot be derived from usage. */
+  cost_unverifiable: boolean;
   target_passed: boolean;
   declared: IndividualCapabilityCaseV1["budgets"];
-  observed: {
-    cycles: number;
-    runtime_actions: number;
-  };
+  observed: CapabilityBudgetObservedCountsV1;
 };
 
 export type CapabilitySuiteIndexRunV1 = {
@@ -122,6 +138,35 @@ export type RunCapabilityCaseInput = {
   cycles?: number;
   maxActionsPerCycle?: number;
   implementationRevision?: string | null;
+  /**
+   * Optional ceiling tighteners for smoke/debug. May only lower declared
+   * ceilings or introduce optional request/token/cost ceilings; never raise.
+   */
+  budgetOverrides?: {
+    max_wall_time_ms?: number;
+    max_provider_requests?: number;
+    max_total_tokens?: number;
+    max_estimated_cost?: number;
+  };
+  /**
+   * Provider-free test hooks. Production callers leave this undefined.
+   * ponytail: hooks are the ceiling for deterministic budget probes; replace
+   * with real ledger/cost sources when normalized USD usage exists.
+   */
+  testHooks?: {
+    nowMs?: () => number;
+    beforeProviderOrRuntimeAction?: (input: {
+      signal: AbortSignal;
+      phase: "cycle" | "action";
+      cycleIndex: number;
+      actionIndex?: number;
+    }) => Promise<void>;
+    observeCaseUsage?: () => Promise<{
+      requests: number;
+      total_tokens: number;
+      estimated_cost?: number;
+    }>;
+  };
 };
 
 export type RunCapabilityCaseResult = {
@@ -232,24 +277,155 @@ export function countRuntimeActions(report: {
   return count;
 }
 
+/**
+ * Pure post-run (or mid-run) budget evaluation from declared ceilings and
+ * observed counts. Cost is never invented: when max_estimated_cost is set and
+ * USD cannot be derived, cost_unverifiable is true and estimated_cost exhausts.
+ */
 export function evaluateBudgetExhaustion(input: {
   declared: IndividualCapabilityCaseV1["budgets"];
-  observedCycles: number;
-  observedRuntimeActions: number;
+  observed: CapabilityBudgetObservedCountsV1;
   targetPassed: boolean;
+  /** Explicit marker when cost cannot be derived from normalized usage. */
+  costUncomputable?: boolean;
 }): {
   budget_exhausted: boolean;
-  exhausted_dimensions: Array<"cycles" | "runtime_actions">;
+  exhausted_dimensions: CapabilityBudgetDimensionV1[];
+  cost_unverifiable: boolean;
 } {
-  const exhausted_dimensions: Array<"cycles" | "runtime_actions"> = [];
-  if (input.observedCycles >= input.declared.max_cycles) {
+  const ceilings = evaluateCaseBudgetCeilings({
+    declared: input.declared,
+    observed: input.observed,
+    costUncomputable: input.costUncomputable
+  });
+  const budget_exhausted = ceilings.shouldStop && !input.targetPassed;
+  return {
+    budget_exhausted,
+    exhausted_dimensions: ceilings.exhausted_dimensions,
+    cost_unverifiable: ceilings.cost_unverifiable
+  };
+}
+
+/**
+ * Pre-action ceiling check. Call before starting a new provider request or
+ * runtime action so a case stops without beginning unbound work.
+ */
+export function evaluateCaseBudgetCeilings(input: {
+  declared: IndividualCapabilityCaseV1["budgets"];
+  observed: CapabilityBudgetObservedCountsV1;
+  costUncomputable?: boolean;
+}): {
+  shouldStop: boolean;
+  exhausted_dimensions: CapabilityBudgetDimensionV1[];
+  cost_unverifiable: boolean;
+} {
+  const exhausted_dimensions: CapabilityBudgetDimensionV1[] = [];
+  let cost_unverifiable = false;
+
+  if (input.observed.cycles >= input.declared.max_cycles) {
     exhausted_dimensions.push("cycles");
   }
-  if (input.observedRuntimeActions >= input.declared.max_runtime_actions) {
+  if (input.observed.runtime_actions >= input.declared.max_runtime_actions) {
     exhausted_dimensions.push("runtime_actions");
   }
-  const budget_exhausted = exhausted_dimensions.length > 0 && !input.targetPassed;
-  return { budget_exhausted, exhausted_dimensions };
+  if (
+    input.observed.wall_time_ms !== undefined &&
+    input.observed.wall_time_ms >= input.declared.max_wall_time_ms
+  ) {
+    exhausted_dimensions.push("wall_time");
+  }
+  if (
+    input.declared.max_provider_requests !== undefined &&
+    (input.observed.provider_requests ?? 0) >= input.declared.max_provider_requests
+  ) {
+    exhausted_dimensions.push("provider_requests");
+  }
+  if (
+    input.declared.max_total_tokens !== undefined &&
+    (input.observed.total_tokens ?? 0) >= input.declared.max_total_tokens
+  ) {
+    exhausted_dimensions.push("total_tokens");
+  }
+  if (input.declared.max_estimated_cost !== undefined) {
+    const cost = input.observed.estimated_cost;
+    if (input.costUncomputable || cost === undefined) {
+      // Never guess USD. A declared cost ceiling without computable cost cannot
+      // be enforced, so the case stops as unverifiable rather than running open-ended.
+      cost_unverifiable = true;
+      exhausted_dimensions.push("estimated_cost");
+    } else if (cost >= input.declared.max_estimated_cost) {
+      exhausted_dimensions.push("estimated_cost");
+    }
+  }
+
+  return {
+    shouldStop: exhausted_dimensions.length > 0,
+    exhausted_dimensions,
+    cost_unverifiable
+  };
+}
+
+export function applyCapabilityBudgetOverrides(
+  declared: IndividualCapabilityCaseV1["budgets"],
+  overrides: RunCapabilityCaseInput["budgetOverrides"]
+): IndividualCapabilityCaseV1["budgets"] {
+  if (!overrides) {
+    return { ...declared };
+  }
+  const next: IndividualCapabilityCaseV1["budgets"] = { ...declared };
+
+  if (overrides.max_wall_time_ms !== undefined) {
+    if (
+      !Number.isInteger(overrides.max_wall_time_ms) ||
+      overrides.max_wall_time_ms <= 0 ||
+      overrides.max_wall_time_ms > declared.max_wall_time_ms
+    ) {
+      throw new CapabilityRunnerError(
+        `budgetOverrides.max_wall_time_ms must be a positive integer no greater than declared max_wall_time_ms (${declared.max_wall_time_ms})`
+      );
+    }
+    next.max_wall_time_ms = overrides.max_wall_time_ms;
+  }
+  if (overrides.max_provider_requests !== undefined) {
+    if (
+      !Number.isInteger(overrides.max_provider_requests) ||
+      overrides.max_provider_requests <= 0 ||
+      (declared.max_provider_requests !== undefined &&
+        overrides.max_provider_requests > declared.max_provider_requests)
+    ) {
+      throw new CapabilityRunnerError(
+        "budgetOverrides.max_provider_requests must be a positive integer that does not raise the declared ceiling"
+      );
+    }
+    next.max_provider_requests = overrides.max_provider_requests;
+  }
+  if (overrides.max_total_tokens !== undefined) {
+    if (
+      !Number.isInteger(overrides.max_total_tokens) ||
+      overrides.max_total_tokens <= 0 ||
+      (declared.max_total_tokens !== undefined &&
+        overrides.max_total_tokens > declared.max_total_tokens)
+    ) {
+      throw new CapabilityRunnerError(
+        "budgetOverrides.max_total_tokens must be a positive integer that does not raise the declared ceiling"
+      );
+    }
+    next.max_total_tokens = overrides.max_total_tokens;
+  }
+  if (overrides.max_estimated_cost !== undefined) {
+    if (
+      !Number.isFinite(overrides.max_estimated_cost) ||
+      overrides.max_estimated_cost <= 0 ||
+      (declared.max_estimated_cost !== undefined &&
+        overrides.max_estimated_cost > declared.max_estimated_cost)
+    ) {
+      throw new CapabilityRunnerError(
+        "budgetOverrides.max_estimated_cost must be a positive finite number that does not raise the declared ceiling"
+      );
+    }
+    next.max_estimated_cost = overrides.max_estimated_cost;
+  }
+  return next;
 }
 
 export function readImplementationRevision(
@@ -338,21 +514,25 @@ export async function runCapabilityCase(
     repoRoot,
     input.implementationRevision
   );
-  const cycles = input.cycles ?? capabilityCase.budgets.max_cycles;
+  const effectiveBudgets = applyCapabilityBudgetOverrides(
+    capabilityCase.budgets,
+    input.budgetOverrides
+  );
+  const cycles = input.cycles ?? effectiveBudgets.max_cycles;
   const maxActionsPerCycle =
-    input.maxActionsPerCycle ?? deriveMaxActionsPerCycle(capabilityCase.budgets);
-  if (!Number.isInteger(cycles) || cycles <= 0 || cycles > capabilityCase.budgets.max_cycles) {
+    input.maxActionsPerCycle ?? deriveMaxActionsPerCycle(effectiveBudgets);
+  if (!Number.isInteger(cycles) || cycles <= 0 || cycles > effectiveBudgets.max_cycles) {
     throw new CapabilityRunnerError(
-      `cycles must be a positive integer no greater than declared max_cycles (${capabilityCase.budgets.max_cycles})`
+      `cycles must be a positive integer no greater than declared max_cycles (${effectiveBudgets.max_cycles})`
     );
   }
   if (
     !Number.isInteger(maxActionsPerCycle) ||
     maxActionsPerCycle <= 0 ||
-    cycles * maxActionsPerCycle > capabilityCase.budgets.max_runtime_actions
+    cycles * maxActionsPerCycle > effectiveBudgets.max_runtime_actions
   ) {
     throw new CapabilityRunnerError(
-      `cycles * maxActionsPerCycle must not exceed declared max_runtime_actions (${capabilityCase.budgets.max_runtime_actions})`
+      `cycles * maxActionsPerCycle must not exceed declared max_runtime_actions (${effectiveBudgets.max_runtime_actions})`
     );
   }
   const repeatIndex = input.repeatIndex ?? 0;
@@ -373,7 +553,7 @@ export async function runCapabilityCase(
     manifest_hash: manifestHash,
     world_scenario_id: worldScenarioId,
     seed,
-    budgets: { ...capabilityCase.budgets },
+    budgets: { ...effectiveBudgets },
     provider: {
       provider_id: providerId,
       model
@@ -411,7 +591,26 @@ export async function runCapabilityCase(
     isolateWorkspace: false,
     worldScenario: worldScenarioId,
     worldSeed: seed,
-    repoRoot
+    repoRoot,
+    caseBudgets: {
+      max_wall_time_ms: effectiveBudgets.max_wall_time_ms,
+      ...(effectiveBudgets.max_provider_requests !== undefined
+        ? { max_provider_requests: effectiveBudgets.max_provider_requests }
+        : {}),
+      ...(effectiveBudgets.max_total_tokens !== undefined
+        ? { max_total_tokens: effectiveBudgets.max_total_tokens }
+        : {}),
+      ...(effectiveBudgets.max_estimated_cost !== undefined
+        ? { max_estimated_cost: effectiveBudgets.max_estimated_cost }
+        : {})
+    },
+    ...(input.testHooks?.nowMs ? { nowMs: input.testHooks.nowMs } : {}),
+    ...(input.testHooks?.beforeProviderOrRuntimeAction
+      ? { beforeProviderOrRuntimeAction: input.testHooks.beforeProviderOrRuntimeAction }
+      : {}),
+    ...(input.testHooks?.observeCaseUsage
+      ? { observeCaseUsage: input.testHooks.observeCaseUsage }
+      : {})
     // Intentionally no benchmarkTask: V4 reports require the manifest path.
   });
 
@@ -435,7 +634,10 @@ export async function runCapabilityCase(
   let normalizedReport = buildIndividualCapabilityReport({
     suite_id: manifest.suite_id,
     suite_version: manifest.version,
-    case: capabilityCase,
+    case: {
+      ...capabilityCase,
+      budgets: effectiveBudgets
+    },
     report: socialResult.report,
     evidence_bag: evidenceBag,
     manifest_hash: manifestHash,
@@ -445,22 +647,88 @@ export async function runCapabilityCase(
     generated_at: new Date().toISOString()
   });
 
+  const stopObserved = socialResult.caseBudgetStop?.observed;
   const observedRuntimeActions = countRuntimeActions(socialResult.report);
+  const observed: CapabilityBudgetObservedCountsV1 = {
+    cycles: socialResult.report.cycles.length,
+    runtime_actions: observedRuntimeActions,
+    wall_time_ms:
+      stopObserved?.wall_time_ms ??
+      normalizedReport.budgets.observed.wall_time_ms,
+    provider_requests:
+      stopObserved?.provider_requests ??
+      normalizedReport.budgets.observed.provider_requests ??
+      0,
+    total_tokens:
+      stopObserved?.total_tokens ?? normalizedReport.budgets.observed.total_tokens ?? 0,
+    ...(stopObserved?.estimated_cost !== undefined
+      ? { estimated_cost: stopObserved.estimated_cost }
+      : normalizedReport.budgets.observed.estimated_cost !== undefined
+        ? { estimated_cost: normalizedReport.budgets.observed.estimated_cost }
+        : {})
+  };
+  const costUncomputable =
+    effectiveBudgets.max_estimated_cost !== undefined &&
+    observed.estimated_cost === undefined;
   const budgetEval = evaluateBudgetExhaustion({
-    declared: capabilityCase.budgets,
-    observedCycles: socialResult.report.cycles.length,
-    observedRuntimeActions,
-    targetPassed: normalizedReport.target.status === "passed"
+    declared: effectiveBudgets,
+    observed,
+    targetPassed: normalizedReport.target.status === "passed",
+    costUncomputable
   });
 
-  if (budgetEval.budget_exhausted) {
-    const note = `Budget exhausted without target pass (${budgetEval.exhausted_dimensions.join(", ")}).`;
+  if (budgetEval.budget_exhausted || budgetEval.cost_unverifiable) {
+    const note = budgetEval.cost_unverifiable
+      ? "Budget cost ceiling unverifiable: max_estimated_cost is declared but USD cannot be derived from normalized usage (never invent cost)."
+      : `Budget exhausted without target pass (${budgetEval.exhausted_dimensions.join(", ")}).`;
     normalizedReport = {
       ...normalizedReport,
+      budgets: {
+        ...normalizedReport.budgets,
+        observed: {
+          ...normalizedReport.budgets.observed,
+          ...observed
+        }
+      },
       diagnostic_notes: [...normalizedReport.diagnostic_notes, note].sort((a, b) =>
         a.localeCompare(b)
       )
     };
+  } else {
+    normalizedReport = {
+      ...normalizedReport,
+      budgets: {
+        ...normalizedReport.budgets,
+        observed: {
+          ...normalizedReport.budgets.observed,
+          ...observed
+        }
+      }
+    };
+  }
+
+  if (budgetEval.cost_unverifiable) {
+    normalizedReport = {
+      ...normalizedReport,
+      interpretation_status: "unverifiable",
+      failure_class: "unverifiable",
+      next_diagnostic_action:
+        "Supply a normalized usage cost source or remove max_estimated_cost until cost is computable."
+    };
+  } else if (budgetEval.budget_exhausted) {
+    // Distinguish budget stop from provider/runtime failure labels that early
+    // exit would otherwise inherit from incomplete cycles.
+    if (
+      normalizedReport.failure_class === "runtime_execution_failed" ||
+      normalizedReport.failure_class === "provider_blocked"
+    ) {
+      normalizedReport = {
+        ...normalizedReport,
+        failure_class: "no_measurable_progress",
+        next_diagnostic_action:
+          "Budget exhausted; inspect budget-status.json exhausted_dimensions before attributing actor or provider failure."
+      };
+    }
   }
 
   const budgetStatus: CapabilityBudgetStatusV1 = {
@@ -469,12 +737,10 @@ export async function runCapabilityCase(
     capability_run_id: capabilityRunId,
     budget_exhausted: budgetEval.budget_exhausted,
     exhausted_dimensions: budgetEval.exhausted_dimensions,
+    cost_unverifiable: budgetEval.cost_unverifiable,
     target_passed: normalizedReport.target.status === "passed",
-    declared: { ...capabilityCase.budgets },
-    observed: {
-      cycles: socialResult.report.cycles.length,
-      runtime_actions: observedRuntimeActions
-    }
+    declared: { ...effectiveBudgets },
+    observed
   };
 
   await writeJson(normalizedReportPath, normalizedReport);
