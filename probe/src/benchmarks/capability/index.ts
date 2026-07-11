@@ -33,3 +33,33 @@ export {
   evaluateCapabilityMilestone,
   evaluateCapabilityPredicate
 } from "./predicates.js";
+
+export type {
+  CapabilityBlockerRecordV1,
+  CapabilityBudgetObservedV1,
+  CapabilityFailureClassV1,
+  CapabilityInterpretationStatusV1,
+  CapabilityMilestoneReportV1,
+  CapabilityProviderUsageTotalsV1,
+  CapabilityRuntimeStatusV1,
+  CapabilityStallRecordV1,
+  IndividualCapabilityReportV1
+} from "./reportTypes.js";
+
+export {
+  CAPABILITY_FAILURE_CLASSES,
+  CAPABILITY_INTERPRETATION_STATUSES
+} from "./reportTypes.js";
+
+export {
+  isRootSafeRelativeRef,
+  resolveRootSafeArtifactRef,
+  resolveUnderDeclaredRoots
+} from "./artifactRefs.js";
+export type { RootSafeResolveResult } from "./artifactRefs.js";
+
+export { adaptSocialCycleReportToEvidenceBag } from "./evidenceBagAdapter.js";
+export type { AdaptSocialCycleEvidenceBagInput } from "./evidenceBagAdapter.js";
+
+export { buildIndividualCapabilityReport } from "./report.js";
+export type { BuildIndividualCapabilityReportInput } from "./report.js";

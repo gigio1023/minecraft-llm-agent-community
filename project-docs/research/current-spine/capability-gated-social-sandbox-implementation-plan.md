@@ -445,22 +445,33 @@ Evidence:
 
 ### Slice A2 — Normalized Report Adapter
 
+Status: **accepted** (2026-07-11). Provider-free; offline adapter over saved
+`social-cycle-run-report/v1` artifacts. No live server or provider call.
+
 Deliver:
 
 - `individual-capability-report/v1` builder;
 - adapter from current `social-cycle-run-report/v1` and actor workspace refs;
 - target, milestone, budget, provider-usage, stall, blocker, and failure results;
+- root-safe artifact ref resolution;
 - explicit import of the current furnace observation path as a case-specific
-  adapter, not generic schema authority.
+  adapter, not generic schema authority (furnace metrics remain unused by the
+  generic builder).
 
 Acceptance:
 
-- clean runtime exit without target evidence reports `failed` or
+- [x] clean runtime exit without target evidence reports `failed` or
   `unverifiable`, never `passed`;
-- partial milestones never imply target completion;
-- fixture setup evidence is not credited as actor progress;
-- report refs resolve inside the declared artifact roots;
-- repeated normalization of the same artifacts is deterministic.
+- [x] partial milestones never imply target completion;
+- [x] fixture setup evidence is not credited as actor progress;
+- [x] report refs resolve inside the declared artifact roots;
+- [x] repeated normalization of the same artifacts is deterministic.
+
+Evidence:
+
+- modules: `probe/src/benchmarks/capability/{reportTypes,artifactRefs,evidenceBagAdapter,report}.ts`
+- tests: `probe/test/individualCapabilityReport.test.ts`
+- validation: focused A2 tests 10/10; A1R+A2 39/39; `bun run typecheck`
 
 ### Slice A3 — Capability Runner Wrapper
 
