@@ -1,5 +1,5 @@
 /**
- * Provider-free offline smoke for the V4 capability runner (Slice A3).
+ * Provider-free offline smoke for the V4 capability runner (Step A3).
  *
  * Uses deterministic-social with connectToWorld=false. Overrides cycles to keep
  * the suite fast while still exercising declaration → raw → normalized → index.
@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   CAPABILITY_CASE_DECLARATION_SCHEMA,
   CAPABILITY_SUITE_INDEX_SCHEMA,
+  countRuntimeActions,
   hashCapabilityManifest,
   loadIndividualCapabilityManifestFromFile,
   runCapabilityCase
@@ -138,5 +139,33 @@ test("capability runner exits conceptually on unknown case", async () => {
         implementationRevision: null
       }),
     /not found/i
+  );
+});
+
+test("runtime action counting does not invent one action for an empty cycle", () => {
+  assert.equal(
+    countRuntimeActions({
+      cycles: [{ action_attempts: [] }, {}, { action_attempts: [{}, {}] }]
+    }),
+    2
+  );
+});
+
+test("capability runner rejects debug overrides beyond declared action budgets", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-runner-budget-"));
+  await assert.rejects(
+    () =>
+      runCapabilityCase({
+        manifestPath,
+        caseId: "collect_logs",
+        outDir,
+        providerId: "deterministic-social",
+        connectToWorld: false,
+        cycles: 20,
+        maxActionsPerCycle: 3,
+        repoRoot,
+        implementationRevision: null
+      }),
+    /max_runtime_actions/i
   );
 });

@@ -385,6 +385,7 @@ function validateAllowedEvidenceKinds(
     return;
   }
 
+  const seen = new Set<string>();
   for (const [index, entry] of value.entries()) {
     if (!nonEmptyString(entry)) {
       errors.push(`${path}[${index}] must be a non-empty string`);
@@ -400,7 +401,52 @@ function validateAllowedEvidenceKinds(
       errors.push(
         `${path}[${index}] '${entry}' is not a closed capability evidence kind (${CAPABILITY_ALLOWED_EVIDENCE_KINDS.join(", ")})`
       );
+    } else if (seen.has(entry)) {
+      errors.push(`${path}[${index}] duplicates evidence kind '${entry}'`);
+    } else {
+      seen.add(entry);
     }
+  }
+}
+
+function validatePredicateEvidenceCoverage(
+  value: unknown,
+  allowedKinds: ReadonlySet<string>,
+  path: string,
+  errors: string[]
+): void {
+  if (!isRecord(value) || typeof value.op !== "string") {
+    return;
+  }
+  if (value.op === "all" || value.op === "any") {
+    if (Array.isArray(value.children)) {
+      for (const [index, child] of value.children.entries()) {
+        validatePredicateEvidenceCoverage(child, allowedKinds, `${path}.children[${index}]`, errors);
+      }
+    }
+    return;
+  }
+  const requireExact = (kind: string) => {
+    if (!allowedKinds.has(kind)) {
+      errors.push(`${path} requires allowed_evidence_kinds to include '${kind}'`);
+    }
+  };
+  const requireOneOf = (kinds: string[]) => {
+    if (!kinds.some((kind) => allowedKinds.has(kind))) {
+      errors.push(`${path} requires one of allowed_evidence_kinds: ${kinds.join(", ")}`);
+    }
+  };
+  if (value.op === "item_count_gte") {
+    requireExact("inventory");
+  } else if (value.op === "held_item_is") {
+    requireExact("held_item");
+  } else if (value.op === "container_item_count_gte") {
+    requireExact("container");
+  } else if (value.op === "block_observed_at") {
+    requireOneOf(["block_observation", "settlement", "tool_attempt"]);
+  } else if (value.op === "position_within") {
+    requireExact("actor_position");
+    requireOneOf(["block_observation", "settlement", "tool_attempt"]);
   }
 }
 
@@ -456,6 +502,24 @@ function validateCase(value: unknown, path: string, errors: string[]): void {
   }
 
   validateAllowedEvidenceKinds(value.allowed_evidence_kinds, `${path}.allowed_evidence_kinds`, errors);
+  const allowedKinds = new Set(
+    Array.isArray(value.allowed_evidence_kinds)
+      ? value.allowed_evidence_kinds.filter((entry): entry is string => typeof entry === "string")
+      : []
+  );
+  validatePredicateEvidenceCoverage(value.target, allowedKinds, `${path}.target`, errors);
+  if (Array.isArray(value.milestones)) {
+    for (const [index, milestone] of value.milestones.entries()) {
+      if (isRecord(milestone)) {
+        validatePredicateEvidenceCoverage(
+          milestone.predicate,
+          allowedKinds,
+          `${path}.milestones[${index}].predicate`,
+          errors
+        );
+      }
+    }
+  }
 
   const seedPolicy = assertRecord(value, "seed_policy", path, errors);
   if (seedPolicy) {

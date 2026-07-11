@@ -10,7 +10,7 @@ import {
 import type { InterdependentSocialScenarioV1 } from "./types.js";
 
 /**
- * Checked-in Slice C2 interdependent scenario families.
+ * Checked-in Step C2 interdependent scenario families.
  * Paths are relative to `probe/benchmarks/social/`.
  */
 export const SOCIAL_SCENARIO_FAMILY_ENTRIES = [

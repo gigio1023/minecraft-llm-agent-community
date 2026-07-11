@@ -1,4 +1,4 @@
-/** Contract tests for individual-capability-manifest/v1 loader and suite. */
+/** Tests for the individual-capability-manifest/v1 loader and suite. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -276,6 +276,18 @@ test("reviewed handoff counterexample fails closed end-to-end", () => {
   assert.ok(result.errors.some((error) => error.includes("provider_rationale")));
   assert.ok(result.errors.some((error) => /seeds must not be present when kind is 'fresh'/i.test(error)));
   assert.ok(result.errors.some((error) => error.includes("strategy")));
+});
+
+test("allowed evidence kinds must cover every target and milestone predicate", () => {
+  const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
+  const poisoned = structuredClone(manifest) as unknown as Record<string, unknown>;
+  const cases = poisoned.cases as Array<Record<string, unknown>>;
+  cases[0]!.allowed_evidence_kinds = ["tool_attempt"];
+  const result = validateIndividualCapabilityManifest(poisoned);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.errors.some((error) => /requires allowed_evidence_kinds.*inventory/i.test(error)));
+  }
 });
 
 test("loadIndividualCapabilityManifestFromFile throws on invalid fixture", () => {

@@ -4,6 +4,8 @@
 
 import { readFileSync } from "node:fs";
 
+import { isRootSafeRelativeRef } from "../capability/artifactRefs.js";
+
 import type {
   PhenomenonCatalogIndexV1,
   PhenomenonRecordV1,
@@ -41,7 +43,6 @@ const recordKeys = [
   "title",
   "status",
   "record_kind",
-  "is_research_result",
   "observation_class",
   "pattern",
   "scenario_versions",
@@ -78,7 +79,6 @@ const catalogEntryKeys = [
   "title",
   "status",
   "record_kind",
-  "is_research_result",
   "observation_class",
   "pattern",
   "scenario_ids",
@@ -158,12 +158,6 @@ function assertString(record: Record<string, unknown>, key: string, path: string
   }
 }
 
-function assertBoolean(record: Record<string, unknown>, key: string, path: string, errors: string[]) {
-  if (typeof record[key] !== "boolean") {
-    errors.push(`${path}.${key} must be a boolean`);
-  }
-}
-
 function assertStringArray(value: unknown, path: string, errors: string[], allowEmpty = true): void {
   if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string" && entry.length > 0)) {
     errors.push(`${path} must be a string array of non-empty strings`);
@@ -171,6 +165,28 @@ function assertStringArray(value: unknown, path: string, errors: string[], allow
   }
   if (!allowEmpty && value.length === 0) {
     errors.push(`${path} must be a non-empty string array`);
+  }
+}
+
+function assertArtifactRefArray(
+  value: unknown,
+  path: string,
+  errors: string[],
+  allowEmpty = false
+): void {
+  assertStringArray(value, path, errors, allowEmpty);
+  if (!Array.isArray(value)) {
+    return;
+  }
+  for (const [index, entry] of value.entries()) {
+    if (!nonEmptyString(entry)) {
+      continue;
+    }
+    if (/^[a-z][a-z0-9+.-]*:/i.test(entry) || !isRootSafeRelativeRef(entry)) {
+      errors.push(
+        `${path}[${index}] must be a root-safe relative artifact ref, not an absolute path, URI, or '..' escape`
+      );
+    }
   }
 }
 
@@ -386,7 +402,14 @@ export function validatePhenomenonRecord(value: unknown): PhenomenonRecordValida
   assertString(value, "title", "PhenomenonRecord", errors);
   assertString(value, "pattern", "PhenomenonRecord", errors);
   assertString(value, "proposed_control", "PhenomenonRecord", errors);
-  assertBoolean(value, "is_research_result", "PhenomenonRecord", errors);
+  if (
+    nonEmptyString(value.phenomenon_id) &&
+    !/^[a-z0-9][a-z0-9._-]*$/.test(value.phenomenon_id)
+  ) {
+    errors.push(
+      "PhenomenonRecord.phenomenon_id must use lowercase letters, digits, dots, underscores, or hyphens"
+    );
+  }
 
   if (!includesString(PHENOMENON_STATUSES, value.status)) {
     errors.push(
@@ -405,9 +428,9 @@ export function validatePhenomenonRecord(value: unknown): PhenomenonRecordValida
   }
 
   if (value.record_kind === "fixture") {
-    if (value.is_research_result !== false) {
+    if (value.status === "selected_for_followup") {
       errors.push(
-        "PhenomenonRecord.is_research_result must be false when record_kind is 'fixture' (fixtures are not research results)"
+        "PhenomenonRecord fixtures cannot be selected_for_followup; select only a real observation record"
       );
     }
     if (
@@ -424,12 +447,6 @@ export function validatePhenomenonRecord(value: unknown): PhenomenonRecordValida
         "PhenomenonRecord.pattern for fixtures must state that the record is a fixture, not a research result"
       );
     }
-  }
-
-  if (value.is_research_result === true && value.record_kind === "fixture") {
-    errors.push(
-      "PhenomenonRecord cannot be both a fixture and a research result"
-    );
   }
 
   if (value.status === "selected_for_followup") {
@@ -469,30 +486,27 @@ export function validatePhenomenonRecord(value: unknown): PhenomenonRecordValida
     "PhenomenonRecord.scenario_versions",
     errors
   );
-  assertStringArray(value.run_refs, "PhenomenonRecord.run_refs", errors, false);
+  assertArtifactRefArray(value.run_refs, "PhenomenonRecord.run_refs", errors);
   assertStringArray(value.seeds, "PhenomenonRecord.seeds", errors, false);
   assertStringArray(value.actor_ids, "PhenomenonRecord.actor_ids", errors, false);
-  assertStringArray(
+  assertArtifactRefArray(
     value.material_stake_refs,
     "PhenomenonRecord.material_stake_refs",
-    errors,
-    true
+    errors
   );
-  assertStringArray(
+  assertArtifactRefArray(
     value.opportunity_refs,
     "PhenomenonRecord.opportunity_refs",
-    errors,
-    true
+    errors
   );
-  assertStringArray(value.evidence_refs, "PhenomenonRecord.evidence_refs", errors, true);
-  assertStringArray(
+  assertArtifactRefArray(value.evidence_refs, "PhenomenonRecord.evidence_refs", errors);
+  assertArtifactRefArray(
     value.visual_segment_refs,
     "PhenomenonRecord.visual_segment_refs",
-    errors,
-    true
+    errors
   );
-  assertStringArray(value.capability_refs, "PhenomenonRecord.capability_refs", errors, false);
-  assertStringArray(value.continuity_refs, "PhenomenonRecord.continuity_refs", errors, false);
+  assertArtifactRefArray(value.capability_refs, "PhenomenonRecord.capability_refs", errors);
+  assertArtifactRefArray(value.continuity_refs, "PhenomenonRecord.continuity_refs", errors);
 
   const actorIds = new Set<string>();
   if (Array.isArray(value.actor_ids)) {
@@ -547,7 +561,6 @@ function validateCatalogEntry(value: unknown, path: string, errors: string[]): v
   assertString(value, "title", path, errors);
   assertString(value, "pattern", path, errors);
   assertString(value, "record_ref", path, errors);
-  assertBoolean(value, "is_research_result", path, errors);
 
   if (!includesString(PHENOMENON_STATUSES, value.status)) {
     errors.push(`${path}.status must be one of: ${PHENOMENON_STATUSES.join(", ")}`);
@@ -573,7 +586,20 @@ function validateCatalogEntry(value: unknown, path: string, errors: string[]): v
     "capability_refs",
     "continuity_refs"
   ] as const) {
-    assertStringArray(value[key], `${path}.${key}`, errors, true);
+    if (
+      key === "scenario_ids" ||
+      key === "scenario_versions" ||
+      key === "seeds" ||
+      key === "actor_ids" ||
+      key === "models"
+    ) {
+      assertStringArray(value[key], `${path}.${key}`, errors, true);
+    } else {
+      assertArtifactRefArray(value[key], `${path}.${key}`, errors, true);
+    }
+  }
+  if (nonEmptyString(value.record_ref)) {
+    assertArtifactRefArray([value.record_ref], `${path}.record_ref`, errors);
   }
 
   if (!isNonNegativeInteger(value.recurrence_numerator)) {

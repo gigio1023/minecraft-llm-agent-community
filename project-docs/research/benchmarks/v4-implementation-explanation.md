@@ -1,4 +1,4 @@
-# V4 Capability-Gated Social Sandbox — Implementation Explanation
+# V4 Capability-First Social Sandbox — Implementation Explanation
 
 Search token: `V4_IMPLEMENTATION_EXPLANATION_2026_07_11`.
 
@@ -10,24 +10,25 @@ This page explains **what was built in this handoff wave, why, and what is
 still blocked**. It is an implementation/reference note, not a replacement for
 the central research plan.
 
-## 1. Highest accepted milestone
+## 1. Current verified scope
 
-Provider-free substrate through **D1 schemas/fixtures** is landed and tested.
+Provider-free code reaches D1 data formats and fixtures. This does not mean the
+research program or live behavior path is complete.
 
-| Slice | Status | Meaning |
+| Step | Status | Meaning |
 | --- | --- | --- |
 | A1R | accepted | Evidence-rule repair of A1 |
 | A2 | accepted | Normalized capability report adapter |
-| A3 | accepted | Capability CLI + provider-free smoke |
+| A3 | partial | Capability CLI + provider-free smoke; several declared limits are not runtime stops yet |
 | A4 | accepted | Basic suite 1.1.0 → later 1.2.0 with B1 |
 | A5 | **blocked** | Needs exact provider/model + preflight + approval |
 | B1 | accepted | Multi-hop furnace case (manifest-owned) |
-| B2 | accepted | Goal-continuity offline evaluator |
+| B2 | partial | Offline evaluator works; strict saved-evidence loader still missing |
 | B3 | declarations only | Live runs blocked pending approval |
-| C1 | accepted | Interdependent social scenario declaration |
-| C2 | accepted | Economic / cooperative / quest families |
-| C3 | accepted | Long-run observation bundle (offline) |
-| D1 | accepted | Phenomenon catalog + fixture record |
+| C1 | declaration only | Interdependent social scenario format; all checked-in capability requirements are gaps |
+| C2 | declaration only | Economic, cooperative, and quest scenario files; no live session |
+| C3 | format only | Long-run bundle writer/index and fixture; no live capture |
+| D1 | writer/index only | Phenomenon catalog and clearly labeled fixture record |
 | D2 | **not started** | Requires user-selected D1 phenomenon |
 
 **Do not call V4 complete.** Live capability batches (A5), live continuity runs
@@ -42,7 +43,7 @@ or keep goals continuous. The build order therefore:
 1. make individual competence measurable with typed targets and real evidence;
 2. normalize reports so clean process exit cannot fake success;
 3. run cases through one declaration-first CLI;
-4. add multi-hop and continuity contracts offline;
+4. add multi-hop cases and continuity evaluation offline;
 5. declare interdependent social scenarios without scripting response;
 6. define joinable long-run observation and a phenomenon catalog.
 
@@ -51,7 +52,7 @@ via `evidence_kind_seen` was **replaced**, not papered over (`ZERO_COST_IMPLEMEN
 
 ## 3. Commits in order (this wave)
 
-| Commit | Slice |
+| Commit | Step |
 | --- | --- |
 | `2d8dd0f1` | A1R — repair evidence rules |
 | `e6c511ae` | A2 — report adapter |
@@ -127,17 +128,41 @@ C1/C2 declare asymmetry, activities, and interaction opportunities. They do not
 require cooperation, refusal, or partner choice. Opportunity observation enums
 keep absent / ignored / attempted / verified distinct for later reports.
 
-### Phenomenon promotion is human-gated
+### Only an explicit reviewer decision can select a follow-up
 
 D1 writers default to `candidate`. `selected_for_followup` requires explicit
 `reviewer_decision` from `user` or `delegated_reviewer`. The checked-in record
 is a **fixture**, not a research result.
 
-## 6. Validation evidence
+## 6. Review corrections
+
+The whole implementation review found several cases where a valid schema could
+still overstate what had been observed. The code now handles them as follows:
+
+- a restart-required continuity case cannot pass from one open PlanBead or
+  Active Episode; it needs distinct before/after durable reload refs and at
+  least one matching open work id;
+- checkpoint conflicts come from typed version fields, not words in a reason
+  string;
+- checked-in social scenarios no longer point at a capability manifest as if it
+  were current-run capability evidence;
+- a numeric long-run metric needs at least one structured evidence ref, and run
+  timestamps must be valid ISO date-times;
+- a long-run bundle with no structured source refs is rejected;
+- phenomenon records no longer carry a manually set `is_research_result`
+  boolean; fixture/observation kind, status, recurrence, and evidence refs carry
+  the actual distinctions;
+- capability runner debug overrides cannot exceed the declared total action
+  budget, and empty cycles no longer count as actions;
+- A3 remains partial because wall-time, provider-request, token, and cost limits
+  are recorded but do not yet stop the case at those manifest-specific limits.
+
+## 7. Validation evidence
 
 ```bash
-cd probe && bun test          # 675 pass (at landing)
+cd probe && bun test          # 688 pass after whole-implementation review
 cd probe && bun run typecheck
+cd docs && npm run build
 git diff --check
 ```
 
@@ -145,26 +170,26 @@ Provider-free smoke: `probe/test/capabilityRunnerSmoke.test.ts`.
 
 No live provider HTTP was used in this wave.
 
-## 7. Still blocked / awaiting user
+## 8. Still blocked / awaiting user
 
-1. **A5** — choose exact `(provider_id, model)`, estimate tokens/RPM, run
-   `provider-quota-preflight`, approve, then run a declared batch.
-2. **B3 live** — same gate for continuity cases (declarations exist).
+1. **A3/A5** — first connect all manifest-specific limits to runtime stopping;
+   then choose exact `(provider_id, model)`, estimate tokens/RPM, run
+   `provider-quota-preflight`, approve, and run a declared batch.
+2. **B3 live** — the same approval requirement applies to continuity cases.
 3. **Live C2/C3 runs** — multi-actor Minecraft + video capture after capability
    evidence for prerequisites exists.
 4. **D2** — only after you select a real D1 candidate (not the fixture).
 5. **Push / PR** — not done unless you ask.
 
-## 8. Next smallest action
+## 9. Next smallest action
 
-If continuing without a provider yet: wire a continuity offline smoke CLI
-mirroring A3, or harden C3 metric writers against real multi-actor report
-fixtures.
+If continuing without a provider yet: add the strict B2 saved-evidence loader
+and a runtime writer for typed restart observations.
 
-If ready for live work: approve one A5 `(provider, model, budget)` and run
-`provider-quota-preflight` first.
+If preparing for live work: finish the A3 stopping behavior first. After that,
+approve one A5 `(provider, model, budget)` and run `provider-quota-preflight`.
 
-## 9. Related docs
+## 10. Related docs
 
 - Central plan: `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
 - Implementation plan: `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`

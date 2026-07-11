@@ -1,4 +1,4 @@
-/** Contract tests for long-run-observation-bundle/v1 (Slice C3). */
+/** Tests for long-run-observation-bundle/v1 (Step C3). */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -261,4 +261,75 @@ test("pixels_are_review_only must stay true", () => {
   if (!result.ok) {
     assert.ok(result.errors.some((error) => /pixels_are_review_only/.test(error)));
   }
+});
+
+test("numeric metrics require structured evidence refs", () => {
+  const bad = cloneFixture();
+  const metrics = bad.metrics as Record<string, Array<Record<string, unknown>>>;
+  const point = metrics.action?.[0];
+  assert.ok(point);
+  if (!point) {
+    return;
+  }
+  point.value = 1;
+  point.evidence_refs = [];
+  const result = validateLongRunObservationBundle(bad);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.errors.some((error) => /evidence_refs.*non-empty/i.test(error)));
+  }
+});
+
+test("join and run timestamps must be real ISO date-times", () => {
+  const bad = cloneFixture();
+  (bad.run_declaration as Record<string, unknown>).started_at = "sometime tomorrow";
+  const metrics = bad.metrics as Record<string, Array<Record<string, unknown>>>;
+  const point = metrics.action?.[0];
+  assert.ok(point);
+  if (point) {
+    point.timestamp = "cycle one";
+  }
+  const result = validateLongRunObservationBundle(bad);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.errors.some((error) => /started_at.*ISO-8601/i.test(error)));
+    assert.ok(result.errors.some((error) => /timestamp.*ISO-8601/i.test(error)));
+  }
+});
+
+test("schema-only observation bundles cannot omit every structured source ref", () => {
+  const bad = cloneFixture();
+  bad.structured_artifact_refs = [];
+  const result = validateLongRunObservationBundle(bad);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.errors.some((error) => /structured_artifact_refs.*non-empty/i.test(error)));
+  }
+});
+
+test("observation writer cannot escape its output directory", () => {
+  const bundle = loadLongRunObservationBundleFromFile(fixturePath);
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "obs-bundle-path-"));
+  assert.throws(
+    () =>
+      writeObservationBundleAndIndex({
+        outputDir,
+        bundle,
+        index_filename: "../outside-index.json",
+        index_id: "fixture-index",
+        generated_at: "2026-07-11T01:00:00.000Z"
+      }),
+    /index_filename.*root-safe/i
+  );
+  assert.throws(
+    () =>
+      writeObservationBundleAndIndex({
+        outputDir,
+        bundle,
+        bundle_filename: "/tmp/outside-bundle.json",
+        index_id: "fixture-index",
+        generated_at: "2026-07-11T01:00:00.000Z"
+      }),
+    /bundle_filename.*root-safe/i
+  );
 });

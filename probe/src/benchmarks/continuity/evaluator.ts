@@ -29,6 +29,7 @@ import type {
   GoalContinuityPlanBeadSnapshotArtifactV1,
   GoalContinuityReadyFrontArtifactV1,
   GoalContinuityReferencedArtifactV1,
+  GoalContinuityRestartObservationV1,
   GoalContinuityReportV1
 } from "./types.js";
 import { GOAL_CONTINUITY_REPORT_SCHEMA } from "./types.js";
@@ -43,25 +44,6 @@ export type EvaluateGoalContinuityInput = {
 
 function dedupeRefs(refs: readonly string[]): string[] {
   return [...new Set(refs.filter((ref) => typeof ref === "string" && ref.trim().length > 0))];
-}
-
-function isStrongPhysicalEvidenceRef(ref: string): boolean {
-  return (
-    ref.startsWith("evidence/") ||
-    ref.startsWith("settlement/") ||
-    ref.startsWith("relationships/") ||
-    ref.startsWith("reviews/applied-relationship-proposals/")
-  );
-}
-
-function isProseOnlyEvidenceRef(ref: string): boolean {
-  return (
-    ref.startsWith("memory/") ||
-    ref.startsWith("plan-beads/") ||
-    ref.startsWith("planbeads/") ||
-    ref.includes("plan-bead") ||
-    ref.includes("memory-note")
-  );
 }
 
 function presentArtifacts<T>(
@@ -239,18 +221,17 @@ function detectCheckpointConflicts(
   const conflicts: GoalContinuityCheckpointConflictV1[] = [];
   for (const entry of operationResults) {
     const result = entry.artifact;
-    const reasonLower = result.reason.toLowerCase();
-    const mentionsCheckpoint =
-      reasonLower.includes("checkpoint") ||
-      result.expected_checkpoint_version !== undefined ||
-      result.operation?.expected_checkpoint_version !== undefined;
+    const expected =
+      result.expected_checkpoint_version ?? result.operation?.expected_checkpoint_version;
+    const observed = result.before_checkpoint_version;
+    const versionMismatch =
+      expected !== undefined && observed !== undefined && expected !== observed;
 
-    if (result.status === "rejected" && mentionsCheckpoint) {
+    if (result.status === "rejected" && versionMismatch) {
       conflicts.push({
         source_artifact_ref: entry.ref,
         reason: result.reason,
-        expected_checkpoint_version:
-          result.expected_checkpoint_version ?? result.operation?.expected_checkpoint_version,
+        expected_checkpoint_version: expected,
         before_checkpoint_version: result.before_checkpoint_version,
         after_checkpoint_version: result.after_checkpoint_version
       });
@@ -262,6 +243,8 @@ function detectCheckpointConflicts(
 function detectUnsupportedPhysicalClosure(input: {
   operationResults: Array<{ ref: string; artifact: GoalContinuityPlanBeadOperationResultArtifactV1 }>;
   snapshots: Array<{ ref: string; artifact: GoalContinuityPlanBeadSnapshotArtifactV1 }>;
+  memoryNoteRefs: ReadonlySet<string>;
+  physicalStatus: CapabilityInterpretationStatusV1;
 }): GoalContinuityFindingV1 | null {
   const snapshotById = new Map(
     input.snapshots.map((entry) => [entry.artifact.bead_id, entry] as const)
@@ -283,27 +266,23 @@ function detectUnsupportedPhysicalClosure(input: {
       ...(result.evidence_refs ?? []),
       ...(result.operation.evidence_refs ?? [])
     ]);
-    const hasStrong = evidenceRefs.some(isStrongPhysicalEvidenceRef);
-    const onlyProse =
-      evidenceRefs.length > 0 && evidenceRefs.every(isProseOnlyEvidenceRef);
-
     const beadId = result.bead_id ?? result.operation.bead_id;
     const snapshot = beadId ? snapshotById.get(beadId) : undefined;
     const requiresPhysical =
       snapshot !== undefined &&
       snapshot.artifact.acceptance_criteria.non_physical_resolution_allowed === false;
 
-    if (!hasStrong && (onlyProse || requiresPhysical || evidenceRefs.length === 0)) {
+    if (requiresPhysical && input.physicalStatus !== "passed") {
       return {
         kind: "unsupported_physical_closure",
         status: "detected",
         source_artifact_refs: dedupeRefs([
           entry.ref,
           ...(snapshot ? [snapshot.ref] : []),
-          ...evidenceRefs.filter(isProseOnlyEvidenceRef)
+          ...evidenceRefs.filter((ref) => input.memoryNoteRefs.has(ref))
         ]),
         details:
-          "closed as satisfied without strong runtime evidence; PlanBead/memory prose cannot prove physical completion"
+          "closed as satisfied although the case's typed physical predicates did not pass; PlanBead/memory prose cannot prove physical completion"
       };
     }
   }
@@ -410,7 +389,49 @@ function openWorkSurvival(input: {
   operationResults: Array<{ ref: string; artifact: GoalContinuityPlanBeadOperationResultArtifactV1 }>;
   missingRefs: string[];
   restartRequired: boolean;
+  restartObservation?: GoalContinuityRestartObservationV1;
 }): GoalContinuityContinuitySectionV1["open_work_survival"] {
+  if (input.restartRequired) {
+    const restart = input.restartObservation;
+    if (!restart) {
+      return {
+        status: "unknown",
+        source_artifact_refs: [],
+        details:
+          "restart or durable reload is required, but no typed restart observation was recorded"
+      };
+    }
+    const refsValid =
+      restart.source_artifact_refs.length > 0 &&
+      restart.before_ref.trim().length > 0 &&
+      restart.after_ref.trim().length > 0 &&
+      restart.before_ref !== restart.after_ref;
+    if (restart.status !== "observed" || !refsValid) {
+      return {
+        status: restart.status === "not_observed" ? "lost" : "unknown",
+        source_artifact_refs: dedupeRefs(restart.source_artifact_refs),
+        details:
+          "restart observation did not establish distinct before/after durable-state reads"
+      };
+    }
+    const before = new Set(restart.before_open_bead_ids);
+    const retained = dedupeRefs(
+      restart.after_open_bead_ids.filter((beadId) => before.has(beadId))
+    );
+    return {
+      status: retained.length > 0 ? "retained" : "lost",
+      source_artifact_refs: dedupeRefs([
+        restart.before_ref,
+        restart.after_ref,
+        ...restart.source_artifact_refs
+      ]),
+      details:
+        retained.length > 0
+          ? `open work reloaded after restart (${retained.join(", ")})`
+          : "restart was observed, but no open work id survived the durable reload"
+    };
+  }
+
   if (input.missingRefs.length > 0 && input.snapshots.length === 0 && input.episodes.length === 0) {
     return {
       status: "unknown",
@@ -440,9 +461,7 @@ function openWorkSurvival(input: {
         ...activeEpisodes.map((entry) => entry.ref),
         ...acceptedCreates.map((entry) => entry.ref)
       ]),
-      details: input.restartRequired
-        ? "open work retained across restart/compaction checkpoint surface"
-        : "open work retained in PlanBead/Active Episode artifacts"
+      details: "open work retained in PlanBead/Active Episode artifacts"
     };
   }
 
@@ -541,6 +560,9 @@ function interpretContinuity(input: {
     return "unverifiable";
   }
   if (input.lifecycle.some((entry) => entry.status === "unknown")) {
+    return "unverifiable";
+  }
+  if (input.openWork.status === "unknown") {
     return "unverifiable";
   }
   if (input.checkpointConflicts.length > 0) {
@@ -676,11 +698,6 @@ export function evaluateGoalContinuity(
     });
   }
 
-  const unsupported = detectUnsupportedPhysicalClosure({ operationResults, snapshots });
-  if (unsupported) {
-    findings.push(unsupported);
-  }
-
   const proseFindings = detectProseCannotProvePhysical({
     memoryNotes,
     physicalTargetPresent: input.case.physical_target !== undefined,
@@ -718,12 +735,23 @@ export function evaluateGoalContinuity(
   // Re-run prose findings awareness once physical result is known (already recorded).
   void physical.target;
 
+  const unsupported = detectUnsupportedPhysicalClosure({
+    operationResults,
+    snapshots,
+    memoryNoteRefs: new Set(memoryNotes.map((entry) => entry.ref)),
+    physicalStatus: physical.interpretation_status
+  });
+  if (unsupported) {
+    findings.push(unsupported);
+  }
+
   const openWork = openWorkSurvival({
     snapshots,
     episodes,
     operationResults,
     missingRefs,
-    restartRequired: input.case.restart_checkpoint?.required === true
+    restartRequired: input.case.restart_checkpoint?.required === true,
+    restartObservation: bag.restart_observation
   });
 
   const continuity: GoalContinuityContinuitySectionV1 = {

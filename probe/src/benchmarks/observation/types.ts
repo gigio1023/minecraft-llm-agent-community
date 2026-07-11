@@ -1,5 +1,5 @@
 /**
- * Long-run observation bundle contracts (V4 Slice C3).
+ * Long-run observation bundle formats (V4 Step C3).
  *
  * Offline, provider-free schemas for joinable run/cycle/actor/timestamp
  * structured evidence, descriptive metric placeholders, optional visual/video

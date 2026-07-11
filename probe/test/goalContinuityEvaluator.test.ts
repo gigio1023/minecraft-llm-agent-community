@@ -230,3 +230,63 @@ test("memory prose alone never passes physical target", () => {
     )
   );
 });
+
+test("restart-required continuity is unknown without distinct before and after reload evidence", () => {
+  const bag = readBag("lifecycle-resume.json");
+  const continuityCase = baseCase(["block", "resume"], {
+    restart_checkpoint: {
+      required: true,
+      description: "A real durable reload is required."
+    }
+  });
+
+  const withoutRestart = evaluateGoalContinuity({
+    suite_id: "goal-continuity-v1",
+    suite_version: "1.1.0",
+    case: continuityCase,
+    artifact_bag: bag
+  });
+  assert.equal(withoutRestart.continuity.open_work_survival.status, "unknown");
+  assert.notEqual(withoutRestart.continuity.interpretation_status, "passed");
+
+  bag.restart_observation = {
+    schema: "goal-continuity-restart-observation/v1",
+    status: "observed",
+    before_ref: "checkpoints/before-restart.json",
+    after_ref: "checkpoints/after-restart.json",
+    before_open_bead_ids: ["bead-resume-1"],
+    after_open_bead_ids: ["bead-resume-1"],
+    source_artifact_refs: ["runtime/restart-observation.json"]
+  };
+  const withRestart = evaluateGoalContinuity({
+    suite_id: "goal-continuity-v1",
+    suite_version: "1.1.0",
+    case: continuityCase,
+    artifact_bag: bag
+  });
+  assert.equal(withRestart.continuity.open_work_survival.status, "retained");
+  assert.equal(withRestart.continuity.interpretation_status, "passed");
+});
+
+test("checkpoint rejection prose alone does not create a version conflict", () => {
+  const bag = readBag("stale-checkpoint.json");
+  const referenced = bag.plan_bead_operation_results[0];
+  assert.ok(referenced?.artifact && "reason" in referenced.artifact);
+  if (!referenced?.artifact || !("reason" in referenced.artifact)) {
+    return;
+  }
+  referenced.artifact.reason = "checkpoint mismatch";
+  delete referenced.artifact.expected_checkpoint_version;
+  delete referenced.artifact.before_checkpoint_version;
+  if (referenced.artifact.operation) {
+    delete referenced.artifact.operation.expected_checkpoint_version;
+  }
+
+  const report = evaluateGoalContinuity({
+    suite_id: "goal-continuity-v1",
+    suite_version: "1.1.0",
+    case: baseCase(["update"]),
+    artifact_bag: bag
+  });
+  assert.equal(report.continuity.checkpoint_conflicts.length, 0);
+});

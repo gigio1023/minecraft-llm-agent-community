@@ -1,4 +1,4 @@
-# Capability-Gated Minecraft Social Sandbox: Implementation Plan
+# Capability-First Minecraft Social Sandbox: Implementation Plan
 
 Status: **ACTIVE implementation plan** for
 `central-plan-capability-gated-social-sandbox.md` (V4).
@@ -30,7 +30,7 @@ checked-in individual capability manifest
 -> existing Actor Turn + Mineflayer execution
 -> normalized capability report
 -> long-horizon goal-continuity cases
--> capability-gated interdependent social scenario
+-> capability-controlled interdependent social scenario
 -> synchronized long-run artifacts, metrics, and video
 -> phenomenon record
 -> optional controlled follow-up study
@@ -105,7 +105,7 @@ integrated path.
 ### Current-State Conclusion
 
 Do not start by adding more social scenarios. First replace the free-form
-benchmark gap with a manifest-owned, typed, reportable capability slice. The
+benchmark gap with manifest-owned, typed, reportable capability cases. The
 existing furnace path should become one case or legacy adapter, not the generic
 schema.
 
@@ -157,7 +157,7 @@ Preserve these ownership rules:
 - V4 report schemas do not silently reinterpret V3 report schemas;
 - legacy report import, if needed, is an explicit adapter.
 
-## 4. Core Contracts
+## 4. Data Formats And Evaluation Rules
 
 ### 4.1 `individual-capability-manifest/v1`
 
@@ -360,7 +360,7 @@ Every V4 runner and report must distinguish:
 
 | Failure class | Meaning | Owner |
 | --- | --- | --- |
-| `manifest_invalid` | schema, predicate, budget, or reference invalid | benchmark contract |
+| `manifest_invalid` | schema, predicate, budget, or reference invalid | manifest validation |
 | `world_setup_failed` | required scenario setup or validation failed | environment/scenario |
 | `provider_blocked` | auth, quota, budget, or provider failure | provider setup |
 | `model_goal_misread` | evidence shows the actor pursued the wrong objective | provider/Actor Turn |
@@ -371,23 +371,23 @@ Every V4 runner and report must distinguish:
 | `stalled_after_progress` | progress stopped and did not recover | behavior/continuity |
 | `context_continuity_failed` | relevant work/evidence disappeared or stayed stale | memory/PlanBeads/context |
 | `claim_without_evidence` | provider or work state claimed unsupported completion | actor/report audit |
-| `unverifiable` | artifacts cannot decide the declared target | evidence contract |
+| `unverifiable` | saved evidence cannot decide the declared target | evidence requirements |
 
-Provider contract incidents and environment blockers never become actor
+Provider response-format errors and environment blockers never become actor
 competence scores.
 
-## 6. Vertical Slices And Acceptance Gates
+## 6. Implementation Steps And Completion Conditions
 
-Each slice must produce an end-to-end artifact before the next slice becomes
+Each step must produce its stated saved output before the next step becomes
 the default build target.
 
-### Slice A0 — Contract And Routing
+### Step A0 — Direction And Document Routing
 
 Deliver:
 
 - V4 implementation plan and active pointer alignment;
 - schema names, file ownership, and failure taxonomy;
-- successor handoff targeting Slice A1.
+- successor handoff targeting Step A1.
 
 Acceptance:
 
@@ -396,11 +396,11 @@ Acceptance:
 - no runtime code change is claimed;
 - docs build and stale-pointer checks pass.
 
-### Slice A1 — Manifest Loader And Typed Predicates
+### Step A1 — Manifest Loader And Typed Predicates
 
 Status: **accepted after A1R** (2026-07-11). Provider-free; no live server or
 provider call. Initial landing `26c1f93f` was reopened after evidence-rule
-counterexamples; A1R repaired the contract in a follow-up commit.
+counterexamples; A1R repaired the evidence rules in a follow-up commit.
 
 Deliver:
 
@@ -443,7 +443,7 @@ Evidence:
   `unverifiable`. `block_observed_at` requires positioned run-origin block
   facts and a run-bound `placed_crafting_table` named position.
 
-### Slice A2 — Normalized Report Adapter
+### Step A2 — Normalized Report Adapter
 
 Status: **accepted** (2026-07-11). Provider-free; offline adapter over saved
 `social-cycle-run-report/v1` artifacts. No live server or provider call.
@@ -473,10 +473,13 @@ Evidence:
 - tests: `probe/test/individualCapabilityReport.test.ts`
 - validation: focused A2 tests 10/10; A1R+A2 39/39; `bun run typecheck`
 
-### Slice A3 — Capability Runner Wrapper
+### Step A3 — Capability Runner Wrapper
 
-Status: **accepted** (2026-07-11). Provider-free offline smoke verified; no live
-provider HTTP.
+Status: **partially accepted** (reviewed 2026-07-11). Provider-free offline
+smoke verified; declared cycle and total-action limits are enforced. The runner
+does not yet stop a case at its manifest-specific wall-time, request, token, or
+cost limit, so A5 must not run until those limits are connected to runtime
+cancellation and provider usage.
 
 Deliver:
 
@@ -502,7 +505,7 @@ Evidence:
 - script: `probe:capability`
 - tests: `probe/test/capabilityRunnerSmoke.test.ts`
 
-### Slice A4 — Basic Capability Suite
+### Step A4 — Basic Capability Suite
 
 Status: **accepted** (2026-07-11). Suite version `1.1.0` with 8 cases;
 provider-free loader validation only.
@@ -532,7 +535,7 @@ Evidence:
 - suite: `probe/benchmarks/capability/individual-capability-v1.json` (`1.1.0`)
 - tests: `probe/test/individualCapabilityManifest.test.ts`
 
-### Slice A5 — First Provider-Backed Capability Batch
+### Step A5 — First Provider-Backed Capability Batch
 
 Status: **blocked** pending exact `(provider_id, model)`, whole-run estimate,
 quota preflight, and explicit user approval.
@@ -557,7 +560,7 @@ Acceptance is artifact completeness and truthful classification, not a required
 pass rate. A weak model result updates required capabilities or model choice; it
 does not invalidate the benchmark path.
 
-### Slice B1 — Multi-Hop Capability Case
+### Step B1 — Multi-Hop Capability Case
 
 Status: **accepted** (2026-07-11). Provider-free; case `reach_placed_furnace` in
 suite `1.2.0`. Furnace observation adapter is case-specific only.
@@ -578,9 +581,13 @@ Acceptance:
 - [x] failure locates the missing prerequisite or continuity break;
 - [x] the long case can time out honestly without fake success.
 
-### Slice B2 — Goal-Continuity Contract And Offline Evaluator
+### Step B2 — Goal-Continuity Formats And Offline Evaluator
 
-Status: **accepted** (2026-07-11). Offline schemas/evaluator/fixtures only.
+Status: **partially accepted** (reviewed 2026-07-11). The offline evaluator and
+fixtures work, but a strict loader that resolves and validates a saved
+`goal-continuity-artifact-bag/v1` is still missing. Restart-required cases now
+remain `unverifiable` unless distinct before/after durable reload evidence is
+present.
 
 Deliver:
 
@@ -598,7 +605,7 @@ Acceptance:
 - [x] each scored lifecycle change cites its source artifacts;
 - [x] missing refs produce `unknown`/`unverifiable`, not zero or success.
 
-### Slice B3 — Live Goal-Continuity Cases
+### Step B3 — Live Goal-Continuity Cases
 
 Status: **declarations accepted; live execution blocked** pending provider
 approval. Offline cases in `goal-continuity-v1` `1.1.0`.
@@ -618,9 +625,11 @@ Acceptance:
 - [ ] physical target progress and continuity quality stay separate;
 - [ ] at least one case exercises restart or equivalent durable reload.
 
-### Slice C1 — Social Scenario Declaration
+### Step C1 — Social Scenario Declaration
 
-Status: **accepted** (2026-07-11). Provider-free schema/loader/fixtures.
+Status: **accepted for declarations** (reviewed 2026-07-11). Provider-free
+schema/loader/fixtures only. Checked-in scenarios declare capability gaps; a
+manifest case declaration no longer counts as resolved capability evidence.
 
 Deliver:
 
@@ -639,7 +648,7 @@ Acceptance:
 - [x] every required capability points to compatible benchmark evidence or a
   declared evidence gap.
 
-### Slice C2 — Minimal Interdependent Sandbox
+### Step C2 — Minimal Interdependent Sandbox
 
 Status: **accepted** (2026-07-11) for declarations. Live multi-actor runs not
 executed in this wave.
@@ -666,7 +675,7 @@ Acceptance:
 - [x] the report distinguishes opportunity absence, refusal, execution failure,
   and no observable response (offline enum).
 
-### Slice C3 — Long-Run Observation Bundle
+### Step C3 — Long-Run Observation Bundle
 
 Status: **accepted** (2026-07-11) for offline schemas/writer/index/fixtures.
 Live capture not run in this wave.
@@ -690,7 +699,7 @@ Acceptance:
 - [x] run duration, dropped captures, reconnects, and missing evidence are explicit
   (schema + fixture).
 
-### Slice D1 — Phenomenon Catalog
+### Step D1 — Phenomenon Catalog
 
 Status: **accepted** (2026-07-11). Fixture record only; no research claim.
 
@@ -710,7 +719,7 @@ Acceptance:
 - [x] observation language does not silently become trust/culture/economy truth;
 - [x] negative and retired candidates remain searchable.
 
-### Slice D2 — Controlled Follow-Up Package
+### Step D2 — Controlled Follow-Up Package
 
 Only after the user selects a phenomenon:
 
@@ -742,7 +751,7 @@ A1 manifest/predicates
   -> D2 selected controlled study
 ```
 
-Parallel work is safe only after a shared contract lands:
+Parallel work is safe only after the shared schema it depends on is stable:
 
 - case authoring may parallelize after A1/A2;
 - report presentation may parallelize after A2;
@@ -757,7 +766,7 @@ Do not parallelize competing schema definitions.
 
 Keep tests small and Detroit-style.
 
-### Contract Tests
+### Schema And Loader Tests
 
 - manifest required fields and enum/predicate validation;
 - rejection of unknown predicate kinds and invalid Minecraft ids;
@@ -801,7 +810,7 @@ Keep tests small and Detroit-style.
 
 ## 9. Validation Commands
 
-For every TypeScript slice:
+For every TypeScript step:
 
 ```bash
 cd probe && bun test <targeted-test-files>
@@ -809,7 +818,7 @@ cd probe && bun run typecheck
 git diff --check
 ```
 
-Before merging a completed vertical slice:
+Before merging a completed step:
 
 ```bash
 cd probe && bun test
@@ -825,7 +834,7 @@ fresh runtime command and artifact paths; unit tests alone are insufficient.
 
 ## 10. Documentation And Artifact Maintenance
 
-When a slice lands:
+When a step lands:
 
 - update its acceptance checklist in this plan;
 - update the active benchmark manifest or scenario declaration version;
@@ -878,19 +887,20 @@ because an older plan used a name.
 - the user can select, retire, or iterate based on evidence and video;
 - D2 begins only for a selected candidate.
 
-## 12. Immediate Next Slice
+## 12. Immediate Next Work
 
-A1 is accepted. The next agent should implement **Slice A2: Normalized Report
-Adapter**. Do not start the provider-backed suite, continuity benchmark, or
-social scenarios yet.
+The provider-free path now reaches D1 data formats and fixtures, with two
+important limits:
 
-First A2 implementation actions:
+1. A3 still needs manifest-specific wall-time, provider-request, token, and cost
+   stopping behavior before A5.
+2. B2 still needs a strict saved-evidence loader before live continuity reports
+   can be trusted end to end.
+3. Every checked-in C1/C2 capability dependency is a declared gap until A5
+   produces current-run normalized reports.
 
-1. define `individual-capability-report/v1` builder types;
-2. adapt `social-cycle-run-report/v1` + actor workspace refs into
-   `CapabilityEvidenceBagV1` without furnace-generic authority;
-3. emit target, milestone, budget, usage, stall/blocker, and failure fields;
-4. ensure clean runtime exit without target evidence reports `failed` or
-   `unverifiable`, never `passed`;
-5. run targeted tests, full typecheck, and `git diff --check`;
-6. update this plan's A2 acceptance status in the same commit.
+Before any A5 run, finish A3's manifest-specific stopping behavior and then use
+the exact provider quota preflight and user approval. The other provider-free
+task is the B2 artifact-bag loader and a runtime writer for typed restart
+observations. D2 remains unavailable until the user selects a real recurring
+observation.

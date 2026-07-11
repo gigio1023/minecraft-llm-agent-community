@@ -42,7 +42,7 @@ export type PhenomenonRecordDraftV1 = Omit<PhenomenonRecordV1, "schema" | "statu
 export type WritePhenomenonRecordRequestV1 = {
   record: PhenomenonRecordDraftV1;
   /**
-   * Explicit reviewer gate. Absent → status `candidate`.
+   * Explicit reviewer decision. Absent → status `candidate`.
    * `select_for_followup` requires reviewer_role `user` | `delegated_reviewer`.
    */
   reviewer_decision?: PhenomenonReviewerDecisionV1;
@@ -71,7 +71,6 @@ export function buildPhenomenonCatalogIndexEntry(
     title: record.title,
     status: record.status,
     record_kind: record.record_kind,
-    is_research_result: record.is_research_result,
     observation_class: record.observation_class,
     pattern: record.pattern,
     scenario_ids: record.scenario_versions.map((entry) => entry.scenario_id),
@@ -242,7 +241,6 @@ export function preparePhenomenonRecordForWrite(
     title: draft.title,
     status,
     record_kind: draft.record_kind,
-    is_research_result: draft.is_research_result,
     observation_class: draft.observation_class,
     pattern: draft.pattern,
     scenario_versions: draft.scenario_versions,
@@ -270,8 +268,7 @@ export function preparePhenomenonRecordForWrite(
 }
 
 function phenomenonRecordFilename(phenomenonId: string): string {
-  const safe = phenomenonId.replace(/[^a-zA-Z0-9._-]+/g, "_");
-  return `${safe}.json`;
+  return `${phenomenonId}.json`;
 }
 
 export function writePhenomenonCatalogIndex(

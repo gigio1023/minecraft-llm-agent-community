@@ -5,7 +5,7 @@
  * prescribed social responses; runners and reports may record which of these
  * outcomes was observed from runtime evidence.
  *
- * Slice C2: schema-only. No runner wiring yet (C3+).
+ * Step C2: schema-only. No runner wiring yet (C3+).
  */
 export const SOCIAL_INTERACTION_OPPORTUNITY_OBSERVATIONS = [
   "opportunity_absent",

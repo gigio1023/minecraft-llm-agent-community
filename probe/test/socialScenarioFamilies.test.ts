@@ -1,4 +1,4 @@
-/** Contract tests for Slice C2 interdependent scenario families. */
+/** Tests for Step C2 interdependent scenario families. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -113,13 +113,8 @@ test("all three C2 family scenarios load through the C1 loader", () => {
     );
 
     for (const capability of entry.scenario.required_capabilities) {
-      assert.ok(
-        capability.evidence_status === "resolved" || capability.evidence_status === "declared_gap"
-      );
-      if (capability.evidence_status === "resolved") {
-        assert.ok(capability.evidence_ref.length > 0);
-        assert.ok(known.includes(capability.capability_case_id));
-      } else {
+      assert.equal(capability.evidence_status, "declared_gap");
+      if (capability.evidence_status === "declared_gap") {
         assert.ok(capability.gap_reason.length > 0);
       }
     }

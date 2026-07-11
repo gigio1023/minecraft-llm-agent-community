@@ -20,6 +20,11 @@ export type ValidateSocialScenarioOptions = {
    * appear in this set. Gaps never require membership.
    */
   knownCapabilityCaseIds?: ReadonlySet<string> | readonly string[];
+  /**
+   * Exact normalized-report refs that the caller already resolved. A manifest
+   * case declaration is not capability evidence.
+   */
+  knownCapabilityEvidenceRefs?: ReadonlySet<string> | readonly string[];
 };
 
 const fixtureClasses = ["natural_world", "command_fixture", "mixed"] as const;
@@ -519,6 +524,7 @@ function validateCapabilityRequirement(
   value: unknown,
   path: string,
   knownCases: ReadonlySet<string> | null,
+  knownEvidenceRefs: ReadonlySet<string> | null,
   errors: string[]
 ): void {
   if (!isRecord(value)) {
@@ -549,6 +555,15 @@ function validateCapabilityRequirement(
         );
       }
     }
+    if (!knownEvidenceRefs) {
+      errors.push(
+        `${path}.evidence_ref cannot be marked resolved without knownCapabilityEvidenceRefs; use evidence_status 'declared_gap' until a normalized capability report exists`
+      );
+    } else if (nonEmptyString(value.evidence_ref) && !knownEvidenceRefs.has(value.evidence_ref)) {
+      errors.push(
+        `${path}.evidence_ref '${value.evidence_ref}' does not resolve to a caller-confirmed normalized capability report`
+      );
+    }
     return;
   }
 
@@ -561,6 +576,7 @@ function validateRequiredCapabilities(
   value: unknown,
   path: string,
   knownCases: ReadonlySet<string> | null,
+  knownEvidenceRefs: ReadonlySet<string> | null,
   errors: string[]
 ): void {
   if (!Array.isArray(value) || value.length === 0) {
@@ -571,7 +587,7 @@ function validateRequiredCapabilities(
   const ids = new Set<string>();
   for (const [index, entry] of value.entries()) {
     const entryPath = `${path}[${index}]`;
-    validateCapabilityRequirement(entry, entryPath, knownCases, errors);
+    validateCapabilityRequirement(entry, entryPath, knownCases, knownEvidenceRefs, errors);
     if (isRecord(entry) && nonEmptyString(entry.capability_case_id)) {
       if (ids.has(entry.capability_case_id)) {
         errors.push(`${entryPath}.capability_case_id duplicate '${entry.capability_case_id}'`);
@@ -740,6 +756,7 @@ export function validateInterdependentSocialScenario(
 ): SocialScenarioValidationResult {
   const errors: string[] = [];
   const knownCases = toKnownCaseSet(options.knownCapabilityCaseIds);
+  const knownEvidenceRefs = toKnownCaseSet(options.knownCapabilityEvidenceRefs);
 
   if (!isRecord(value)) {
     return { ok: false, errors: ["InterdependentSocialScenario must be an object"] };
@@ -836,6 +853,7 @@ export function validateInterdependentSocialScenario(
     value.required_capabilities,
     "InterdependentSocialScenario.required_capabilities",
     knownCases,
+    knownEvidenceRefs,
     errors
   );
 

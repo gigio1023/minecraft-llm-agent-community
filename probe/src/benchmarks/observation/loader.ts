@@ -218,7 +218,7 @@ function assertStringArray(value: unknown, path: string, errors: string[]): stri
   return value as string[];
 }
 
-function assertPathSafeRefArray(value: unknown, path: string, errors: string[]): void {
+function assertPathSafeRefArray(value: unknown, path: string, errors: string[]): string[] {
   const refs = assertStringArray(value, path, errors);
   for (const [index, ref] of refs.entries()) {
     if (nonEmptyString(ref) && !isRootSafeRelativeRef(ref)) {
@@ -227,6 +227,15 @@ function assertPathSafeRefArray(value: unknown, path: string, errors: string[]):
       );
     }
   }
+  return refs;
+}
+
+function isIsoTimestamp(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
 }
 
 /**
@@ -248,6 +257,9 @@ export function validateObservationJoinKey(
     if (!nonEmptyString(value[key])) {
       errors.push(`${path}.${key} must be a non-empty string (fixed join key)`);
     }
+  }
+  if (nonEmptyString(value.timestamp) && !isIsoTimestamp(value.timestamp)) {
+    errors.push(`${path}.timestamp must be an ISO-8601 date-time with timezone`);
   }
 
   if (knownRunId && nonEmptyString(value.run_id) && value.run_id !== knownRunId) {
@@ -297,13 +309,19 @@ function validateMetricPoint(
   rejectUnknownKeys(value, metricPointKeys, path, errors);
   validateObservationJoinKey(value, path, errors, knownActorIds, knownRunId);
   assertString(value, "metric_key", path, errors);
-  assertPathSafeRefArray(value.evidence_refs, `${path}.evidence_refs`, errors);
+  const evidenceRefs = assertPathSafeRefArray(
+    value.evidence_refs,
+    `${path}.evidence_refs`,
+    errors
+  );
 
   if (value.series !== expectedSeries) {
     errors.push(`${path}.series must be '${expectedSeries}'`);
   }
   if (!isFiniteNumberOrNull(value.value)) {
     errors.push(`${path}.value must be a finite number or null (placeholder)`);
+  } else if (value.value !== null && evidenceRefs.length === 0) {
+    errors.push(`${path}.evidence_refs must be non-empty when value is numeric`);
   }
   if (value.unit !== undefined) {
     assertString(value, "unit", path, errors);
@@ -553,10 +571,22 @@ function validateRunDeclaration(
   assertString(value, "scenario_version", path, errors);
   assertPathSafeRef(value.scenario_ref, `${path}.scenario_ref`, errors);
   assertString(value, "started_at", path, errors);
+  if (nonEmptyString(value.started_at) && !isIsoTimestamp(value.started_at)) {
+    errors.push(`${path}.started_at must be an ISO-8601 date-time with timezone`);
+  }
   assertBoolean(value, "is_fixture", path, errors);
 
   if (value.ended_at !== undefined) {
     assertString(value, "ended_at", path, errors);
+    if (nonEmptyString(value.ended_at) && !isIsoTimestamp(value.ended_at)) {
+      errors.push(`${path}.ended_at must be an ISO-8601 date-time with timezone`);
+    } else if (
+      isIsoTimestamp(value.started_at) &&
+      isIsoTimestamp(value.ended_at) &&
+      Date.parse(value.ended_at) < Date.parse(value.started_at)
+    ) {
+      errors.push(`${path}.ended_at must not precede started_at`);
+    }
   }
   if (value.duration_ms !== undefined && !isNonNegativeInteger(value.duration_ms)) {
     errors.push(`${path}.duration_ms must be a non-negative integer when present`);
@@ -670,11 +700,16 @@ export function validateLongRunObservationBundle(
     );
   }
 
-  assertPathSafeRefArray(
+  const structuredRefs = assertPathSafeRefArray(
     value.structured_artifact_refs,
     "LongRunObservationBundle.structured_artifact_refs",
     errors
   );
+  if (structuredRefs.length === 0) {
+    errors.push(
+      "LongRunObservationBundle.structured_artifact_refs must be non-empty; a schema-only bundle is not a run observation"
+    );
+  }
 
   const privateHits = findPrivateFieldPaths(value);
   if (privateHits.length > 0) {

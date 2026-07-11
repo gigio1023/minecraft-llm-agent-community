@@ -1,5 +1,5 @@
 /**
- * Phenomenon catalog contracts for V4 Slice D1.
+ * Phenomenon catalog formats for V4 Step D1.
  *
  * A phenomenon-record/v1 is an evidence-linked observation candidate, not a
  * scientific claim or locked research label. Fixture records must stay labeled
@@ -90,7 +90,7 @@ export type PhenomenonAlternativeExplanationV1 = {
 };
 
 /**
- * Explicit reviewer gate for status changes. Writers must receive this field
+ * Explicit reviewer decision for status changes. Writers must receive this field
  * to promote to `selected_for_followup`; absent decision defaults to candidate.
  */
 export type PhenomenonReviewerDecisionV1 = {
@@ -113,13 +113,8 @@ export type PhenomenonRecordV1 = {
   phenomenon_id: string;
   title: string;
   status: PhenomenonStatusV1;
-  /**
-   * Fixture catalog entries must use `fixture` and `is_research_result: false`.
-   * They exercise writer/index behavior and are not research results.
-   */
+  /** Fixture catalog entries exercise writer/index behavior and are not research results. */
   record_kind: PhenomenonRecordKindV1;
-  /** Must be false for fixtures. True only for real observation candidates. */
-  is_research_result: boolean;
   observation_class: PhenomenonObservationClassV1;
   /** Concise recurring pattern description. */
   pattern: string;
@@ -146,7 +141,6 @@ export type PhenomenonCatalogIndexEntryV1 = {
   title: string;
   status: PhenomenonStatusV1;
   record_kind: PhenomenonRecordKindV1;
-  is_research_result: boolean;
   observation_class: PhenomenonObservationClassV1;
   pattern: string;
   scenario_ids: string[];

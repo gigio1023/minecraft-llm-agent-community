@@ -1,4 +1,4 @@
-/** Contract tests for phenomenon-record/v1 writer, loader, and searchable index. */
+/** Tests for the phenomenon-record/v1 writer, loader, and searchable index. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -44,7 +44,6 @@ test("fixture phenomenon record loads and is labeled fixture not research", () =
   const record = loadFixtureRecord();
   assert.equal(record.schema, "phenomenon-record/v1");
   assert.equal(record.record_kind, "fixture");
-  assert.equal(record.is_research_result, false);
   assert.equal(record.status, "candidate");
   assert.match(record.title, /fixture/i);
   assert.match(record.pattern, /fixture/i);
@@ -87,17 +86,40 @@ test("selected_for_followup without reviewer_decision is rejected", () => {
 test("selected_for_followup requires explicit reviewer_decision from user or delegated reviewer", () => {
   const draft = asDraft(loadFixtureRecord());
   const prepared = preparePhenomenonRecordForWrite({
-    record: draft,
+    record: {
+      ...draft,
+      record_kind: "observation",
+      phenomenon_id: "observed-tool-share-v1",
+      title: "Observed asymmetric tool share",
+      pattern: "The same tool-sharing pattern recurred in comparable recorded windows."
+    },
     reviewer_decision: {
       reviewer_role: "delegated_reviewer",
       decision: "select_for_followup",
-      rationale: "Synthetic promotion for writer contract test only.",
+      rationale: "Synthetic promotion for writer test only.",
       decided_at: "2026-07-11T00:00:00.000Z"
     }
   });
   assert.equal(prepared.status, "selected_for_followup");
   assert.equal(prepared.user_decision?.decided_by, "delegated_reviewer");
   assert.match(prepared.user_decision?.rationale ?? "", /Synthetic promotion/);
+});
+
+test("a fixture cannot be selected for follow-up", () => {
+  const draft = asDraft(loadFixtureRecord());
+  assert.throws(
+    () =>
+      preparePhenomenonRecordForWrite({
+        record: draft,
+        reviewer_decision: {
+          reviewer_role: "user",
+          decision: "select_for_followup",
+          rationale: "This must be rejected because it is only a fixture.",
+          decided_at: "2026-07-11T00:00:00.000Z"
+        }
+      }),
+    /fixture.*cannot be selected|Invalid PhenomenonRecord/i
+  );
 });
 
 test("retired candidates remain writable and searchable", () => {
@@ -198,14 +220,35 @@ test("searchable index retains fixture and filters by scenario/text", () => {
   assert.equal(boring.length, 1);
 });
 
-test("fixture claiming is_research_result true is rejected", () => {
+test("phenomenon refs reject URI schemes and parent escapes", () => {
+  const base = loadFixtureRecord();
+  const uri = validatePhenomenonRecord({
+    ...base,
+    evidence_refs: ["fixture://evidence/fake.json"]
+  });
+  assert.equal(uri.ok, false);
+  if (!uri.ok) {
+    assert.ok(uri.errors.some((error) => /relative artifact ref|URI/i.test(error)));
+  }
+
+  const escaping = validatePhenomenonRecord({
+    ...base,
+    capability_refs: ["../outside/normalized-report.json"]
+  });
+  assert.equal(escaping.ok, false);
+  if (!escaping.ok) {
+    assert.ok(escaping.errors.some((error) => /relative artifact ref|escape/i.test(error)));
+  }
+});
+
+test("phenomenon ids cannot collapse to the same sanitized filename", () => {
   const base = loadFixtureRecord();
   const result = validatePhenomenonRecord({
     ...base,
-    is_research_result: true
+    phenomenon_id: "fixture/path"
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.ok(result.errors.some((error) => /research result|fixture/i.test(error)));
+    assert.ok(result.errors.some((error) => /phenomenon_id.*lowercase/i.test(error)));
   }
 });

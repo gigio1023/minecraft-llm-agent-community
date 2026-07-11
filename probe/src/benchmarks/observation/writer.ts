@@ -5,6 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { isRootSafeRelativeRef } from "../capability/artifactRefs.js";
+
 import {
   assertLongRunObservationBundle,
   assertMultiActorReportIndex,
@@ -31,6 +33,17 @@ export type WriteObservationBundleOptions = {
 
 function toPosixRelative(fromDir: string, absolutePath: string): string {
   return path.relative(fromDir, absolutePath).split(path.sep).join("/");
+}
+
+function resolveOutputFilename(outputDir: string, filename: string, field: string): string {
+  if (
+    /^[a-z][a-z0-9+.-]*:/i.test(filename) ||
+    path.isAbsolute(filename) ||
+    !isRootSafeRelativeRef(filename)
+  ) {
+    throw new Error(`${field} must be a root-safe relative filename`);
+  }
+  return path.join(outputDir, filename);
 }
 
 function indexEntryFromBundle(
@@ -66,12 +79,9 @@ export function writeLongRunObservationBundle(
 ): WriteObservationBundleResult {
   const bundle = assertLongRunObservationBundle(bundleInput);
   const filename = options.bundle_filename ?? "observation-bundle.json";
-  if (filename.includes("..") || path.isAbsolute(filename)) {
-    throw new Error("bundle_filename must be a path-safe relative filename");
-  }
+  const bundlePath = resolveOutputFilename(outputDir, filename, "bundle_filename");
 
-  mkdirSync(outputDir, { recursive: true });
-  const bundlePath = path.join(outputDir, filename);
+  mkdirSync(path.dirname(bundlePath), { recursive: true });
   writeFileSync(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`, "utf8");
 
   return {
@@ -147,10 +157,14 @@ export function writeObservationBundleAndIndex(input: {
   bundle: LongRunObservationBundleV1;
   index: MultiActorReportIndexV1;
 } {
+  const indexPath = resolveOutputFilename(
+    input.outputDir,
+    input.index_filename ?? "multi-actor-report-index.json",
+    "index_filename"
+  );
   const written = writeLongRunObservationBundle(input.outputDir, input.bundle, {
     bundle_filename: input.bundle_filename
   });
-  const indexPath = path.join(input.outputDir, input.index_filename ?? "multi-actor-report-index.json");
   const index = upsertMultiActorReportIndex(indexPath, written.bundle, {
     index_id: input.index_id,
     generated_at: input.generated_at,

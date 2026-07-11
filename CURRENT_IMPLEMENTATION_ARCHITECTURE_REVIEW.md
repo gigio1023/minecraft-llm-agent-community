@@ -86,15 +86,18 @@ checks.
 
 ## Current Product Scope
 
-The active direction is the capability-gated social sandbox
-(`central-plan-capability-gated-social-sandbox.md`). The next delivery target is
-a small dataset-free individual capability manifest and normalized report
-contract, followed by long-horizon goal-continuity cases and a minimal
-interdependent social session.
+The active direction is defined in
+`central-plan-capability-gated-social-sandbox.md`. The provider-free
+implementation now includes individual capability manifests/reports, declared
+continuity cases, interdependent scenario files, long-run observation formats,
+and a fixture-only phenomenon index. A3 and B2 remain partial: the capability
+runner still needs manifest-specific stopping for wall time and provider usage,
+and continuity evaluation still needs a strict saved-evidence loader plus a
+runtime restart-observation writer.
 
-The detailed sequence and acceptance gates are in
-`capability-gated-social-sandbox-implementation-plan.md`; its immediate target
-is Slice A1, the manifest loader and typed predicate evaluator.
+The detailed sequence and current status are in
+`capability-gated-social-sandbox-implementation-plan.md`. No provider-backed
+batch or live multi-actor V4 session has been run.
 
 | Scope | Current target |
 | --- | --- |
@@ -405,16 +408,17 @@ evidence, and persistence stay traceable despite that size.
 
 ## Current Implementation Risks
 
-1. The runtime does not yet expose the active program as one integrated path:
-   an individual capability manifest, normalized report, goal-continuity suite,
-   interdependent scenario declaration, long-run metrics, and synchronized
-   video are not wired end to end.
+1. The runtime does not yet expose the active program as one integrated path.
+   Capability manifests and normalized reports run offline, but A3 does not
+   stop on every manifest-specific limit, B2 lacks strict saved-evidence
+   loading, and the social/observation/phenomenon files are not connected to a
+   live V4 multi-actor session.
 2. Response-window semantics are the highest-risk logic. A window that closes on
    immediate post-action observation recreates the old `no_observable_response`
    vacuity and makes social-response labels uninformative.
-3. Public/private separation is not yet enforceable by artifact shape. Offline
-   analysis and public reports must not ingest private actor workspaces or
-   provider snapshots without an explicit allowlisted view.
+3. The C3 public export rejects its named private fields, but no live V4 writer
+   yet proves that raw actor workspaces and provider snapshots stay outside the
+   bundle. Live export still needs an explicit allowlisted producer.
 4. `socialCycleRunner.ts` is still a large orchestration file; the architecture
    risk is not size by itself, but whether slot events, actor routing, row
    assembly, evidence, and response-window closure remain traceable through it.

@@ -1,5 +1,5 @@
 /**
- * Goal-continuity benchmark contracts for V4 Stage 2 Slice B2.
+ * Goal-continuity benchmark formats for V4 Stage 2 Step B2.
  *
  * Manifests declare pressure and observable lifecycle *kinds*, never correct
  * PlanBead titles or prescribed intermediate goals. PlanBead / memory prose may
@@ -296,6 +296,20 @@ export type GoalContinuityMemoryNoteArtifactV1 = {
   claims_physical_progress: boolean;
 };
 
+/**
+ * Runtime-written proof that durable open work was read after a real process
+ * restart or context reload. A single open snapshot is insufficient.
+ */
+export type GoalContinuityRestartObservationV1 = {
+  schema: "goal-continuity-restart-observation/v1";
+  status: "observed" | "not_observed";
+  before_ref: string;
+  after_ref: string;
+  before_open_bead_ids: string[];
+  after_open_bead_ids: string[];
+  source_artifact_refs: string[];
+};
+
 export type GoalContinuityReferencedArtifactV1 = {
   ref: string;
   present: boolean;
@@ -318,6 +332,8 @@ export type GoalContinuityArtifactBagV1 = {
   ready_fronts: GoalContinuityReferencedArtifactV1[];
   plan_bead_snapshots: GoalContinuityReferencedArtifactV1[];
   memory_notes: GoalContinuityReferencedArtifactV1[];
+  /** Required when the case asks for a process restart or durable reload. */
+  restart_observation?: GoalContinuityRestartObservationV1;
   /** Optional physical evidence bag; absent when only continuity is scored. */
   physical_evidence?: CapabilityEvidenceBagV1;
 };

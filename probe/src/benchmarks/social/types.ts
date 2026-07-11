@@ -1,7 +1,7 @@
 import type { WorldScenarioId } from "../../server/worldScenarios.js";
 
 /**
- * Interdependent social scenario declaration (V4 Slice C1).
+ * Interdependent social scenario declaration (V4 Step C1).
  *
  * Declares environment pressure and measurement settings only.
  * Must not prescribe trust, cooperation, refusal, specialization, partners,

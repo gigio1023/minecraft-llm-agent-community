@@ -1,4 +1,4 @@
-/** Contract tests for interdependent-social-scenario/v1 loader and example. */
+/** Tests for the interdependent-social-scenario/v1 loader and example. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -52,14 +52,9 @@ test("checked-in minimal scenario loads with C1 declaration fields", () => {
   assert.equal(scenario.visual.pixels_are_review_only, true);
   assert.ok(scenario.provenance.source_ref.length > 0);
 
-  const resolved = scenario.required_capabilities.find(
-    (entry) => entry.evidence_status === "resolved"
+  assert.ok(
+    scenario.required_capabilities.every((entry) => entry.evidence_status === "declared_gap")
   );
-  const gap = scenario.required_capabilities.find(
-    (entry) => entry.evidence_status === "declared_gap"
-  );
-  assert.ok(resolved);
-  assert.ok(gap);
   assert.equal(
     "recommended_actions" in scenario,
     false,
@@ -148,6 +143,41 @@ test("unresolved capability ref fails when known cases are supplied", () => {
       /does not resolve|declared_gap|not_a_real_capability_case/i.test(error)
     )
   );
+});
+
+test("a manifest case declaration cannot masquerade as resolved capability evidence", () => {
+  const raw = JSON.parse(fs.readFileSync(scenarioPath, "utf8")) as Record<string, unknown>;
+  const requirements = raw.required_capabilities as Array<Record<string, unknown>>;
+  requirements[0] = {
+    capability_case_id: "collect_logs",
+    evidence_status: "resolved",
+    evidence_ref: "probe/benchmarks/capability/individual-capability-v1.json#collect_logs",
+    suite_id: "individual-capability-v1"
+  };
+  const result = validateInterdependentSocialScenario(raw, {
+    knownCapabilityCaseIds: knownCapabilityCaseIds()
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.errors.some((error) => /normalized capability report|declared_gap/i.test(error)));
+  }
+});
+
+test("resolved capability evidence requires an exact caller-confirmed report ref", () => {
+  const raw = JSON.parse(fs.readFileSync(scenarioPath, "utf8")) as Record<string, unknown>;
+  const requirements = raw.required_capabilities as Array<Record<string, unknown>>;
+  const reportRef = "runs/capability/collect-logs/normalized-report.json";
+  requirements[0] = {
+    capability_case_id: "collect_logs",
+    evidence_status: "resolved",
+    evidence_ref: reportRef,
+    suite_id: "individual-capability-v1"
+  };
+  const result = validateInterdependentSocialScenario(raw, {
+    knownCapabilityCaseIds: knownCapabilityCaseIds(),
+    knownCapabilityEvidenceRefs: [reportRef]
+  });
+  assert.equal(result.ok, true);
 });
 
 test("missing capability evidence status fails loader validation", () => {

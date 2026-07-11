@@ -217,7 +217,7 @@ export function resolveCaseSeed(
 }
 
 export function deriveMaxActionsPerCycle(budgets: IndividualCapabilityCaseV1["budgets"]): number {
-  return Math.max(1, Math.ceil(budgets.max_runtime_actions / budgets.max_cycles));
+  return Math.max(1, Math.floor(budgets.max_runtime_actions / budgets.max_cycles));
 }
 
 export function countRuntimeActions(report: {
@@ -227,8 +227,6 @@ export function countRuntimeActions(report: {
   for (const cycle of report.cycles) {
     if (cycle.action_attempts && cycle.action_attempts.length > 0) {
       count += cycle.action_attempts.length;
-    } else {
-      count += 1;
     }
   }
   return count;
@@ -343,6 +341,20 @@ export async function runCapabilityCase(
   const cycles = input.cycles ?? capabilityCase.budgets.max_cycles;
   const maxActionsPerCycle =
     input.maxActionsPerCycle ?? deriveMaxActionsPerCycle(capabilityCase.budgets);
+  if (!Number.isInteger(cycles) || cycles <= 0 || cycles > capabilityCase.budgets.max_cycles) {
+    throw new CapabilityRunnerError(
+      `cycles must be a positive integer no greater than declared max_cycles (${capabilityCase.budgets.max_cycles})`
+    );
+  }
+  if (
+    !Number.isInteger(maxActionsPerCycle) ||
+    maxActionsPerCycle <= 0 ||
+    cycles * maxActionsPerCycle > capabilityCase.budgets.max_runtime_actions
+  ) {
+    throw new CapabilityRunnerError(
+      `cycles * maxActionsPerCycle must not exceed declared max_runtime_actions (${capabilityCase.budgets.max_runtime_actions})`
+    );
+  }
   const repeatIndex = input.repeatIndex ?? 0;
   const capabilityRunId = `capability-${capabilityCase.case_id}-${randomUUID()}`;
   const runDir = path.join(outDir, "cases", capabilityCase.case_id, capabilityRunId);
