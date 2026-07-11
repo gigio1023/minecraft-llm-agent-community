@@ -1,7 +1,7 @@
 # V4 Implementation Notes
 
 Branch: `codex/capability-gated-social-sandbox-v4`
-Handoff: `handoff-prompt.md` (bounded GPT-5.4 Mini live validation)
+Handoff: `handoff-prompt.md` (provider-free capability early completion)
 
 ## Current focus
 
@@ -35,7 +35,7 @@ via the adaptation in the active implementation plan.
 
 ## Validation snapshot
 
-- `cd probe && bun test` → 729 pass
+- `cd probe && bun test` → 733 pass
 - `bun run typecheck` → pass
 - `cd docs && npm run build` → pass
 - `git diff --check` → pass
@@ -44,6 +44,8 @@ via the adaptation in the active implementation plan.
 
 | Commit | Work |
 | --- | --- |
+| `773e3bca` | detailed capability live-validation repair plan |
+| `b7dda428` | exact goal input, explicit table placement, diverse world scan |
 | `76db6cc0` | B2 strict artifact-bag loader + restart writer |
 | `75a68ec9` | A3 case budget stopping |
 | `83b26f85` | B2 assert bags at evaluate entry |
