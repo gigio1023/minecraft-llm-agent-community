@@ -6,11 +6,13 @@ import {
   isKnownMinecraftItemOrBlock
 } from "./minecraftIds.js";
 import type {
+  CapabilityAllowedEvidenceKindV1,
   CapabilityMilestoneV1,
   CapabilityPredicateV1,
   IndividualCapabilityCaseV1,
   IndividualCapabilityManifestV1
 } from "./types.js";
+import { CAPABILITY_ALLOWED_EVIDENCE_KINDS } from "./types.js";
 
 type ValidationFailure = { ok: false; errors: string[] };
 
@@ -22,23 +24,57 @@ const fixtureClasses = ["natural_world", "command_fixture", "mixed"] as const;
 const seedPolicyKinds = ["fixed", "declared_set", "fresh"] as const;
 const partialCreditKinds = ["milestones", "none"] as const;
 
-const forbiddenCaseRootKeys = [
-  "recommended_actions",
-  "action_order",
-  "recipe_steps",
-  "hidden_candidates",
-  "provider_rationale"
+const manifestKeys = ["schema", "suite_id", "version", "description", "cases"] as const;
+const caseKeys = [
+  "case_id",
+  "title",
+  "top_level_goal",
+  "world_scenario_id",
+  "fixture_class",
+  "required_capabilities",
+  "budgets",
+  "target",
+  "milestones",
+  "allowed_evidence_kinds",
+  "seed_policy",
+  "completion_policy"
 ] as const;
+const budgetKeys = [
+  "max_cycles",
+  "max_runtime_actions",
+  "max_wall_time_ms",
+  "max_provider_requests",
+  "max_total_tokens",
+  "max_estimated_cost"
+] as const;
+const seedPolicyKeys = ["kind", "seeds", "repeats"] as const;
+const completionPolicyKeys = ["require_target", "partial_credit"] as const;
+const milestoneKeys = ["milestone_id", "title", "predicate", "order", "weight"] as const;
 
-const predicateOps = [
-  "item_count_gte",
-  "held_item_is",
-  "block_observed_at",
-  "position_within",
-  "container_item_count_gte",
-  "evidence_kind_seen",
-  "all",
-  "any"
+const predicateKeysByOp: Record<string, readonly string[]> = {
+  item_count_gte: ["op", "item", "count", "owner"],
+  held_item_is: ["op", "item"],
+  block_observed_at: ["op", "block", "position_ref"],
+  position_within: ["op", "center_ref", "radius"],
+  container_item_count_gte: ["op", "container_ref", "item", "count"],
+  all: ["op", "children"],
+  any: ["op", "children"]
+};
+
+const predicateOps = Object.keys(predicateKeysByOp);
+
+const forbiddenEvidenceKinds = [
+  "provider_rationale",
+  "task",
+  "task_text",
+  "memory",
+  "memory_text",
+  "planbead",
+  "planbead_prose",
+  "video",
+  "screenshot",
+  "chat",
+  "chat_wording"
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,16 +89,29 @@ function includesString<T extends string>(values: readonly T[], value: unknown):
   return typeof value === "string" && values.includes(value as T);
 }
 
-function isPositiveFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
-}
-
 function isPositiveInteger(value: unknown): value is number {
   return Number.isInteger(value) && typeof value === "number" && value > 0;
 }
 
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function rejectUnknownKeys(
+  record: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+  errors: string[]
+) {
+  for (const key of Object.keys(record)) {
+    if (!allowed.includes(key)) {
+      errors.push(`${path}.${key} is not an allowed key`);
+    }
+  }
 }
 
 function assertString(record: Record<string, unknown>, key: string, path: string, errors: string[]) {
@@ -103,17 +152,6 @@ function assertRecord(
     return null;
   }
   return record[key];
-}
-
-function assertPositiveNumber(
-  record: Record<string, unknown>,
-  key: string,
-  path: string,
-  errors: string[]
-) {
-  if (!isPositiveFiniteNumber(record[key])) {
-    errors.push(`${path}.${key} must be a positive finite number`);
-  }
 }
 
 function assertPositiveIntegerField(
@@ -159,29 +197,6 @@ function assertKnownBlockField(
   }
 }
 
-function assertConstraintRecord(
-  record: Record<string, unknown>,
-  key: string,
-  path: string,
-  errors: string[]
-) {
-  const value = record[key];
-  if (!isRecord(value)) {
-    errors.push(`${path}.${key} must be an object`);
-    return;
-  }
-  for (const [constraintKey, constraintValue] of Object.entries(value)) {
-    const constraintPath = `${path}.${key}.${constraintKey}`;
-    if (
-      typeof constraintValue !== "string" &&
-      typeof constraintValue !== "number" &&
-      typeof constraintValue !== "boolean"
-    ) {
-      errors.push(`${constraintPath} must be a string, number, or boolean`);
-    }
-  }
-}
-
 function assertWorldScenarioId(
   record: Record<string, unknown>,
   key: string,
@@ -205,18 +220,6 @@ function assertWorldScenarioId(
   }
 }
 
-function rejectForbiddenCaseRootKeys(
-  record: Record<string, unknown>,
-  path: string,
-  errors: string[]
-) {
-  for (const key of forbiddenCaseRootKeys) {
-    if (record[key] !== undefined) {
-      errors.push(`${path}.${key} must not appear in capability manifest cases`);
-    }
-  }
-}
-
 function validatePredicate(value: unknown, path: string, errors: string[]): void {
   if (!isRecord(value)) {
     errors.push(`${path} must be an object`);
@@ -224,10 +227,14 @@ function validatePredicate(value: unknown, path: string, errors: string[]): void
   }
 
   const op = value.op;
-  if (!includesString(predicateOps, op)) {
+  if (typeof op !== "string" || !predicateOps.includes(op)) {
     errors.push(`${path}.op must be a known capability predicate op`);
+    rejectUnknownKeys(value, ["op"], path, errors);
     return;
   }
+
+  const allowedKeys = predicateKeysByOp[op] ?? ["op"];
+  rejectUnknownKeys(value, allowedKeys, path, errors);
 
   switch (op) {
     case "item_count_gte":
@@ -259,10 +266,6 @@ function validatePredicate(value: unknown, path: string, errors: string[]): void
         errors.push(`${path}.count must be a positive finite number`);
       }
       break;
-    case "evidence_kind_seen":
-      assertString(value, "evidence_kind", path, errors);
-      assertConstraintRecord(value, "constraints", path, errors);
-      break;
     case "all":
     case "any": {
       const children = value.children;
@@ -278,16 +281,13 @@ function validatePredicate(value: unknown, path: string, errors: string[]): void
   }
 }
 
-function validateMilestone(
-  value: unknown,
-  path: string,
-  errors: string[]
-): CapabilityMilestoneV1 | null {
+function validateMilestone(value: unknown, path: string, errors: string[]): void {
   if (!isRecord(value)) {
     errors.push(`${path} must be an object`);
-    return null;
+    return;
   }
 
+  rejectUnknownKeys(value, milestoneKeys, path, errors);
   assertString(value, "milestone_id", path, errors);
   assertString(value, "title", path, errors);
   validatePredicate(value.predicate, `${path}.predicate`, errors);
@@ -300,35 +300,28 @@ function validateMilestone(
   if (!isFiniteNumber(value.weight)) {
     errors.push(`${path}.weight must be a finite number`);
   }
-
-  return null;
 }
 
-function validateBudgets(
-  value: unknown,
-  path: string,
-  errors: string[]
-): IndividualCapabilityCaseV1["budgets"] | null {
+function validateBudgets(value: unknown, path: string, errors: string[]): void {
   if (!isRecord(value)) {
     errors.push(`${path} must be an object`);
-    return null;
+    return;
   }
 
-  assertPositiveNumber(value, "max_cycles", path, errors);
-  assertPositiveNumber(value, "max_runtime_actions", path, errors);
-  assertPositiveNumber(value, "max_wall_time_ms", path, errors);
+  rejectUnknownKeys(value, budgetKeys, path, errors);
+  assertPositiveIntegerField(value, "max_cycles", path, errors);
+  assertPositiveIntegerField(value, "max_runtime_actions", path, errors);
+  assertPositiveIntegerField(value, "max_wall_time_ms", path, errors);
 
-  if (value.max_provider_requests !== undefined && !isPositiveFiniteNumber(value.max_provider_requests)) {
-    errors.push(`${path}.max_provider_requests must be a positive finite number when present`);
+  if (value.max_provider_requests !== undefined) {
+    assertPositiveIntegerField(value, "max_provider_requests", path, errors);
   }
-  if (value.max_total_tokens !== undefined && !isPositiveFiniteNumber(value.max_total_tokens)) {
-    errors.push(`${path}.max_total_tokens must be a positive finite number when present`);
+  if (value.max_total_tokens !== undefined) {
+    assertPositiveIntegerField(value, "max_total_tokens", path, errors);
   }
   if (value.max_estimated_cost !== undefined && !isPositiveFiniteNumber(value.max_estimated_cost)) {
     errors.push(`${path}.max_estimated_cost must be a positive finite number when present`);
   }
-
-  return null;
 }
 
 function validateSeedPolicy(value: unknown, path: string, errors: string[]): void {
@@ -337,6 +330,8 @@ function validateSeedPolicy(value: unknown, path: string, errors: string[]): voi
     return;
   }
 
+  rejectUnknownKeys(value, seedPolicyKeys, path, errors);
+
   if (!includesString(seedPolicyKinds, value.kind)) {
     errors.push(`${path}.kind must be one of: ${seedPolicyKinds.join(", ")}`);
   }
@@ -344,9 +339,17 @@ function validateSeedPolicy(value: unknown, path: string, errors: string[]): voi
   assertPositiveIntegerField(value, "repeats", path, errors);
 
   if (value.kind === "fixed" || value.kind === "declared_set") {
-    assertStringArray(value, "seeds", path, errors);
-  } else if (value.seeds !== undefined) {
-    assertStringArray(value, "seeds", path, errors);
+    if (
+      !Array.isArray(value.seeds) ||
+      value.seeds.length === 0 ||
+      !value.seeds.every((entry) => typeof entry === "string" && entry.length > 0)
+    ) {
+      errors.push(`${path}.seeds must be a non-empty string array for kind '${String(value.kind)}'`);
+    }
+  } else if (value.kind === "fresh") {
+    if (value.seeds !== undefined) {
+      errors.push(`${path}.seeds must not be present when kind is 'fresh'`);
+    }
   }
 }
 
@@ -356,9 +359,39 @@ function validateCompletionPolicy(value: unknown, path: string, errors: string[]
     return;
   }
 
+  rejectUnknownKeys(value, completionPolicyKeys, path, errors);
   assertBoolean(value, "require_target", path, errors);
   if (!includesString(partialCreditKinds, value.partial_credit)) {
     errors.push(`${path}.partial_credit must be one of: ${partialCreditKinds.join(", ")}`);
+  }
+}
+
+function validateAllowedEvidenceKinds(
+  value: unknown,
+  path: string,
+  errors: string[]
+): void {
+  if (!Array.isArray(value) || value.length === 0) {
+    errors.push(`${path} must be a non-empty array`);
+    return;
+  }
+
+  for (const [index, entry] of value.entries()) {
+    if (!nonEmptyString(entry)) {
+      errors.push(`${path}[${index}] must be a non-empty string`);
+      continue;
+    }
+    if (includesString(forbiddenEvidenceKinds, entry)) {
+      errors.push(
+        `${path}[${index}] '${entry}' cannot decide physical targets (prose/video/screenshot are not allowed)`
+      );
+      continue;
+    }
+    if (!includesString(CAPABILITY_ALLOWED_EVIDENCE_KINDS, entry)) {
+      errors.push(
+        `${path}[${index}] '${entry}' is not a closed capability evidence kind (${CAPABILITY_ALLOWED_EVIDENCE_KINDS.join(", ")})`
+      );
+    }
   }
 }
 
@@ -368,7 +401,7 @@ function validateCase(value: unknown, path: string, errors: string[]): void {
     return;
   }
 
-  rejectForbiddenCaseRootKeys(value, path, errors);
+  rejectUnknownKeys(value, caseKeys, path, errors);
 
   assertString(value, "case_id", path, errors);
   assertString(value, "title", path, errors);
@@ -399,12 +432,21 @@ function validateCase(value: unknown, path: string, errors: string[]): void {
   } else if (!Array.isArray(value.milestones)) {
     errors.push(`${path}.milestones must be an array`);
   } else {
+    const milestoneIds = new Set<string>();
     for (const [index, milestone] of value.milestones.entries()) {
       validateMilestone(milestone, `${path}.milestones[${index}]`, errors);
+      if (isRecord(milestone) && nonEmptyString(milestone.milestone_id)) {
+        if (milestoneIds.has(milestone.milestone_id)) {
+          errors.push(
+            `${path}.milestones duplicate milestone_id '${milestone.milestone_id}'`
+          );
+        }
+        milestoneIds.add(milestone.milestone_id);
+      }
     }
   }
 
-  assertStringArray(value, "allowed_evidence_kinds", path, errors);
+  validateAllowedEvidenceKinds(value.allowed_evidence_kinds, `${path}.allowed_evidence_kinds`, errors);
 
   const seedPolicy = assertRecord(value, "seed_policy", path, errors);
   if (seedPolicy) {
@@ -421,12 +463,92 @@ function validateCase(value: unknown, path: string, errors: string[]): void {
   }
 }
 
+function validateCapabilityDependencyGraph(
+  cases: unknown[],
+  errors: string[]
+): void {
+  const caseIds = new Set<string>();
+  for (const [index, capabilityCase] of cases.entries()) {
+    if (!isRecord(capabilityCase) || !nonEmptyString(capabilityCase.case_id)) {
+      continue;
+    }
+    if (caseIds.has(capabilityCase.case_id)) {
+      errors.push(
+        `IndividualCapabilityManifest.cases duplicate case_id '${capabilityCase.case_id}'`
+      );
+    }
+    caseIds.add(capabilityCase.case_id);
+    void index;
+  }
+
+  const adjacency = new Map<string, string[]>();
+  for (const [index, capabilityCase] of cases.entries()) {
+    if (!isRecord(capabilityCase) || !nonEmptyString(capabilityCase.case_id)) {
+      continue;
+    }
+    const caseId = capabilityCase.case_id;
+    const deps = Array.isArray(capabilityCase.required_capabilities)
+      ? capabilityCase.required_capabilities.filter(
+          (entry): entry is string => typeof entry === "string" && entry.length > 0
+        )
+      : [];
+
+    const internalDeps: string[] = [];
+    for (const [depIndex, dep] of deps.entries()) {
+      if (dep === caseId) {
+        errors.push(
+          `IndividualCapabilityManifest.cases[${index}].required_capabilities[${depIndex}] must not reference itself`
+        );
+        continue;
+      }
+      if (dep.startsWith("external:")) {
+        continue;
+      }
+      if (!caseIds.has(dep)) {
+        errors.push(
+          `IndividualCapabilityManifest.cases[${index}].required_capabilities[${depIndex}] '${dep}' is not a suite case_id; use 'external:<id>' for external refs`
+        );
+        continue;
+      }
+      internalDeps.push(dep);
+    }
+    adjacency.set(caseId, internalDeps);
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(node: string, stack: string[]): void {
+    if (visited.has(node)) {
+      return;
+    }
+    if (visiting.has(node)) {
+      const cycleStart = stack.indexOf(node);
+      const cycle = [...stack.slice(cycleStart), node].join(" -> ");
+      errors.push(`IndividualCapabilityManifest.cases required_capabilities cycle: ${cycle}`);
+      return;
+    }
+    visiting.add(node);
+    for (const next of adjacency.get(node) ?? []) {
+      visit(next, [...stack, node]);
+    }
+    visiting.delete(node);
+    visited.add(node);
+  }
+
+  for (const caseId of caseIds) {
+    visit(caseId, []);
+  }
+}
+
 export function validateIndividualCapabilityManifest(value: unknown): ManifestValidationResult {
   const errors: string[] = [];
 
   if (!isRecord(value)) {
     return { ok: false, errors: ["IndividualCapabilityManifest must be an object"] };
   }
+
+  rejectUnknownKeys(value, manifestKeys, "IndividualCapabilityManifest", errors);
 
   if (value.schema !== "individual-capability-manifest/v1") {
     errors.push("schema must be 'individual-capability-manifest/v1'");
@@ -442,6 +564,7 @@ export function validateIndividualCapabilityManifest(value: unknown): ManifestVa
     for (const [index, capabilityCase] of value.cases.entries()) {
       validateCase(capabilityCase, `IndividualCapabilityManifest.cases[${index}]`, errors);
     }
+    validateCapabilityDependencyGraph(value.cases, errors);
   }
 
   if (errors.length > 0) {
@@ -466,3 +589,5 @@ export function loadIndividualCapabilityManifestFromFile(
   const parsed: unknown = JSON.parse(raw);
   return assertIndividualCapabilityManifest(parsed);
 }
+
+export type { CapabilityAllowedEvidenceKindV1, CapabilityMilestoneV1, CapabilityPredicateV1 };

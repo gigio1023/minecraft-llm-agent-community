@@ -111,6 +111,10 @@ Current research direction lives under:
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/society-observable-preflight.md`
 
+V4 implementation / reference notes (not direction-defining):
+
+- `project-docs/research/benchmarks/individual-capability-manifest-a1.md`
+
 The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05), and
 the V2 co-actor legibility docs (central plan, implementation plan, cycle 2
 work plan) are superseded (2026-07-10). The V3 lived-vs-told central plan and

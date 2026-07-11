@@ -1,4 +1,5 @@
 export type {
+  CapabilityAllowedEvidenceKindV1,
   CapabilityMilestoneV1,
   CapabilityPredicateResultV1,
   CapabilityPredicateV1,
@@ -6,7 +7,13 @@ export type {
   IndividualCapabilityManifestV1
 } from "./types.js";
 
-export type { CapabilityEvidenceBagV1 } from "./evidenceBag.js";
+export { CAPABILITY_ALLOWED_EVIDENCE_KINDS } from "./types.js";
+
+export type {
+  CapabilityEvidenceBagV1,
+  EvidencedValueV1,
+  EvidenceOriginV1
+} from "./evidenceBag.js";
 
 export {
   DEFAULT_CAPABILITY_MC_VERSION,

@@ -398,37 +398,50 @@ Acceptance:
 
 ### Slice A1 — Manifest Loader And Typed Predicates
 
-Status: **accepted** (2026-07-11). Provider-free; no live server or provider call.
+Status: **accepted after A1R** (2026-07-11). Provider-free; no live server or
+provider call. Initial landing `26c1f93f` was reopened after evidence-rule
+counterexamples; A1R repaired the contract in a follow-up commit.
 
 Deliver:
 
-- `individual-capability-manifest/v1` TypeScript types and strict loader;
+- `individual-capability-manifest/v1` TypeScript types and strict recursive
+  allowlist loader;
 - typed predicate evaluator with `passed | failed | unknown`;
+- evidenced bag values with non-empty source refs and `origin: setup | run`;
 - one checked-in suite containing three minimal cases:
-  `collect_logs`, `craft_table`, and `place_table`;
-- negative fixtures for unknown evidence, invalid Minecraft id, missing budget,
-  and prose-only success.
+  `collect_logs` (including `pale_oak_log`), `craft_table`, and `place_table`;
+- negative fixtures for unknown keys, fractional budgets, invalid evidence
+  kinds, inconsistent seeds, duplicate ids, dependency cycles, removed
+  `evidence_kind_seen`, invalid Minecraft id, missing budget, and strategy
+  fields.
 
 Acceptance:
 
 - [x] invalid manifests fail before server/provider work;
 - [x] valid cases round-trip without defaulting missing evaluation authority;
-- [x] predicates evaluate only saved structured evidence;
-- [x] every pass cites evidence refs;
-- [x] provider prose, task text, and tool names cannot flip a predicate;
+- [x] predicates evaluate only saved structured evidence with resolvable refs;
+- [x] every pass cites supplied artifact refs only (no fabricated `settlement:*`);
+- [x] provider prose, task text, tool names, and setup/fixture origin cannot
+  flip a physical target;
 - [x] `cd probe && bun test` and `bun run typecheck` pass.
 
 Evidence:
 
+- explanation of implementation and rationale:
+  `project-docs/research/benchmarks/individual-capability-manifest-a1.md`
+  (`CAPABILITY_MANIFEST_V1_A1`)
 - modules: `probe/src/benchmarks/capability/{types,loader,predicates,minecraftIds,evidenceBag,index}.ts`
 - suite: `probe/benchmarks/capability/individual-capability-v1.json`
 - fixtures: `probe/benchmarks/capability/fixtures/`
 - tests: `probe/test/individualCapabilityManifest.test.ts`,
   `probe/test/capabilityPredicates.test.ts`
-- validation: focused A1 tests 19/19; `bun run typecheck`; `git diff --check`
+- validation: focused A1R tests 29/29; full probe suite 607/607;
+  `bun run typecheck`; docs build; `git diff --check`
 - A2 note: report adapter must map real social-cycle artifacts into
-  `CapabilityEvidenceBagV1`; do not import furnace milestone scoring as generic
-  authority. `block_observed_at` requires positioned block facts.
+  `CapabilityEvidenceBagV1` with per-value refs and correct origin; do not
+  import furnace milestone scoring as generic authority. Missing refs stay
+  `unverifiable`. `block_observed_at` requires positioned run-origin block
+  facts and a run-bound `placed_crafting_table` named position.
 
 ### Slice A2 — Normalized Report Adapter
 

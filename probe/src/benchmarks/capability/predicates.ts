@@ -1,4 +1,7 @@
-import type { CapabilityEvidenceBagV1 } from "./evidenceBag.js";
+import type {
+  CapabilityEvidenceBagV1,
+  EvidencedValueV1
+} from "./evidenceBag.js";
 import { normalizeMinecraftId } from "./minecraftIds.js";
 import type {
   CapabilityMilestoneV1,
@@ -7,11 +10,11 @@ import type {
 } from "./types.js";
 
 function passed(evidence_refs: string[]): CapabilityPredicateResultV1 {
-  return { status: "passed", evidence_refs };
+  return { status: "passed", evidence_refs: dedupeRefs(evidence_refs) };
 }
 
 function failed(reasons: string[], evidence_refs: string[] = []): CapabilityPredicateResultV1 {
-  return { status: "failed", evidence_refs, reasons };
+  return { status: "failed", evidence_refs: dedupeRefs(evidence_refs), reasons };
 }
 
 function unknown(
@@ -25,6 +28,51 @@ function unknown(
     missing_evidence,
     unsupported,
     reasons: reasons.length > 0 ? reasons : undefined
+  };
+}
+
+function dedupeRefs(refs: string[]): string[] {
+  return [...new Set(refs.filter((ref) => typeof ref === "string" && ref.trim().length > 0))];
+}
+
+function hasNonEmptyRefs(refs: readonly string[] | undefined): refs is [string, ...string[]] {
+  return Array.isArray(refs) && refs.some((ref) => typeof ref === "string" && ref.trim().length > 0);
+}
+
+function requireRunEvidenced<T>(
+  evidenced: EvidencedValueV1<T> | undefined,
+  available: boolean,
+  missingKey: string
+):
+  | { ok: true; value: T; evidence_refs: string[] }
+  | { ok: false; result: CapabilityPredicateResultV1 } {
+  if (!available || evidenced === undefined) {
+    return { ok: false, result: unknown([missingKey]) };
+  }
+  if (!hasNonEmptyRefs(evidenced.evidence_refs)) {
+    return {
+      ok: false,
+      result: unknown(
+        [`${missingKey}.evidence_refs`],
+        [],
+        [`${missingKey} is present without resolvable source artifact refs`]
+      )
+    };
+  }
+  if (evidenced.origin !== "run") {
+    return {
+      ok: false,
+      result: unknown(
+        [`${missingKey}.run`],
+        [],
+        [`${missingKey} origin is '${evidenced.origin}'; setup/fixture values cannot satisfy acquisition or placement targets`]
+      )
+    };
+  }
+  return {
+    ok: true,
+    value: evidenced.value,
+    evidence_refs: dedupeRefs(evidenced.evidence_refs)
   };
 }
 
@@ -45,9 +93,8 @@ function distance3d(
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function inventoryCountForItem(bag: CapabilityEvidenceBagV1, item: string): number {
+function inventoryCountForItem(counts: Record<string, number>, item: string): number {
   const normalized = normalizeMinecraftId(item);
-  const counts = bag.inventory_counts ?? {};
   let total = 0;
   for (const [name, count] of Object.entries(counts)) {
     if (normalizeMinecraftId(name) === normalized) {
@@ -57,67 +104,47 @@ function inventoryCountForItem(bag: CapabilityEvidenceBagV1, item: string): numb
   return total;
 }
 
-function findInventoryFactRef(bag: CapabilityEvidenceBagV1, item: string): string | undefined {
-  const normalized = normalizeMinecraftId(item);
-  for (const fact of bag.facts ?? []) {
-    if (fact.item !== undefined && normalizeMinecraftId(fact.item) === normalized) {
-      return fact.evidence_ref;
-    }
-  }
-  return undefined;
-}
-
-function constraintMatches(
-  fact: Record<string, unknown>,
-  constraints: Record<string, string | number | boolean>
-): boolean {
-  for (const [key, expected] of Object.entries(constraints)) {
-    if (fact[key] !== expected) {
-      return false;
-    }
-  }
-  return true;
-}
-
 function evaluateItemCountGte(
   predicate: Extract<CapabilityPredicateV1, { op: "item_count_gte" }>,
   bag: CapabilityEvidenceBagV1
 ): CapabilityPredicateResultV1 {
-  if (!bag.available.inventory || bag.inventory_counts === undefined) {
-    return unknown(["inventory_counts"]);
+  const required = requireRunEvidenced(bag.inventory, bag.available.inventory, "inventory");
+  if (!required.ok) {
+    return required.result;
   }
 
-  const actual = inventoryCountForItem(bag, predicate.item);
+  const actual = inventoryCountForItem(required.value, predicate.item);
   if (actual < predicate.count) {
-    return failed([
-      `inventory count for '${normalizeMinecraftId(predicate.item)}' is ${actual}, need >= ${predicate.count}`
-    ]);
+    return failed(
+      [
+        `inventory count for '${normalizeMinecraftId(predicate.item)}' is ${actual}, need >= ${predicate.count}`
+      ],
+      required.evidence_refs
+    );
   }
 
-  const evidenceRef = findInventoryFactRef(bag, predicate.item) ?? "settlement:inventory_counts";
-  return passed([evidenceRef]);
+  return passed(required.evidence_refs);
 }
 
 function evaluateHeldItemIs(
   predicate: Extract<CapabilityPredicateV1, { op: "held_item_is" }>,
   bag: CapabilityEvidenceBagV1
 ): CapabilityPredicateResultV1 {
-  if (!bag.available.held_item) {
-    return unknown(["held_item"]);
+  const required = requireRunEvidenced(bag.held_item, bag.available.held_item, "held_item");
+  if (!required.ok) {
+    return required.result;
   }
 
   const expected = normalizeMinecraftId(predicate.item);
-  const actual = bag.held_item?.name ? normalizeMinecraftId(bag.held_item.name) : null;
+  const actual = required.value?.name ? normalizeMinecraftId(required.value.name) : null;
   if (actual !== expected) {
-    return failed([
-      `held item is '${actual ?? "none"}', expected '${expected}'`
-    ]);
+    return failed(
+      [`held item is '${actual ?? "none"}', expected '${expected}'`],
+      required.evidence_refs
+    );
   }
 
-  const factRef = (bag.facts ?? []).find(
-    (fact) => fact.kind === "held_item" || fact.item === predicate.item
-  )?.evidence_ref;
-  return passed([factRef ?? "settlement:held_item"]);
+  return passed(required.evidence_refs);
 }
 
 function evaluateBlockObservedAt(
@@ -128,9 +155,27 @@ function evaluateBlockObservedAt(
     return unknown(["known_blocks"]);
   }
 
-  const namedPosition = bag.named_positions?.[predicate.position_ref];
-  if (!namedPosition) {
+  const named = bag.named_positions?.[predicate.position_ref];
+  if (!named) {
     return unknown([`named_positions.${predicate.position_ref}`]);
+  }
+  if (!hasNonEmptyRefs(named.evidence_refs)) {
+    return unknown(
+      [`named_positions.${predicate.position_ref}.evidence_refs`],
+      [],
+      [
+        `position_ref '${predicate.position_ref}' lacks resolvable source refs; A2 must bind it to a current-run placement artifact`
+      ]
+    );
+  }
+  if (named.origin !== "run") {
+    return unknown(
+      [`named_positions.${predicate.position_ref}.run`],
+      [],
+      [
+        `position_ref '${predicate.position_ref}' origin is '${named.origin}'; setup/fixture positions cannot satisfy placement targets`
+      ]
+    );
   }
 
   const expectedBlock = normalizeMinecraftId(predicate.block);
@@ -143,7 +188,18 @@ function evaluateBlockObservedAt(
     ]);
   }
 
-  const positioned = candidates.filter((entry) => entry.position !== undefined);
+  const runCandidates = candidates.filter((entry) => entry.origin === "run");
+  if (runCandidates.length === 0) {
+    return unknown(
+      [`known_blocks.run for '${expectedBlock}'`],
+      [],
+      [
+        `block '${expectedBlock}' was only recorded as setup/fixture; cannot satisfy placement target`
+      ]
+    );
+  }
+
+  const positioned = runCandidates.filter((entry) => entry.position !== undefined);
   if (positioned.length === 0) {
     return unknown(
       [`known_blocks.position for '${expectedBlock}'`],
@@ -154,37 +210,54 @@ function evaluateBlockObservedAt(
     );
   }
 
-  const match = positioned.find((entry) => positionsEqual(entry.position!, namedPosition));
+  const match = positioned.find((entry) =>
+    positionsEqual(entry.position!, named.value)
+  );
   if (!match) {
-    return failed([
-      `block '${expectedBlock}' not observed at position_ref '${predicate.position_ref}'`
-    ]);
+    return failed(
+      [`block '${expectedBlock}' not observed at position_ref '${predicate.position_ref}'`],
+      named.evidence_refs
+    );
+  }
+  if (!hasNonEmptyRefs([match.evidence_ref])) {
+    return unknown(
+      [`known_blocks.evidence_ref for '${expectedBlock}'`],
+      [],
+      [`matching block observation lacks a resolvable source artifact ref`]
+    );
   }
 
-  return passed([match.evidence_ref]);
+  return passed(dedupeRefs([...named.evidence_refs, match.evidence_ref]));
 }
 
 function evaluatePositionWithin(
   predicate: Extract<CapabilityPredicateV1, { op: "position_within" }>,
   bag: CapabilityEvidenceBagV1
 ): CapabilityPredicateResultV1 {
-  if (!bag.available.position || bag.actor_position === undefined) {
-    return unknown(["actor_position"]);
+  const actor = requireRunEvidenced(bag.actor_position, bag.available.position, "actor_position");
+  if (!actor.ok) {
+    return actor.result;
   }
 
   const center = bag.named_positions?.[predicate.center_ref];
   if (!center) {
     return unknown([`named_positions.${predicate.center_ref}`]);
   }
-
-  const distance = distance3d(bag.actor_position, center);
+  if (!hasNonEmptyRefs(center.evidence_refs)) {
+    return unknown([`named_positions.${predicate.center_ref}.evidence_refs`]);
+  }
+  // Center refs may be scenario/setup anchors; actor position must still be run-evidenced.
+  const distance = distance3d(actor.value, center.value);
   if (distance > predicate.radius) {
-    return failed([
-      `actor is ${distance.toFixed(3)} blocks from '${predicate.center_ref}', radius is ${predicate.radius}`
-    ]);
+    return failed(
+      [
+        `actor is ${distance.toFixed(3)} blocks from '${predicate.center_ref}', radius is ${predicate.radius}`
+      ],
+      dedupeRefs([...actor.evidence_refs, ...center.evidence_refs])
+    );
   }
 
-  return passed([center.evidence_ref ?? "settlement:actor_position"]);
+  return passed(dedupeRefs([...actor.evidence_refs, ...center.evidence_refs]));
 }
 
 function evaluateContainerItemCountGte(
@@ -201,6 +274,18 @@ function evaluateContainerItemCountGte(
   if (!container) {
     return unknown([`containers.${predicate.container_ref}`]);
   }
+  if (!hasNonEmptyRefs([container.evidence_ref])) {
+    return unknown([`containers.${predicate.container_ref}.evidence_ref`]);
+  }
+  if (container.origin !== "run") {
+    return unknown(
+      [`containers.${predicate.container_ref}.run`],
+      [],
+      [
+        `container '${predicate.container_ref}' origin is '${container.origin}'; setup/fixture contents cannot satisfy contribution targets`
+      ]
+    );
+  }
 
   const normalized = normalizeMinecraftId(predicate.item);
   let actual = 0;
@@ -211,32 +296,15 @@ function evaluateContainerItemCountGte(
   }
 
   if (actual < predicate.count) {
-    return failed([
-      `container '${predicate.container_ref}' has ${actual} of '${normalized}', need >= ${predicate.count}`
-    ]);
+    return failed(
+      [
+        `container '${predicate.container_ref}' has ${actual} of '${normalized}', need >= ${predicate.count}`
+      ],
+      [container.evidence_ref]
+    );
   }
 
   return passed([container.evidence_ref]);
-}
-
-function evaluateEvidenceKindSeen(
-  predicate: Extract<CapabilityPredicateV1, { op: "evidence_kind_seen" }>,
-  bag: CapabilityEvidenceBagV1
-): CapabilityPredicateResultV1 {
-  if (!bag.available.facts) {
-    return unknown(["facts"]);
-  }
-
-  const match = (bag.facts ?? []).find(
-    (fact) => fact.kind === predicate.evidence_kind && constraintMatches(fact, predicate.constraints)
-  );
-  if (!match) {
-    return failed([
-      `no fact with kind '${predicate.evidence_kind}' matching constraints`
-    ]);
-  }
-
-  return passed([match.evidence_ref]);
 }
 
 function mergeAllResults(children: CapabilityPredicateResultV1[]): CapabilityPredicateResultV1 {
@@ -244,7 +312,7 @@ function mergeAllResults(children: CapabilityPredicateResultV1[]): CapabilityPre
     const failedChildren = children.filter((child) => child.status === "failed");
     return {
       status: "failed",
-      evidence_refs: failedChildren.flatMap((child) => child.evidence_refs),
+      evidence_refs: dedupeRefs(failedChildren.flatMap((child) => child.evidence_refs)),
       reasons: failedChildren.flatMap((child) => child.reasons ?? [])
     };
   }
@@ -264,7 +332,7 @@ function mergeAllResults(children: CapabilityPredicateResultV1[]): CapabilityPre
 
   return {
     status: "passed",
-    evidence_refs: children.flatMap((child) => child.evidence_refs)
+    evidence_refs: dedupeRefs(children.flatMap((child) => child.evidence_refs))
   };
 }
 
@@ -273,7 +341,7 @@ function mergeAnyResults(children: CapabilityPredicateResultV1[]): CapabilityPre
   if (passedChildren.length > 0) {
     return {
       status: "passed",
-      evidence_refs: passedChildren.flatMap((child) => child.evidence_refs)
+      evidence_refs: dedupeRefs(passedChildren.flatMap((child) => child.evidence_refs))
     };
   }
 
@@ -292,7 +360,7 @@ function mergeAnyResults(children: CapabilityPredicateResultV1[]): CapabilityPre
 
   return {
     status: "failed",
-    evidence_refs: [],
+    evidence_refs: dedupeRefs(children.flatMap((child) => child.evidence_refs)),
     reasons: children.flatMap((child) => child.reasons ?? [])
   };
 }
@@ -312,12 +380,14 @@ export function evaluateCapabilityPredicate(
       return evaluatePositionWithin(predicate, bag);
     case "container_item_count_gte":
       return evaluateContainerItemCountGte(predicate, bag);
-    case "evidence_kind_seen":
-      return evaluateEvidenceKindSeen(predicate, bag);
     case "all":
-      return mergeAllResults(predicate.children.map((child) => evaluateCapabilityPredicate(child, bag)));
+      return mergeAllResults(
+        predicate.children.map((child) => evaluateCapabilityPredicate(child, bag))
+      );
     case "any":
-      return mergeAnyResults(predicate.children.map((child) => evaluateCapabilityPredicate(child, bag)));
+      return mergeAnyResults(
+        predicate.children.map((child) => evaluateCapabilityPredicate(child, bag))
+      );
     default: {
       const unsupportedOp = (predicate as { op?: string }).op ?? "unknown";
       return unknown([], [unsupportedOp], [`unsupported predicate op '${unsupportedOp}'`]);

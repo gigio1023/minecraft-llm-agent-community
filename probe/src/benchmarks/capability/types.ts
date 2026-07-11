@@ -1,16 +1,25 @@
 import type { WorldScenarioId } from "../../server/worldScenarios.js";
 
+/** Closed runtime-recorded evidence categories. Prose/video/screenshot never decide targets. */
+export const CAPABILITY_ALLOWED_EVIDENCE_KINDS = [
+  "inventory",
+  "held_item",
+  "tool_attempt",
+  "settlement",
+  "block_observation",
+  "container",
+  "actor_position"
+] as const;
+
+export type CapabilityAllowedEvidenceKindV1 =
+  (typeof CAPABILITY_ALLOWED_EVIDENCE_KINDS)[number];
+
 export type CapabilityPredicateV1 =
   | { op: "item_count_gte"; item: string; count: number; owner: "actor" }
   | { op: "held_item_is"; item: string }
   | { op: "block_observed_at"; block: string; position_ref: string }
   | { op: "position_within"; center_ref: string; radius: number }
   | { op: "container_item_count_gte"; container_ref: string; item: string; count: number }
-  | {
-      op: "evidence_kind_seen";
-      evidence_kind: string;
-      constraints: Record<string, string | number | boolean>;
-    }
   | { op: "all"; children: CapabilityPredicateV1[] }
   | { op: "any"; children: CapabilityPredicateV1[] };
 
@@ -39,7 +48,7 @@ export type IndividualCapabilityCaseV1 = {
   };
   target: CapabilityPredicateV1;
   milestones: CapabilityMilestoneV1[];
-  allowed_evidence_kinds: string[];
+  allowed_evidence_kinds: CapabilityAllowedEvidenceKindV1[];
   seed_policy: {
     kind: "fixed" | "declared_set" | "fresh";
     seeds?: string[];
