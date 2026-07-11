@@ -35,6 +35,31 @@ const manifestPath = path.join(
   "benchmarks/capability/individual-capability-v1.json"
 );
 
+async function readFirstActorTurnInput(actorWorkspacePath: string) {
+  const providerInputsDir = path.join(actorWorkspacePath, "npc_b", "provider-inputs");
+  const names = (await fs.readdir(providerInputsDir)).sort();
+  const actorTurnName = names.find((name) => name.startsWith("actor-turn-"));
+  assert.ok(actorTurnName, "expected a saved Actor Turn provider input");
+  const snapshot = JSON.parse(
+    await fs.readFile(path.join(providerInputsDir, actorTurnName), "utf8")
+  ) as { input?: Record<string, unknown> };
+  assert.ok(snapshot.input, "provider input snapshot must contain input");
+  return snapshot.input;
+}
+
+function allObjectKeys(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(allObjectKeys);
+  }
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => [
+    key,
+    ...allObjectKeys(child)
+  ]);
+}
+
 test("capability runner provider-free offline smoke emits declaration, raw, normalized, suite index", async () => {
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-runner-smoke-"));
   const manifest = loadIndividualCapabilityManifestFromFile(manifestPath);
@@ -74,13 +99,35 @@ test("capability runner provider-free offline smoke emits declaration, raw, norm
   const rawReport = JSON.parse(await fs.readFile(result.raw_report_path, "utf8")) as {
     schema?: string;
     provider?: { provider_id?: string; model?: string };
+    capability_case_context?: {
+      case_id?: string;
+      top_level_goal?: string;
+      manifest_hash?: string;
+    };
     provider_usage?: { totals?: Array<{ usage?: { requests?: number } }> };
     cycles?: unknown[];
   };
   assert.equal(rawReport.schema, "social-cycle-run-report/v1");
   assert.equal(rawReport.provider?.provider_id, "deterministic-social");
   assert.equal(rawReport.provider?.model, "deterministic-social");
+  assert.equal(rawReport.capability_case_context?.case_id, "collect_logs");
+  assert.equal(
+    rawReport.capability_case_context?.top_level_goal,
+    manifest.cases.find((entry) => entry.case_id === "collect_logs")?.top_level_goal
+  );
+  assert.equal(rawReport.capability_case_context?.manifest_hash, expectedHash);
   assert.equal((rawReport.cycles ?? []).length, 2);
+
+  const placeTableRecord = JSON.parse(
+    await fs.readFile(
+      path.join(
+        declaration.output_paths.actor_workspace,
+        "npc_b/action-skills/active/placeCraftingTable.json"
+      ),
+      "utf8"
+    )
+  ) as { input_schema?: { required?: unknown } };
+  assert.deepEqual(placeTableRecord.input_schema?.required, ["targetPosition"]);
 
   // Zero provider HTTP: deterministic-social must not record live provider requests.
   const usageTotals = rawReport.provider_usage?.totals ?? [];
@@ -132,6 +179,73 @@ test("capability runner provider-free offline smoke emits declaration, raw, norm
   assert.equal(suiteIndex.runs[0]?.capability_run_id, declaration.capability_run_id);
   assert.ok(suiteIndex.runs[0]?.declaration_ref.includes("declaration.json"));
   assert.ok(suiteIndex.runs[0]?.normalized_report_ref.includes("normalized-report.json"));
+});
+
+test("capability runner sends distinct declared goals without evaluation rules or scenario task prose", async () => {
+  const manifest = loadIndividualCapabilityManifestFromFile(manifestPath);
+  const expectedHash = hashCapabilityManifest(manifest);
+  const cases = [
+    "collect_logs",
+    "acquire_diamond_pickaxe_infeasible",
+    "craft_wooden_pickaxe"
+  ] as const;
+  const savedInputs = new Map<string, Record<string, unknown>>();
+
+  for (const caseId of cases) {
+    const outDir = await fs.mkdtemp(path.join(os.tmpdir(), `capability-goal-${caseId}-`));
+    const result = await runCapabilityCase({
+      manifestPath,
+      caseId,
+      outDir,
+      providerId: "deterministic-social",
+      model: "deterministic-social",
+      connectToWorld: false,
+      cycles: 1,
+      maxActionsPerCycle: 1,
+      actorId: "npc_b",
+      repoRoot,
+      implementationRevision: null
+    });
+    savedInputs.set(caseId, await readFirstActorTurnInput(result.declaration.output_paths.actor_workspace));
+  }
+
+  for (const caseId of cases) {
+    const savedInput = savedInputs.get(caseId);
+    assert.ok(savedInput);
+    const capabilityContext = savedInput.capability_case_context as Record<string, unknown>;
+    const declaredCase = manifest.cases.find((entry) => entry.case_id === caseId);
+    assert.ok(declaredCase);
+    assert.deepEqual(capabilityContext, {
+      schema: "capability-case-context/v1",
+      case_id: caseId,
+      top_level_goal: declaredCase.top_level_goal,
+      manifest_hash: expectedHash
+    });
+    assert.equal(
+      (savedInput.active_episode as { current_focus?: unknown }).current_focus,
+      declaredCase.top_level_goal
+    );
+    assert.deepEqual(
+      (savedInput.source_evidence_bundle as { world_event_cards?: unknown }).world_event_cards,
+      []
+    );
+    const keys = new Set(allObjectKeys(savedInput));
+    assert.equal(keys.has("milestones"), false);
+    assert.equal(keys.has("completion_policy"), false);
+    assert.equal(keys.has("allowed_evidence_kinds"), false);
+  }
+
+  assert.notEqual(
+    (savedInputs.get("collect_logs")?.capability_case_context as { top_level_goal: string })
+      .top_level_goal,
+    (savedInputs.get("acquire_diamond_pickaxe_infeasible")?.capability_case_context as {
+      top_level_goal: string;
+    }).top_level_goal
+  );
+  assert.doesNotMatch(
+    JSON.stringify(savedInputs.get("craft_wooden_pickaxe")),
+    /Useful milestone evidence includes|oak_planks and stick crafting/
+  );
 });
 
 test("capability runner exits conceptually on unknown case", async () => {

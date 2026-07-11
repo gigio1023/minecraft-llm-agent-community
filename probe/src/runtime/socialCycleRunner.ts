@@ -20,6 +20,7 @@ import {
 import { createEmptySocialCycleReport, finalizeRuntimeStatus } from "./goals/cycleReport.js";
 import type {
   ActorCycleGoal,
+  CapabilityCaseContext,
   CycleJudgment,
   SocialCycleProviderId,
   SocialCycleRunReport,
@@ -413,6 +414,8 @@ export type SocialCycleRunOptions = {
    * still owns action selection and runtime verifiers still own progress truth.
    */
   worldScenario?: WorldScenarioId;
+  /** Model-visible capability goal. Evaluation predicates remain outside Actor Turn. */
+  capabilityCaseContext?: CapabilityCaseContext;
   benchmarkTask?: string;
   worldSeed?: string;
   levelType?: string;
@@ -549,6 +552,53 @@ function buildBenchmarkTaskCycleGoal(input: {
       "benchmark target reached with runtime evidence",
       "max cycles reached",
       "runtime gate blocked",
+      "environment setup failed"
+    ]
+  };
+}
+
+function buildCapabilityCaseCycleGoal(input: {
+  actorId: string;
+  cycleId: string;
+  context: SocialCycleContextPacket;
+  capabilityCaseContext: CapabilityCaseContext;
+  allowedActionSkillIds: readonly string[];
+  allowedPrimitiveIds: readonly string[];
+}): ActorCycleGoal {
+  return {
+    schema: "actor-cycle-goal/v1",
+    actor_id: input.actorId,
+    goal_id: `cycle-goal-${randomUUID()}`,
+    life_goal_id: input.context.ActorLifeGoal.goal_id,
+    cycle_id: input.cycleId,
+    status: "active",
+    source: "world_event_context",
+    summary: input.capabilityCaseContext.top_level_goal,
+    rationale:
+      `Declared capability case ${input.capabilityCaseContext.case_id}. ` +
+      "Choose actions from current state; evaluation milestones and a preferred action order are not provided.",
+    derived_from: {
+      soul_ref: soulRef(input.actorId),
+      observation_refs: [],
+      world_event_refs: [],
+      memory_refs: listActorMemoryRefs(input.context.memory_packet).map((ref) => ref.memory_id),
+      relationship_refs: [],
+      previous_cycle_judgment_refs: input.context.previous_cycle_judgments.map(
+        (judgment) => judgment.ref
+      )
+    },
+    success_condition: {
+      verifier: "capability_target_runtime_evidence",
+      evidence_required: [
+        "Physical completion is decided by runtime-recorded inventory, held-item, block, container, or position evidence."
+      ]
+    },
+    allowed_action_skill_ids: [...input.allowedActionSkillIds],
+    allowed_primitive_ids: [...input.allowedPrimitiveIds],
+    stop_conditions: [
+      "declared capability target reached with runtime evidence",
+      "case limits reached",
+      "runtime blocked",
       "environment setup failed"
     ]
   };
@@ -815,6 +865,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     model: input.model,
     reasoning
   });
+  if (input.capabilityCaseContext) {
+    report.capability_case_context = { ...input.capabilityCaseContext };
+  }
   report.agency_status.builtin_execution_source =
     input.providerId === "deterministic-social" || input.providerId === "scripted-social";
   report.actor_workspace_root_dir = rootDir;
@@ -917,7 +970,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       worldScenario.fixtureDependency;
   }
 
-  if (worldScenario.worldEventSummary) {
+  if (worldScenario.worldEventSummary && !input.capabilityCaseContext) {
     const event = createWorldEvent({
       summary: worldScenario.worldEventSummary,
       kind: "scenario_event",
@@ -1565,6 +1618,43 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.agency_status.cycle_goal_source = cycleGoal.source;
         report.agency_status.builtin_goal_authority =
           input.providerId === "deterministic-social" || input.providerId === "scripted-social";
+      } else if (input.capabilityCaseContext) {
+        cycleGoal = buildCapabilityCaseCycleGoal({
+          actorId: input.actorId,
+          cycleId,
+          context,
+          capabilityCaseContext: input.capabilityCaseContext,
+          allowedActionSkillIds: allowedSkillIds,
+          allowedPrimitiveIds: allowedPrimitives
+        });
+        const writtenCycleGoal = await writeCycleGoal(rootDir, input.actorId, cycleGoal);
+        cycleGoalRef = writtenCycleGoal.ref;
+        activeEpisodeForCycle = buildActiveEpisodeFromCycleGoal({
+          episodeId: `episode-${cycleId}`,
+          context,
+          cycleGoal,
+          selectedPlanBeadRefs: [],
+          startedAtTurnRef: `${cycleId}-action-01`
+        });
+        const activeEpisodeWritten = await writeActiveEpisode(
+          rootDir,
+          input.actorId,
+          activeEpisodeForCycle
+        );
+        activeEpisodeRefForCycle = activeEpisodeWritten.ref;
+        activeEpisodeState = {
+          episode: activeEpisodeForCycle,
+          ref: activeEpisodeRefForCycle,
+          openedCycleId: cycleId
+        };
+        pendingDeliberationBranch = null;
+        report.active_episode_refs = pushUniqueRef(
+          report.active_episode_refs,
+          activeEpisodeRefForCycle
+        );
+        report.agency_status.strategic_goal_source = "runtime_rule";
+        report.agency_status.cycle_goal_source = cycleGoal.source;
+        report.agency_status.builtin_goal_authority = false;
       } else if (input.benchmarkTask?.trim()) {
         cycleGoal = buildBenchmarkTaskCycleGoal({
           actorId: input.actorId,
@@ -1750,7 +1840,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             provider_id: input.providerId,
             model: input.model,
             status: "unknown"
-          }
+          },
+          ...(input.capabilityCaseContext
+            ? { capabilityCaseContext: input.capabilityCaseContext }
+            : {})
         });
         // Abort + await: never Promise.race the turn against the case deadline.
         const turnCore = await runSocialCycleTurnCore({

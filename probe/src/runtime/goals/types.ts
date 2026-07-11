@@ -150,6 +150,14 @@ export type WorldEvent = {
   run_id?: string;
 };
 
+/** Model-visible capability identity; scoring predicates remain evaluator-only. */
+export type CapabilityCaseContext = {
+  schema: "capability-case-context/v1";
+  case_id: string;
+  top_level_goal: string;
+  manifest_hash: string;
+};
+
 export type GeneratedActionSkillCandidate = {
   schema: "generated-action-skill-candidate/v1";
   proposed_skill_id: string;
@@ -301,6 +309,7 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
+  capability_case_context?: CapabilityCaseContext;
   action_hot_path?: "actor_turn";
   provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";

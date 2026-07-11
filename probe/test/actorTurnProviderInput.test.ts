@@ -148,7 +148,24 @@ function buildPlaceCraftingTableRecord() {
     success_verifier: "placed or confirmed reachable crafting_table",
     known_failure_modes: ["target cell occupied", "crafting_table already usable"],
     evidence_refs: [],
-    review_refs: []
+    review_refs: [],
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        targetPosition: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            x: { type: "number" },
+            y: { type: "number" },
+            z: { type: "number" }
+          },
+          required: ["x", "y", "z"]
+        }
+      },
+      required: ["targetPosition"]
+    }
   };
 }
 
@@ -1738,6 +1755,11 @@ test("Actor Turn input keeps crafting-table placement visible with advisory curr
   );
   assert.ok(placeCraftingTableCard);
   assert.ok(
+    placeCraftingTableCard.parameter_hints.some((hint) =>
+      hint.includes("nearby_block_observations")
+    )
+  );
+  assert.ok(
     placeCraftingTableCard.current_state_requirements.includes("no usable crafting_table already known")
   );
   assert.equal(
@@ -1745,6 +1767,22 @@ test("Actor Turn input keeps crafting-table placement visible with advisory curr
       mapping.kind === "use_action_skill" && mapping.action_skill_id === "placeCraftingTable"
     ),
     true
+  );
+  const toolPayload = buildActorTurnToolSelectionPayload({
+    actorTurnInput,
+    actionCardProjection
+  });
+  const placementTool = toolPayload.tools.find((tool) =>
+    typeof tool.description === "string" &&
+    tool.description.includes(placeCraftingTableCard.title)
+  );
+  assert.ok(placementTool);
+  const placementToolProperties = (
+    placementTool.parameters as { properties: Record<string, unknown> }
+  ).properties;
+  assert.deepEqual(
+    (placementToolProperties.parameters as { required?: unknown }).required,
+    ["targetPosition"]
   );
   assert.ok(
     actorTurnInput.action_cards.some((card) => card.title === "Place Block")

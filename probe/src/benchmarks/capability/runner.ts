@@ -607,6 +607,12 @@ export async function runCapabilityCase(
       isolateWorkspace: false,
       worldScenario: worldScenarioId,
       worldSeed: seed,
+      capabilityCaseContext: {
+        schema: "capability-case-context/v1",
+        case_id: capabilityCase.case_id,
+        top_level_goal: capabilityCase.top_level_goal,
+        manifest_hash: manifestHash
+      },
       repoRoot,
       signal: caseController.signal,
       caseStartedAtMs,

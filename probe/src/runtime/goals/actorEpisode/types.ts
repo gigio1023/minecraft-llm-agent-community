@@ -1,6 +1,6 @@
-import type { GeneratedActionSkillCandidate } from "../types.js";
+import type { CapabilityCaseContext, GeneratedActionSkillCandidate } from "../types.js";
 
-export type { GeneratedActionSkillCandidate };
+export type { CapabilityCaseContext, GeneratedActionSkillCandidate };
 
 export type JsonValue =
   | string
@@ -207,6 +207,15 @@ export type ActorTurnSourceEvidenceBundle = {
       absence_claims_exhaustive: boolean;
       total_verified_blocks: number;
       truncated: boolean;
+      sampling?: {
+        method: string;
+        query_count: number;
+        candidate_verified: number;
+        retained: number;
+        distance_bands_retained: number[];
+        direction_sectors_retained: number[];
+        vertical_bands_retained: number[];
+      };
       nearest_blocks: Array<{
         name: string;
         position: { x: number; y: number; z: number };
@@ -315,6 +324,15 @@ export type ActorTurnCurrentStateProjection = {
     absence_claims_exhaustive: boolean;
     total_verified_blocks: number;
     truncated: boolean;
+    sampling?: {
+      method: string;
+      query_count: number;
+      candidate_verified: number;
+      retained: number;
+      distance_bands_retained: number[];
+      direction_sectors_retained: number[];
+      vertical_bands_retained: number[];
+    };
     retained_block_counts: Array<{ name: string; count: number }>;
     nearest_blocks: Array<{
       name: string;
@@ -491,6 +509,7 @@ export type ActionCard = {
 export type ActorTurnInput = {
   schema: "actor-turn-input/v1";
   turn_id: string;
+  capability_case_context?: CapabilityCaseContext;
   decision_frame: ActorTurnDecisionFrame;
   active_episode: ActiveEpisode;
   actor_context: ActorSoulAndLifeGoalProjection;

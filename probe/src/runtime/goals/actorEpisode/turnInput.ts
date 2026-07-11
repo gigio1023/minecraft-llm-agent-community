@@ -22,6 +22,7 @@ import { buildActorTurnSourceEvidenceBundle } from "./sourceEvidenceBundle.js";
 import type {
   ActiveEpisode,
   ActorTurnInput,
+  CapabilityCaseContext,
   EvidenceTraceEntry,
   ProviderBudgetHint
 } from "./types.js";
@@ -33,6 +34,7 @@ export function buildActorTurnInput(input: {
   currentObservationRefs: readonly string[];
   recentEvidenceTrace?: readonly EvidenceTraceEntry[];
   providerBudgetHint?: ProviderBudgetHint;
+  capabilityCaseContext?: CapabilityCaseContext;
 }): { actorTurnInput: ActorTurnInput; actionCardProjection: ActionCardProjection } {
   const currentState = buildActorTurnCurrentStateProjection(input.context);
   const recentEvidenceTrace = [...(input.recentEvidenceTrace ?? [])];
@@ -48,6 +50,9 @@ export function buildActorTurnInput(input: {
   const actorTurnInput: ActorTurnInput = {
     schema: "actor-turn-input/v1",
     turn_id: input.turnId,
+    ...(input.capabilityCaseContext
+      ? { capability_case_context: { ...input.capabilityCaseContext } }
+      : {}),
     decision_frame: buildActorTurnDecisionFrame({
       activeEpisode,
       currentState,

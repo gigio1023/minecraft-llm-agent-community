@@ -41,12 +41,17 @@ function createScanBot(input: {
     bot: {
       entity: { position: center },
       findBlocks(options: {
-        matching: (block: { name: string }) => boolean;
+        matching: (block: { name: string; position?: WorldStatePosition }) => boolean;
         maxDistance: number;
         count: number;
+        useExtraInfo?: (block: {
+          name: string;
+          position?: WorldStatePosition;
+        }) => boolean;
       }) {
         return findableBlocks
-          .filter((block) => options.matching({ name: block.name }))
+          .filter((block) => options.matching(block))
+          .filter((block) => options.useExtraInfo?.(block) ?? true)
           .filter((block) => distance(center, block.position) <= options.maxDistance)
           .sort((left, right) => distance(center, left.position) - distance(center, right.position))
           .slice(0, options.count)
@@ -130,7 +135,48 @@ test("scanWorldState marks raw block observations truncated when the cap is reac
 
   assert.equal(scan.block_observations.truncated, true);
   assert.equal(scan.block_observations.total_verified, 2);
-  assert.ok(scan.limitations.some((limitation) => limitation.includes("block observations reached cap 2")));
+  assert.ok(scan.limitations.some((limitation) => limitation.includes("into cap 2")));
+});
+
+test("scanWorldState retains a farther block type beside dense nearby ground", () => {
+  const ground = Array.from({ length: 320 }, (_, index) => {
+    const ring = 2 + Math.floor(index / 32);
+    const angle = (index % 32) * (Math.PI * 2 / 32);
+    return {
+      name: index % 2 === 0 ? "grass_block" : "dirt",
+      position: {
+        x: Math.round(Math.cos(angle) * ring),
+        y: 63 - (index % 2),
+        z: Math.round(Math.sin(angle) * ring)
+      }
+    };
+  });
+  const { bot } = createScanBot({
+    blocks: [
+      ...ground,
+      { name: "oak_log", position: { x: 22, y: 66, z: 4 } },
+      { name: "oak_leaves", position: { x: 22, y: 69, z: 4 } }
+    ]
+  });
+
+  const scan = scanWorldState({
+    bot,
+    radius: 32,
+    verticalRange: { minY: 48, maxY: 80 },
+    caps: { blockObservations: 32, nearestExamples: 8 },
+    createdAt: "2026-05-25T00:00:00.000Z",
+    dimension: "overworld"
+  });
+
+  assert.ok(countFor(scan, "oak_log") >= 1);
+  assert.ok(countFor(scan, "oak_leaves") >= 1);
+  assert.equal(
+    scan.block_observations.sampling.method,
+    "distance-direction-height-stratified/v1"
+  );
+  assert.equal(scan.block_observations.sampling.retained, 32);
+  assert.ok(scan.block_observations.sampling.candidate_verified > 32);
+  assert.ok(scan.block_observations.sampling.distance_bands_retained[2]! > 0);
 });
 
 test("scanWorldState records missing API limits without fabricated counts", () => {

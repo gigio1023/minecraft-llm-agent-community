@@ -556,7 +556,7 @@ function choosePlaceBlockItemName(input: {
   return undefined;
 }
 
-function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positioned {
+function readPlacementTarget(args: Record<string, unknown>): Positioned | null {
   const surfacePosition =
     readPositionedObject(args.surfacePosition) ??
     readPositionedObject(args.surface_position) ??
@@ -574,12 +574,7 @@ function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positione
     readPositionedObject(args.targetPosition) ??
     readPositionedObject(args.target_position) ??
     readPositionedObject(args.position) ??
-    readPositionedObject(args) ??
-    {
-      x: Math.floor(bot.entity.position.x) + 1,
-      y: Math.floor(bot.entity.position.y),
-      z: Math.floor(bot.entity.position.z)
-    }
+    readPositionedObject(args)
   );
 }
 
@@ -902,10 +897,17 @@ async function runSocialPrimitive(input: {
       if (!itemName) {
         return { status: "blocked", reason: "place_block requires explicit itemName or a station-placement action skill" };
       }
+      const targetPosition = readPlacementTarget(proposal.args);
+      if (!targetPosition) {
+        return {
+          status: "blocked",
+          reason: "place_block requires an explicit structured target position"
+        };
+      }
       return (await placeBlock({
         bot: input.bot,
         itemName,
-        targetPosition: readPlacementTarget(input.bot, proposal.args),
+        targetPosition,
         signal: input.signal
       })) as unknown as JsonValue;
     }

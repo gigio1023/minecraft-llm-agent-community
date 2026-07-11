@@ -169,6 +169,47 @@ test("executor records missing structured primitive args as contract evidence", 
   );
 });
 
+test("placeCraftingTable rejects empty parameters before Mineflayer placement", async () => {
+  const workspaceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "actor-turn-place-table-args-")
+  );
+  const result = await executeActorTurnAction({
+    actorWorkspaceRootDir: workspaceRoot,
+    actorId: "npc_b",
+    cycleId: "cycle-0001",
+    cycleGoal: cycleGoal({
+      allowed_action_skill_ids: ["placeCraftingTable"],
+      allowed_primitive_ids: ["observe", "place_block", "wait"],
+      summary: "Place a carried crafting table at an explicit target."
+    }),
+    action: actionSkillAction({
+      actionSkillId: "placeCraftingTable",
+      parameters: {},
+      expectedOutcome: "world_block_delta"
+    }),
+    activeActionSkills: [
+      testActionSkillRecord(
+        "placeCraftingTable",
+        ["observe", "place_block", "wait"],
+        "npc_b"
+      )
+    ],
+    bot: fakeBot()
+  });
+
+  assert.equal(result.verifierStatus, "failed");
+  assert.equal(result.contractBlocked, true);
+  assert.deepEqual(result.executedTools, ["observe", "place_block"]);
+  assert.match(
+    JSON.stringify(result.runtimeResult),
+    /explicit target position|missing coordinate/
+  );
+  assert.equal(
+    result.evidenceRefs.some((ref) => ref.includes("place_block-args-contract-blocked")),
+    true
+  );
+});
+
 test("Actor Turn generated Mineflayer action can promote and be reused as an owned action skill", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "actor-turn-generated-"));
   const result = await executeActorTurnAction({

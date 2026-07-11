@@ -59,12 +59,17 @@ export function annotateActionCardsWithCurrentStateHints(
       };
     }
 
-    if (card.title === "Place Block" || card.title === "Build Pattern") {
+    if (
+      card.title === "Place Block" ||
+      card.title === "Place Crafting Table" ||
+      card.title === "Build Pattern"
+    ) {
       return {
         ...card,
         parameter_hints: unique([
           ...card.parameter_hints,
           "Provide an explicit targetPosition/anchor in structured parameters; runtime will not synthesize placement coordinates.",
+          "Use current_state.world_scan.named_block_examples and nearby_block_observations to choose a replaceable target next to a known support block; the runtime does not choose one for you.",
           "Placement and pattern verifiers are local physical-evidence checks, not universal goal-completion rules; compare current_state.structure_progress with active_episode/world event wording before continuing, adapting, or pivoting."
         ])
       };

@@ -592,6 +592,39 @@ export function validateActorTurnInput(
     errors.push("ActorTurnInput.schema must be actor-turn-input/v1");
   }
   assertString(value, "turn_id", "ActorTurnInput", errors);
+  if (value.capability_case_context !== undefined) {
+    const capabilityContext = assertRecord(
+      value,
+      "capability_case_context",
+      "ActorTurnInput",
+      errors
+    );
+    if (capabilityContext) {
+      if (capabilityContext.schema !== "capability-case-context/v1") {
+        errors.push(
+          "ActorTurnInput.capability_case_context.schema must be capability-case-context/v1"
+        );
+      }
+      assertString(
+        capabilityContext,
+        "case_id",
+        "ActorTurnInput.capability_case_context",
+        errors
+      );
+      assertString(
+        capabilityContext,
+        "top_level_goal",
+        "ActorTurnInput.capability_case_context",
+        errors
+      );
+      assertString(
+        capabilityContext,
+        "manifest_hash",
+        "ActorTurnInput.capability_case_context",
+        errors
+      );
+    }
+  }
   validateDecisionFrame(
     value.decision_frame,
     "ActorTurnInput.decision_frame",

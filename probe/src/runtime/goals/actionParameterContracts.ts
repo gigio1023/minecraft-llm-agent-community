@@ -239,7 +239,6 @@ function validatePhysicalPrimitiveArgs(
         });
       }
       if (
-        !hasFallback &&
         !hasPositionAt(args, [
           "targetPosition",
           "target_position",
@@ -253,7 +252,8 @@ function validatePhysicalPrimitiveArgs(
       ) {
         return failed({
           primitiveId: input.primitiveId,
-          error: "place_block requires an explicit target position in structured args"
+          error:
+            "place_block requires an explicit target position in structured args; action skills may supply an item name but not a missing coordinate"
         });
       }
       return passed({ primitiveId: input.primitiveId });
