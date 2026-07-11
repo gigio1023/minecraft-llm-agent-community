@@ -5,14 +5,15 @@ Handoff: `handoff-prompt.md` (bounded GPT-5.4 Mini live validation)
 
 ## Current focus
 
-Provider-free Work 1 (A3 budget stopping) and Work 2 (B2 artifact-bag loader)
-are landed and reviewed again in `63eb47df`. The three-scenario A5 live
-validation completed with `openai-api:gpt-5.4-mini`; see
-`project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`.
-It exposed two provider-free repair targets: natural manifest goals do not
-reach Actor Turn, and empty `placeCraftingTable` parameters become an implicit
-adjacent-cell target. Do not rerun before repairing these. B3 live remains
-separate, and D2 still needs a real D1 selection (fixture ineligible).
+The first GPT-5.4 Mini capability campaign is complete and must not be rerun
+unchanged. The active work is
+`project-docs/research/benchmarks/capability-live-validation-repair-plan.md`.
+It starts by delivering the exact capability goal to Actor Turn while removing
+scenario prose that exposed a generic survival objective or the controlled
+fixture's preferred crafting sequence. Explicit placement targets and
+query-neutral world-scan sampling are now implemented with focused tests. The
+next work is evidence-based early completion and result attribution. No new
+provider request is authorized.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -50,6 +51,40 @@ via the adaptation in the active implementation plan.
 | `63eb47df` | A3/B2 review repair: setup time, stop status, physical values, symlinks |
 
 ## Deviations
+
+what the live-run repair proposal said
+-> pass case ID, final goal, and initial state to the model
+-> what the code revealed
+-> Actor Turn already carries typed current state on every action, while the
+   scenario WorldEvent added a competing generic or milestone-rich task
+-> conservative choice
+-> add typed capability case identity, reuse current_state, and suppress scenario
+   task prose only for capability runs
+-> revisit
+-> after a provider-free saved-input audit or if a scenario fact not present in
+   current state proves necessary
+
+what the placement repair proposal said
+-> require targetPosition for placeCraftingTable and remove adjacent fallback
+-> what the code revealed
+-> seed action skills had no persisted provider input schema, while primitive
+   validation allowed any action skill to bypass placement coordinates
+-> conservative choice
+-> persist an input schema for the seed action skill, keep item-name fallback,
+   and remove coordinate fallback at both validation and execution
+-> revisit
+-> only if another placement action needs a different explicit structured form
+
+what the scan repair proposal said
+-> sample by distance, direction, height, and block-name diversity
+-> what the code revealed
+-> Mineflayer findBlocks supports a spatial useExtraInfo predicate but returns
+   nearest-first results for each query
+-> conservative choice
+-> use eleven bounded distance/direction/height queries, then retain two nearby
+   examples per observed name and round-robin combined spatial groups
+-> revisit
+-> profile real scan latency before increasing query count or retained caps
 
 what the plan said
 -> A1 accepted at `26c1f93f`
