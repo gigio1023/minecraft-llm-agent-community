@@ -114,6 +114,7 @@ Current research direction lives under:
 V4 implementation / reference notes (not direction-defining):
 
 - `project-docs/research/benchmarks/individual-capability-manifest-a1.md`
+- `project-docs/research/benchmarks/v4-implementation-explanation.md`
 
 The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05), and
 the V2 co-actor legibility docs (central plan, implementation plan, cycle 2

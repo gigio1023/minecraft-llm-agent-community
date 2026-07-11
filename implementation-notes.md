@@ -5,33 +5,45 @@ Handoff: `handoff-prompt.md` (full path A1R → D1; D2 gated)
 
 ## Current focus
 
-**A1R accepted.** Next: A2 normalized report adapter (provider-free).
+Provider-free path through D1 is landed. Next user decisions: A5 provider
+approval, B3 live continuity, or D2 phenomenon selection.
 
-## Assumptions (A1R) — resolved
+## Accepted (provider-free)
 
-1. Removing `evidence_kind_seen` is correct; no suite case uses it.
-2. Evidence-bearing observed-value objects (`EvidencedValueV1`) chosen over parallel ref maps.
-3. Closed `allowed_evidence_kinds` enum excludes prose/video/screenshot authority.
-4. Dirty A1 docs preserved and reconciled with A1R.
-5. Commit `26c1f93f` stays; A1R is a new commit.
+- A1R, A2, A3, A4, B1, B2, C1, C2, C3, D1
+- B3 case declarations only (live blocked)
 
-## A1R validation
+## Blocked
 
-- focused: 29/29
-- full probe: 607/607
-- typecheck, docs build, diff-check: pass
+- A5 / B3 live / live multi-actor: need exact provider+model, estimate, preflight, approval
+- D2: user must select a D1 candidate (fixture is not eligible)
+- Push/PR: only on request
+
+## Validation snapshot
+
+- `cd probe && bun test` → 675 pass
+- `bun run typecheck` → pass
 
 ## Deviations
 
 what the plan said
--> A1 accepted at `26c1f93f` with fabricated settlement refs and open evidence_kind_seen
--> what the code or runtime revealed
--> review counterexamples still passed
--> the conservative choice taken
--> reopen A1, repair in A1R, do not weaken for old artifacts
--> when to revisit it
--> if A2 discovers more bag surfaces needed, extend EvidencedValueV1 fields without restoring prose matchers
+-> A1 accepted at `26c1f93f`
+-> what the code revealed
+-> evidence_kind_seen + fabricated settlement refs still passed review counterexamples
+-> conservative choice
+-> A1R repair commit; do not weaken for old artifacts
+-> revisit
+-> only if A2 discovers new evidenced surfaces (extend EvidencedValueV1)
 
-## Provider-backed steps (A5/B3/C*)
+what the plan said
+-> complete through live social observation
+-> what reality revealed
+-> no provider/model approved in this wave
+-> conservative choice
+-> finish all provider-free schemas/CLIs/fixtures; pause at A5/B3-live/D2 gates
+-> revisit
+-> when user supplies exact provider approval
 
-Blocked until exact `(provider_id, model)`, estimate, preflight, and user approval.
+## Explanation doc
+
+`project-docs/research/benchmarks/v4-implementation-explanation.md`

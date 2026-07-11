@@ -559,6 +559,9 @@ does not invalidate the benchmark path.
 
 ### Slice B1 — Multi-Hop Capability Case
 
+Status: **accepted** (2026-07-11). Provider-free; case `reach_placed_furnace` in
+suite `1.2.0`. Furnace observation adapter is case-specific only.
+
 Deliver:
 
 - convert the current furnace chain into a manifest-owned case;
@@ -569,13 +572,15 @@ Deliver:
 
 Acceptance:
 
-- milestone order comes from the manifest;
-- the actor is not shown the dependency chain;
-- partial credit is evidence-backed;
-- failure locates the missing prerequisite or continuity break;
-- the long case can time out honestly without fake success.
+- [x] milestone order comes from the manifest;
+- [x] the actor is not shown the dependency chain;
+- [x] partial credit is evidence-backed;
+- [x] failure locates the missing prerequisite or continuity break;
+- [x] the long case can time out honestly without fake success.
 
 ### Slice B2 — Goal-Continuity Contract And Offline Evaluator
+
+Status: **accepted** (2026-07-11). Offline schemas/evaluator/fixtures only.
 
 Deliver:
 
@@ -587,13 +592,16 @@ Deliver:
 
 Acceptance:
 
-- the evaluator does not prescribe PlanBead titles or intermediate goals;
-- memory or PlanBead prose cannot prove physical progress;
-- checkpoint/version conflicts remain visible;
-- each scored lifecycle change cites its source artifacts;
-- missing refs produce `unknown`/`unverifiable`, not zero or success.
+- [x] the evaluator does not prescribe PlanBead titles or intermediate goals;
+- [x] memory or PlanBead prose cannot prove physical progress;
+- [x] checkpoint/version conflicts remain visible;
+- [x] each scored lifecycle change cites its source artifacts;
+- [x] missing refs produce `unknown`/`unverifiable`, not zero or success.
 
 ### Slice B3 — Live Goal-Continuity Cases
+
+Status: **declarations accepted; live execution blocked** pending provider
+approval. Offline cases in `goal-continuity-v1` `1.1.0`.
 
 Deliver at least three versioned cases:
 
@@ -603,13 +611,16 @@ Deliver at least three versioned cases:
 
 Acceptance:
 
-- current-run artifacts show what remained open and why;
-- the actor changes work only from available evidence/context;
-- stale repetition and unsupported closure are separately reported;
-- physical target progress and continuity quality stay separate;
-- at least one case exercises restart or equivalent durable reload.
+- [x] offline case declarations exist and load;
+- [ ] current-run artifacts show what remained open and why;
+- [ ] the actor changes work only from available evidence/context;
+- [ ] stale repetition and unsupported closure are separately reported;
+- [ ] physical target progress and continuity quality stay separate;
+- [ ] at least one case exercises restart or equivalent durable reload.
 
 ### Slice C1 — Social Scenario Declaration
+
+Status: **accepted** (2026-07-11). Provider-free schema/loader/fixtures.
 
 Deliver:
 
@@ -621,14 +632,17 @@ Deliver:
 
 Acceptance:
 
-- a scenario may create a reason to interact but never a required relationship
+- [x] a scenario may create a reason to interact but never a required relationship
   label or response;
-- assigned, negotiable, and unassigned roles are distinct;
-- command fixtures are identified and never credited as actor progress;
-- every required capability points to compatible benchmark evidence or a
+- [x] assigned, negotiable, and unassigned roles are distinct;
+- [x] command fixtures are identified and never credited as actor progress;
+- [x] every required capability points to compatible benchmark evidence or a
   declared evidence gap.
 
 ### Slice C2 — Minimal Interdependent Sandbox
+
+Status: **accepted** (2026-07-11) for declarations. Live multi-actor runs not
+executed in this wave.
 
 Implement three small scenario families:
 
@@ -642,15 +656,20 @@ Implement three small scenario families:
 
 Acceptance:
 
-- capable actors receive the same runtime authority and normal Actor Turn path;
-- cross-actor observation and chat are captured;
-- response windows allow other actors a real subsequent turn;
-- each scenario produces repeated interaction opportunities with material stakes;
-- actor goals and actions remain autonomous;
-- the report distinguishes opportunity absence, refusal, execution failure,
-  and no observable response.
+- [x] scenario families declare pressure without prescribed response;
+- [ ] capable actors receive the same runtime authority and normal Actor Turn path
+  (live);
+- [ ] cross-actor observation and chat are captured (live);
+- [ ] response windows allow other actors a real subsequent turn (live);
+- [x] each scenario produces repeated interaction opportunities with material stakes
+  (declared);
+- [x] the report distinguishes opportunity absence, refusal, execution failure,
+  and no observable response (offline enum).
 
 ### Slice C3 — Long-Run Observation Bundle
+
+Status: **accepted** (2026-07-11) for offline schemas/writer/index/fixtures.
+Live capture not run in this wave.
 
 Deliver:
 
@@ -664,13 +683,16 @@ Deliver:
 
 Acceptance:
 
-- structured evidence and visual time remain joinable by run/cycle/actor;
-- missing visual capture does not change Minecraft truth;
-- private actor state is not leaked into public analysis exports;
-- long-run reports cite raw artifacts rather than copying provider stories;
-- run duration, dropped captures, reconnects, and missing evidence are explicit.
+- [x] structured evidence and visual time remain joinable by run/cycle/actor;
+- [x] missing visual capture does not change Minecraft truth;
+- [x] private actor state is not leaked into public analysis exports;
+- [x] long-run reports cite raw artifacts rather than copying provider stories;
+- [x] run duration, dropped captures, reconnects, and missing evidence are explicit
+  (schema + fixture).
 
 ### Slice D1 — Phenomenon Catalog
+
+Status: **accepted** (2026-07-11). Fixture record only; no research claim.
 
 Deliver:
 
@@ -682,11 +704,11 @@ Deliver:
 
 Acceptance:
 
-- a single transcript quote cannot satisfy recurrence;
-- the record cites capability and continuity controls;
-- scenario changes remain version-visible;
-- observation language does not silently become trust/culture/economy truth;
-- negative and retired candidates remain searchable.
+- [x] a single transcript quote cannot satisfy recurrence;
+- [x] the record cites capability and continuity controls;
+- [x] scenario changes remain version-visible;
+- [x] observation language does not silently become trust/culture/economy truth;
+- [x] negative and retired candidates remain searchable.
 
 ### Slice D2 — Controlled Follow-Up Package
 
