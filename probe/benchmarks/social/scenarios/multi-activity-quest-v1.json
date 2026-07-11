@@ -1,0 +1,235 @@
+{
+  "schema": "interdependent-social-scenario/v1",
+  "scenario_id": "multi-activity-quest-v1",
+  "version": "1.0.0",
+  "title": "Multi-activity quest (gather, craft, shelter)",
+  "description": "Three-actor quest family: gather logs, craft a crafting table, and establish a small shelter compete for actors, materials, and time. The setup creates concurrent useful activities without centrally assigning division of labor, partners, or any social response.",
+  "world_scenario_id": "natural-safe-spawn-v1",
+  "fixture_class": "natural_world",
+  "fixture_progress_credited_to_actors": false,
+  "social_response_prescribed": false,
+  "actor_count": 3,
+  "actor_profiles": [
+    {
+      "actor_id": "actor_a",
+      "profile_ref": "profiles/quest-actor-a.json"
+    },
+    {
+      "actor_id": "actor_b",
+      "profile_ref": "profiles/quest-actor-b.json"
+    },
+    {
+      "actor_id": "actor_c",
+      "profile_ref": "profiles/quest-actor-c.json"
+    }
+  ],
+  "model_assignment": {
+    "comparable_capability": true,
+    "assignments": [
+      {
+        "actor_id": "actor_a",
+        "provider_id": "deterministic-social",
+        "model": "deterministic-social"
+      },
+      {
+        "actor_id": "actor_b",
+        "provider_id": "deterministic-social",
+        "model": "deterministic-social"
+      },
+      {
+        "actor_id": "actor_c",
+        "provider_id": "deterministic-social",
+        "model": "deterministic-social"
+      }
+    ]
+  },
+  "role_assignment_mode": "negotiable",
+  "asymmetries": [
+    {
+      "asymmetry_id": "forest_edge_start",
+      "kind": "resource",
+      "description": "Actor A begins nearer the densest log cluster; the others begin with longer travel to the same wood.",
+      "visible_to": "all",
+      "holder_actor_ids": ["actor_a"],
+      "subject": "log_cluster_proximity"
+    },
+    {
+      "asymmetry_id": "flat_clearing_knowledge",
+      "kind": "information",
+      "description": "Actor B begins knowing a flatter clearing suitable for shelter; the others may discover it only through observation or exploration.",
+      "visible_to": "holders",
+      "holder_actor_ids": ["actor_b"],
+      "subject": "shelter_clearing_location"
+    },
+    {
+      "asymmetry_id": "crafting_table_item",
+      "kind": "access",
+      "description": "Actor C begins holding a crafting table item that can be placed as a shared station; the others begin without that item.",
+      "visible_to": "all",
+      "holder_actor_ids": ["actor_c"],
+      "subject": "crafting_table_item"
+    }
+  ],
+  "activity_graph": {
+    "nodes": [
+      {
+        "activity_id": "gather_logs",
+        "kind": "quest",
+        "title": "Gather logs",
+        "description": "Collect logs needed for crafting and shelter blocks."
+      },
+      {
+        "activity_id": "place_crafting_station",
+        "kind": "quest",
+        "title": "Place crafting station",
+        "description": "Place or craft a crafting table usable as a shared station in the world."
+      },
+      {
+        "activity_id": "craft_early_tools",
+        "kind": "quest",
+        "title": "Craft early tools",
+        "description": "Convert materials at a station into planks, sticks, or simple tools."
+      },
+      {
+        "activity_id": "establish_shelter",
+        "kind": "quest",
+        "title": "Establish shelter",
+        "description": "Place enough blocks for a small shelter footprint before night pressure rises."
+      }
+    ],
+    "edges": [
+      {
+        "from_activity_id": "gather_logs",
+        "to_activity_id": "place_crafting_station",
+        "dependency": "resource_flow",
+        "description": "Crafting a station from scratch needs logs; placing an existing table does not, but both compete for attention."
+      },
+      {
+        "from_activity_id": "place_crafting_station",
+        "to_activity_id": "craft_early_tools",
+        "dependency": "sequential_unlock",
+        "description": "A placed station unlocks efficient conversion of materials into tools."
+      },
+      {
+        "from_activity_id": "gather_logs",
+        "to_activity_id": "establish_shelter",
+        "dependency": "resource_flow",
+        "description": "Shelter blocks consume the same wood pool used for crafting."
+      },
+      {
+        "from_activity_id": "craft_early_tools",
+        "to_activity_id": "gather_logs",
+        "dependency": "competing_demand",
+        "description": "Tool crafting and continued gathering compete for actor time and material."
+      },
+      {
+        "from_activity_id": "establish_shelter",
+        "to_activity_id": "craft_early_tools",
+        "dependency": "competing_demand",
+        "description": "Shelter work and tool crafting compete for the same actors and wood budget."
+      },
+      {
+        "from_activity_id": "place_crafting_station",
+        "to_activity_id": "establish_shelter",
+        "dependency": "shared_infrastructure",
+        "description": "A placed station near a clearing can anchor both crafting and shelter activity without assigning who uses it."
+      }
+    ]
+  },
+  "required_capabilities": [
+    {
+      "capability_case_id": "collect_logs",
+      "evidence_status": "resolved",
+      "evidence_ref": "probe/benchmarks/capability/individual-capability-v1.json#collect_logs",
+      "suite_id": "individual-capability-v1"
+    },
+    {
+      "capability_case_id": "craft_table",
+      "evidence_status": "resolved",
+      "evidence_ref": "probe/benchmarks/capability/individual-capability-v1.json#craft_table",
+      "suite_id": "individual-capability-v1"
+    },
+    {
+      "capability_case_id": "place_table",
+      "evidence_status": "resolved",
+      "evidence_ref": "probe/benchmarks/capability/individual-capability-v1.json#place_table",
+      "suite_id": "individual-capability-v1"
+    },
+    {
+      "capability_case_id": "craft_wooden_pickaxe",
+      "evidence_status": "declared_gap",
+      "gap_reason": "Early-tool crafting is a useful competing activity in this quest graph, but no current-run craft_wooden_pickaxe capability report is required to declare the family."
+    }
+  ],
+  "interaction_opportunities": [
+    {
+      "opportunity_id": "station_placement_visibility",
+      "description": "Actors may observe a crafting-table item or placed station and choose to place, use, request access, ignore, or pursue another activity.",
+      "involved_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    },
+    {
+      "opportunity_id": "wood_budget_contention",
+      "description": "Actors may observe the same limited wood pool being pulled toward crafting versus shelter and choose how, whether, or with whom to act.",
+      "involved_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    },
+    {
+      "opportunity_id": "clearing_discovery",
+      "description": "Actors who learn the flatter clearing may leave traces or be observed by others without any required disclosure or joint plan.",
+      "involved_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    }
+  ],
+  "material_stakes": [
+    {
+      "stake_id": "shared_wood_pool",
+      "kind": "possession",
+      "description": "Logs and planks used for tools or shelter reduce what remains for other quest activities.",
+      "affected_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    },
+    {
+      "stake_id": "crafting_table_item",
+      "kind": "tool",
+      "description": "Holding or placing the crafting table changes station access for whoever can reach it.",
+      "affected_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    },
+    {
+      "stake_id": "shelter_footprint",
+      "kind": "place",
+      "description": "Shelter blocks change available cover and later construction options for all actors near the clearing.",
+      "affected_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    },
+    {
+      "stake_id": "placed_station",
+      "kind": "station",
+      "description": "A placed crafting table is shared-world infrastructure that alters conversion options without assigning users.",
+      "affected_actor_ids": ["actor_a", "actor_b", "actor_c"]
+    }
+  ],
+  "response_window": {
+    "require_subsequent_actor_turn": true,
+    "timeout_ms": 180000
+  },
+  "metrics": {
+    "record_goal_series": true,
+    "record_action_series": true,
+    "record_resource_series": true,
+    "record_interaction_series": true,
+    "record_spatial_series": true
+  },
+  "visual": {
+    "capture_first_person": true,
+    "capture_third_person": true,
+    "capture_video": false,
+    "pixels_are_review_only": true
+  },
+  "budgets": {
+    "max_cycles": 60,
+    "max_runtime_actions_per_actor": 100,
+    "max_wall_time_ms": 1800000
+  },
+  "provenance": {
+    "source_kind": "authored",
+    "source_ref": "slice-c2-multi-activity-quest",
+    "reset_refs": ["world_scenario:natural-safe-spawn-v1"],
+    "notes": "C2 multi-activity quest family. Competing useful activities; no prescribed division of labor or social response."
+  }
+}

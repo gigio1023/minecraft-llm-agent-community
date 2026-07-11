@@ -38,3 +38,26 @@ export type {
   SocialScenarioValidationResult,
   ValidateSocialScenarioOptions
 } from "./loader.js";
+
+export {
+  SOCIAL_INTERACTION_OPPORTUNITY_OBSERVATIONS
+} from "./observationTypes.js";
+
+export type {
+  SocialInteractionOpportunityObservationV1,
+  SocialOpportunityObservationRecordV1
+} from "./observationTypes.js";
+
+export {
+  SOCIAL_SCENARIO_FAMILY_ENTRIES,
+  hashSocialScenarioFamilies,
+  loadAllSocialScenarioFamilies,
+  loadSocialScenarioFamily,
+  resolveSocialScenarioFamilyPath
+} from "./socialScenarioFamilies.js";
+
+export type {
+  LoadedSocialScenarioFamily,
+  SocialScenarioFamilyEntry,
+  SocialScenarioFamilyId
+} from "./socialScenarioFamilies.js";

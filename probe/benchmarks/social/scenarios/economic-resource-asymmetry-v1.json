@@ -1,0 +1,177 @@
+{
+  "schema": "interdependent-social-scenario/v1",
+  "scenario_id": "economic-resource-asymmetry-v1",
+  "version": "1.0.0",
+  "title": "Economic resource asymmetry (wood vs station access)",
+  "description": "Two-actor economic family: one actor begins with nearer wood-gathering pressure and the other with nearer crafting-station access. The setup creates a reason to exchange, specialize, or work alone. It does not prescribe trust, trade, refusal, or any social response.",
+  "world_scenario_id": "natural-safe-spawn-v1",
+  "fixture_class": "natural_world",
+  "fixture_progress_credited_to_actors": false,
+  "social_response_prescribed": false,
+  "actor_count": 2,
+  "actor_profiles": [
+    {
+      "actor_id": "actor_a",
+      "profile_ref": "profiles/economic-forager-a.json"
+    },
+    {
+      "actor_id": "actor_b",
+      "profile_ref": "profiles/economic-crafter-b.json"
+    }
+  ],
+  "model_assignment": {
+    "comparable_capability": true,
+    "assignments": [
+      {
+        "actor_id": "actor_a",
+        "provider_id": "deterministic-social",
+        "model": "deterministic-social"
+      },
+      {
+        "actor_id": "actor_b",
+        "provider_id": "deterministic-social",
+        "model": "deterministic-social"
+      }
+    ]
+  },
+  "role_assignment_mode": "unassigned",
+  "asymmetries": [
+    {
+      "asymmetry_id": "log_proximity",
+      "kind": "resource",
+      "description": "Actor A begins nearer harvestable logs; Actor B begins farther from the same wood pressure.",
+      "visible_to": "all",
+      "holder_actor_ids": ["actor_a"],
+      "subject": "oak_log_proximity"
+    },
+    {
+      "asymmetry_id": "crafting_station_access",
+      "kind": "access",
+      "description": "Actor B begins nearer a usable crafting-table location or equivalent station access; Actor A does not start with the same station proximity.",
+      "visible_to": "all",
+      "holder_actor_ids": ["actor_b"],
+      "subject": "crafting_table_station_access"
+    }
+  ],
+  "activity_graph": {
+    "nodes": [
+      {
+        "activity_id": "gather_logs",
+        "kind": "economic",
+        "title": "Gather logs",
+        "description": "Collect logs from the natural world under wood pressure."
+      },
+      {
+        "activity_id": "use_crafting_station",
+        "kind": "economic",
+        "title": "Use crafting station",
+        "description": "Convert gathered materials at a crafting station into planks, sticks, or tools."
+      },
+      {
+        "activity_id": "obtain_tools",
+        "kind": "economic",
+        "title": "Obtain tools",
+        "description": "Produce or acquire simple wooden tools that change later gathering efficiency."
+      }
+    ],
+    "edges": [
+      {
+        "from_activity_id": "gather_logs",
+        "to_activity_id": "use_crafting_station",
+        "dependency": "resource_flow",
+        "description": "Station work becomes useful when logs or derived materials are available somewhere in the shared world."
+      },
+      {
+        "from_activity_id": "use_crafting_station",
+        "to_activity_id": "obtain_tools",
+        "dependency": "sequential_unlock",
+        "description": "Crafted components at a station can unlock tool production without assigning who must craft."
+      },
+      {
+        "from_activity_id": "obtain_tools",
+        "to_activity_id": "gather_logs",
+        "dependency": "resource_flow",
+        "description": "Tool availability can change gathering efficiency for whoever holds or can reach the tool."
+      }
+    ]
+  },
+  "required_capabilities": [
+    {
+      "capability_case_id": "collect_logs",
+      "evidence_status": "resolved",
+      "evidence_ref": "probe/benchmarks/capability/individual-capability-v1.json#collect_logs",
+      "suite_id": "individual-capability-v1"
+    },
+    {
+      "capability_case_id": "craft_table",
+      "evidence_status": "resolved",
+      "evidence_ref": "probe/benchmarks/capability/individual-capability-v1.json#craft_table",
+      "suite_id": "individual-capability-v1"
+    },
+    {
+      "capability_case_id": "craft_wooden_pickaxe",
+      "evidence_status": "declared_gap",
+      "gap_reason": "Tool-production competence is useful under this asymmetry but no current-run craft_wooden_pickaxe capability report is required to declare the family."
+    }
+  ],
+  "interaction_opportunities": [
+    {
+      "opportunity_id": "log_for_station_access",
+      "description": "Actors may observe complementary wood and station access and choose to request, offer, ignore, or continue alone.",
+      "involved_actor_ids": ["actor_a", "actor_b"]
+    },
+    {
+      "opportunity_id": "tool_access_after_craft",
+      "description": "If tools appear from station work, nearby actors may observe changed options around tool possession or temporary access.",
+      "involved_actor_ids": ["actor_a", "actor_b"]
+    }
+  ],
+  "material_stakes": [
+    {
+      "stake_id": "log_possession",
+      "kind": "possession",
+      "description": "Who holds logs changes who can feed station work without further gathering.",
+      "affected_actor_ids": ["actor_a", "actor_b"]
+    },
+    {
+      "stake_id": "station_access",
+      "kind": "station",
+      "description": "Crafting-station proximity changes conversion options for materials already in the world.",
+      "affected_actor_ids": ["actor_a", "actor_b"]
+    },
+    {
+      "stake_id": "tool_possession",
+      "kind": "tool",
+      "description": "Tool possession changes later gathering and crafting options for the holder and for nearby actors who lack tools.",
+      "affected_actor_ids": ["actor_a", "actor_b"]
+    }
+  ],
+  "response_window": {
+    "require_subsequent_actor_turn": true,
+    "timeout_ms": 120000
+  },
+  "metrics": {
+    "record_goal_series": true,
+    "record_action_series": true,
+    "record_resource_series": true,
+    "record_interaction_series": true,
+    "record_spatial_series": true
+  },
+  "visual": {
+    "capture_first_person": true,
+    "capture_third_person": true,
+    "capture_video": false,
+    "pixels_are_review_only": true
+  },
+  "budgets": {
+    "max_cycles": 40,
+    "max_runtime_actions_per_actor": 80,
+    "max_wall_time_ms": 1200000
+  },
+  "provenance": {
+    "source_kind": "authored",
+    "source_ref": "slice-c2-economic-resource-asymmetry",
+    "reset_refs": ["world_scenario:natural-safe-spawn-v1"],
+    "notes": "C2 economic family. Creates material reasons to interact; does not prescribe social response."
+  }
+}

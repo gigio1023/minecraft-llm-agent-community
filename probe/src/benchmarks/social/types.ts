@@ -8,8 +8,8 @@ import type { WorldScenarioId } from "../../server/worldScenarios.js";
  * promises, relationship labels, or social outcomes. Must not embed hidden
  * action plans or parameter suggestions.
  *
- * TODO(C2): economic / cooperative / multi-activity quest scenario families
- * build on this declaration; do not expand family runners here.
+ * C2 family declarations live under `probe/benchmarks/social/scenarios/` and
+ * are indexed by `socialScenarioFamilies.ts`. Do not expand family runners here.
  */
 export const INTERDEPENDENT_SOCIAL_SCENARIO_SCHEMA =
   "interdependent-social-scenario/v1" as const;
