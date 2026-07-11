@@ -398,6 +398,8 @@ Acceptance:
 
 ### Slice A1 — Manifest Loader And Typed Predicates
 
+Status: **accepted** (2026-07-11). Provider-free; no live server or provider call.
+
 Deliver:
 
 - `individual-capability-manifest/v1` TypeScript types and strict loader;
@@ -409,12 +411,24 @@ Deliver:
 
 Acceptance:
 
-- invalid manifests fail before server/provider work;
-- valid cases round-trip without defaulting missing evaluation authority;
-- predicates evaluate only saved structured evidence;
-- every pass cites evidence refs;
-- provider prose, task text, and tool names cannot flip a predicate;
-- `cd probe && bun test` and `bun run typecheck` pass.
+- [x] invalid manifests fail before server/provider work;
+- [x] valid cases round-trip without defaulting missing evaluation authority;
+- [x] predicates evaluate only saved structured evidence;
+- [x] every pass cites evidence refs;
+- [x] provider prose, task text, and tool names cannot flip a predicate;
+- [x] `cd probe && bun test` and `bun run typecheck` pass.
+
+Evidence:
+
+- modules: `probe/src/benchmarks/capability/{types,loader,predicates,minecraftIds,evidenceBag,index}.ts`
+- suite: `probe/benchmarks/capability/individual-capability-v1.json`
+- fixtures: `probe/benchmarks/capability/fixtures/`
+- tests: `probe/test/individualCapabilityManifest.test.ts`,
+  `probe/test/capabilityPredicates.test.ts`
+- validation: focused A1 tests 19/19; `bun run typecheck`; `git diff --check`
+- A2 note: report adapter must map real social-cycle artifacts into
+  `CapabilityEvidenceBagV1`; do not import furnace milestone scoring as generic
+  authority. `block_observed_at` requires positioned block facts.
 
 ### Slice A2 — Normalized Report Adapter
 
@@ -800,20 +814,17 @@ because an older plan used a name.
 
 ## 12. Immediate Next Slice
 
-The next agent should implement **Slice A1: Manifest Loader And Typed
-Predicates**. Do not start the provider-backed suite, continuity benchmark, or
+A1 is accepted. The next agent should implement **Slice A2: Normalized Report
+Adapter**. Do not start the provider-backed suite, continuity benchmark, or
 social scenarios yet.
 
-First implementation actions:
+First A2 implementation actions:
 
-1. inspect `socialCycleBenchmarkMetrics.ts`, `socialCycleRunner.ts`,
-   `worldScenarios.ts`, and their tests to confirm the narrowest evidence-reader
-   seam;
-2. add the manifest/predicate types, strict loader, and focused tests;
-3. add three checked-in minimal cases without wiring a live provider;
-4. run targeted tests, full typecheck, and `git diff --check`;
-5. update this plan's A1 acceptance status in the same commit.
-
-The first slice is complete when invalid manifests fail before execution and a
-typed predicate can evaluate saved structured evidence with explicit
-`passed | failed | unknown` plus evidence refs.
+1. define `individual-capability-report/v1` builder types;
+2. adapt `social-cycle-run-report/v1` + actor workspace refs into
+   `CapabilityEvidenceBagV1` without furnace-generic authority;
+3. emit target, milestone, budget, usage, stall/blocker, and failure fields;
+4. ensure clean runtime exit without target evidence reports `failed` or
+   `unverifiable`, never `passed`;
+5. run targeted tests, full typecheck, and `git diff --check`;
+6. update this plan's A2 acceptance status in the same commit.
