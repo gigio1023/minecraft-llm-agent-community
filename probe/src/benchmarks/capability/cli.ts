@@ -2,13 +2,14 @@
  * CLI for V4 individual capability cases.
  *
  * Flags: --manifest --case --provider --model --repeat --seed --out
- * Optional: --offline --actor
+ * Optional: --offline --actor and tighter wall/request/token limits
  * Does not accept --benchmark-task; V4 reports require a validated manifest.
  */
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { loadRepoDotEnv } from "../../config/loadRepoDotEnv.js";
 import type { SocialCycleProviderId } from "../../runtime/goals/types.js";
 import {
   CapabilityRunnerError,
@@ -28,6 +29,9 @@ type ParsedArgs = {
   offline?: boolean;
   cycles?: number;
   maxActionsPerCycle?: number;
+  maxWallTimeMs?: number;
+  maxProviderRequests?: number;
+  maxTotalTokens?: number;
 };
 
 function normalizeProvider(value: string | undefined): SocialCycleProviderId | undefined {
@@ -106,6 +110,15 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--max-actions-per-cycle" && next) {
       options.maxActionsPerCycle = parsePositiveInt(next, "--max-actions-per-cycle");
       index++;
+    } else if (arg === "--max-wall-time-ms" && next) {
+      options.maxWallTimeMs = parsePositiveInt(next, "--max-wall-time-ms");
+      index++;
+    } else if (arg === "--max-provider-requests" && next) {
+      options.maxProviderRequests = parsePositiveInt(next, "--max-provider-requests");
+      index++;
+    } else if (arg === "--max-total-tokens" && next) {
+      options.maxTotalTokens = parsePositiveInt(next, "--max-total-tokens");
+      index++;
     } else if (arg.startsWith("-")) {
       throw new CapabilityRunnerError(`Unknown flag: ${arg}`);
     }
@@ -117,6 +130,9 @@ function parseArgs(argv: string[]): ParsedArgs {
 async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../../../..");
+  loadRepoDotEnv(repoRoot, {
+    overrideKeys: ["OPENAI_API_KEY"]
+  });
 
   let parsed: ParsedArgs;
   try {
@@ -167,6 +183,11 @@ async function main() {
       repeat: parsed.repeat ?? 1,
       cycles: parsed.cycles,
       maxActionsPerCycle: parsed.maxActionsPerCycle,
+      budgetOverrides: {
+        max_wall_time_ms: parsed.maxWallTimeMs,
+        max_provider_requests: parsed.maxProviderRequests,
+        max_total_tokens: parsed.maxTotalTokens
+      },
       repoRoot
     });
 
