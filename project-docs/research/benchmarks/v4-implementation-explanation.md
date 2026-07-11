@@ -21,7 +21,7 @@ research program or live behavior path is complete.
 | A2 | accepted | Normalized capability report adapter |
 | A3 | accepted provider-free | Capability CLI + case limit checks; live provider request cancellation remains untested |
 | A4 | accepted | Basic suite 1.1.0 → later 1.2.0 with B1 |
-| A5 | **blocked** | Needs exact provider/model + preflight + approval |
+| A5 | live attempt recorded; not accepted | GPT-5.4 Mini provider/evidence paths worked, but natural manifest goals did not reach Actor Turn; controlled crafting made partial progress |
 | B1 | accepted | Multi-hop furnace case (manifest-owned) |
 | B2 | accepted provider-free | Offline evaluator + deep artifact-bag validation + restart writer |
 | B3 | declarations only | Live runs blocked pending approval |
@@ -31,9 +31,11 @@ research program or live behavior path is complete.
 | D1 | writer/index only | Phenomenon catalog and clearly labeled fixture record |
 | D2 | **not started** | Requires user-selected D1 phenomenon |
 
-**Do not call V4 complete.** Live capability batches (A5), live continuity runs
-(B3), and live multi-actor sandboxes still lack current-run provider-backed
-evidence. Schemas and offline smokes are not substitutes for those steps.
+**Do not call V4 complete.** A5 now has current provider-backed evidence, but
+the natural cases are invalid as declared-goal measurements and the controlled
+case did not reach its target. Live continuity runs (B3) and live multi-actor
+sandboxes still lack current-run provider-backed evidence. Schemas and offline
+smokes are not substitutes for those steps.
 
 ## 2. Why this shape
 
@@ -176,7 +178,7 @@ still overstate what had been observed. The code now handles them as follows:
 ## 7. Validation evidence
 
 ```bash
-cd probe && bun test          # 729 pass after Codex review repairs
+cd probe && bun test          # 730 pass after live-CLI preparation
 cd probe && bun run typecheck
 cd docs && npm run build
 git diff --check
@@ -186,12 +188,15 @@ Provider-free smoke: `probe/test/capabilityRunnerSmoke.test.ts`,
 `probe/test/capabilityBudgetStopping.test.ts`,
 `probe/test/goalContinuityArtifactBag.test.ts`.
 
-No live provider HTTP was used in this wave.
+The 2026-07-11 A5 attempt used `openai-api:gpt-5.4-mini`: 18 requests and
+382,133 tokens across three runs. All report audits passed. See
+`project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`.
 
 ## 8. Still blocked / awaiting user
 
-1. **A5** — choose exact `(provider_id, model)`, estimate tokens/RPM, run
-   `provider-quota-preflight`, approve, and run a declared batch.
+1. **A5 acceptance** — first carry the typed manifest goal into Actor Turn and
+   reject empty placement parameters provider-free. Any later live rerun needs
+   a new user decision and current-day preflight.
 2. **B3 live** — the same approval requirement; offline bag loading is not live
    restart proof.
 3. **Live C2/C3 runs** — multi-actor Minecraft + video capture after capability
@@ -201,8 +206,8 @@ No live provider HTTP was used in this wave.
 
 ## 9. Next smallest action
 
-Approve one A5 `(provider, model, budget)` and run `provider-quota-preflight`.
-Do not start D2 from the fixture record.
+Repair the two A5 findings provider-free and add focused tests. Do not rerun A5
+or start D2 from the fixture record.
 
 ## 10. Related docs
 

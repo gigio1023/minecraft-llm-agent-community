@@ -1,5 +1,10 @@
 # Lower-Capability Executor Prompt: GPT-5.4 Mini Live Validation
 
+> Status: executed on 2026-07-11. Do not execute these live commands again.
+> Read the result report under
+> `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`.
+> Any rerun requires a new user decision and current-day approval.
+
 Do not optimize for completing the request as broadly as possible.
 Optimize for the smallest correct and verifiable change.
 

@@ -6,12 +6,13 @@ Handoff: `handoff-prompt.md` (bounded GPT-5.4 Mini live validation)
 ## Current focus
 
 Provider-free Work 1 (A3 budget stopping) and Work 2 (B2 artifact-bag loader)
-are landed and reviewed again in `63eb47df`. The next planned work is the
-three-scenario A5 live validation in
-`project-docs/research/benchmarks/gpt54mini-v4-live-validation-plan.md`, using
-only `openai-api:gpt-5.4-mini`. Its planning preflight is
-`needs_dashboard_approval`; no live request has run. B3 live remains separate,
-and D2 still needs a real D1 selection (fixture ineligible).
+are landed and reviewed again in `63eb47df`. The three-scenario A5 live
+validation completed with `openai-api:gpt-5.4-mini`; see
+`project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`.
+It exposed two provider-free repair targets: natural manifest goals do not
+reach Actor Turn, and empty `placeCraftingTable` parameters become an implicit
+adjacent-cell target. Do not rerun before repairing these. B3 live remains
+separate, and D2 still needs a real D1 selection (fixture ineligible).
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.

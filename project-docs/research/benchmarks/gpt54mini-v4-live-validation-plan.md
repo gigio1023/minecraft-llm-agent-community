@@ -2,9 +2,15 @@
 
 Search token: `GPT54MINI_V4_LIVE_VALIDATION`.
 
-Status: planned; no live provider request has run.
+Status: completed on 2026-07-11; no rerun is authorized.
 
 Recorded: 2026-07-11 (`Asia/Seoul`).
+
+Result:
+`project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`.
+The provider and evidence paths worked, but the natural cases did not carry
+their manifest goals into Actor Turn context. The controlled crafting case made
+verified partial progress and then exposed an empty-parameter placement defect.
 
 This plan tests the V4 capability path with a real LLM and live Minecraft. It
 does not test research novelty, compare models, or establish social behavior.
@@ -62,9 +68,9 @@ this work.
 
 OpenAI dashboard eligibility is still authoritative. The planning preflight at
 `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/preflight/planning.json`
-reports `needs_dashboard_approval`. No live request may run until the user has
-checked the dashboard after the current `00:00 UTC` reset and approved the
-campaign in a dated note.
+originally reported `needs_dashboard_approval`. The user then checked the
+dashboard, approved the campaign, and the saved approved preflight returned
+`allowed`. Future runs require a new current-day approval and preflight.
 
 ## Required CLI Preparation
 

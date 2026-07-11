@@ -1,5 +1,10 @@
 # Successor Prompt: Bounded GPT-5.4 Mini Live Validation
 
+> Status: the live work described below was executed on 2026-07-11. Do not run
+> it again. The current result and next provider-free fixes are recorded in
+> `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`.
+> A future live run requires a new user decision and current-day approval.
+
 You are the high-capability successor responsible for the first live validation
 of the V4 individual-capability path. Prepare the CLI, require current dashboard
 approval, supervise the bounded executor instructions, inspect the resulting
