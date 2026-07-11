@@ -5,18 +5,20 @@ Handoff: `handoff-prompt.md` (full path A1R → D1; D2 requires user selection)
 
 ## Current focus
 
-Provider-free code reaches D1 formats and fixtures. Review reopened B2 as
-partial because its evaluator still lacks a strict saved-evidence loader.
-Before the next user decision, A3 needs complete runtime stopping behavior and
-B2 needs strict saved-evidence loading. Provider approval matters after those
-two implementation gaps are closed. D2 remains a later user selection.
+A3 adversarial remediations landed (budget stop labeling, always-observed
+wall_time_ms, abort-before-provider). Remaining provider-free gap before live:
+
+- Work 2 (B2): strict recursive `goal-continuity-artifact-bag/v1` loader plus a
+  minimal restart-observation writer; evaluator must only see validated bags.
+
+Provider approval and D2 remain blocked until B2 lands and the user decides.
 
 Implementation style: apply default-strength `DietrichGebert/ponytail` at
 `14a0d79`; the active implementation plan owns the repo-specific adaptation.
 
 ## Accepted (provider-free)
 
-- A1R, A2, A4, B1
+- A1R, A2, A3, A4, B1
 - C1/C2 declarations, C3 format/writer, D1 writer/index fixture
 - B3 case declarations only (live blocked)
 
@@ -24,21 +26,18 @@ Implementation style: apply default-strength `DietrichGebert/ponytail` at
 
 - B2 offline evaluator: strict `goal-continuity-artifact-bag/v1` loader and
   runtime restart-observation writer still missing
-- A3 runner: cycle/action limits are enforced, but manifest-specific wall-time,
-  provider-request, token, and cost limits do not yet stop execution
 
 ## Blocked
 
-- A5 / B3 live / live multi-actor: implementation gaps above must close, then
-  exact provider+model, estimate, preflight, and approval are required
+- A5 / B3 live / live multi-actor: B2 must close, then exact provider+model,
+  estimate, preflight, and approval are required
 - D2: user must select a D1 candidate (fixture is not eligible)
 - Push/PR: only on request
 
 ## Validation snapshot
 
-- `cd probe && bun test` → 688 pass
+- `cd probe && bun test test/capabilityBudgetStopping.test.ts test/capabilityRunnerSmoke.test.ts` → 13 pass
 - `bun run typecheck` → pass
-- `cd docs && npm run build` → pass
 
 ## Deviations
 

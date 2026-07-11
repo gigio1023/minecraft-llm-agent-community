@@ -108,6 +108,14 @@ test("capability runner provider-free offline smoke emits declaration, raw, norm
   assert.equal(budgetStatus.target_passed, false);
   // Smoke uses cycle override below declared budgets, so exhaustion is false.
   assert.equal(budgetStatus.budget_exhausted, false);
+  assert.ok(
+    Number.isFinite(budgetStatus.observed.wall_time_ms) &&
+      (budgetStatus.observed.wall_time_ms ?? -1) >= 0
+  );
+  assert.ok(
+    Number.isFinite(normalized.budgets.observed.wall_time_ms) &&
+      (normalized.budgets.observed.wall_time_ms ?? -1) >= 0
+  );
 
   // Suite index updated.
   const suiteIndex = JSON.parse(

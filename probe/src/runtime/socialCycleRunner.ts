@@ -455,6 +455,8 @@ export type SocialCycleRunOptions = {
 export type SocialCycleRunResult = {
   report: SocialCycleRunReport;
   reportPath: string;
+  /** Elapsed wall ms for this case (`nowMs() - start`); always set. */
+  observedWallTimeMs: number;
   caseBudgetStop?: SocialCycleCaseBudgetStop;
 };
 
@@ -1171,7 +1173,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   let providerFailed = false;
   let anyMeaningfulProgress = false;
   let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
-  let wallTimeStopped = false;
   const nowMs = input.nowMs ?? (() => Date.now());
   const caseBudgetStartedAtMs = nowMs();
   const caseBudgetController = new AbortController();
@@ -1224,9 +1225,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     });
     if (stop) {
       caseBudgetStop = stop;
-      if (stop.exhausted_dimensions.includes("wall_time")) {
-        wallTimeStopped = true;
-      }
       if (!caseBudgetController.signal.aborted) {
         caseBudgetController.abort();
       }
@@ -1257,7 +1255,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             )
           }
         } satisfies SocialCycleCaseBudgetStop);
-      wallTimeStopped = true;
       return true;
     }
     return false;
@@ -1793,6 +1790,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         }
 
         if (turnCore.status === "provider_failed") {
+          // Budget abort before/during planning returns provider_failed shape but
+          // must not be attributed as provider failure when caseBudgetStop is set.
+          if (caseBudgetStop) {
+            break;
+          }
           providerFailed = true;
           report.provider_error = turnCore.planner.error;
           appendProviderErrorRefs({
@@ -2078,18 +2080,21 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     environmentBlocked
   });
 
-  if (providerFailed) {
-    report.runtime_status = "failed";
-  } else if (wallTimeStopped || caseBudgetStop?.exhausted_dimensions.includes("wall_time")) {
-    // Case wall-time stop is distinct from actor incompetence or provider failure.
+  if (caseBudgetStop) {
+    // Any case-budget stop (wall_time, requests, tokens, cost) is distinct from
+    // actor incompetence or provider/runtime failure.
     report.runtime_status = "timeout";
+  } else if (providerFailed) {
+    report.runtime_status = "failed";
   }
 
   report.provider_usage = await summarizeProviderUsage({ repoRoot, runId });
   await writeJson(input.reportPath, report);
+  const observedWallTimeMs = Math.max(0, nowMs() - caseBudgetStartedAtMs);
   return {
     report,
     reportPath: input.reportPath,
+    observedWallTimeMs,
     ...(caseBudgetStop ? { caseBudgetStop } : {})
   };
 }

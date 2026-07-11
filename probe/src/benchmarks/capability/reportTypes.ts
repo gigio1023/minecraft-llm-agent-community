@@ -32,6 +32,7 @@ export const CAPABILITY_FAILURE_CLASSES = [
   "stalled_after_progress",
   "context_continuity_failed",
   "claim_without_evidence",
+  "budget_exhausted",
   "unverifiable"
 ] as const;
 

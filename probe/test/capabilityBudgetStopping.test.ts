@@ -149,6 +149,8 @@ test("capability runner stops on wall-time with deterministic delayed fake", asy
   assert.ok(result.budget_status.exhausted_dimensions.includes("wall_time"));
   assert.ok((result.budget_status.observed.wall_time_ms ?? 0) >= 40);
   assert.equal(result.normalized_report.runtime_status, "timeout");
+  assert.equal(result.normalized_report.failure_class, "budget_exhausted");
+  assert.equal(result.normalized_report.interpretation_status, "failed");
   assert.ok(
     result.normalized_report.diagnostic_notes.some((note) => /budget exhausted/i.test(note))
   );
@@ -197,7 +199,19 @@ test("capability runner stops on provider-request ceiling before next request", 
   assert.equal(result.budget_status.budget_exhausted, true);
   assert.ok(result.budget_status.exhausted_dimensions.includes("provider_requests"));
   assert.equal(result.budget_status.observed.provider_requests, 2);
+  assert.equal(result.normalized_report.runtime_status, "timeout");
+  assert.equal(result.normalized_report.failure_class, "budget_exhausted");
+  assert.equal(result.normalized_report.interpretation_status, "failed");
   assert.notEqual(result.normalized_report.failure_class, "provider_blocked");
+  assert.ok(
+    Number.isFinite(result.budget_status.observed.wall_time_ms) &&
+      (result.budget_status.observed.wall_time_ms ?? -1) >= 0
+  );
+  assert.ok(
+    result.normalized_report.diagnostic_notes.some((note) =>
+      /budget exhausted/i.test(note) && /provider_requests/i.test(note)
+    )
+  );
 });
 
 test("capability runner stops on token ceiling from saved/normalized usage", async () => {
@@ -230,6 +244,13 @@ test("capability runner stops on token ceiling from saved/normalized usage", asy
   assert.ok(result.budget_status.exhausted_dimensions.includes("total_tokens"));
   assert.equal(result.budget_status.observed.total_tokens, 100);
   assert.equal(result.normalized_report.budgets.observed.total_tokens, 100);
+  assert.equal(result.normalized_report.runtime_status, "timeout");
+  assert.equal(result.normalized_report.failure_class, "budget_exhausted");
+  assert.equal(result.normalized_report.interpretation_status, "failed");
+  assert.ok(
+    Number.isFinite(result.budget_status.observed.wall_time_ms) &&
+      (result.budget_status.observed.wall_time_ms ?? -1) >= 0
+  );
 });
 
 test("capability runner marks estimated_cost unverifiable when cost cannot be computed", async () => {

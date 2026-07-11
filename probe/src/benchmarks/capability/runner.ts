@@ -653,8 +653,7 @@ export async function runCapabilityCase(
     cycles: socialResult.report.cycles.length,
     runtime_actions: observedRuntimeActions,
     wall_time_ms:
-      stopObserved?.wall_time_ms ??
-      normalizedReport.budgets.observed.wall_time_ms,
+      stopObserved?.wall_time_ms ?? socialResult.observedWallTimeMs,
     provider_requests:
       stopObserved?.provider_requests ??
       normalizedReport.budgets.observed.provider_requests ??
@@ -716,19 +715,14 @@ export async function runCapabilityCase(
         "Supply a normalized usage cost source or remove max_estimated_cost until cost is computable."
     };
   } else if (budgetEval.budget_exhausted) {
-    // Distinguish budget stop from provider/runtime failure labels that early
-    // exit would otherwise inherit from incomplete cycles.
-    if (
-      normalizedReport.failure_class === "runtime_execution_failed" ||
-      normalizedReport.failure_class === "provider_blocked"
-    ) {
-      normalizedReport = {
-        ...normalizedReport,
-        failure_class: "no_measurable_progress",
-        next_diagnostic_action:
-          "Budget exhausted; inspect budget-status.json exhausted_dimensions before attributing actor or provider failure."
-      };
-    }
+    // Budget stop is not actor no_measurable_progress and not runtime_execution_failed.
+    normalizedReport = {
+      ...normalizedReport,
+      interpretation_status: "failed",
+      failure_class: "budget_exhausted",
+      next_diagnostic_action:
+        "Budget exhausted; inspect budget-status.json exhausted_dimensions before attributing actor or provider failure."
+    };
   }
 
   const budgetStatus: CapabilityBudgetStatusV1 = {

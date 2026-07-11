@@ -283,6 +283,22 @@ export async function runSocialCycleTurnCore(input: {
   /** Case-budget abort; threaded into action execution for abort+await cleanup. */
   signal?: AbortSignal;
 }): Promise<SocialCycleTurnCoreResult> {
+  // Prefer early abort over starting provider planning when the case budget
+  // (or external) signal already fired. Deep HTTP cancel is out of scope here.
+  if (input.signal?.aborted) {
+    return {
+      status: "provider_failed",
+      planner: {
+        ok: false,
+        errorKind: "case_budget_aborted",
+        error:
+          "Case budget abort: provider planning skipped because AbortSignal was already aborted.",
+        inputRef: "",
+        outputRef: ""
+      }
+    };
+  }
+
   const planner = await runSocialActorTurnProvider({
     providerId: input.providerId,
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
