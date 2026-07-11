@@ -92,6 +92,10 @@ a small dataset-free individual capability manifest and normalized report
 contract, followed by long-horizon goal-continuity cases and a minimal
 interdependent social session.
 
+The detailed sequence and acceptance gates are in
+`capability-gated-social-sandbox-implementation-plan.md`; its immediate target
+is Slice A1, the manifest loader and typed predicate evaluator.
+
 | Scope | Current target |
 | --- | --- |
 | Actor count | single actor for competence/continuity gates; small attributable multi-actor sessions first; scale later as an explicit axis |
@@ -431,12 +435,13 @@ If documents disagree, start from:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
-4. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
-5. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-6. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-7. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-8. `project-docs/orientation/documentation-map.md`
-9. `project-docs/orientation/terminology.md`
+4. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+5. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+6. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+7. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+8. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+9. `project-docs/orientation/documentation-map.md`
+10. `project-docs/orientation/terminology.md`
 
 Reference docs under `project-docs/references/**` and historical docs under
 `project-docs/archive/**` are not active implementation specs unless a current

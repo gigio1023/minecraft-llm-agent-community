@@ -16,6 +16,10 @@ deep direction interview on 2026-07-11 because prediction and legibility were
 too narrow to remain the project's center even if the experiment succeeded.
 The V3 documents remain in place as audit trail. Do not build from them.
 
+The detailed build order, contracts, vertical slices, and acceptance gates live
+in `capability-gated-social-sandbox-implementation-plan.md`
+(`CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN`).
+
 ## 0. One-Sentence Direction
 
 First establish, with verifier-backed scenario benchmarks, that each actor can
@@ -655,6 +659,11 @@ what_not_to_do_next: >
 This document is the central direction authority below `SPEC.md` and
 `AGENTS.md`. Implementation plans, benchmark manifests, scenario catalogs,
 reports, and public docs must point back here.
+
+The active companion implementation plan is
+`capability-gated-social-sandbox-implementation-plan.md`. The central plan owns
+intent and stage boundaries; the companion owns current sequencing and
+acceptance criteria.
 
 Update this plan only when the program structure, success definition, research
 authority, or stage boundaries change. Routine scenario tuning, benchmark case

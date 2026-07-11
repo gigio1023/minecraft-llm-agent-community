@@ -13,6 +13,9 @@ cooperative, and quest scenarios. Long-run evidence, metrics, and video are used
 to discover recurring social phenomena; narrow controlled experiments are
 chosen only after a phenomenon is worth explaining.
 
+The detailed implementation sequence and acceptance gates live in
+`project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`.
+
 The V3 lived-vs-told plan and implementation plan are superseded audit trail.
 Prediction and observer legibility are not active headlines or deferred build
 orders. Their runtime and evidence mechanisms remain usable only where V4
@@ -244,6 +247,9 @@ Read these documents to understand the full spec:
      interdependent social sandbox, phenomenon discovery, controlled follow-up,
      and the build order connecting them. The V3 lived-vs-told and V2 co-actor
      legibility plans are historical; verification-as-hygiene remains binding.
+   - `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+     expands the program into contracts, vertical slices, dependencies,
+     acceptance gates, validation, and the immediate next slice.
 4. `project-docs/specification/runtime-evidence-and-action-skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.

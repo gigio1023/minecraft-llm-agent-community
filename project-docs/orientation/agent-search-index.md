@@ -31,6 +31,7 @@ guidance.
 |--------------|---------|--------------------|
 | `ACTIVE_CENTRAL_PLAN` | Current research spine: verify individual Minecraft competence and autonomous goal continuity, then run materially interdependent social sandboxes, catalog recurring phenomena, and choose controlled follow-up studies | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `AGENTS.md` |
 | `CAPABILITY_GATED_SOCIAL_SANDBOX` | V4 staged program connecting individual capability, goal continuity, economic/cooperative/quest interdependence, long-run observation, and discovery-to-experiment promotion | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/benchmarks/project-level-benchmark-plan.md` |
+| `CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN` | Active V4 build order: manifest/predicates, normalized reports, capability runs, goal continuity, interdependent scenarios, long-run bundles, phenomenon records, and controlled follow-up | `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`, `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md` |
 | `INDIVIDUAL_CAPABILITY_GATE` | Dataset-free scenario benchmarks with natural-language goals, target predicates, milestones, budgets, verifier evidence, efficiency, blocker recovery, and truthful failure | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/benchmarks/project-level-benchmark-plan.md` |
 | `AUTONOMOUS_GOAL_CONTINUITY_GATE` | Long-horizon benchmark for intermediate-goal creation, persistence, revision, interruption recovery, and evidence-grounded closure | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md` |
 | `INTERDEPENDENT_SOCIAL_SANDBOX` | Economic, cooperative, and quest scenarios create material reasons for actors to interact without scripting the social response | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md` |
@@ -142,44 +143,45 @@ For any onboarding developer or agent, read in this order:
 3. `CLAUDE.md` when using Claude Code
 4. `project-docs/research/current-spine/research-documentation-hierarchy.md`
 5. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
-6. `project-docs/research/current-spine/research-value-harness.md`
-7. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
-8. `project-docs/research/current-spine/transition-row-v1-contract.md`
-9. `project-docs/research/current-spine/transition-row-label-codebook.md`
-10. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
-11. `project-docs/research/current-spine/society-observable-preflight.md`
-12. `README.md`
-13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-14. `project-docs/orientation/documentation-map.md`
-15. `project-docs/orientation/terminology.md`
-16. `project-docs/specification/advisory-social-material-wam.md`
-17. `project-docs/specification/soul-grounded-social-simulation.md`
-18. `project-docs/specification/evidence-grounded-minecraft-society.md`
-19. `project-docs/specification/runtime-evidence-and-action-skills.md`
-20. `project-docs/specification/engineering-governance-and-testing.md`
-21. `project-docs/specification/reference-adaptation-guide.md`
-22. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
-23. `project-docs/runtime/overview/runtime-loop-and-verification.md`
-24. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
-25. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-26. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-27. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-28. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
-29. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
-30. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-31. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-32. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
-33. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
-34. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-35. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
-36. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
-37. `project-docs/runtime/overview/minecraft-basic-guide.md`
-38. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
-39. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-40. `project-docs/operations/setup/headless-server.md`
-41. `project-docs/operations/setup/provider-setup.md`
-42. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
-43. `project-docs/operations/setup/modelscope-qwen-api-access.md`
+6. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+7. `project-docs/research/current-spine/research-value-harness.md`
+8. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+9. `project-docs/research/current-spine/transition-row-v1-contract.md`
+10. `project-docs/research/current-spine/transition-row-label-codebook.md`
+11. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
+12. `project-docs/research/current-spine/society-observable-preflight.md`
+13. `README.md`
+14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+15. `project-docs/orientation/documentation-map.md`
+16. `project-docs/orientation/terminology.md`
+17. `project-docs/specification/advisory-social-material-wam.md`
+18. `project-docs/specification/soul-grounded-social-simulation.md`
+19. `project-docs/specification/evidence-grounded-minecraft-society.md`
+20. `project-docs/specification/runtime-evidence-and-action-skills.md`
+21. `project-docs/specification/engineering-governance-and-testing.md`
+22. `project-docs/specification/reference-adaptation-guide.md`
+23. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
+24. `project-docs/runtime/overview/runtime-loop-and-verification.md`
+25. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
+26. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+27. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+28. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+29. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
+30. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
+31. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+32. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+33. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
+34. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
+35. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+36. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
+37. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
+38. `project-docs/runtime/overview/minecraft-basic-guide.md`
+39. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
+40. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+41. `project-docs/operations/setup/headless-server.md`
+42. `project-docs/operations/setup/provider-setup.md`
+43. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
+44. `project-docs/operations/setup/modelscope-qwen-api-access.md`
 
 ## Active vs Archived
 

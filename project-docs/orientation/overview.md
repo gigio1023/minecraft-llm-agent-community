@@ -19,6 +19,10 @@ Active plan:
 (`ACTIVE_CENTRAL_PLAN`). The V3 lived-vs-told and V2 co-actor-legibility plans
 are superseded audit trail.
 
+Active implementation plan:
+`../research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+(`CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN`).
+
 ## Program Stages
 
 1. Dataset-free scenario benchmarks establish individual Minecraft competence.
@@ -121,6 +125,7 @@ closes obligations, or overrides runtime checks. The actor's
 ## Read Next
 
 - [Central Plan V4: Capability-Gated Social Sandbox](../research/current-spine/central-plan-capability-gated-social-sandbox.md)
+- [V4 Implementation Plan](../research/current-spine/capability-gated-social-sandbox-implementation-plan.md)
 - [Project-Level Benchmark Plan](../research/benchmarks/project-level-benchmark-plan.md)
 - [Central Plan V3: Lived Vs Told (superseded)](../research/current-spine/central-plan-lived-vs-told-social-history.md)
 - [Central Plan V2: Embodied Co-Actor Legibility (superseded)](../research/current-spine/central-plan-embodied-co-actor-legibility.md)

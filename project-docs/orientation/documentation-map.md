@@ -105,6 +105,7 @@ Current research direction lives under:
 
 - `project-docs/research/current-spine/research-documentation-hierarchy.md`
 - `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+- `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`

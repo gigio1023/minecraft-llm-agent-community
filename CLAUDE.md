@@ -9,11 +9,12 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
-4. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-5. `project-docs/orientation/documentation-map.md`
-6. `project-docs/orientation/agent-search-index.md`
-7. `project-docs/orientation/terminology.md`
-8. Task-relevant docs routed by the search index or repo-local agent skills.
+4. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+6. `project-docs/orientation/documentation-map.md`
+7. `project-docs/orientation/agent-search-index.md`
+8. `project-docs/orientation/terminology.md`
+9. Task-relevant docs routed by the search index or repo-local agent skills.
 
 `GEMINI.md` no longer exists and is not part of the active guidance surface.
 
@@ -25,8 +26,9 @@ competence and autonomous goal continuity; then run capable actors in
 interdependent economic, cooperative, and quest scenarios; record long-run
 evidence, metrics, and video; and choose controlled studies from recurring
 phenomena. Standing requirements live in `AGENTS.md` (Current Direction) and
-the V4 plan above. The V3 lived-vs-told and V2 co-actor-legibility plans are
-superseded audit trail; do not build or run from them.
+the V4 central and implementation plans above. The V3 lived-vs-told and V2
+co-actor-legibility plans are superseded audit trail; do not build or run from
+them.
 
 ## Use Repo-Local Agent Skills
 

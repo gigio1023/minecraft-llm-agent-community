@@ -103,6 +103,10 @@ The active research plan is
 and its implementation plan, which are superseded audit trail and must not
 drive builds or runs.
 
+The active build order and acceptance gates live in
+`project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+(`CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN`).
+
 The active sequence is:
 
 1. establish non-social Minecraft competence with dataset-free scenario

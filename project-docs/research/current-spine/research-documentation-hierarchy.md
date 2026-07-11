@@ -44,6 +44,9 @@ Active:
 - `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
   (V4 central plan; capability benchmarks, goal continuity, interdependent
   sandbox, phenomenon discovery, controlled follow-up; added 2026-07-11)
+- `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+  (active contracts, vertical slices, dependencies, acceptance gates, and
+  immediate next work; added 2026-07-11)
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`

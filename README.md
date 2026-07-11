@@ -11,6 +11,9 @@ is `project-docs/research/current-spine/central-plan-capability-gated-social-san
 the V3 lived-vs-told plan, V2 co-actor legibility plan, and former "advisory
 social-material WAM" framing are historical.
 
+Detailed build order:
+`project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`.
+
 Runtime verification, evidence artifacts, seed/reset records, screenshots, and
 scoring scripts are mandatory experiment hygiene. They are not the research
 claim by themselves. Acting outcome, physical competence, goal continuity,
@@ -155,18 +158,19 @@ Read in this order:
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
 4. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
-5. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
-6. `project-docs/orientation/documentation-map.md`
-7. `project-docs/orientation/agent-search-index.md`
-8. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-9. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-10. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-11. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-12. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-13. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-14. `project-docs/runtime/overview/minecraft-basic-guide.md`
-15. `project-docs/operations/setup/headless-server.md`
-16. `project-docs/operations/setup/provider-setup.md`
+5. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+6. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+7. `project-docs/orientation/documentation-map.md`
+8. `project-docs/orientation/agent-search-index.md`
+9. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+10. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+11. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+12. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+13. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+14. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+15. `project-docs/runtime/overview/minecraft-basic-guide.md`
+16. `project-docs/operations/setup/headless-server.md`
+17. `project-docs/operations/setup/provider-setup.md`
 
 ## Running Checks
 
