@@ -88,12 +88,11 @@ checks.
 
 The active direction is defined in
 `central-plan-capability-gated-social-sandbox.md`. The provider-free
-implementation now includes individual capability manifests/reports, declared
+implementation now includes individual capability manifests/reports with full
+case budget stopping, continuity bag loading and offline evaluation, declared
 continuity cases, interdependent scenario files, long-run observation formats,
-and a fixture-only phenomenon index. A3 and B2 remain partial: the capability
-runner still needs manifest-specific stopping for wall time and provider usage,
-and continuity evaluation still needs a strict saved-evidence loader plus a
-runtime restart-observation writer.
+and a fixture-only phenomenon index. A5, live B3, and live multi-actor C2/C3
+still require provider approval and current-run evidence.
 
 The detailed sequence and current status are in
 `capability-gated-social-sandbox-implementation-plan.md`. No provider-backed
@@ -408,11 +407,10 @@ evidence, and persistence stay traceable despite that size.
 
 ## Current Implementation Risks
 
-1. The runtime does not yet expose the active program as one integrated path.
-   Capability manifests and normalized reports run offline, but A3 does not
-   stop on every manifest-specific limit, B2 lacks strict saved-evidence
-   loading, and the social/observation/phenomenon files are not connected to a
-   live V4 multi-actor session.
+1. The runtime does not yet expose the active program as one integrated live
+   path. Capability A3 budget stopping and B2 bag loading are provider-free
+   complete, but social/observation/phenomenon files are not connected to a
+   live V4 multi-actor session, and A5/B3 live still need provider approval.
 2. Response-window semantics are the highest-risk logic. A window that closes on
    immediate post-action observation recreates the old `no_observable_response`
    vacuity and makes social-response labels uninformative.

@@ -505,11 +505,13 @@ Evidence:
 
 ### Step A3 — Capability Runner Wrapper
 
-Status: **partially accepted** (reviewed 2026-07-11). Provider-free offline
-smoke verified; declared cycle and total-action limits are enforced. The runner
-does not yet stop a case at its manifest-specific wall-time, request, token, or
-cost limit, so A5 must not run until those limits are connected to runtime
-cancellation and provider usage.
+Status: **accepted** (provider-free, 2026-07-11; repaired labeling in
+`c4266841`). Manifest-specific cycle, action, wall-time, provider-request,
+token, and estimated-cost ceilings stop execution through AbortSignal + await
+(no early Promise.race return). Cost ceilings without normalized USD mark
+`cost_unverifiable` instead of inventing prices. Budget stops label
+`runtime_status: "timeout"` and `failure_class: "budget_exhausted"` (or
+`unverifiable` for cost). A5 remains blocked on provider approval only.
 
 Deliver:
 
@@ -527,13 +529,19 @@ Acceptance:
 - [x] budget exhaustion produces an explicit status and artifact;
 - [x] deterministic/provider-free calibration makes zero live provider calls;
 - [x] a one-command smoke emits declaration, raw report, normalized report, and
-  suite index.
+  suite index;
+- [x] wall-time, provider-request, token, and cost ceilings stop before the next
+  provider/runtime action and leave truthful declaration/raw/normalized/budget
+  artifacts.
 
 Evidence:
 
-- modules: `probe/src/benchmarks/capability/{cli,runner}.ts`
+- modules: `probe/src/benchmarks/capability/{cli,runner}.ts`;
+  `probe/src/runtime/socialCycleRunner.ts` case-budget path
 - script: `probe:capability`
-- tests: `probe/test/capabilityRunnerSmoke.test.ts`
+- tests: `probe/test/capabilityRunnerSmoke.test.ts`,
+  `probe/test/capabilityBudgetStopping.test.ts`
+- commits: `75a68ec9`, `c4266841`
 
 ### Step A4 — Basic Capability Suite
 
@@ -613,11 +621,13 @@ Acceptance:
 
 ### Step B2 — Goal-Continuity Formats And Offline Evaluator
 
-Status: **partially accepted** (reviewed 2026-07-11). The offline evaluator and
-fixtures work, but a strict loader that resolves and validates a saved
-`goal-continuity-artifact-bag/v1` is still missing. Restart-required cases now
-remain `unverifiable` unless distinct before/after durable reload evidence is
-present.
+Status: **accepted** (provider-free offline, 2026-07-11; bag assert at evaluate
+entry in `83b26f85`). Strict recursive loader validates
+`goal-continuity-artifact-bag/v1` from a declared root; `evaluateGoalContinuity`
+asserts bags before scoring. Restart-observation writer records typed offline
+observations only — live process-restart survival is still unproven until B3
+live evidence exists. Restart-required cases remain `unverifiable` without
+distinct before/after durable reload refs and overlapping open work ids.
 
 Deliver:
 
@@ -633,7 +643,18 @@ Acceptance:
 - [x] memory or PlanBead prose cannot prove physical progress;
 - [x] checkpoint/version conflicts remain visible;
 - [x] each scored lifecycle change cites its source artifacts;
-- [x] missing refs produce `unknown`/`unverifiable`, not zero or success.
+- [x] missing refs produce `unknown`/`unverifiable`, not zero or success;
+- [x] saved artifact bags are root-safe, recursively allowlisted, and validated
+  before evaluation;
+- [x] a typed restart-observation writer exists for offline bags (not live
+  restart proof).
+
+Evidence:
+
+- modules: `probe/src/benchmarks/continuity/{types,loader,evaluator,writer}.ts`
+- tests: `probe/test/goalContinuityArtifactBag.test.ts`,
+  `probe/test/goalContinuityEvaluator.test.ts`
+- commits: `76db6cc0`, `83b26f85`
 
 ### Step B3 — Live Goal-Continuity Cases
 
@@ -919,18 +940,18 @@ because an older plan used a name.
 
 ## 12. Immediate Next Work
 
-The provider-free path now reaches D1 data formats and fixtures, with two
-important limits:
+Provider-free A3 budget stopping and B2 saved-evidence loading are accepted.
+Remaining gates are live-run decisions:
 
-1. A3 still needs manifest-specific wall-time, provider-request, token, and cost
-   stopping behavior before A5.
-2. B2 still needs a strict saved-evidence loader before live continuity reports
-   can be trusted end to end.
-3. Every checked-in C1/C2 capability dependency is a declared gap until A5
+1. A5 needs exact `(provider_id, model)`, whole-run estimate, quota preflight,
+   and explicit user approval.
+2. B3 live continuity (including real process restart / durable reload) needs
+   the same provider gate; offline declarations and bag loading are not live
+   proof.
+3. Every checked-in C1/C2 capability dependency remains a declared gap until A5
    produces current-run normalized reports.
+4. D2 remains unavailable until the user selects a real recurring D1
+   observation (fixture records are permanently ineligible).
 
-Before any A5 run, finish A3's manifest-specific stopping behavior and then use
-the exact provider quota preflight and user approval. The other provider-free
-task is the B2 artifact-bag loader and a runtime writer for typed restart
-observations. D2 remains unavailable until the user selects a real recurring
-observation.
+Do not start A5 from this plan alone — run the repo quota preflight and wait
+for user approval with the exact command and budget.

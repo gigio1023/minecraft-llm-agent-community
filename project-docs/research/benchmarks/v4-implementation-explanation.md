@@ -19,11 +19,11 @@ research program or live behavior path is complete.
 | --- | --- | --- |
 | A1R | accepted | Evidence-rule repair of A1 |
 | A2 | accepted | Normalized capability report adapter |
-| A3 | partial | Capability CLI + provider-free smoke; several declared limits are not runtime stops yet |
+| A3 | accepted | Capability CLI + full case budget stopping (wall/request/token/cost) |
 | A4 | accepted | Basic suite 1.1.0 → later 1.2.0 with B1 |
 | A5 | **blocked** | Needs exact provider/model + preflight + approval |
 | B1 | accepted | Multi-hop furnace case (manifest-owned) |
-| B2 | partial | Offline evaluator works; strict saved-evidence loader still missing |
+| B2 | accepted | Offline evaluator + strict artifact-bag loader + restart writer |
 | B3 | declarations only | Live runs blocked pending approval |
 | C1 | declaration only | Interdependent social scenario format; all checked-in capability requirements are gaps |
 | C2 | declaration only | Economic, cooperative, and quest scenario files; no live session |
@@ -65,6 +65,11 @@ via `evidence_kind_seen` was **replaced**, not papered over (`ZERO_COST_IMPLEMEN
 | `ce91e191` | C3 — observation bundle |
 | `755c925b` | D1 — phenomenon catalog |
 | `ea9bae2e` | B3 — offline continuity case stubs |
+| `620955d8` | Review harden — evidence/restart/social gaps |
+| `76db6cc0` | B2 — strict artifact-bag loader + restart writer |
+| `75a68ec9` | A3 — case budget stopping |
+| `83b26f85` | B2 — assert bags at evaluate entry |
+| `c4266841` | A3 — budget-stop labeling + always observe wall time |
 
 Prior on branch: `26c1f93f` (initial A1), `2c7f2193` (handoff rewrite).
 
@@ -73,7 +78,7 @@ Prior on branch: `26c1f93f` (initial A1), `2c7f2193` (handoff rewrite).
 ```text
 probe/src/benchmarks/
   capability/     A1R–A4, B1 (manifest, predicates, report, runner, CLI)
-  continuity/     B2–B3 declarations (offline evaluator)
+  continuity/     B2–B3 (loader, evaluator, writer; live B3 blocked)
   social/         C1–C2 (scenario declaration + families)
   observation/    C3 (long-run bundle)
   phenomenon/     D1 (catalog)
@@ -154,28 +159,34 @@ still overstate what had been observed. The code now handles them as follows:
   the actual distinctions;
 - capability runner debug overrides cannot exceed the declared total action
   budget, and empty cycles no longer count as actions;
-- A3 remains partial because wall-time, provider-request, token, and cost limits
-  are recorded but do not yet stop the case at those manifest-specific limits.
+- A3 now stops on wall-time, provider-request, token, and estimated-cost
+  ceilings with AbortSignal + await; budget stops label `timeout` /
+  `budget_exhausted` (or `unverifiable` when cost cannot be computed);
+- B2 loads and asserts `goal-continuity-artifact-bag/v1` before scoring;
+  restart-observation writer is offline-only and does not prove live restart
+  survival.
 
 ## 7. Validation evidence
 
 ```bash
-cd probe && bun test          # 688 pass after whole-implementation review
+cd probe && bun test          # 725 pass after A3/B2 successor repairs
 cd probe && bun run typecheck
 cd docs && npm run build
 git diff --check
 ```
 
-Provider-free smoke: `probe/test/capabilityRunnerSmoke.test.ts`.
+Provider-free smoke: `probe/test/capabilityRunnerSmoke.test.ts`,
+`probe/test/capabilityBudgetStopping.test.ts`,
+`probe/test/goalContinuityArtifactBag.test.ts`.
 
 No live provider HTTP was used in this wave.
 
 ## 8. Still blocked / awaiting user
 
-1. **A3/A5** — first connect all manifest-specific limits to runtime stopping;
-   then choose exact `(provider_id, model)`, estimate tokens/RPM, run
+1. **A5** — choose exact `(provider_id, model)`, estimate tokens/RPM, run
    `provider-quota-preflight`, approve, and run a declared batch.
-2. **B3 live** — the same approval requirement applies to continuity cases.
+2. **B3 live** — the same approval requirement; offline bag loading is not live
+   restart proof.
 3. **Live C2/C3 runs** — multi-actor Minecraft + video capture after capability
    evidence for prerequisites exists.
 4. **D2** — only after you select a real D1 candidate (not the fixture).
@@ -183,11 +194,8 @@ No live provider HTTP was used in this wave.
 
 ## 9. Next smallest action
 
-If continuing without a provider yet: add the strict B2 saved-evidence loader
-and a runtime writer for typed restart observations.
-
-If preparing for live work: finish the A3 stopping behavior first. After that,
-approve one A5 `(provider, model, budget)` and run `provider-quota-preflight`.
+Approve one A5 `(provider, model, budget)` and run `provider-quota-preflight`.
+Do not start D2 from the fixture record.
 
 ## 10. Related docs
 
