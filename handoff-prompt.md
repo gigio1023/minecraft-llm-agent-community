@@ -1,4 +1,4 @@
-# Successor Prompt: Provider-Free Capability Early Completion
+# Successor Prompt: Provider-Free Failure Attribution and CLI Summary Order
 
 Do not optimize for completing the V4 repair plan as broadly as possible.
 Optimize for the smallest correct and verifiable change described below.
@@ -17,252 +17,240 @@ or improvise recovery after an unexpected failure.
 
 This packet assumes you can make exact TypeScript edits and run supplied
 commands, but should not be asked to resolve new product decisions, redesign
-schemas, or decide how to trade correctness against compatibility. If the
-specified procedure does not fit the current code, stop and report the mismatch
-instead of inventing an alternative.
+schemas beyond attribution, or decide how to trade correctness against
+compatibility. If the specified procedure does not fit the current code, stop
+and report the mismatch instead of inventing an alternative.
 
 Use plain engineering language. Avoid inflated process terms. Preserve exact
-schema, file, command, and branch identifiers when required.
+schema, file, command, and branch identifiers when required. Do not write “as a
+gate”; say “required check” when a check must pass before the next step.
 
 ## One Outcome and Mode
 
-- Outcome: capability execution stops before the next cycle when the existing
-  evidence evaluator proves the declared target, and the raw and normalized
-  reports record first measurable progress and target-completion usage.
-- Mode: ordered `change`, `run`, and local `commit` work.
+- Outcome: keep `runtime_status`, target/milestone status, action-selection
+  result, and `interpretation_status` / `failure_class` independent in
+  normalized capability results; add or reuse explicit failure values from the
+  repair plan; CLI summaries print target, milestone progress, interpretation,
+  and stop reason before lower-level `runtime_status`.
+- Mode: ordered `change`, `run`, and local `commit` work. No push.
 
 ## Definition of Done
 
 All of these must be true:
 
-1. `runSocialCycle` accepts one optional typed progress observer and calls it
-   after a completed cycle has been appended to the report, before starting the
-   next cycle.
-2. `runCapabilityCase` supplies the production observer. It builds the evidence
-   bag through the existing social-cycle adapter and furnace adapter, then uses
-   the existing capability predicates. Provider prose, tool names, scenario
-   text, and self-reported success remain irrelevant.
-3. A passed target ends the case normally without setting a budget-stop reason
-   and without starting another cycle.
-4. The raw report and normalized capability report record:
-   - first measurable progress;
-   - target completion when present;
-   - cycle count, runtime-action count, wall time, provider requests, total
-     tokens, passed milestone IDs, and evidence refs at each recorded point.
-5. A run without progress still records its final observed wall time and usage
-   through the existing budget fields. Do not create a second usage system.
-6. Focused tests, all probe tests, TypeScript checking, documentation build, and
+1. Normalized `individual-capability-report/v1` keeps these layers independent:
+   - `runtime_status` — process, provider, environment, or Minecraft execution;
+   - `target` and `milestones` — capability evidence predicates only;
+   - action-selection result — valid selection, malformed parameters, repeated
+     blocker, or no measurable goal progress;
+   - `interpretation_status` and optional `failure_class`.
+2. Explicit failure values are added or reused so that:
+   - absent capability context makes the run `unverifiable`;
+   - successfully executed actions with no target or milestone change become
+     `no_measurable_progress`;
+   - malformed structured parameters remain an action-selection / input failure;
+   - Mineflayer or environment failures remain separate from the layers above.
+3. CLI summaries print, in this order before lower-level runtime status:
+   target status, milestone progress, interpretation (including `failure_class`
+   when present), and stop reason; then `runtime_status` and existing budget
+   flags.
+4. Completion counterexamples from the repair plan pass:
+   - a movement-only verified action under a log-collection goal is not labeled
+     as Minecraft execution failure when movement itself verified;
+   - clean runtime exit without target evidence is still not capability success;
+   - parameter-contract / malformed-input failures are not collapsed into
+     `runtime_execution_failed` or environment failure;
+   - absent `capability_case_context` on a capability-normalized path is
+     `unverifiable`, not actor `no_measurable_progress`.
+5. Focused tests, all probe tests, TypeScript checking, documentation build, and
    `git diff --check` pass.
-7. The implementation and its tests are committed once. No push is authorized
-   for the successor.
+6. The implementation and its tests are committed once. No push is authorized.
+7. The repair-plan Progress checkbox for item 5 is marked complete only after the
+   required checks pass. Do not mark later items complete.
 
 ## Why This Work Exists
 
 The first `openai-api:gpt-5.4-mini` capability campaign produced useful failure
-evidence but did not measure the intended goals correctly. Three provider-free
-repairs are already complete: exact case-goal delivery, explicit crafting-table
-placement coordinates, and diverse world-scan sampling. The next defect is
-that target evaluation occurs only after the full social-cycle run, so a target
-reached early can still consume unnecessary cycles and provider usage.
+evidence, but summaries and interpretation often collapsed distinct layers. A
+verified movement under a log goal could be read as execution failure; a clean
+runtime exit could be mistaken for competence; missing context or malformed
+parameters could be mislabeled as actor progress failure.
 
-This is measurement and runtime correctness work. It is not a model comparison,
-social-simulation experiment, or research result.
+Items 1–4 of the repair plan are already complete provider-free, including
+evidence-based early completion with **action-level** stop: after each completed
+action is recorded, not only after each cycle. This task is item 5 only:
+attribution and CLI summary order. It is measurement correctness, not a model
+comparison, Action Card redesign, or live Minecraft rerun.
 
 ## Approved Basis
 
 Treat these as fixed input:
 
 - `project-docs/research/benchmarks/capability-live-validation-repair-plan.md`,
-  work item 4;
+  section `### 5. Attribute failure at the right layer` and its completion
+  checks;
+- item 4 status writeup:
+  `project-docs/research/benchmarks/capability-early-completion-implementation.md`
+  (action-level early stop is done; do not redo it);
 - live-result evidence in
-  `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`;
-- implementation commits:
-  - `b7dda428` — capability goal, placement, and scan repairs;
-  - `773e3bca` — detailed repair plan and current status;
-- existing evaluator modules:
-  - `probe/src/benchmarks/capability/evidenceBagAdapter.ts`;
-  - `probe/src/benchmarks/capability/furnaceObservationAdapter.ts`;
-  - `probe/src/benchmarks/capability/predicates.ts`;
-- existing budget observation inside
-  `probe/src/runtime/socialCycleRunner.ts`.
+  `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`
+  (diagnostic motivation only; no rerun authority);
+- existing report and CLI surfaces (inspect before editing; do not invent APIs):
+  - `probe/src/benchmarks/capability/reportTypes.ts`
+    (`CAPABILITY_FAILURE_CLASSES`, `CAPABILITY_INTERPRETATION_STATUSES`,
+    `IndividualCapabilityReportV1`);
+  - `probe/src/benchmarks/capability/report.ts`
+    (`interpretCapability`, `buildIndividualCapabilityReport`);
+  - `probe/src/benchmarks/capability/cli.ts`
+    (final JSON summary currently emits `interpretation_status` then
+    `runtime_status` without target/milestone/stop-reason-first ordering);
+  - `probe/src/benchmarks/capability/runner.ts`
+    (`CapabilityBudgetStatusV1`, suite-index run rows, budget override of
+    interpretation when exhausted / cost-unverifiable);
+  - existing evidence already available on `social-cycle-run-report/v1`
+    (`capability_case_context`, cycle / `action_attempts`, settlement blockers,
+    actor-evidence categories such as `action_parameter_contract_failure`).
 
-No unresolved alternative is delegated to you. Use an optional callback so the
-generic social runner does not import capability evaluation policy.
+No unresolved product alternative is delegated to you. Prefer reusing existing
+`CapabilityFailureClassV1` values (`unverifiable`, `no_measurable_progress`,
+`runtime_execution_failed`, `world_setup_failed`, `provider_blocked`,
+`missing_action_capability`, `budget_exhausted`, and related listed values)
+before inventing new class names. If a dedicated action-selection result field
+is required for independence, add the smallest typed optional field on
+`IndividualCapabilityReportV1` and derive it from existing report/evidence
+facts — do not invent new social-runner hooks or provider tools.
 
 ## Current Verified State
 
 - Repository: `/Users/gigio/git/minecraft-llm-agent-community`
 - Branch: `codex/capability-gated-social-sandbox-v4`
-- Expected worktree at start: clean and synchronized with the branch upstream
-  after the handoff commit is pushed; verify this rather than assuming it.
-- Required completed commits: `b7dda428` and `773e3bca`
-- Most recent full verification before this handoff:
-  - `cd probe && bun test` -> 733 passed, 0 failed;
-  - `cd probe && bun run typecheck` -> passed;
-  - `cd docs && npm run build` -> passed;
-  - `git diff --check` -> passed.
-- No provider request or live Minecraft rerun occurred after the archived
-  three-case campaign.
-- The old root `lower-capability-executor-prompt.md` was removed because it
-  described an already executed live campaign. This file is now the only active
-  root continuation prompt.
+- Expected at start: item 4 early completion is present, including action-level
+  stop after each completed action in `probe/src/runtime/socialCycleRunner.ts`
+  via `observeCapabilityProgress`. Verify this rather than assuming only the
+  older cycle-boundary stop from `d852be2e`.
+- Ancestor commits that must be present: `b7dda428`, `773e3bca`, and early
+  completion (`d852be2e` or later commit that includes action-level stop).
+- No provider request or live Minecraft rerun is authorized by this packet.
+- This file is the only active root continuation prompt for the next change.
 
 ## Completed Work and Evidence
 
 | Work | Result | Evidence |
 | --- | --- | --- |
-| Declared goal delivery | `case_id`, exact `top_level_goal`, and `manifest_hash` reach Actor Turn while evaluator rules stay hidden | `b7dda428`, `probe/test/capabilityRunnerSmoke.test.ts` |
-| Scenario-prompt cleanup | capability runs suppress generic natural-survival and milestone-rich fixture task prose | `b7dda428`, saved-input regression test |
-| Crafting-table placement | empty parameters are rejected; no adjacent coordinate is invented | `b7dda428`, `probe/test/socialCycleExecution.test.ts` |
-| World scan | retained blocks are sampled across distance, direction, height, and observed names without resource-specific priorities | `b7dda428`, `probe/test/worldStateScan.test.ts` |
-| Detailed continuation plan | work items 4-8, verification, and future live conditions are recorded | `773e3bca`, repair plan |
+| Declared goal delivery | Exact `case_id` / `top_level_goal` / `manifest_hash`; scenario task prose suppressed | `b7dda428` |
+| Crafting-table placement | Empty parameters rejected; no adjacent invent | `b7dda428` |
+| World scan diversity | Query-neutral sampling | `b7dda428` |
+| Early completion (item 4) | Stop after each completed **action** when target evidence passes; write-once progress measurements; not budget exhaustion | `d852be2e` plus action-level follow-through; tests in `probe/test/capabilityEarlyCompletion.test.ts` |
+| Repair plan | Items 1–4 checked; item 5 next | repair plan Progress section |
 
 ## Exact Allowed Scope
 
 You may modify only these files:
 
-1. `probe/src/runtime/goals/types.ts`
-   - add the optional raw-report progress-summary types and field;
-2. `probe/src/runtime/socialCycleRunner.ts`
-   - add the optional progress-observer input;
-   - call it after each completed cycle is appended and before the next cycle;
-   - record measurement points and stop normally on a passed target;
-3. `probe/src/benchmarks/capability/runner.ts`
-   - add the production observer using the existing adapters and predicates;
-   - add a provider-free test-only observer override only if orchestration cannot
-     otherwise be tested deterministically;
-4. `probe/src/benchmarks/capability/reportTypes.ts`
-   - expose the recorded progress summary in `individual-capability-report/v1`;
-5. `probe/src/benchmarks/capability/report.ts`
-   - copy the runtime-recorded progress summary into the normalized report
-     without recomputing or interpreting provider prose;
-6. `probe/test/capabilityEarlyCompletion.test.ts`
-   - new direct tests for evaluation, stopping, measurement, and non-progress;
-7. `probe/src/benchmarks/capability/index.ts`
-   - only if a newly tested public helper or type must be exported.
+1. `probe/src/benchmarks/capability/reportTypes.ts`
+   - keep existing interpretation / failure enums;
+   - add the smallest optional action-selection result type/field only if needed
+     for layer independence;
+2. `probe/src/benchmarks/capability/report.ts`
+   - attribute failures at the correct layer without collapsing
+     `runtime_status`, target/milestones, action-selection, and interpretation;
+3. `probe/src/benchmarks/capability/cli.ts`
+   - reorder / enrich the printed JSON summary so target, milestone progress,
+     interpretation, and stop reason appear before `runtime_status`;
+4. `probe/src/benchmarks/capability/runner.ts`
+   - only if suite-index or CLI-facing result shaping must expose the same
+     ordered fields without changing stop policy;
+5. `probe/src/benchmarks/capability/index.ts`
+   - only if a newly tested public type or helper must be exported;
+6. Focused tests under `probe/test/`, especially:
+   - `probe/test/individualCapabilityReport.test.ts`
+   - `probe/test/capabilityCli.test.ts`
+   - and a new focused attribution test file if clearer than overloading others;
+7. `implementation-notes.md`
+   - record item 5 completion and deviations only;
+8. `project-docs/research/benchmarks/capability-live-validation-repair-plan.md`
+   - mark only the item 5 Progress checkbox complete when done.
 
 Do not change any other file. In particular, do not edit:
 
-- capability manifests or predicates;
 - Action Cards, provider prompts, Mineflayer actions, placement, or world scans;
-- provider usage tracking or quota policy;
-- CLI output or failure attribution;
-- plans, status documents, reports, archived evidence, `SPEC.md`, or
-  `AGENTS.md`.
+- early-completion observer / stop policy in `socialCycleRunner.ts` (item 4 is
+  done);
+- capability manifests or predicate algebra except as read-only fixtures;
+- provider quota / preflight policy;
+- live experiment archives, `SPEC.md`, or `AGENTS.md`;
+- repair-plan items 6–8.
 
 If a required correct change needs another file, stop and report the exact file
 and reason. Do not expand your own file list.
 
-## Fixed Data Shape
+## Fixed Attribution Behavior
 
-Use one optional raw-report field named `capability_progress` with schema
-`capability-progress-summary/v1`.
+Ground attribution in existing typed facts:
 
-The summary contains:
+1. `runtime_status` remains the social-cycle exit status copied into
+   `IndividualCapabilityReportV1.runtime_status`. Do not overwrite it to encode
+   capability failure.
+2. Target and milestone statuses remain predicate results on the evidence bag.
+3. Action-selection result must distinguish at least:
+   - valid selection that executed;
+   - malformed structured parameters / parameter-contract failure;
+   - repeated blocker;
+   - executed actions with no measurable target or milestone change.
+4. `interpretation_status` / `failure_class` summarize the capability reading
+   after the layers above, reusing `CAPABILITY_FAILURE_CLASSES` where possible:
+   - absent capability context → `unverifiable` / `failure_class: "unverifiable"`;
+   - successful execution, no target/milestone change →
+     `no_measurable_progress` (not `runtime_execution_failed`);
+   - malformed parameters → action-selection / input failure, not Mineflayer
+     execution failure;
+   - Mineflayer / environment failures stay on the runtime / environment path
+     (`runtime_execution_failed`, `world_setup_failed`, etc.).
 
-```ts
-type CapabilityProgressMeasurement = {
-  cycle_count: number;
-  runtime_action_count: number;
-  wall_time_ms: number;
-  provider_requests: number;
-  total_tokens: number;
-  passed_milestone_ids: string[];
-  evidence_refs: string[];
-};
+Do not parse provider prose, tool names, scenario text, or Action Card wording
+to decide attribution. Use schemas, report fields, evidence categories, verifier
+status, settlement blockers/stalls, and predicate results.
 
-type CapabilityProgressSummary = {
-  schema: "capability-progress-summary/v1";
-  latest_target_status: "passed" | "failed" | "unknown";
-  latest_passed_milestone_ids: string[];
-  first_measurable_progress?: CapabilityProgressMeasurement;
-  target_completion?: CapabilityProgressMeasurement;
-};
-```
+## Fixed CLI Summary Order
 
-Requirements:
+In `probe/src/benchmarks/capability/cli.ts`, the successful-run JSON summary for
+each run must present capability-facing fields before lower-level runtime
+status. Required order:
 
-- arrays are deduplicated and sorted;
-- `first_measurable_progress` is written once, when at least one milestone or
-  the target first passes;
-- `target_completion` is written once when the target first passes;
-- measurement counts come from the existing report/action counts, clock, and
-  usage observer after the completed cycle;
-- evidence refs are the union of the passed target and passed milestones only;
-- a later check may update the two `latest_*` fields but must not rewrite the
-  first measurement points;
-- the normalized report copies this object as `capability_progress`.
+1. target status (from `normalized_report.target.status`);
+2. milestone progress (passed milestone ids / counts from
+   `normalized_report.milestones`);
+3. interpretation (`interpretation_status`, and `failure_class` when present);
+4. stop reason (derive from existing `budget_status` and/or
+   `capability_progress.target_completion` / early-pass facts — do not invent a
+   second budget system);
+5. then `runtime_status`, paths, and existing budget flags.
 
-Do not introduce a second schema version, event stream, standalone JSON file,
-new clock, or new provider ledger.
-
-## Fixed Observer Behavior
-
-Add an optional callback to `SocialCycleRunOptions`. Its input contains only:
-
-- the current `SocialCycleRunReport`, including the cycle just appended;
-- the resolved actor workspace directory.
-
-Its output contains only:
-
-- target status;
-- passed milestone IDs;
-- evidence refs from the passed target and milestones.
-
-The social runner owns elapsed time, request/token counts, action/cycle counts,
-measurement persistence, report flushing, and the stop decision. It must not
-know manifest predicates.
-
-`runCapabilityCase` owns the production callback:
-
-1. adapt the current report through `adaptSocialCycleReportToEvidenceBag`;
-2. apply `applyFurnaceObservationAdapter` exactly as final normalization does;
-3. call `evaluateCapabilityPredicate` for the target;
-4. call `evaluateCapabilityMilestone` for every declared milestone;
-5. return only passed milestone IDs and evidence refs from passed results.
-
-Do not use `top_level_goal`, descriptions, tool names, action names, provider
-text, or WorldEvent text to decide progress.
-
-## Fixed Stop Semantics
-
-- Invoke the observer only after a completed cycle is present in
-  `report.cycles` and before starting another cycle.
-- If target status is `passed`, flush the raw report, leave
-  `caseBudgetStop` unset, stop the outer cycle loop, and finalize
-  `runtime_status` as `passed` unless provider or environment failure already
-  occurred.
-- Do not mark `timeout`, `budget_exhausted`, `runtime_execution_failed`, or a
-  provider failure merely because execution ended early on target evidence.
-- Existing wall/request/token/cost stopping retains higher priority if it was
-  already recorded before target observation.
-- Do not cancel or race in-flight provider work. This task only prevents a new
-  cycle after an already completed cycle.
+Preserve current useful path fields (`suite_index_path`, report paths,
+`budget_stopped`, `budget_exhausted`, `provider_free`). Do not hide them; only
+reorder and add the missing capability-facing fields.
 
 ## Test Procedure
 
-Create `probe/test/capabilityEarlyCompletion.test.ts` with direct tests for all
-four cases below:
+Add or extend provider-free tests so each attribution counterexample is
+asserted directly:
 
-1. The production capability progress helper evaluates a constructed
-   evidence-backed inventory target using real artifact refs and returns a
-   passed target. Reuse existing report/evidence fixture style; do not use
-   provider prose.
-2. A deterministic provider-free social run whose injected observer returns a
-   passed target after the first completed cycle ends with one cycle, does not
-   record a budget stop, and records both measurement points.
-3. A deterministic provider-free run whose observer reports one passed
-   milestone but a failed target records first progress and continues until its
-   requested cycle count.
-4. A deterministic provider-free run with no passed milestone and an unknown or
-   failed target omits both measurement points and retains existing stop/status
-   behavior.
+1. Movement-only / verified non-goal action under a log-collection case is not
+   `runtime_execution_failed` merely because the target failed; expect
+   `no_measurable_progress` (or partial/stalled when milestones warrant it) while
+   `runtime_status` can still be a clean pass.
+2. Absent capability context → `unverifiable`.
+3. Malformed structured parameters / parameter-contract failure remains an
+   action-selection / input failure, not environment or Mineflayer execution
+   failure.
+4. Environment / Mineflayer blocked paths remain separate.
+5. CLI stdout JSON for a provider-free offline capability CLI invocation includes
+   target, milestone progress, interpretation, and stop reason before
+   `runtime_status`.
 
-If a test-only observer override is necessary, keep it under the existing
-`RunCapabilityCaseInput.testHooks` or call `runSocialCycle` directly. Production
-execution must always use the real evaluator callback.
-
-Do not weaken, delete, skip, or snapshot broad objects in existing tests.
+Reuse fixture style from `probe/test/individualCapabilityReport.test.ts` and
+spawn style from `probe/test/capabilityCli.test.ts`. Do not weaken, delete,
+skip, or snapshot broad objects in existing tests.
 
 ## Preflight
 
@@ -279,27 +267,32 @@ git diff
 Continue without pausing only if:
 
 - the branch is exactly `codex/capability-gated-social-sandbox-v4`;
-- commits `b7dda428` and `773e3bca` are ancestors of `HEAD`;
-- the worktree is clean;
-- every allowed file still contains the named current implementation surface;
+- early-completion ancestors are present and action-level observation after each
+  completed action exists in `socialCycleRunner.ts`;
+- overlapping unrelated user edits are not present on disallowed files;
 - no provider or live-run command is required.
 
-If these conditions match, proceed. Do not ask the user to reconfirm.
+If item 4 action-level stop is missing, stop; do not reimplement item 4 under
+this packet. If these conditions match, proceed. Do not ask the user to
+reconfirm.
 
 ## Ordered Execution
 
 1. Read only the approved basis and allowed source/test files.
-2. Add the fixed types and optional report field.
-3. Add the callback and stop/measurement behavior to `runSocialCycle`.
-4. Add the production evaluator callback to `runCapabilityCase`.
-5. Copy the raw progress summary into the normalized report.
-6. Add the four direct tests.
-7. Run the focused checks below once.
-8. If focused checks pass, run the complete provider-free checks once.
-9. Inspect `git diff --check`, changed paths, and the complete diff.
-10. If and only if all required checks pass, create one commit with subject:
-    `probe: stop capability runs on target evidence`
-11. Inspect the commit and final worktree. Do not push.
+2. Inspect current `failure_class` / interpretation behavior and CLI summary
+   payload; list the minimal field additions actually required.
+3. Implement independent-layer attribution in report types / report builder.
+4. Update CLI summary order and fields.
+5. Touch runner / index only if required for the same CLI-facing shape.
+6. Add the attribution and CLI counterexample tests.
+7. Update `implementation-notes.md` and the repair-plan item 5 checkbox only
+   after required checks pass.
+8. Run the focused checks below once.
+9. If focused checks pass, run the complete provider-free checks once.
+10. Inspect `git diff --check`, changed paths, and the complete diff.
+11. If and only if all required checks pass, create one commit with subject:
+    `probe: attribute capability failures by layer`
+12. Inspect the commit and final worktree. Do not push.
 
 ## Allowed Commands
 
@@ -310,11 +303,16 @@ Focused checks:
 
 ```bash
 cd probe
-bun test test/capabilityEarlyCompletion.test.ts \
-  test/capabilityRunnerSmoke.test.ts \
-  test/capabilityBudgetStopping.test.ts
+bun test test/individualCapabilityReport.test.ts \
+  test/capabilityCli.test.ts \
+  test/capabilityBudgetStopping.test.ts \
+  test/capabilityEarlyCompletion.test.ts \
+  test/capabilityRunnerSmoke.test.ts
 bun run typecheck
 ```
+
+If you add a new attribution test file, include it in the focused `bun test`
+invocation.
 
 Complete checks after focused checks pass:
 
@@ -346,30 +344,34 @@ or redesign the procedure.
 
 ## Preservation Rules
 
-- Keep capability evaluator rules private to the capability runner.
-- Keep `runtime_status`, target/milestone evidence, and budget stopping
-  independent.
+- Keep `runtime_status`, target/milestone evidence, action-selection result, and
+  interpretation independent.
+- Preserve item 4 action-level early completion and `capability_progress`
+  measurement semantics.
 - Preserve setup evidence exclusions and the furnace adapter.
 - Preserve typed refs and root-safe actor workspace resolution.
-- Preserve the exact case goal delivery, explicit placement requirement, and
-  diverse world scan landed in `b7dda428`.
+- Preserve exact case-goal delivery, explicit placement, and diverse scan from
+  `b7dda428`.
 - Use Bun for repository TypeScript.
 - Do not install dependencies, change configuration, change model/provider
   settings, or access secrets.
 - Do not make a live run or write experiment results.
-- Do not update plan checkboxes or claim later work is complete.
+- Do not mark repair-plan items after item 5 complete.
 
 ## Stop Conditions
 
 Stop before the affected action when:
 
-- the branch, ancestor commits, or clean-worktree prerequisite does not match;
-- an allowed file has overlapping user changes;
-- the fixed observer design cannot be implemented without another file;
+- the branch, ancestor commits, or action-level early-completion prerequisite
+  does not match;
+- an allowed file has overlapping unrelated user changes;
+- correct attribution requires editing a disallowed file (for example Action
+  Cards or `socialCycleRunner` stop policy);
 - a required test needs a provider, Docker, Minecraft, credentials, or network;
-- evaluator and final normalization would disagree under the fixed procedure;
-- a check fails and repair requires architecture, schema naming, or scope
-  judgment not stated here;
+- the change would redesign schemas beyond attribution (new progress schemas,
+  new budget systems, predicate redesign);
+- a check fails and repair requires architecture or scope judgment not stated
+  here;
 - committing would include an unlisted file.
 
 Use this stop report:
@@ -388,12 +390,12 @@ Checks completed and not completed: ...
 
 After this task is reviewed, the remaining plan order is:
 
-1. improve failure attribution and CLI summary order;
-2. reduce repeated Action Card input without changing action availability;
-3. add conservative external dashboard usage observations to preflight;
-4. add portable archive relocation and approved-preflight linkage;
-5. run full provider-free CLI checks;
-6. ask the user for a new current-day allowance before one `collect_logs` and
+1. reduce repeated Action Card input without changing action availability;
+2. add conservative external dashboard usage observations to preflight;
+3. add portable archive relocation and approved-preflight linkage;
+4. run full provider-free CLI checks for `collect_logs` and
+   `craft_wooden_pickaxe` as required checks before any live ask;
+5. ask the user for a new current-day allowance before one `collect_logs` and
    one wooden-pickaxe live rerun.
 
 Do not begin any of these in the same execution.
@@ -402,29 +404,32 @@ Do not begin any of these in the same execution.
 
 | Path | Purpose | State |
 | --- | --- | --- |
-| `project-docs/research/benchmarks/capability-live-validation-repair-plan.md` | Approved full repair order and completion checks | active; work items 1-3 complete |
-| `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md` | Evidence that motivated the repairs | completed diagnostic result; no rerun authority |
-| `implementation-notes.md` | Current implementation status and deviations | current through `b7dda428`/`773e3bca` |
-| `probe/src/runtime/socialCycleRunner.ts` | Cycle loop, budgets, report flush, and new observer location | work item 4 target |
-| `probe/src/benchmarks/capability/runner.ts` | Manifest-owned evaluation and adapter composition | work item 4 target |
-| `probe/src/benchmarks/capability/report.ts` | Final normalized capability result | must copy recorded measurements |
-| `probe/test/capabilityEarlyCompletion.test.ts` | Direct proof of early completion behavior | must be created |
+| `project-docs/research/benchmarks/capability-live-validation-repair-plan.md` | Approved repair order; item 5 is this work | items 1–4 complete; item 5 checkbox pending |
+| `project-docs/research/benchmarks/capability-early-completion-implementation.md` | Item 4 done, including action-level stop | prerequisite; do not reopen |
+| `probe/src/benchmarks/capability/reportTypes.ts` | Interpretation / failure enums and report shape | edit if action-selection field needed |
+| `probe/src/benchmarks/capability/report.ts` | Attribution logic | primary change surface |
+| `probe/src/benchmarks/capability/cli.ts` | Summary field order | primary change surface |
+| `probe/test/individualCapabilityReport.test.ts` | Existing interpretation counterexamples | extend |
+| `probe/test/capabilityCli.test.ts` | Provider-free CLI spawn coverage | extend for summary order |
+| `implementation-notes.md` | Branch-local status | update after success |
 
 ## Final Report
 
-Lead with whether early completion is implemented and committed. Include:
+Lead with whether failure attribution and CLI summary order are implemented and
+committed. Include:
 
-- preflight consistency result;
+- preflight consistency result, including confirmation that item 4 action-level
+  stop was already present;
 - files changed and why each was allowed;
 - focused and complete commands with working directory, exit status, and
   concise result;
 - the new commit hash and subject, if created;
-- evidence that target completion stops before another cycle and does not
-  become budget exhaustion;
-- evidence that partial/no progress retains truthful behavior;
+- evidence for each required attribution counterexample;
+- evidence that CLI summary order places target, milestones, interpretation, and
+  stop reason before `runtime_status`;
 - any failed, skipped, unavailable, or unverified item;
 - final staged, unstaged, and untracked state;
-- explicit confirmation that no provider request, live Minecraft run, push, or
-  later-plan work occurred.
+- explicit confirmation that no provider request, live Minecraft run, push,
+  Action Card work, or later-plan work occurred.
 
 Do not claim completion from this prompt or a green typecheck alone.

@@ -73,8 +73,14 @@ via `evidence_kind_seen` was **replaced**, not papered over (`ZERO_COST_IMPLEMEN
 | `83b26f85` | B2 — assert bags at evaluate entry |
 | `c4266841` | A3 — budget-stop labeling + always observe wall time |
 | `63eb47df` | Review repair — include setup time, distinguish stop/exhaustion, validate physical values, reject symlink traversal |
+| `b7dda428` | Live-validation repair — exact goal input, explicit table placement, diverse world scan |
+| `d852be2e` | Live-validation repair — stop capability runs on target evidence (cycle-boundary early completion) |
+| (follow-up) | Live-validation repair — action-level early completion (after each completed action) |
 
 Prior on branch: `26c1f93f` (initial A1), `2c7f2193` (handoff rewrite).
+
+Detailed early-completion writeup:
+`project-docs/research/benchmarks/capability-early-completion-implementation.md`.
 
 ## 4. Module map
 
@@ -178,7 +184,7 @@ still overstate what had been observed. The code now handles them as follows:
 ## 7. Validation evidence
 
 ```bash
-cd probe && bun test          # 730 pass after live-CLI preparation
+cd probe && bun test          # 737 pass after early-completion
 cd probe && bun run typecheck
 cd docs && npm run build
 git diff --check
@@ -186,6 +192,7 @@ git diff --check
 
 Provider-free smoke: `probe/test/capabilityRunnerSmoke.test.ts`,
 `probe/test/capabilityBudgetStopping.test.ts`,
+`probe/test/capabilityEarlyCompletion.test.ts`,
 `probe/test/goalContinuityArtifactBag.test.ts`.
 
 The 2026-07-11 A5 attempt used `openai-api:gpt-5.4-mini`: 18 requests and
@@ -194,9 +201,9 @@ The 2026-07-11 A5 attempt used `openai-api:gpt-5.4-mini`: 18 requests and
 
 ## 8. Still blocked / awaiting user
 
-1. **A5 acceptance** — first carry the typed manifest goal into Actor Turn and
-   reject empty placement parameters provider-free. Any later live rerun needs
-   a new user decision and current-day preflight.
+1. **A5 acceptance** — goal/placement/scan and early-completion repairs are
+   provider-free. Any later live rerun needs a new user decision and
+   current-day preflight.
 2. **B3 live** — the same approval requirement; offline bag loading is not live
    restart proof.
 3. **Live C2/C3 runs** — multi-actor Minecraft + video capture after capability
@@ -206,11 +213,13 @@ The 2026-07-11 A5 attempt used `openai-api:gpt-5.4-mini`: 18 requests and
 
 ## 9. Next smallest action
 
-Repair the two A5 findings provider-free and add focused tests. Do not rerun A5
-or start D2 from the fixture record.
+Continue the live-validation repair plan from failure attribution / CLI
+summary order. Do not rerun A5 or start D2 from the fixture record without
+explicit approval.
 
 ## 10. Related docs
 
+- Early completion detail: `project-docs/research/benchmarks/capability-early-completion-implementation.md`
 - Central plan: `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
 - Implementation plan: `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
 - A1/A1R detail: `project-docs/research/benchmarks/individual-capability-manifest-a1.md`

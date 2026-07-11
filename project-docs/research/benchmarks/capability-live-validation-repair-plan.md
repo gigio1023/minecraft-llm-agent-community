@@ -345,7 +345,8 @@ or start social simulations from this plan.
 - [x] Deliver typed capability goal context and remove scenario task leakage.
 - [x] Require explicit crafting-table placement targets.
 - [x] Improve query-neutral world-scan sampling.
-- [ ] Add evidence-based early completion and measurements.
+- [x] Add evidence-based early completion and measurements
+  (action-level stop after each completed action; not cycle-only).
 - [ ] Improve failure attribution and CLI summary order.
 - [ ] Reduce repeated Action Card input without changing action availability.
 - [ ] Add external usage observations to preflight.

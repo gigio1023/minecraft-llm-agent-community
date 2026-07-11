@@ -458,9 +458,10 @@ export type SocialCycleRunOptions = {
     estimated_cost?: number;
   }>;
   /**
-   * Optional progress observer for capability early completion. Called after a
-   * completed cycle is appended and before the next cycle starts. Must not own
-   * measurement persistence or stop policy.
+   * Optional progress observer for capability early completion. Called after each
+   * completed action is recorded on the report (in-progress cycle upserted) and
+   * before the next action starts. Must not own measurement persistence or stop
+   * policy.
    */
   observeCapabilityProgress?: (input: {
     report: SocialCycleRunReport;
@@ -834,6 +835,18 @@ function applyCapabilityProgressObservation(input: {
     };
   }
   input.report.capability_progress = summary;
+}
+
+function upsertReportCycle(
+  report: SocialCycleRunReport,
+  cycle: SocialCycleReportCycleWithAttempts
+): void {
+  const index = report.cycles.findIndex((entry) => entry.cycle_id === cycle.cycle_id);
+  if (index >= 0) {
+    report.cycles[index] = cycle;
+    return;
+  }
+  report.cycles.push(cycle);
 }
 
 async function defaultObserveCaseUsage(input: {
@@ -2089,6 +2102,101 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.relationship_application_results?.push(...relationshipApplications);
         await bumpLifeGoalCounters(rootDir, input.actorId, { actions: 1 });
 
+        if (input.observeCapabilityProgress) {
+          // Expose this action's evidence before the next action starts. Adapters
+          // and runtime-action counts only see cycles already on the report.
+          const priorCycleEvidenceRefs = report.cycles
+            .filter((cycle) => cycle.cycle_id !== cycleId)
+            .flatMap((cycle) => cycle.evidence_refs);
+          const priorCycleJudgmentRefs = report.cycles
+            .filter((cycle) => cycle.cycle_id !== cycleId)
+            .map((cycle) => cycle.judgment_ref)
+            .filter(Boolean);
+          report.settlement_state = buildSettlementState({
+            actorId: input.actorId,
+            observation: await observeCurrentActorWorld(),
+            activeActionSkills: executableActiveSkills,
+            previousJudgments: lastJudgment ? [lastJudgment] : [],
+            recentToolResults: settlementToolResults,
+            postconditionResults: allPostconditionResults,
+            evidenceRefs: [
+              ...priorCycleEvidenceRefs,
+              ...actionAttempts.flatMap((attempt) => attempt.evidence_refs)
+            ],
+            judgmentRefs: [
+              ...priorCycleJudgmentRefs,
+              ...(lastJudgmentRef ? [lastJudgmentRef] : [])
+            ],
+            memoryWriteCount
+          });
+          report.settlement_checklist = report.settlement_state.checklist;
+          upsertReportCycle(report, {
+            cycle_id: cycleId,
+            cycle_goal_ref: cycleGoalRef,
+            action_ref: lastActionRef,
+            provider_input_refs: [
+              cycleGoalInputRef ? path.relative(paths.actorDir, cycleGoalInputRef) : "",
+              ...actionAttempts.flatMap((attempt) => attempt.provider_input_refs)
+            ].filter(Boolean),
+            provider_output_refs: [
+              cycleGoalOutputRef ? path.relative(paths.actorDir, cycleGoalOutputRef) : "",
+              ...actionAttempts.flatMap((attempt) => attempt.provider_output_refs)
+            ].filter(Boolean),
+            evidence_refs: actionAttempts.flatMap((attempt) => attempt.evidence_refs),
+            judgment_ref: lastJudgmentRef,
+            verifier_status: lastVerifier,
+            plan_bead_packet_ref: readyFrontSnapshot.ref,
+            active_episode_ref: activeEpisodeRefForCycle,
+            selected_plan_bead_refs: activeEpisodeForCycle.selected_plan_bead_refs,
+            plan_bead_operation_result_refs: [
+              ...cyclePlanBeadOperationResultRefs,
+              ...actionAttempts.flatMap((attempt) => attempt.plan_bead_operation_result_refs ?? [])
+            ],
+            action_attempts: actionAttempts
+          });
+          // Flush before observer so a predicate failure cannot hide this action.
+          await writeJson(input.reportPath, report);
+          const actorWorkspaceDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
+          const progressObservation = await input.observeCapabilityProgress({
+            report,
+            actorWorkspaceDir
+          });
+          const observed = await collectCaseBudgetObserved();
+          if (input.caseBudgets && !caseBudgetStop) {
+            const budgetAtObservation = evaluateRuntimeCaseBudgetStop({
+              caseBudgets: input.caseBudgets,
+              observed
+            });
+            if (budgetAtObservation) {
+              caseBudgetStop = budgetAtObservation;
+              if (!caseBudgetController.signal.aborted) {
+                caseBudgetController.abort();
+              }
+            }
+          }
+          applyCapabilityProgressObservation({
+            report,
+            observation: progressObservation,
+            measurement: {
+              cycle_count: observed.cycles,
+              runtime_action_count: observed.runtime_actions,
+              wall_time_ms: observed.wall_time_ms,
+              provider_requests: observed.provider_requests,
+              total_tokens: observed.total_tokens
+            }
+          });
+          await writeJson(input.reportPath, report);
+          // Budget stop retains priority when already recorded before or at target observation.
+          if (progressObservation.targetStatus === "passed" && !caseBudgetStop) {
+            earlyTargetCompleted = true;
+            anyMeaningfulProgress = true;
+            break;
+          }
+          if (caseBudgetStop) {
+            break;
+          }
+        }
+
         if (execution.verifierStatus === "passed" || execution.verifierStatus === "failed") {
           break;
         }
@@ -2100,6 +2208,13 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
       let cycleDeliberationBranchRef: string | undefined;
       let deliberationTriggerReason: DeliberationBranchReason | undefined;
+      const priorCycleEvidenceRefs = report.cycles
+        .filter((cycle) => cycle.cycle_id !== cycleId)
+        .flatMap((cycle) => cycle.evidence_refs);
+      const priorCycleJudgmentRefs = report.cycles
+        .filter((cycle) => cycle.cycle_id !== cycleId)
+        .map((cycle) => cycle.judgment_ref)
+        .filter(Boolean);
       const postCycleSettlementState = buildSettlementState({
         actorId: input.actorId,
         observation: await observeCurrentActorWorld(),
@@ -2108,11 +2223,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         recentToolResults: settlementToolResults,
         postconditionResults: allPostconditionResults,
         evidenceRefs: [
-          ...report.cycles.flatMap((cycle) => cycle.evidence_refs),
+          ...priorCycleEvidenceRefs,
           ...actionAttempts.flatMap((attempt) => attempt.evidence_refs)
         ],
         judgmentRefs: [
-          ...report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+          ...priorCycleJudgmentRefs,
           ...(lastJudgmentRef ? [lastJudgmentRef] : [])
         ],
         memoryWriteCount
@@ -2149,7 +2264,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         );
       }
 
-      report.cycles.push({
+      upsertReportCycle(report, {
         cycle_id: cycleId,
         cycle_goal_ref: cycleGoalRef,
         action_ref: lastActionRef,
@@ -2190,35 +2305,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.visual_evidence = visualEvidenceRecorder.manifest;
       }
 
-      // Flush the completed cycle before optional progress observation so a
-      // predicate/adapter failure cannot hide the appended cycle.
+      // Persist the finalized cycle. Progress observation already ran after each
+      // action; stop here when the target passed or a budget ceiling tripped mid-cycle.
       await writeJson(input.reportPath, report);
-
-      if (input.observeCapabilityProgress) {
-        const actorWorkspaceDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
-        const progressObservation = await input.observeCapabilityProgress({
-          report,
-          actorWorkspaceDir
-        });
-        const observed = await collectCaseBudgetObserved();
-        applyCapabilityProgressObservation({
-          report,
-          observation: progressObservation,
-          measurement: {
-            cycle_count: observed.cycles,
-            runtime_action_count: observed.runtime_actions,
-            wall_time_ms: observed.wall_time_ms,
-            provider_requests: observed.provider_requests,
-            total_tokens: observed.total_tokens
-          }
-        });
-        await writeJson(input.reportPath, report);
-        // Budget stop retains priority when already recorded before target observation.
-        if (progressObservation.targetStatus === "passed" && !caseBudgetStop) {
-          earlyTargetCompleted = true;
-          anyMeaningfulProgress = true;
-          break;
-        }
+      if (earlyTargetCompleted || caseBudgetStop) {
+        break;
       }
     }
   } finally {

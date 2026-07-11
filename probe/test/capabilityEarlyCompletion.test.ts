@@ -1,6 +1,7 @@
 /**
- * Provider-free early completion: target evidence stops before the next cycle
- * and records first progress / target-completion usage. No live provider calls.
+ * Provider-free early completion: target evidence stops before the next action
+ * (and therefore before the next cycle) and records first progress /
+ * target-completion usage. No live provider calls.
  */
 
 import assert from "node:assert/strict";
@@ -12,15 +13,24 @@ import { fileURLToPath } from "node:url";
 
 import {
   evaluateCapabilityCaseProgress,
-  type IndividualCapabilityCaseV1
+  runCapabilityCase,
+  type IndividualCapabilityCaseV1,
+  type IndividualCapabilityReportV1
 } from "../src/benchmarks/capability/index.js";
-import type { SocialCycleRunReport } from "../src/runtime/goals/types.js";
+import type {
+  CapabilityProgressSummary,
+  SocialCycleRunReport
+} from "../src/runtime/goals/types.js";
 import { runSocialCycle } from "../src/runtime/socialCycleRunner.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const probeRoot = path.resolve(here, "..");
 const repoRoot = path.resolve(probeRoot, "..");
 const actorId = "npc_b";
+const manifestPath = path.join(
+  probeRoot,
+  "benchmarks/capability/individual-capability-v1.json"
+);
 
 function baseCase(partial: Partial<IndividualCapabilityCaseV1> = {}): IndividualCapabilityCaseV1 {
   return {
@@ -183,6 +193,49 @@ test("passed target after first cycle stops without budget stop and records both
   ]);
 });
 
+test("passed target after first action stops second action in the same cycle", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-action-"));
+  const reportPath = path.join(outDir, "social-cycle-report.json");
+  let observeCalls = 0;
+  let actionStarts = 0;
+
+  const result = await runSocialCycle({
+    actorId,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 3,
+    maxActionsPerCycle: 2,
+    reportPath,
+    connectToWorld: false,
+    isolateWorkspace: true,
+    actorWorkspaceRootDir: outDir,
+    repoRoot,
+    observeCaseUsage: async () => ({ requests: 3, total_tokens: 30 }),
+    beforeProviderOrRuntimeAction: async ({ phase }) => {
+      if (phase === "action") {
+        actionStarts += 1;
+      }
+    },
+    observeCapabilityProgress: async () => {
+      observeCalls += 1;
+      return {
+        targetStatus: "passed",
+        passedMilestoneIds: ["any_log_inventory"],
+        evidenceRefs: ["evidence/action-01-collect.json"]
+      };
+    }
+  });
+
+  assert.equal(actionStarts, 1);
+  assert.equal(observeCalls, 1);
+  assert.equal(result.report.cycles.length, 1);
+  assert.equal(result.report.cycles[0]?.action_attempts?.length, 1);
+  assert.equal(result.caseBudgetStop, undefined);
+  assert.equal(result.report.runtime_status, "passed");
+  assert.equal(result.report.capability_progress?.target_completion?.runtime_action_count, 1);
+  assert.equal(result.report.capability_progress?.first_measurable_progress?.runtime_action_count, 1);
+});
+
 test("passed milestone with failed target records first progress and continues", async () => {
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-partial-"));
   const reportPath = path.join(outDir, "social-cycle-report.json");
@@ -226,6 +279,48 @@ test("passed milestone with failed target records first progress and continues",
   );
 });
 
+test("milestone after first action continues to second action in the same cycle", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-milestone-action-"));
+  const reportPath = path.join(outDir, "social-cycle-report.json");
+  let observeCalls = 0;
+  let actionStarts = 0;
+
+  const result = await runSocialCycle({
+    actorId,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 1,
+    maxActionsPerCycle: 2,
+    reportPath,
+    connectToWorld: false,
+    isolateWorkspace: true,
+    actorWorkspaceRootDir: outDir,
+    repoRoot,
+    observeCaseUsage: async () => ({ requests: 4, total_tokens: 20 }),
+    beforeProviderOrRuntimeAction: async ({ phase }) => {
+      if (phase === "action") {
+        actionStarts += 1;
+      }
+    },
+    observeCapabilityProgress: async () => {
+      observeCalls += 1;
+      return {
+        targetStatus: "failed",
+        passedMilestoneIds: ["any_log_inventory"],
+        evidenceRefs: ["evidence/milestone-only.json"]
+      };
+    }
+  });
+
+  assert.equal(actionStarts, 2);
+  assert.equal(observeCalls, 2);
+  assert.equal(result.report.cycles.length, 1);
+  assert.equal(result.report.cycles[0]?.action_attempts?.length, 2);
+  assert.ok(result.report.capability_progress?.first_measurable_progress);
+  assert.equal(result.report.capability_progress?.target_completion, undefined);
+  assert.equal(result.report.capability_progress?.first_measurable_progress?.runtime_action_count, 1);
+});
+
 test("no progress omits measurement points and retains existing stop behavior", async () => {
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-none-"));
   const reportPath = path.join(outDir, "social-cycle-report.json");
@@ -267,4 +362,125 @@ test("no progress omits measurement points and retains existing stop behavior", 
   );
   assert.notEqual(result.report.runtime_status, "timeout");
   assert.ok(result.observedWallTimeMs >= 0);
+});
+
+test("runCapabilityCase persists matching capability_progress on disk raw and normalized reports", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-disk-"));
+  let observeCalls = 0;
+  let actionStarts = 0;
+
+  const result = await runCapabilityCase({
+    manifestPath,
+    caseId: "collect_logs",
+    outDir,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    connectToWorld: false,
+    cycles: 2,
+    maxActionsPerCycle: 2,
+    actorId,
+    repoRoot,
+    implementationRevision: null,
+    testHooks: {
+      observeCaseUsage: async () => ({ requests: 5, total_tokens: 50 }),
+      beforeProviderOrRuntimeAction: async ({ phase }) => {
+        if (phase === "action") {
+          actionStarts += 1;
+        }
+      },
+      observeCapabilityProgress: async () => {
+        observeCalls += 1;
+        return {
+          targetStatus: "passed",
+          passedMilestoneIds: ["any_log_inventory"],
+          evidenceRefs: ["evidence/disk-progress.json"]
+        };
+      }
+    }
+  });
+
+  assert.equal(actionStarts, 1);
+  assert.equal(observeCalls, 1);
+
+  const rawReport = JSON.parse(
+    await fs.readFile(result.raw_report_path, "utf8")
+  ) as SocialCycleRunReport;
+  const normalized = JSON.parse(
+    await fs.readFile(result.normalized_report_path, "utf8")
+  ) as IndividualCapabilityReportV1;
+
+  assert.equal(rawReport.runtime_status, "passed");
+  assert.equal(rawReport.cycles.length, 1);
+  assert.equal(rawReport.cycles[0]?.action_attempts?.length, 1);
+  assert.ok(rawReport.capability_progress);
+  assert.ok(normalized.capability_progress);
+  assert.deepEqual(
+    normalized.capability_progress as CapabilityProgressSummary,
+    rawReport.capability_progress as CapabilityProgressSummary
+  );
+  assert.equal(normalized.capability_progress?.target_completion?.runtime_action_count, 1);
+  assert.equal(normalized.capability_progress?.latest_target_status, "passed");
+});
+
+test("budget stop retains priority when target also passes at the same boundary", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-budget-"));
+  let observeCalls = 0;
+  let atTargetObservation = false;
+
+  const result = await runCapabilityCase({
+    manifestPath,
+    caseId: "collect_logs",
+    outDir,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    connectToWorld: false,
+    cycles: 2,
+    maxActionsPerCycle: 2,
+    actorId,
+    repoRoot,
+    implementationRevision: null,
+    budgetOverrides: {
+      max_provider_requests: 1,
+      max_total_tokens: 10
+    },
+    testHooks: {
+      // Usage reaches the ceiling only during the post-action progress observation,
+      // the same boundary where the target also passes.
+      observeCaseUsage: async () => {
+        if (!atTargetObservation) {
+          return { requests: 0, total_tokens: 0 };
+        }
+        return { requests: 1, total_tokens: 10 };
+      },
+      observeCapabilityProgress: async () => {
+        atTargetObservation = true;
+        observeCalls += 1;
+        return {
+          targetStatus: "passed",
+          passedMilestoneIds: ["any_log_inventory"],
+          evidenceRefs: ["evidence/budget-boundary.json"]
+        };
+      }
+    }
+  });
+
+  assert.equal(observeCalls, 1);
+
+  const rawReport = JSON.parse(
+    await fs.readFile(result.raw_report_path, "utf8")
+  ) as SocialCycleRunReport;
+  const normalized = JSON.parse(
+    await fs.readFile(result.normalized_report_path, "utf8")
+  ) as IndividualCapabilityReportV1;
+
+  assert.equal(rawReport.runtime_status, "timeout");
+  assert.equal(normalized.runtime_status, "timeout");
+  assert.equal(result.budget_status.budget_stopped, true);
+  assert.ok(
+    result.budget_status.exhausted_dimensions.includes("provider_requests") ||
+      result.budget_status.exhausted_dimensions.includes("total_tokens")
+  );
+  // Progress may still be recorded; it must not override budget timeout attribution.
+  assert.equal(rawReport.capability_progress?.latest_target_status, "passed");
+  assert.notEqual(rawReport.runtime_status, "passed");
 });
