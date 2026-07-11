@@ -22,7 +22,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
   assert.equal(manifest.schema, "individual-capability-manifest/v1");
   assert.equal(manifest.suite_id, "individual-capability-v1");
-  assert.equal(manifest.version, "1.1.0");
+  assert.equal(manifest.version, "1.2.0");
   assert.deepEqual(
     manifest.cases.map((capabilityCase) => capabilityCase.case_id),
     [
@@ -32,6 +32,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
       "place_table",
       "craft_wooden_pickaxe",
       "mine_cobblestone",
+      "reach_placed_furnace",
       "contribute_shared_chest",
       "acquire_diamond_pickaxe_infeasible"
     ]
@@ -46,6 +47,39 @@ test("checked-in suite loads with A4 individual capability cases", () => {
       .map((child) => (child.op === "item_count_gte" ? child.item : ""));
     assert.ok(items.includes("pale_oak_log"));
   }
+
+  const furnace = manifest.cases.find(
+    (capabilityCase) => capabilityCase.case_id === "reach_placed_furnace"
+  );
+  assert.ok(furnace);
+  assert.equal(furnace.target.op, "block_observed_at");
+  if (furnace.target.op === "block_observed_at") {
+    assert.equal(furnace.target.block, "furnace");
+    assert.equal(furnace.target.position_ref, "placed_furnace");
+  }
+  assert.deepEqual(
+    furnace.milestones.map((milestone) => milestone.milestone_id),
+    [
+      "log_inventory",
+      "planks_inventory",
+      "crafting_table_item",
+      "crafting_table_placed",
+      "sticks_inventory",
+      "wooden_pickaxe_present",
+      "cobblestone_inventory",
+      "cobblestone_8",
+      "furnace_item",
+      "furnace_placed"
+    ]
+  );
+  assert.deepEqual(
+    furnace.milestones.map((milestone) => milestone.order),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  );
+  assert.equal("recommended_actions" in furnace, false);
+  assert.equal("action_order" in furnace, false);
+  assert.equal("recipe_steps" in furnace, false);
+  assert.ok(!/logs?\s*→|first gather|then craft|prerequisite chain/i.test(furnace.top_level_goal));
 
   for (const capabilityCase of manifest.cases) {
     assert.ok(Number.isInteger(capabilityCase.budgets.max_cycles));
@@ -79,7 +113,7 @@ test("valid suite round-trips without injecting evaluation defaults", () => {
   if (!again.ok) {
     return;
   }
-  assert.equal(again.manifest.cases.length, 8);
+  assert.equal(again.manifest.cases.length, 9);
   assert.equal(again.manifest.cases[0]?.completion_policy.require_target, true);
 });
 

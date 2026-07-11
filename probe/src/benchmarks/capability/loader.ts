@@ -220,6 +220,15 @@ function assertWorldScenarioId(
   }
 }
 
+/** Exported for continuity and other offline evaluators that reuse CapabilityPredicateV1. */
+export function validateCapabilityPredicate(
+  value: unknown,
+  path: string,
+  errors: string[]
+): void {
+  validatePredicate(value, path, errors);
+}
+
 function validatePredicate(value: unknown, path: string, errors: string[]): void {
   if (!isRecord(value)) {
     errors.push(`${path} must be an object`);

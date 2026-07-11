@@ -16,6 +16,7 @@ import { runSocialCycle } from "../../runtime/socialCycleRunner.js";
 import type { SocialCycleProviderId } from "../../runtime/goals/types.js";
 import { parseWorldScenarioId } from "../../server/worldScenarios.js";
 import { adaptSocialCycleReportToEvidenceBag } from "./evidenceBagAdapter.js";
+import { applyFurnaceObservationAdapter } from "./furnaceObservationAdapter.js";
 import { loadIndividualCapabilityManifestFromFile } from "./loader.js";
 import { buildIndividualCapabilityReport } from "./report.js";
 import type { IndividualCapabilityReportV1 } from "./reportTypes.js";
@@ -406,10 +407,18 @@ export async function runCapabilityCase(
     socialResult.report.actor_workspace_root_dir ?? actorWorkspacePath,
     actorId
   );
-  const evidenceBag = adaptSocialCycleReportToEvidenceBag({
-    report: socialResult.report,
-    actorDir
-  });
+  // Furnace placement is not tracked in settlement known_positions; enrich after
+  // the generic adapter. Report builder stays furnace-plan-free.
+  const evidenceBag = applyFurnaceObservationAdapter(
+    adaptSocialCycleReportToEvidenceBag({
+      report: socialResult.report,
+      actorDir
+    }),
+    {
+      report: socialResult.report,
+      actorDir
+    }
+  );
 
   let normalizedReport = buildIndividualCapabilityReport({
     suite_id: manifest.suite_id,

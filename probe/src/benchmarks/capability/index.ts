@@ -26,6 +26,7 @@ export {
 export {
   assertIndividualCapabilityManifest,
   loadIndividualCapabilityManifestFromFile,
+  validateCapabilityPredicate,
   validateIndividualCapabilityManifest
 } from "./loader.js";
 
@@ -60,6 +61,8 @@ export type { RootSafeResolveResult } from "./artifactRefs.js";
 
 export { adaptSocialCycleReportToEvidenceBag } from "./evidenceBagAdapter.js";
 export type { AdaptSocialCycleEvidenceBagInput } from "./evidenceBagAdapter.js";
+
+export { applyFurnaceObservationAdapter } from "./furnaceObservationAdapter.js";
 
 export { buildIndividualCapabilityReport } from "./report.js";
 export type { BuildIndividualCapabilityReportInput } from "./report.js";
