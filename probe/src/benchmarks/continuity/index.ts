@@ -23,6 +23,7 @@ export type {
   GoalContinuityReferencedArtifactV1,
   GoalContinuityReportV1,
   GoalContinuityRestartCheckpointV1,
+  GoalContinuityRestartObservationV1,
   GoalContinuitySeedPolicyV1
 } from "./types.js";
 
@@ -33,15 +34,25 @@ export {
   GOAL_CONTINUITY_LIFECYCLE_EVENTS,
   GOAL_CONTINUITY_MANIFEST_SCHEMA,
   GOAL_CONTINUITY_OPEN_WORK_KINDS,
-  GOAL_CONTINUITY_REPORT_SCHEMA
+  GOAL_CONTINUITY_REPORT_SCHEMA,
+  GOAL_CONTINUITY_RESTART_OBSERVATION_SCHEMA
 } from "./types.js";
 
 export {
+  assertGoalContinuityArtifactBag,
   assertGoalContinuityManifest,
+  assertGoalContinuityRestartObservation,
+  loadGoalContinuityArtifactBagFromFile,
   loadGoalContinuityManifestFromFile,
+  resolveGoalContinuityArtifactPath,
   selectGoalContinuityCase,
-  validateGoalContinuityManifest
+  validateGoalContinuityArtifactBag,
+  validateGoalContinuityManifest,
+  validateGoalContinuityRestartObservation
 } from "./loader.js";
 
 export { evaluateGoalContinuity } from "./evaluator.js";
 export type { EvaluateGoalContinuityInput } from "./evaluator.js";
+
+export { writeGoalContinuityRestartObservation } from "./writer.js";
+export type { WriteGoalContinuityRestartObservationResult } from "./writer.js";

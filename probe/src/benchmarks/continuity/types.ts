@@ -22,6 +22,8 @@ import type { WorldScenarioId } from "../../server/worldScenarios.js";
 export const GOAL_CONTINUITY_MANIFEST_SCHEMA = "goal-continuity-manifest/v1" as const;
 export const GOAL_CONTINUITY_REPORT_SCHEMA = "goal-continuity-report/v1" as const;
 export const GOAL_CONTINUITY_ARTIFACT_BAG_SCHEMA = "goal-continuity-artifact-bag/v1" as const;
+export const GOAL_CONTINUITY_RESTART_OBSERVATION_SCHEMA =
+  "goal-continuity-restart-observation/v1" as const;
 
 /** Actor-side lifecycle kinds the evaluator can observe from saved artifacts. */
 export const GOAL_CONTINUITY_LIFECYCLE_EVENTS = [
@@ -301,7 +303,7 @@ export type GoalContinuityMemoryNoteArtifactV1 = {
  * restart or context reload. A single open snapshot is insufficient.
  */
 export type GoalContinuityRestartObservationV1 = {
-  schema: "goal-continuity-restart-observation/v1";
+  schema: typeof GOAL_CONTINUITY_RESTART_OBSERVATION_SCHEMA;
   status: "observed" | "not_observed";
   before_ref: string;
   after_ref: string;

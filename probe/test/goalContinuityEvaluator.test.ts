@@ -1,12 +1,13 @@
 /** Offline evaluator tests for goal-continuity-report/v1. */
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  assertGoalContinuityRestartObservation,
   evaluateGoalContinuity,
+  loadGoalContinuityArtifactBagFromFile,
   loadGoalContinuityManifestFromFile,
   selectGoalContinuityCase,
   type GoalContinuityArtifactBagV1,
@@ -22,7 +23,7 @@ const fixturesDir = path.join(here, "../benchmarks/continuity/fixtures");
 const TEMPLATE_CASE_ID = "interrupt_and_resume_open_work";
 
 function readBag(name: string): GoalContinuityArtifactBagV1 {
-  return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), "utf8")) as GoalContinuityArtifactBagV1;
+  return loadGoalContinuityArtifactBagFromFile(fixturesDir, name);
 }
 
 function baseCase(
@@ -249,7 +250,7 @@ test("restart-required continuity is unknown without distinct before and after r
   assert.equal(withoutRestart.continuity.open_work_survival.status, "unknown");
   assert.notEqual(withoutRestart.continuity.interpretation_status, "passed");
 
-  bag.restart_observation = {
+  bag.restart_observation = assertGoalContinuityRestartObservation({
     schema: "goal-continuity-restart-observation/v1",
     status: "observed",
     before_ref: "checkpoints/before-restart.json",
@@ -257,7 +258,7 @@ test("restart-required continuity is unknown without distinct before and after r
     before_open_bead_ids: ["bead-resume-1"],
     after_open_bead_ids: ["bead-resume-1"],
     source_artifact_refs: ["runtime/restart-observation.json"]
-  };
+  });
   const withRestart = evaluateGoalContinuity({
     suite_id: "goal-continuity-v1",
     suite_version: "1.1.0",
