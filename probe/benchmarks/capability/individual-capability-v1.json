@@ -1,8 +1,8 @@
 {
   "schema": "individual-capability-manifest/v1",
   "suite_id": "individual-capability-v1",
-  "version": "1.0.0",
-  "description": "Minimal dataset-free individual Minecraft capability cases for V4 Stage 1. Manifests declare targets and milestones only; actors choose their own actions.",
+  "version": "1.1.0",
+  "description": "Dataset-free individual Minecraft capability cases for V4 Stage 1 Slice A4. Manifests declare targets and milestones only; actors choose their own actions. Includes an honest infeasibility probe with a tiny budget.",
   "cases": [
     {
       "case_id": "collect_logs",
@@ -56,6 +56,62 @@
       "seed_policy": {
         "kind": "fixed",
         "seeds": ["natural-safe-spawn-v1"],
+        "repeats": 1
+      },
+      "completion_policy": {
+        "require_target": true,
+        "partial_credit": "milestones"
+      }
+    },
+    {
+      "case_id": "craft_planks_sticks",
+      "title": "Craft planks or sticks",
+      "top_level_goal": "Craft oak_planks or stick into the actor inventory from gathered wood materials.",
+      "world_scenario_id": "wooden-pickaxe-flat-benchmark-v1",
+      "fixture_class": "command_fixture",
+      "required_capabilities": ["collect_logs"],
+      "budgets": {
+        "max_cycles": 25,
+        "max_runtime_actions": 50,
+        "max_wall_time_ms": 750000
+      },
+      "target": {
+        "op": "any",
+        "children": [
+          { "op": "item_count_gte", "item": "oak_planks", "count": 1, "owner": "actor" },
+          { "op": "item_count_gte", "item": "stick", "count": 1, "owner": "actor" }
+        ]
+      },
+      "milestones": [
+        {
+          "milestone_id": "oak_planks_inventory",
+          "title": "Oak planks in inventory",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "oak_planks",
+            "count": 1,
+            "owner": "actor"
+          },
+          "order": 1,
+          "weight": 1
+        },
+        {
+          "milestone_id": "stick_inventory",
+          "title": "Stick in inventory",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "stick",
+            "count": 1,
+            "owner": "actor"
+          },
+          "order": 2,
+          "weight": 1
+        }
+      ],
+      "allowed_evidence_kinds": ["inventory", "tool_attempt", "settlement"],
+      "seed_policy": {
+        "kind": "fixed",
+        "seeds": ["wooden-pickaxe-flat-benchmark-v1"],
         "repeats": 1
       },
       "completion_policy": {
@@ -176,6 +232,246 @@
       "seed_policy": {
         "kind": "fixed",
         "seeds": ["wooden-pickaxe-flat-benchmark-v1"],
+        "repeats": 1
+      },
+      "completion_policy": {
+        "require_target": true,
+        "partial_credit": "milestones"
+      }
+    },
+    {
+      "case_id": "craft_wooden_pickaxe",
+      "title": "Craft a wooden pickaxe",
+      "top_level_goal": "Craft one wooden_pickaxe into the actor inventory or held slot.",
+      "world_scenario_id": "wooden-pickaxe-flat-benchmark-v1",
+      "fixture_class": "command_fixture",
+      "required_capabilities": ["craft_planks_sticks", "craft_table"],
+      "budgets": {
+        "max_cycles": 40,
+        "max_runtime_actions": 80,
+        "max_wall_time_ms": 1200000
+      },
+      "target": {
+        "op": "any",
+        "children": [
+          { "op": "item_count_gte", "item": "wooden_pickaxe", "count": 1, "owner": "actor" },
+          { "op": "held_item_is", "item": "wooden_pickaxe" }
+        ]
+      },
+      "milestones": [
+        {
+          "milestone_id": "oak_planks_inventory",
+          "title": "Oak planks available",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "oak_planks",
+            "count": 3,
+            "owner": "actor"
+          },
+          "order": 1,
+          "weight": 1
+        },
+        {
+          "milestone_id": "stick_inventory",
+          "title": "Sticks available",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "stick",
+            "count": 2,
+            "owner": "actor"
+          },
+          "order": 2,
+          "weight": 1
+        },
+        {
+          "milestone_id": "wooden_pickaxe_present",
+          "title": "Wooden pickaxe in inventory or held",
+          "predicate": {
+            "op": "any",
+            "children": [
+              { "op": "item_count_gte", "item": "wooden_pickaxe", "count": 1, "owner": "actor" },
+              { "op": "held_item_is", "item": "wooden_pickaxe" }
+            ]
+          },
+          "order": 3,
+          "weight": 2
+        }
+      ],
+      "allowed_evidence_kinds": ["inventory", "held_item", "tool_attempt", "settlement"],
+      "seed_policy": {
+        "kind": "fixed",
+        "seeds": ["wooden-pickaxe-flat-benchmark-v1"],
+        "repeats": 1
+      },
+      "completion_policy": {
+        "require_target": true,
+        "partial_credit": "milestones"
+      }
+    },
+    {
+      "case_id": "mine_cobblestone",
+      "title": "Mine cobblestone",
+      "top_level_goal": "Obtain at least one cobblestone in the actor inventory from the world.",
+      "world_scenario_id": "natural-safe-spawn-v1",
+      "fixture_class": "natural_world",
+      "required_capabilities": ["craft_wooden_pickaxe"],
+      "budgets": {
+        "max_cycles": 40,
+        "max_runtime_actions": 80,
+        "max_wall_time_ms": 1200000
+      },
+      "target": {
+        "op": "item_count_gte",
+        "item": "cobblestone",
+        "count": 1,
+        "owner": "actor"
+      },
+      "milestones": [
+        {
+          "milestone_id": "wooden_pickaxe_ready",
+          "title": "Wooden pickaxe available",
+          "predicate": {
+            "op": "any",
+            "children": [
+              { "op": "item_count_gte", "item": "wooden_pickaxe", "count": 1, "owner": "actor" },
+              { "op": "held_item_is", "item": "wooden_pickaxe" }
+            ]
+          },
+          "order": 1,
+          "weight": 1
+        },
+        {
+          "milestone_id": "cobblestone_inventory",
+          "title": "Cobblestone in inventory",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "cobblestone",
+            "count": 1,
+            "owner": "actor"
+          },
+          "order": 2,
+          "weight": 2
+        }
+      ],
+      "allowed_evidence_kinds": ["inventory", "held_item", "tool_attempt", "settlement", "block_observation"],
+      "seed_policy": {
+        "kind": "fixed",
+        "seeds": ["natural-safe-spawn-v1"],
+        "repeats": 1
+      },
+      "completion_policy": {
+        "require_target": true,
+        "partial_credit": "milestones"
+      }
+    },
+    {
+      "case_id": "contribute_shared_chest",
+      "title": "Contribute items to a shared chest",
+      "top_level_goal": "Deposit at least one oak_log into the shared chest container as a non-social physical storage operation.",
+      "world_scenario_id": "wooden-pickaxe-flat-benchmark-v1",
+      "fixture_class": "command_fixture",
+      "required_capabilities": ["collect_logs"],
+      "budgets": {
+        "max_cycles": 30,
+        "max_runtime_actions": 60,
+        "max_wall_time_ms": 900000
+      },
+      "target": {
+        "op": "container_item_count_gte",
+        "container_ref": "chest:shared",
+        "item": "oak_log",
+        "count": 1
+      },
+      "milestones": [
+        {
+          "milestone_id": "oak_log_inventory",
+          "title": "Oak log available to deposit",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "oak_log",
+            "count": 1,
+            "owner": "actor"
+          },
+          "order": 1,
+          "weight": 1
+        },
+        {
+          "milestone_id": "oak_log_in_shared_chest",
+          "title": "Oak log observed in shared chest",
+          "predicate": {
+            "op": "container_item_count_gte",
+            "container_ref": "chest:shared",
+            "item": "oak_log",
+            "count": 1
+          },
+          "order": 2,
+          "weight": 2
+        }
+      ],
+      "allowed_evidence_kinds": ["inventory", "tool_attempt", "settlement", "container"],
+      "seed_policy": {
+        "kind": "fixed",
+        "seeds": ["wooden-pickaxe-flat-benchmark-v1"],
+        "repeats": 1
+      },
+      "completion_policy": {
+        "require_target": true,
+        "partial_credit": "milestones"
+      }
+    },
+    {
+      "case_id": "acquire_diamond_pickaxe_infeasible",
+      "title": "Acquire diamond pickaxe under infeasible budget",
+      "top_level_goal": "Obtain a diamond_pickaxe. This case is an honest infeasibility probe: prerequisites and a tiny budget make target completion unexpected without inventing a recovery planner.",
+      "world_scenario_id": "natural-safe-spawn-v1",
+      "fixture_class": "natural_world",
+      "required_capabilities": [
+        "mine_cobblestone",
+        "external:smelt_iron_ingot",
+        "external:craft_iron_pickaxe",
+        "external:mine_diamond_ore"
+      ],
+      "budgets": {
+        "max_cycles": 3,
+        "max_runtime_actions": 6,
+        "max_wall_time_ms": 60000
+      },
+      "target": {
+        "op": "item_count_gte",
+        "item": "diamond_pickaxe",
+        "count": 1,
+        "owner": "actor"
+      },
+      "milestones": [
+        {
+          "milestone_id": "cobblestone_present",
+          "title": "Any cobblestone gathered before budget exhaustion",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "cobblestone",
+            "count": 1,
+            "owner": "actor"
+          },
+          "order": 1,
+          "weight": 1
+        },
+        {
+          "milestone_id": "diamond_pickaxe_inventory",
+          "title": "Diamond pickaxe in inventory",
+          "predicate": {
+            "op": "item_count_gte",
+            "item": "diamond_pickaxe",
+            "count": 1,
+            "owner": "actor"
+          },
+          "order": 2,
+          "weight": 2
+        }
+      ],
+      "allowed_evidence_kinds": ["inventory", "tool_attempt", "settlement"],
+      "seed_policy": {
+        "kind": "fixed",
+        "seeds": ["natural-safe-spawn-v1"],
         "repeats": 1
       },
       "completion_policy": {

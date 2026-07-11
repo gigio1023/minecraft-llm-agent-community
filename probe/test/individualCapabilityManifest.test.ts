@@ -18,13 +18,23 @@ function readFixture(name: string): unknown {
   return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), "utf8"));
 }
 
-test("checked-in suite loads with collect_logs, craft_table, and place_table", () => {
+test("checked-in suite loads with A4 individual capability cases", () => {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
   assert.equal(manifest.schema, "individual-capability-manifest/v1");
   assert.equal(manifest.suite_id, "individual-capability-v1");
+  assert.equal(manifest.version, "1.1.0");
   assert.deepEqual(
     manifest.cases.map((capabilityCase) => capabilityCase.case_id),
-    ["collect_logs", "craft_table", "place_table"]
+    [
+      "collect_logs",
+      "craft_planks_sticks",
+      "craft_table",
+      "place_table",
+      "craft_wooden_pickaxe",
+      "mine_cobblestone",
+      "contribute_shared_chest",
+      "acquire_diamond_pickaxe_infeasible"
+    ]
   );
 
   const collectLogs = manifest.cases.find((capabilityCase) => capabilityCase.case_id === "collect_logs");
@@ -69,7 +79,7 @@ test("valid suite round-trips without injecting evaluation defaults", () => {
   if (!again.ok) {
     return;
   }
-  assert.equal(again.manifest.cases.length, 3);
+  assert.equal(again.manifest.cases.length, 8);
   assert.equal(again.manifest.cases[0]?.completion_policy.require_target, true);
 });
 
