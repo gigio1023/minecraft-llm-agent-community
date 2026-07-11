@@ -11,6 +11,9 @@ Before the next user decision, A3 needs complete runtime stopping behavior and
 B2 needs strict saved-evidence loading. Provider approval matters after those
 two implementation gaps are closed. D2 remains a later user selection.
 
+Implementation style: apply default-strength `DietrichGebert/ponytail` at
+`14a0d79`; the active implementation plan owns the repo-specific adaptation.
+
 ## Accepted (provider-free)
 
 - A1R, A2, A4, B1

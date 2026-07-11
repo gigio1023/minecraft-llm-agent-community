@@ -82,6 +82,36 @@ Types, unit tests, plans, and green docs are not substitutes for runtime evidenc
 Routine reversible implementation, fixtures, tests, and provider-free smokes
 inside this plan do not require repeated confirmation.
 
+### Ponytail Implementation Discipline
+
+Apply the default-strength principles from `DietrichGebert/ponytail` (reviewed
+at upstream commit `14a0d79`) to implementation work in this plan:
+
+1. First decide whether new code is necessary.
+2. Reuse a current repo helper or pattern before writing another one.
+3. Prefer the Node/Bun standard library and existing platform behavior.
+4. Reuse an installed dependency before adding a new dependency.
+5. Add the smallest root-cause fix after tracing every caller of the shared
+   function being changed.
+
+Do not create an interface with one implementation, a factory for one product,
+a generic validator for one data format, or configuration for a value that does
+not vary. Prefer deletion and direct code over speculative flexibility.
+
+These principles reduce implementation size; they do not reduce correctness.
+Never remove input validation at file/provider/runtime entry points, error
+handling that prevents data loss, runtime-owned Minecraft truth, provider usage
+limits, saved evidence, or the smallest test that fails when non-trivial logic
+breaks. Repo authority and the requirements in `SPEC.md` and `AGENTS.md` remain
+stronger than this implementation discipline.
+
+For A3, first reuse existing cancellation, provider-usage, and report-writing
+paths; do not add a separate hierarchy of budget-manager classes. For B2, reuse
+the current root-safe ref resolver and nearby strict loader patterns; do not
+introduce a general schema library solely for continuity files. If a deliberate
+simplification has a known limit, add a `ponytail:` comment that names the limit
+and the exact condition for replacing it.
+
 ## 2. Current Implementation Inventory
 
 The repository already has useful mechanisms, but not the V4 program as one

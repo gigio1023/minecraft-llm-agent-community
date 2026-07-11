@@ -43,7 +43,7 @@ preflight. Do not begin D2 unless the user selects a real D1 observation record.
 - Repository: `/Users/gigio/git/minecraft-llm-agent-community`
 - Branch: `codex/capability-gated-social-sandbox-v4`
 - Reviewed implementation commit: `620955d8`
-- Branch state after that commit: ahead of origin by 14; not pushed
+- Branch state: ahead of origin and not pushed; verify the live count
 - Provider use in the review: none
 - Minecraft live run in the review: none
 - Review validation:
@@ -89,6 +89,22 @@ Binding rules:
 - Keep `implementation-notes.md` current when code reality changes the plan.
 - Commit each coherent completed repair with detailed Why/What/Validation
   sections. Do not push unless the user asks.
+
+## Ponytail Rules For This Implementation
+
+The user requires default `full` Ponytail discipline. The local reference was
+refreshed to upstream commit `14a0d79`. Read:
+
+- `~/git/harness/ponytail/AGENTS.md`
+- `~/git/harness/ponytail/skills/ponytail/SKILL.md`
+- `~/git/harness/ponytail/skills/ponytail-review/SKILL.md`
+- the maintained adaptation in “Ponytail Implementation Discipline” inside
+  `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+
+Use Ponytail to reduce code, not truth or safety checks. Before committing,
+remove code and files that serve no stated requirement. Mark a conscious
+limited shortcut with a `ponytail:` comment naming its ceiling and replacement
+condition.
 
 ## Reviewed Status
 
@@ -195,6 +211,8 @@ Required behavior:
   failure, and verifier failure.
 - Write the case declaration before work begins and preserve partial raw output
   on a stop.
+- Prefer extending the existing shared runtime path over adding a parallel A3
+  execution system.
 
 Tests must cover:
 
@@ -239,6 +257,8 @@ It must:
   refs, non-empty source refs, and valid open work id arrays;
 - load JSON from a declared actor/run root without following paths outside it;
 - pass only validated data into `evaluateGoalContinuity`.
+- stay direct and specific to this data format; a reusable validation framework
+  is unnecessary until another real consumer needs the same behavior.
 
 Add negative tests for every rule above. Replace test-only unchecked JSON casts
 where practical with the new loader.
