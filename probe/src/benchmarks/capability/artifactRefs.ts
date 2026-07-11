@@ -5,6 +5,7 @@
  * the actor directory or another declared artifact root.
  */
 
+import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 export type RootSafeResolveResult =
@@ -73,6 +74,58 @@ export function resolveRootSafeArtifactRef(
     ok: true,
     absolute_path: absolutePath,
     relative_ref: relative.split(path.sep).join("/")
+  };
+}
+
+/**
+ * Resolve a ref without traversing symlinks below the declared root.
+ *
+ * The ordinary resolver prevents lexical `..` escapes. File readers and
+ * writers that must not follow an in-root symlink to an outside path should
+ * use this stricter form.
+ */
+export function resolveRootSafeArtifactRefWithoutSymlinks(
+  rootDir: string,
+  ref: string
+): RootSafeResolveResult {
+  const resolved = resolveRootSafeArtifactRef(rootDir, ref);
+  if (!resolved.ok) {
+    return resolved;
+  }
+
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = realpathSync(rootDir);
+  } catch {
+    return { ok: false, reason: "declared root does not exist" };
+  }
+
+  let current = canonicalRoot;
+  for (const part of resolved.relative_ref.split("/")) {
+    current = path.join(current, part);
+    try {
+      if (lstatSync(current).isSymbolicLink()) {
+        return {
+          ok: false,
+          reason: `ref traverses symbolic link '${part}' below declared root`
+        };
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        break;
+      }
+      return {
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    absolute_path: path.join(canonicalRoot, ...resolved.relative_ref.split("/")),
+    relative_ref: resolved.relative_ref
   };
 }
 

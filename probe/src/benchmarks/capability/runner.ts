@@ -82,6 +82,9 @@ export type CapabilityBudgetStatusV1 = {
   schema: typeof CAPABILITY_BUDGET_STATUS_SCHEMA;
   case_id: string;
   capability_run_id: string;
+  /** True when any declared ceiling stopped or prevented further work. */
+  budget_stopped: boolean;
+  /** True when work stopped at a ceiling before the target passed. */
   budget_exhausted: boolean;
   exhausted_dimensions: CapabilityBudgetDimensionV1[];
   /** True when max_estimated_cost is declared but USD cannot be derived from usage. */
@@ -101,6 +104,7 @@ export type CapabilitySuiteIndexRunV1 = {
   budget_status_ref: string;
   interpretation_status: IndividualCapabilityReportV1["interpretation_status"];
   runtime_status: IndividualCapabilityReportV1["runtime_status"];
+  budget_stopped: boolean;
   budget_exhausted: boolean;
   provider_id: SocialCycleProviderId;
   model: string;
@@ -289,6 +293,7 @@ export function evaluateBudgetExhaustion(input: {
   /** Explicit marker when cost cannot be derived from normalized usage. */
   costUncomputable?: boolean;
 }): {
+  budget_stopped: boolean;
   budget_exhausted: boolean;
   exhausted_dimensions: CapabilityBudgetDimensionV1[];
   cost_unverifiable: boolean;
@@ -298,8 +303,10 @@ export function evaluateBudgetExhaustion(input: {
     observed: input.observed,
     costUncomputable: input.costUncomputable
   });
-  const budget_exhausted = ceilings.shouldStop && !input.targetPassed;
+  const budget_stopped = ceilings.shouldStop;
+  const budget_exhausted = budget_stopped && !input.targetPassed;
   return {
+    budget_stopped,
     budget_exhausted,
     exhausted_dimensions: ceilings.exhausted_dimensions,
     cost_unverifiable: ceilings.cost_unverifiable
@@ -579,40 +586,54 @@ export async function runCapabilityCase(
   // Declaration must exist before Minecraft/provider work begins.
   await writeJson(declarationPath, declaration);
 
-  const socialResult = await runSocialCycle({
-    actorId,
-    providerId,
-    model,
-    cycles,
-    maxActionsPerCycle,
-    reportPath: rawReportPath,
-    connectToWorld,
-    actorWorkspaceRootDir: actorWorkspacePath,
-    isolateWorkspace: false,
-    worldScenario: worldScenarioId,
-    worldSeed: seed,
-    repoRoot,
-    caseBudgets: {
-      max_wall_time_ms: effectiveBudgets.max_wall_time_ms,
-      ...(effectiveBudgets.max_provider_requests !== undefined
-        ? { max_provider_requests: effectiveBudgets.max_provider_requests }
+  const caseNowMs = input.testHooks?.nowMs ?? (() => Date.now());
+  const caseStartedAtMs = caseNowMs();
+  const caseController = new AbortController();
+  const caseDeadlineTimer = setTimeout(
+    () => caseController.abort(),
+    effectiveBudgets.max_wall_time_ms
+  );
+  let socialResult: Awaited<ReturnType<typeof runSocialCycle>>;
+  try {
+    socialResult = await runSocialCycle({
+      actorId,
+      providerId,
+      model,
+      cycles,
+      maxActionsPerCycle,
+      reportPath: rawReportPath,
+      connectToWorld,
+      actorWorkspaceRootDir: actorWorkspacePath,
+      isolateWorkspace: false,
+      worldScenario: worldScenarioId,
+      worldSeed: seed,
+      repoRoot,
+      signal: caseController.signal,
+      caseStartedAtMs,
+      caseBudgets: {
+        max_wall_time_ms: effectiveBudgets.max_wall_time_ms,
+        ...(effectiveBudgets.max_provider_requests !== undefined
+          ? { max_provider_requests: effectiveBudgets.max_provider_requests }
+          : {}),
+        ...(effectiveBudgets.max_total_tokens !== undefined
+          ? { max_total_tokens: effectiveBudgets.max_total_tokens }
+          : {}),
+        ...(effectiveBudgets.max_estimated_cost !== undefined
+          ? { max_estimated_cost: effectiveBudgets.max_estimated_cost }
+          : {})
+      },
+      ...(input.testHooks?.nowMs ? { nowMs: input.testHooks.nowMs } : {}),
+      ...(input.testHooks?.beforeProviderOrRuntimeAction
+        ? { beforeProviderOrRuntimeAction: input.testHooks.beforeProviderOrRuntimeAction }
         : {}),
-      ...(effectiveBudgets.max_total_tokens !== undefined
-        ? { max_total_tokens: effectiveBudgets.max_total_tokens }
-        : {}),
-      ...(effectiveBudgets.max_estimated_cost !== undefined
-        ? { max_estimated_cost: effectiveBudgets.max_estimated_cost }
+      ...(input.testHooks?.observeCaseUsage
+        ? { observeCaseUsage: input.testHooks.observeCaseUsage }
         : {})
-    },
-    ...(input.testHooks?.nowMs ? { nowMs: input.testHooks.nowMs } : {}),
-    ...(input.testHooks?.beforeProviderOrRuntimeAction
-      ? { beforeProviderOrRuntimeAction: input.testHooks.beforeProviderOrRuntimeAction }
-      : {}),
-    ...(input.testHooks?.observeCaseUsage
-      ? { observeCaseUsage: input.testHooks.observeCaseUsage }
-      : {})
-    // Intentionally no benchmarkTask: V4 reports require the manifest path.
-  });
+      // Intentionally no benchmarkTask: V4 reports require the manifest path.
+    });
+  } finally {
+    clearTimeout(caseDeadlineTimer);
+  }
 
   const actorDir = path.join(
     socialResult.report.actor_workspace_root_dir ?? actorWorkspacePath,
@@ -729,6 +750,7 @@ export async function runCapabilityCase(
     schema: CAPABILITY_BUDGET_STATUS_SCHEMA,
     case_id: capabilityCase.case_id,
     capability_run_id: capabilityRunId,
+    budget_stopped: budgetEval.budget_stopped,
     budget_exhausted: budgetEval.budget_exhausted,
     exhausted_dimensions: budgetEval.exhausted_dimensions,
     cost_unverifiable: budgetEval.cost_unverifiable,
@@ -751,6 +773,7 @@ export async function runCapabilityCase(
     budget_status_ref: relativeUnder(outDir, budgetStatusPath),
     interpretation_status: normalizedReport.interpretation_status,
     runtime_status: normalizedReport.runtime_status,
+    budget_stopped: budgetEval.budget_stopped,
     budget_exhausted: budgetEval.budget_exhausted,
     provider_id: providerId,
     model,

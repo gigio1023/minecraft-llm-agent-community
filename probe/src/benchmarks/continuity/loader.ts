@@ -4,7 +4,7 @@ import { parseWorldScenarioId, worldScenarioIds } from "../../server/worldScenar
 import {
   CAPABILITY_ALLOWED_EVIDENCE_KINDS,
   isRootSafeRelativeRef,
-  resolveRootSafeArtifactRef,
+  resolveRootSafeArtifactRefWithoutSymlinks,
   validateCapabilityPredicate
 } from "../capability/index.js";
 import type {
@@ -738,7 +738,57 @@ function assertNonNegativeIntegerField(
   }
 }
 
-function validateEvidencedValue(value: unknown, pathLabel: string, errors: string[]): void {
+function validatePositionValue(value: unknown, pathLabel: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${pathLabel} must be an object`);
+    return;
+  }
+  rejectUnknownKeys(value, ["x", "y", "z"], pathLabel, errors);
+  for (const coordinate of ["x", "y", "z"] as const) {
+    if (!isFiniteNumber(value[coordinate])) {
+      errors.push(`${pathLabel}.${coordinate} must be a finite number`);
+    }
+  }
+}
+
+function validateInventoryCounts(value: unknown, pathLabel: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${pathLabel} must be an object`);
+    return;
+  }
+  for (const [item, count] of Object.entries(value)) {
+    if (item.trim().length === 0) {
+      errors.push(`${pathLabel} item ids must be non-empty`);
+    }
+    if (!isNonNegativeInteger(count)) {
+      errors.push(`${pathLabel}.${item || "<empty>"} must be a non-negative integer`);
+    }
+  }
+}
+
+function validateHeldItemValue(value: unknown, pathLabel: string, errors: string[]): void {
+  if (value === null) {
+    return;
+  }
+  if (!isRecord(value)) {
+    errors.push(`${pathLabel} must be null or an object`);
+    return;
+  }
+  rejectUnknownKeys(value, ["name", "count"], pathLabel, errors);
+  if (!nonEmptyString(value.name)) {
+    errors.push(`${pathLabel}.name must be a non-empty string`);
+  }
+  if (value.count !== undefined && !isPositiveInteger(value.count)) {
+    errors.push(`${pathLabel}.count must be a positive integer when present`);
+  }
+}
+
+function validateEvidencedValue(
+  value: unknown,
+  pathLabel: string,
+  errors: string[],
+  validateValue: (value: unknown, pathLabel: string, errors: string[]) => void
+): void {
   if (!isRecord(value)) {
     errors.push(`${pathLabel} must be an object`);
     return;
@@ -746,6 +796,8 @@ function validateEvidencedValue(value: unknown, pathLabel: string, errors: strin
   rejectUnknownKeys(value, evidencedValueKeys, pathLabel, errors);
   if (!("value" in value)) {
     errors.push(`${pathLabel}.value is required`);
+  } else {
+    validateValue(value.value, `${pathLabel}.value`, errors);
   }
   assertRootSafeRefArray(value.evidence_refs, `${pathLabel}.evidence_refs`, errors);
   if (
@@ -789,13 +841,28 @@ function validatePhysicalEvidence(
   }
 
   if (value.inventory !== undefined) {
-    validateEvidencedValue(value.inventory, `${pathLabel}.inventory`, errors);
+    validateEvidencedValue(
+      value.inventory,
+      `${pathLabel}.inventory`,
+      errors,
+      validateInventoryCounts
+    );
   }
   if (value.held_item !== undefined) {
-    validateEvidencedValue(value.held_item, `${pathLabel}.held_item`, errors);
+    validateEvidencedValue(
+      value.held_item,
+      `${pathLabel}.held_item`,
+      errors,
+      validateHeldItemValue
+    );
   }
   if (value.actor_position !== undefined) {
-    validateEvidencedValue(value.actor_position, `${pathLabel}.actor_position`, errors);
+    validateEvidencedValue(
+      value.actor_position,
+      `${pathLabel}.actor_position`,
+      errors,
+      validatePositionValue
+    );
   }
 
   if (value.known_blocks !== undefined) {
@@ -814,6 +881,13 @@ function validatePhysicalEvidence(
           errors
         );
         assertString(entry, "block", `${pathLabel}.known_blocks[${index}]`, errors);
+        if (entry.position !== undefined) {
+          validatePositionValue(
+            entry.position,
+            `${pathLabel}.known_blocks[${index}].position`,
+            errors
+          );
+        }
         assertRootSafeRelativeRef(
           entry.evidence_ref,
           `${pathLabel}.known_blocks[${index}].evidence_ref`,
@@ -833,7 +907,12 @@ function validatePhysicalEvidence(
       errors.push(`${pathLabel}.named_positions must be an object when present`);
     } else {
       for (const [name, entry] of Object.entries(value.named_positions)) {
-        validateEvidencedValue(entry, `${pathLabel}.named_positions.${name}`, errors);
+        validateEvidencedValue(
+          entry,
+          `${pathLabel}.named_positions.${name}`,
+          errors,
+          validatePositionValue
+        );
       }
     }
   }
@@ -854,9 +933,11 @@ function validatePhysicalEvidence(
           errors
         );
         assertString(entry, "container_ref", `${pathLabel}.containers[${index}]`, errors);
-        if (!isRecord(entry.items)) {
-          errors.push(`${pathLabel}.containers[${index}].items must be an object`);
-        }
+        validateInventoryCounts(
+          entry.items,
+          `${pathLabel}.containers[${index}].items`,
+          errors
+        );
         assertRootSafeRelativeRef(
           entry.evidence_ref,
           `${pathLabel}.containers[${index}].evidence_ref`,
@@ -1369,7 +1450,7 @@ export function loadGoalContinuityArtifactBagFromFile(
   if (isUriLikeRef(relativeRef)) {
     throw new Error(`Invalid GoalContinuityArtifactBag ref: URI refs are rejected ('${relativeRef}')`);
   }
-  const resolved = resolveRootSafeArtifactRef(rootDir, relativeRef);
+  const resolved = resolveRootSafeArtifactRefWithoutSymlinks(rootDir, relativeRef);
   if (!resolved.ok) {
     throw new Error(`Invalid GoalContinuityArtifactBag ref: ${resolved.reason}`);
   }
@@ -1389,7 +1470,7 @@ export function resolveGoalContinuityArtifactPath(
   if (isUriLikeRef(relativeRef)) {
     throw new Error(`URI refs are rejected ('${relativeRef}')`);
   }
-  const resolved = resolveRootSafeArtifactRef(rootDir, relativeRef);
+  const resolved = resolveRootSafeArtifactRefWithoutSymlinks(rootDir, relativeRef);
   if (!resolved.ok) {
     throw new Error(resolved.reason);
   }

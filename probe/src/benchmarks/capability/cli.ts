@@ -184,6 +184,7 @@ async function main() {
             budget_status_path: result.budget_status_path,
             interpretation_status: result.normalized_report.interpretation_status,
             runtime_status: result.normalized_report.runtime_status,
+            budget_stopped: result.budget_status.budget_stopped,
             budget_exhausted: result.budget_status.budget_exhausted,
             provider_free: result.declaration.provider_free
           }))

@@ -83,6 +83,17 @@ test("evaluateBudgetExhaustion stops on computed estimated_cost without inventin
   assert.ok(result.exhausted_dimensions.includes("estimated_cost"));
 });
 
+test("budget status distinguishes a stop from target-miss exhaustion", () => {
+  const result = evaluateBudgetExhaustion({
+    declared: { ...baseDeclared, max_wall_time_ms: 100 },
+    observed: { cycles: 1, runtime_actions: 1, wall_time_ms: 100 },
+    targetPassed: true
+  });
+  assert.equal(result.budget_stopped, true);
+  assert.equal(result.budget_exhausted, false);
+  assert.ok(result.exhausted_dimensions.includes("wall_time"));
+});
+
 test("evaluateCaseBudgetCeilings stops before next work when ceilings are already met", () => {
   const check = evaluateCaseBudgetCeilings({
     declared: { ...baseDeclared, max_provider_requests: 2, max_total_tokens: 10 },
@@ -145,6 +156,7 @@ test("capability runner stops on wall-time with deterministic delayed fake", asy
 
   assert.ok(delayEntered >= 1);
   assert.equal(continuedAfterAbort, false);
+  assert.equal(result.budget_status.budget_stopped, true);
   assert.equal(result.budget_status.budget_exhausted, true);
   assert.ok(result.budget_status.exhausted_dimensions.includes("wall_time"));
   assert.ok((result.budget_status.observed.wall_time_ms ?? 0) >= 40);
@@ -163,6 +175,41 @@ test("capability runner stops on wall-time with deterministic delayed fake", asy
   assert.ok(await fs.stat(result.declaration_path));
   assert.ok(await fs.stat(result.raw_report_path));
   assert.ok(await fs.stat(result.normalized_report_path));
+});
+
+test("capability wall time includes time before the social-cycle work loop", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-budget-setup-time-"));
+  let clockReads = 0;
+  let workStarted = false;
+
+  const result = await runCapabilityCase({
+    manifestPath,
+    caseId: "collect_logs",
+    outDir,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    connectToWorld: false,
+    cycles: 2,
+    maxActionsPerCycle: 1,
+    actorId: "npc_b",
+    repoRoot,
+    implementationRevision: null,
+    budgetOverrides: {
+      max_wall_time_ms: 40
+    },
+    testHooks: {
+      nowMs: () => (clockReads++ === 0 ? 0 : 100),
+      beforeProviderOrRuntimeAction: async () => {
+        workStarted = true;
+      }
+    }
+  });
+
+  assert.equal(workStarted, false);
+  assert.equal(result.budget_status.budget_stopped, true);
+  assert.equal(result.budget_status.budget_exhausted, true);
+  assert.ok(result.budget_status.exhausted_dimensions.includes("wall_time"));
+  assert.equal(result.budget_status.observed.wall_time_ms, 100);
 });
 
 test("capability runner stops on provider-request ceiling before next request", async () => {
@@ -196,6 +243,7 @@ test("capability runner stops on provider-request ceiling before next request", 
   });
 
   assert.equal(actionsStarted, 0);
+  assert.equal(result.budget_status.budget_stopped, true);
   assert.equal(result.budget_status.budget_exhausted, true);
   assert.ok(result.budget_status.exhausted_dimensions.includes("provider_requests"));
   assert.equal(result.budget_status.observed.provider_requests, 2);
@@ -241,6 +289,7 @@ test("capability runner stops on token ceiling from saved/normalized usage", asy
   });
 
   assert.equal(result.budget_status.budget_exhausted, true);
+  assert.equal(result.budget_status.budget_stopped, true);
   assert.ok(result.budget_status.exhausted_dimensions.includes("total_tokens"));
   assert.equal(result.budget_status.observed.total_tokens, 100);
   assert.equal(result.normalized_report.budgets.observed.total_tokens, 100);
@@ -281,6 +330,7 @@ test("capability runner marks estimated_cost unverifiable when cost cannot be co
   });
 
   assert.equal(result.budget_status.budget_exhausted, true);
+  assert.equal(result.budget_status.budget_stopped, true);
   assert.equal(result.budget_status.cost_unverifiable, true);
   assert.ok(result.budget_status.exhausted_dimensions.includes("estimated_cost"));
   assert.equal(result.normalized_report.interpretation_status, "unverifiable");

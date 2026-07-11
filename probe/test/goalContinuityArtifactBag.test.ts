@@ -142,6 +142,95 @@ test("rejects invalid physical_evidence subtree", () => {
   );
 });
 
+test("rejects malformed physical evidence values before predicate evaluation", () => {
+  const available = {
+    inventory: false,
+    held_item: false,
+    position: false,
+    blocks: false,
+    containers: false
+  };
+  const evidenced = (value: unknown) => ({
+    value,
+    evidence_refs: ["evidence/runtime.json"],
+    origin: "run"
+  });
+  const cases: Array<{ name: string; field: Record<string, unknown>; pattern: RegExp }> = [
+    {
+      name: "fractional inventory count",
+      field: { inventory: evidenced({ oak_log: 1.5 }) },
+      pattern: /inventory\.value\.oak_log must be a non-negative integer/
+    },
+    {
+      name: "invalid held item count",
+      field: { held_item: evidenced({ name: "oak_log", count: 0 }) },
+      pattern: /held_item\.value\.count must be a positive integer/
+    },
+    {
+      name: "non-finite actor coordinate",
+      field: { actor_position: evidenced({ x: 0, y: 64, z: "near" }) },
+      pattern: /actor_position\.value\.z must be a finite number/
+    },
+    {
+      name: "incomplete known-block position",
+      field: {
+        known_blocks: [
+          {
+            block: "crafting_table",
+            position: { x: 0, y: 64 },
+            evidence_ref: "evidence/block.json",
+            origin: "run"
+          }
+        ]
+      },
+      pattern: /known_blocks\[0\]\.position\.z must be a finite number/
+    },
+    {
+      name: "invalid named position",
+      field: { named_positions: { worksite: evidenced({ x: 0, y: null, z: 0 }) } },
+      pattern: /named_positions\.worksite\.value\.y must be a finite number/
+    },
+    {
+      name: "negative container count",
+      field: {
+        containers: [
+          {
+            container_ref: "shared",
+            items: { oak_log: -1 },
+            evidence_ref: "evidence/chest.json",
+            origin: "run"
+          }
+        ]
+      },
+      pattern: /containers\[0\]\.items\.oak_log must be a non-negative integer/
+    }
+  ];
+
+  for (const entry of cases) {
+    const result = validateGoalContinuityArtifactBag({
+      schema: "goal-continuity-artifact-bag/v1",
+      actor_id: "npc_a",
+      run_id: `invalid-${entry.name}`,
+      required_refs: [],
+      plan_bead_operation_results: [],
+      active_episodes: [],
+      ready_fronts: [],
+      plan_bead_snapshots: [],
+      memory_notes: [],
+      physical_evidence: {
+        schema: "capability-evidence-bag/v1",
+        actor_id: "npc_a",
+        available,
+        ...entry.field
+      }
+    });
+    assert.equal(result.ok, false, entry.name);
+    if (!result.ok) {
+      assert.match(result.errors.join("; "), entry.pattern, entry.name);
+    }
+  }
+});
+
 test("rejects present true without artifact", () => {
   expectRejection("present-true-missing-artifact.json", /artifact is required when present is true/);
 });
@@ -218,6 +307,40 @@ test("loadGoalContinuityArtifactBagFromFile rejects paths outside declared root"
     () => loadGoalContinuityArtifactBagFromFile(fixturesDir, "file:///tmp/x.json"),
     /URI/
   );
+});
+
+test("continuity artifact I/O rejects symlinks below the declared root", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "goal-continuity-symlink-root-"));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "goal-continuity-symlink-outside-"));
+  try {
+    fs.copyFileSync(
+      path.join(fixturesDir, "lifecycle-create.json"),
+      path.join(outside, "bag.json")
+    );
+    fs.symlinkSync(outside, path.join(root, "linked"), "dir");
+
+    assert.throws(
+      () => loadGoalContinuityArtifactBagFromFile(root, "linked/bag.json"),
+      /symbolic link/i
+    );
+    assert.throws(
+      () =>
+        writeGoalContinuityRestartObservation(root, "linked/restart.json", {
+          schema: "goal-continuity-restart-observation/v1",
+          status: "not_observed",
+          before_ref: "checkpoints/before.json",
+          after_ref: "checkpoints/after.json",
+          before_open_bead_ids: [],
+          after_open_bead_ids: [],
+          source_artifact_refs: []
+        }),
+      /symbolic link/i
+    );
+    assert.equal(fs.existsSync(path.join(outside, "restart.json")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
 });
 
 test("assertGoalContinuityArtifactBag accepts valid create fixture", () => {

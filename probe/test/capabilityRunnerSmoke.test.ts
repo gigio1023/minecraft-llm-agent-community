@@ -107,6 +107,7 @@ test("capability runner provider-free offline smoke emits declaration, raw, norm
   assert.equal(budgetStatus.schema, "capability-budget-status/v1");
   assert.equal(budgetStatus.target_passed, false);
   // Smoke uses cycle override below declared budgets, so exhaustion is false.
+  assert.equal(budgetStatus.budget_stopped, false);
   assert.equal(budgetStatus.budget_exhausted, false);
   assert.ok(
     Number.isFinite(budgetStatus.observed.wall_time_ms) &&
@@ -127,6 +128,7 @@ test("capability runner provider-free offline smoke emits declaration, raw, norm
   assert.equal(suiteIndex.runs.length, 1);
   assert.equal(suiteIndex.runs[0]?.case_id, "collect_logs");
   assert.equal(suiteIndex.runs[0]?.provider_free, true);
+  assert.equal(suiteIndex.runs[0]?.budget_stopped, false);
   assert.equal(suiteIndex.runs[0]?.capability_run_id, declaration.capability_run_id);
   assert.ok(suiteIndex.runs[0]?.declaration_ref.includes("declaration.json"));
   assert.ok(suiteIndex.runs[0]?.normalized_report_ref.includes("normalized-report.json"));

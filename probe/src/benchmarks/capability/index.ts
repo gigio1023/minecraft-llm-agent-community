@@ -55,6 +55,7 @@ export {
 export {
   isRootSafeRelativeRef,
   resolveRootSafeArtifactRef,
+  resolveRootSafeArtifactRefWithoutSymlinks,
   resolveUnderDeclaredRoots
 } from "./artifactRefs.js";
 export type { RootSafeResolveResult } from "./artifactRefs.js";

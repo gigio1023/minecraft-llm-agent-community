@@ -433,6 +433,8 @@ export type SocialCycleRunOptions = {
   caseBudgets?: SocialCycleCaseBudgets;
   /** Optional clock for deterministic wall-time tests. */
   nowMs?: () => number;
+  /** Case start captured by an outer wrapper before server/world preparation. */
+  caseStartedAtMs?: number;
   /**
    * Optional usage observer. Default reads run-scoped ledger totals.
    * estimated_cost is omitted unless a real normalized cost source exists.
@@ -1174,7 +1176,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   let anyMeaningfulProgress = false;
   let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
   const nowMs = input.nowMs ?? (() => Date.now());
-  const caseBudgetStartedAtMs = nowMs();
+  const caseBudgetStartedAtMs = input.caseStartedAtMs ?? nowMs();
   const caseBudgetController = new AbortController();
   const onExternalAbort = () => {
     if (!caseBudgetController.signal.aborted) {
@@ -1188,11 +1190,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   }
   let wallDeadlineTimer: ReturnType<typeof setTimeout> | undefined;
   if (input.caseBudgets?.max_wall_time_ms !== undefined) {
-    wallDeadlineTimer = setTimeout(() => {
-      if (!caseBudgetController.signal.aborted) {
-        caseBudgetController.abort();
-      }
-    }, input.caseBudgets.max_wall_time_ms);
+    const remainingWallTimeMs = Math.max(
+      0,
+      input.caseBudgets.max_wall_time_ms - (nowMs() - caseBudgetStartedAtMs)
+    );
+    if (remainingWallTimeMs === 0) {
+      caseBudgetController.abort();
+    } else {
+      wallDeadlineTimer = setTimeout(() => {
+        if (!caseBudgetController.signal.aborted) {
+          caseBudgetController.abort();
+        }
+      }, remainingWallTimeMs);
+    }
   }
   const observeUsage =
     input.observeCaseUsage ??
