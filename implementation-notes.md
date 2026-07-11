@@ -58,4 +58,4 @@ via the adaptation in the active implementation plan.
 | Hash | Subject |
 | --- | --- |
 | `d852be2e` | probe: stop capability runs on target evidence |
-| (this commit) | probe: stop capability runs after each action |
+| `962440af` | probe: stop capability runs after each action |

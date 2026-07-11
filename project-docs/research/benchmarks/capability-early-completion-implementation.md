@@ -5,7 +5,7 @@ Search token: `CAPABILITY_EARLY_COMPLETION_IMPLEMENTATION_2026_07_12`.
 Branch: `codex/capability-gated-social-sandbox-v4`  
 Commits:
 - `d852be2e` — cycle-boundary early stop (narrow handoff)
-- follow-up — action-level early stop (repair-plan item 4 completion)
+- `962440af` — action-level early stop (repair-plan item 4 completion)
 
 Date: 2026-07-12  
 Authority: repair-plan item 4 in

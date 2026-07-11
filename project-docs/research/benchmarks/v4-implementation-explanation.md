@@ -75,7 +75,7 @@ via `evidence_kind_seen` was **replaced**, not papered over (`ZERO_COST_IMPLEMEN
 | `63eb47df` | Review repair — include setup time, distinguish stop/exhaustion, validate physical values, reject symlink traversal |
 | `b7dda428` | Live-validation repair — exact goal input, explicit table placement, diverse world scan |
 | `d852be2e` | Live-validation repair — stop capability runs on target evidence (cycle-boundary early completion) |
-| (follow-up) | Live-validation repair — action-level early completion (after each completed action) |
+| `962440af` | Live-validation repair — action-level early completion (after each completed action) |
 
 Prior on branch: `26c1f93f` (initial A1), `2c7f2193` (handoff rewrite).
 
