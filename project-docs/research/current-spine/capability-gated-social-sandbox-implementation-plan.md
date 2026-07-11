@@ -475,25 +475,37 @@ Evidence:
 
 ### Slice A3 — Capability Runner Wrapper
 
+Status: **accepted** (2026-07-11). Provider-free offline smoke verified; no live
+provider HTTP.
+
 Deliver:
 
 - one Bun CLI accepting `--manifest`, `--case`, provider/model, repeat/seed, and
   output directory;
 - wrapper around existing social-cycle and world-scenario seams;
 - case declaration artifact written before execution;
-- per-run report plus suite index.
+- per-run report plus suite index;
+- `--benchmark-task` rejected on this path.
 
 Acceptance:
 
-- the CLI does not translate the manifest into action suggestions;
-- `--benchmark-task` may remain an ad-hoc path but cannot emit a V4 capability
-  report without a manifest;
-- budget exhaustion produces an explicit status and artifact;
-- deterministic/provider-free calibration makes zero live provider calls;
-- a one-command smoke emits declaration, raw report, normalized report, and
+- [x] the CLI does not translate the manifest into action suggestions;
+- [x] `--benchmark-task` cannot emit a V4 capability report without a manifest;
+- [x] budget exhaustion produces an explicit status and artifact;
+- [x] deterministic/provider-free calibration makes zero live provider calls;
+- [x] a one-command smoke emits declaration, raw report, normalized report, and
   suite index.
 
+Evidence:
+
+- modules: `probe/src/benchmarks/capability/{cli,runner}.ts`
+- script: `probe:capability`
+- tests: `probe/test/capabilityRunnerSmoke.test.ts`
+
 ### Slice A4 — Basic Capability Suite
+
+Status: **accepted** (2026-07-11). Suite version `1.1.0` with 8 cases;
+provider-free loader validation only.
 
 Deliver 5-8 cases covering:
 
@@ -508,14 +520,22 @@ Deliver 5-8 cases covering:
 
 Acceptance:
 
-- each case declares natural/fixture status and required capabilities;
-- target and milestone evidence are case-specific and machine-checkable;
-- deterministic action-skill calibration is reported separately from Actor Turn
+- [x] each case declares natural/fixture status and required capabilities;
+- [x] target and milestone evidence are case-specific and machine-checkable;
+- [x] deterministic action-skill calibration is reported separately from Actor Turn
   goal pursuit;
-- the suite can compare pass/partial/failure shape without a gold trajectory;
-- no provider-backed claim is made until quota preflight passes.
+- [x] the suite can compare pass/partial/failure shape without a gold trajectory;
+- [x] no provider-backed claim is made until quota preflight passes.
+
+Evidence:
+
+- suite: `probe/benchmarks/capability/individual-capability-v1.json` (`1.1.0`)
+- tests: `probe/test/individualCapabilityManifest.test.ts`
 
 ### Slice A5 — First Provider-Backed Capability Batch
+
+Status: **blocked** pending exact `(provider_id, model)`, whole-run estimate,
+quota preflight, and explicit user approval.
 
 Before execution:
 

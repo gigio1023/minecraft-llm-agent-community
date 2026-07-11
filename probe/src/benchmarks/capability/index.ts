@@ -63,3 +63,30 @@ export type { AdaptSocialCycleEvidenceBagInput } from "./evidenceBagAdapter.js";
 
 export { buildIndividualCapabilityReport } from "./report.js";
 export type { BuildIndividualCapabilityReportInput } from "./report.js";
+
+export {
+  CAPABILITY_BUDGET_STATUS_SCHEMA,
+  CAPABILITY_CASE_DECLARATION_SCHEMA,
+  CAPABILITY_SUITE_INDEX_SCHEMA,
+  CapabilityRunnerError,
+  countRuntimeActions,
+  deriveMaxActionsPerCycle,
+  evaluateBudgetExhaustion,
+  hashCapabilityManifest,
+  isProviderFree,
+  readImplementationRevision,
+  resolveCaseSeed,
+  resolveDefaultModel,
+  runCapabilityCase,
+  runCapabilityCaseRepeats,
+  selectCapabilityCase,
+  stableJsonStringify
+} from "./runner.js";
+export type {
+  CapabilityBudgetStatusV1,
+  CapabilityCaseDeclarationV1,
+  CapabilitySuiteIndexRunV1,
+  CapabilitySuiteIndexV1,
+  RunCapabilityCaseInput,
+  RunCapabilityCaseResult
+} from "./runner.js";
