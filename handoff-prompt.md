@@ -6,6 +6,11 @@ You are the implementation successor for the V4 capability-gated Minecraft
 social sandbox. Continue from the verified plan state below without repeating
 the completed direction interview, V3 review, or documentation rewrite.
 
+Work on `codex/capability-gated-social-sandbox-v4`. If the checkout is on a
+different branch, preserve any unexpected changes and switch to this branch
+before editing. Do not commit V4 implementation directly to `main` unless the
+user explicitly changes the delivery branch.
+
 Read the named authority and live code before editing. Keep changes bounded to
 the immediate vertical slice, preserve runtime-owned Minecraft truth, and verify
 the slice before reporting it. Proceed with reversible in-scope work without
@@ -112,10 +117,14 @@ evidence, while the actor chooses its own actions.
 
 - Status: implementation not started; plans and routing are complete.
 - Workspace: `/Users/gigio/git/minecraft-llm-agent-community`
-- Repository and branch: `minecraft-llm-agent-community`, `main`
+- Repository and branch: `minecraft-llm-agent-community`,
+  `codex/capability-gated-social-sandbox-v4`
+- Branch point: commit `d5d29cec` (`docs: add V4 capability benchmark handoff
+  prompt`), containing the V4 direction, implementation plan, and original
+  handoff.
 - Verified plan baseline: commit `fe21fd9b`
 - V4 direction commit: `6eef8978`
-- Worktree at plan handoff: clean before this handoff file was created.
+- Worktree at branch creation: clean.
 - Runtime code changed by the two plan commits: none.
 - Live provider calls made for this direction change: none.
 - Last verified: 2026-07-11 (`Asia/Seoul`), after Docusaurus build and
@@ -206,12 +215,21 @@ over this snapshot. Do not reset or discard unexpected user changes.
 1. Run:
 
    ```bash
-   git status --short
+   git status -sb
+   git branch --show-current
    git log -3 --oneline --decorate
    ```
 
-   Confirm the branch is `main`, the V4 plan commits are present, and preserve
-   any unexpected worktree changes.
+   Confirm the branch is `codex/capability-gated-social-sandbox-v4`, the V4
+   plan commits are present, and preserve any unexpected worktree changes. If
+   another branch is checked out and the worktree is clean, run:
+
+   ```bash
+   git switch codex/capability-gated-social-sandbox-v4
+   ```
+
+   If the worktree is not clean, inspect and preserve those changes before
+   switching; do not reset, discard, or hide them in an automatic stash.
 
 2. Read, in order:
 

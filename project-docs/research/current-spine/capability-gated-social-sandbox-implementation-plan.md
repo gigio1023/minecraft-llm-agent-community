@@ -10,6 +10,11 @@ Search token: `CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN`. Also:
 
 Recorded: 2026-07-11 (`Asia/Seoul`).
 
+Implementation branch: `codex/capability-gated-social-sandbox-v4`, created
+from commit `d5d29cec`. Continue V4 implementation and its plan-status updates
+on this branch unless the user explicitly changes the delivery branch. Do not
+resume this plan by committing directly to `main`.
+
 Authority: subordinate to `SPEC.md`, `AGENTS.md`, and the V4 central plan. If
 this implementation plan and the central plan disagree, the central plan wins
 and this file must be reconciled in the same change that implements the new
