@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  assertGoalContinuityArtifactBag,
   assertGoalContinuityRestartObservation,
   evaluateGoalContinuity,
   loadGoalContinuityArtifactBagFromFile,
@@ -210,12 +211,13 @@ test("memory prose alone never passes physical target", () => {
   });
   // Explicitly omit physical evidence; only memory prose remains.
   delete bag.physical_evidence;
+  const validatedBag = assertGoalContinuityArtifactBag(bag);
 
   const report = evaluateGoalContinuity({
     suite_id: "goal-continuity-v1",
     suite_version: "1.1.0",
     case: continuityCase,
-    artifact_bag: bag
+    artifact_bag: validatedBag
   });
 
   assert.equal(report.physical.target?.status, "unknown");
@@ -245,7 +247,7 @@ test("restart-required continuity is unknown without distinct before and after r
     suite_id: "goal-continuity-v1",
     suite_version: "1.1.0",
     case: continuityCase,
-    artifact_bag: bag
+    artifact_bag: assertGoalContinuityArtifactBag(bag)
   });
   assert.equal(withoutRestart.continuity.open_work_survival.status, "unknown");
   assert.notEqual(withoutRestart.continuity.interpretation_status, "passed");
@@ -259,11 +261,12 @@ test("restart-required continuity is unknown without distinct before and after r
     after_open_bead_ids: ["bead-resume-1"],
     source_artifact_refs: ["runtime/restart-observation.json"]
   });
+  const withRestartBag = assertGoalContinuityArtifactBag(bag);
   const withRestart = evaluateGoalContinuity({
     suite_id: "goal-continuity-v1",
     suite_version: "1.1.0",
     case: continuityCase,
-    artifact_bag: bag
+    artifact_bag: withRestartBag
   });
   assert.equal(withRestart.continuity.open_work_survival.status, "retained");
   assert.equal(withRestart.continuity.interpretation_status, "passed");
@@ -283,11 +286,12 @@ test("checkpoint rejection prose alone does not create a version conflict", () =
     delete referenced.artifact.operation.expected_checkpoint_version;
   }
 
+  const validatedBag = assertGoalContinuityArtifactBag(bag);
   const report = evaluateGoalContinuity({
     suite_id: "goal-continuity-v1",
     suite_version: "1.1.0",
     case: baseCase(["update"]),
-    artifact_bag: bag
+    artifact_bag: validatedBag
   });
   assert.equal(report.continuity.checkpoint_conflicts.length, 0);
 });

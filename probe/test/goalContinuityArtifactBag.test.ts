@@ -131,6 +131,17 @@ test("rejects duplicate refs across incompatible collections", () => {
   expectRejection("duplicate-cross-collection.json", /incompatible collections/);
 });
 
+test("rejects duplicate refs within the same collection", () => {
+  expectRejection("duplicate-same-collection.json", /duplicate ref/);
+});
+
+test("rejects invalid physical_evidence subtree", () => {
+  expectRejection(
+    "invalid-physical-evidence.json",
+    /physical_evidence\.inventory\.origin must be one of/
+  );
+});
+
 test("rejects present true without artifact", () => {
   expectRejection("present-true-missing-artifact.json", /artifact is required when present is true/);
 });
@@ -216,6 +227,24 @@ test("assertGoalContinuityArtifactBag accepts valid create fixture", () => {
   const bag = assertGoalContinuityArtifactBag(raw);
   assert.equal(bag.actor_id, "npc_a");
   assert.equal(bag.plan_bead_operation_results[0]?.present, true);
+});
+
+test("evaluateGoalContinuity rejects raw invalid artifact bags at entry", () => {
+  const invalid = readNegative("wrong-schema.json");
+  assert.throws(
+    () =>
+      evaluateGoalContinuity({
+        suite_id: "goal-continuity-v1",
+        suite_version: "1.1.0",
+        case: selectGoalContinuityCase(
+          loadGoalContinuityManifestFromFile(suitePath),
+          "interrupt_and_resume_open_work"
+        ),
+        // Intentionally bypass typed loaders so entry assert is the gate.
+        artifact_bag: invalid as never
+      }),
+    /Invalid GoalContinuityArtifactBag/
+  );
 });
 
 test("restart observation validator and writer round-trip under declared root", () => {

@@ -14,6 +14,7 @@ import {
   type CapabilityMilestoneReportV1,
   type CapabilityPredicateResultV1
 } from "../capability/index.js";
+import { assertGoalContinuityArtifactBag } from "./loader.js";
 import type {
   GoalContinuityActiveEpisodeArtifactV1,
   GoalContinuityArtifactBagV1,
@@ -646,7 +647,7 @@ function collectFailureClasses(input: {
 export function evaluateGoalContinuity(
   input: EvaluateGoalContinuityInput
 ): GoalContinuityReportV1 {
-  const bag = input.artifact_bag;
+  const bag = assertGoalContinuityArtifactBag(input.artifact_bag);
   const missingRefs = collectMissingRefs(bag);
 
   const operationResults = presentArtifacts<GoalContinuityPlanBeadOperationResultArtifactV1>(
