@@ -19,11 +19,11 @@ research program or live behavior path is complete.
 | --- | --- | --- |
 | A1R | accepted | Evidence-rule repair of A1 |
 | A2 | accepted | Normalized capability report adapter |
-| A3 | accepted | Capability CLI + full case budget stopping (wall/request/token/cost) |
+| A3 | accepted provider-free | Capability CLI + case limit checks; live provider request cancellation remains untested |
 | A4 | accepted | Basic suite 1.1.0 → later 1.2.0 with B1 |
 | A5 | **blocked** | Needs exact provider/model + preflight + approval |
 | B1 | accepted | Multi-hop furnace case (manifest-owned) |
-| B2 | accepted | Offline evaluator + strict artifact-bag loader + restart writer |
+| B2 | accepted provider-free | Offline evaluator + deep artifact-bag validation + restart writer |
 | B3 | declarations only | Live runs blocked pending approval |
 | C1 | declaration only | Interdependent social scenario format; all checked-in capability requirements are gaps |
 | C2 | declaration only | Economic, cooperative, and quest scenario files; no live session |
@@ -70,6 +70,7 @@ via `evidence_kind_seen` was **replaced**, not papered over (`ZERO_COST_IMPLEMEN
 | `75a68ec9` | A3 — case budget stopping |
 | `83b26f85` | B2 — assert bags at evaluate entry |
 | `c4266841` | A3 — budget-stop labeling + always observe wall time |
+| `63eb47df` | Review repair — include setup time, distinguish stop/exhaustion, validate physical values, reject symlink traversal |
 
 Prior on branch: `26c1f93f` (initial A1), `2c7f2193` (handoff rewrite).
 
@@ -159,17 +160,23 @@ still overstate what had been observed. The code now handles them as follows:
   the actual distinctions;
 - capability runner debug overrides cannot exceed the declared total action
   budget, and empty cycles no longer count as actions;
-- A3 now stops on wall-time, provider-request, token, and estimated-cost
-  ceilings with AbortSignal + await; budget stops label `timeout` /
-  `budget_exhausted` (or `unverifiable` when cost cannot be computed);
-- B2 loads and asserts `goal-continuity-artifact-bag/v1` before scoring;
-  restart-observation writer is offline-only and does not prove live restart
+- A3 measures wall time from immediately after declaration, including server
+  and world preparation. `budget_stopped` is separate from target-miss
+  `budget_exhausted`; provider-request, token, and estimated-cost checks happen
+  before further work;
+- provider-free cancellation is tested with signal-aware delayed work. Provider
+  SDK requests do not yet receive the case signal, so an A5 live smoke must test
+  expiry during a real request before claiming mid-request cancellation;
+- B2 loads and asserts `goal-continuity-artifact-bag/v1` before scoring. It now
+  validates physical value shapes deeply and rejects symbolic-link traversal
+  for bag reads and restart-observation writes;
+- the restart-observation writer is offline-only and does not prove live restart
   survival.
 
 ## 7. Validation evidence
 
 ```bash
-cd probe && bun test          # 725 pass after A3/B2 successor repairs
+cd probe && bun test          # 729 pass after Codex review repairs
 cd probe && bun run typecheck
 cd docs && npm run build
 git diff --check

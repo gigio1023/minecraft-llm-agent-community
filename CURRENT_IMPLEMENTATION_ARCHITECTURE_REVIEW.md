@@ -408,9 +408,10 @@ evidence, and persistence stay traceable despite that size.
 ## Current Implementation Risks
 
 1. The runtime does not yet expose the active program as one integrated live
-   path. Capability A3 budget stopping and B2 bag loading are provider-free
-   complete, but social/observation/phenomenon files are not connected to a
-   live V4 multi-actor session, and A5/B3 live still need provider approval.
+   path. A3 limit handling and B2 bag loading pass provider-free tests, but a
+   case signal still does not cancel a provider SDK request already in flight.
+   Social/observation/phenomenon files are not connected to a live V4
+   multi-actor session, and A5/B3 live still need provider approval.
 2. Response-window semantics are the highest-risk logic. A window that closes on
    immediate post-action observation recreates the old `no_observable_response`
    vacuity and makes social-response labels uninformative.

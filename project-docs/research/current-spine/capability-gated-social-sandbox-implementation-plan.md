@@ -506,12 +506,15 @@ Evidence:
 ### Step A3 — Capability Runner Wrapper
 
 Status: **accepted** (provider-free, 2026-07-11; repaired labeling in
-`c4266841`). Manifest-specific cycle, action, wall-time, provider-request,
-token, and estimated-cost ceilings stop execution through AbortSignal + await
-(no early Promise.race return). Cost ceilings without normalized USD mark
-`cost_unverifiable` instead of inventing prices. Budget stops label
-`runtime_status: "timeout"` and `failure_class: "budget_exhausted"` (or
-`unverifiable` for cost). A5 remains blocked on provider approval only.
+`c4266841`, reviewed again in `63eb47df`). Manifest-specific cycle, action,
+wall-time, provider-request, token, and estimated-cost ceilings are checked
+before further work. Wall time begins immediately after the case declaration,
+so server and world preparation are included. `budget_stopped` records that a
+limit ended or prevented work; `budget_exhausted` additionally means the target
+had not passed. Cost limits without normalized USD mark `cost_unverifiable`
+instead of inventing prices. A5 remains blocked on provider approval. Live A5
+must also test SDK-specific cancellation because provider HTTP requests are not
+yet cancelled in flight by the case signal.
 
 Deliver:
 
@@ -622,12 +625,14 @@ Acceptance:
 ### Step B2 — Goal-Continuity Formats And Offline Evaluator
 
 Status: **accepted** (provider-free offline, 2026-07-11; bag assert at evaluate
-entry in `83b26f85`). Strict recursive loader validates
+entry in `83b26f85`, reviewed again in `63eb47df`). Strict recursive loader validates
 `goal-continuity-artifact-bag/v1` from a declared root; `evaluateGoalContinuity`
 asserts bags before scoring. Restart-observation writer records typed offline
 observations only — live process-restart survival is still unproven until B3
-live evidence exists. Restart-required cases remain `unverifiable` without
-distinct before/after durable reload refs and overlapping open work ids.
+live evidence exists. The loader rejects malformed physical evidence values and
+symbolic-link traversal below the declared root. Restart-required cases remain
+`unverifiable` without distinct before/after durable reload refs and overlapping
+open work ids.
 
 Deliver:
 
@@ -941,10 +946,12 @@ because an older plan used a name.
 ## 12. Immediate Next Work
 
 Provider-free A3 budget stopping and B2 saved-evidence loading are accepted.
-Remaining gates are live-run decisions:
+Remaining work requires live-run decisions:
 
 1. A5 needs exact `(provider_id, model)`, whole-run estimate, quota preflight,
-   and explicit user approval.
+   and explicit user approval. Its first live smoke must verify request counting
+   and show what happens when wall time expires during an SDK request; the
+   provider-free tests do not establish mid-request cancellation.
 2. B3 live continuity (including real process restart / durable reload) needs
    the same provider gate; offline declarations and bag loading are not live
    proof.

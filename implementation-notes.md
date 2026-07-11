@@ -1,13 +1,14 @@
 # V4 Implementation Notes
 
 Branch: `codex/capability-gated-social-sandbox-v4`
-Handoff: `handoff-prompt.md` (successor after review `620955d8`)
+Handoff: `handoff-prompt.md` (successor after review `63eb47df`)
 
 ## Current focus
 
 Provider-free Work 1 (A3 budget stopping) and Work 2 (B2 artifact-bag loader)
-are landed and adversarially repaired. Next gate is user provider approval for
-A5 / B3 live. D2 still needs a real D1 selection (fixture ineligible).
+are landed and reviewed again in `63eb47df`. Next work needs user provider
+approval for A5 / B3 live. D2 still needs a real D1 selection (fixture
+ineligible).
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -29,7 +30,7 @@ via the adaptation in the active implementation plan.
 
 ## Validation snapshot
 
-- `cd probe && bun test` → 725 pass
+- `cd probe && bun test` → 729 pass
 - `bun run typecheck` → pass
 - `cd docs && npm run build` → pass
 - `git diff --check` → pass
@@ -42,6 +43,7 @@ via the adaptation in the active implementation plan.
 | `75a68ec9` | A3 case budget stopping |
 | `83b26f85` | B2 assert bags at evaluate entry |
 | `c4266841` | A3 budget-stop labeling + always observe wall time |
+| `63eb47df` | A3/B2 review repair: setup time, stop status, physical values, symlinks |
 
 ## Deviations
 
@@ -73,6 +75,18 @@ what adversarial review said after first A3/B2 land
 -> repair commits `c4266841` and `83b26f85`; do not mark complete from first land
 -> revisit
 -> only if live provider cancel needs deeper HTTP abort than pre-planning check
+
+what the second completion summary said
+-> A3 and B2 were accepted after provider-free tests
+-> what review found
+-> A3 started wall time after server/world preparation and did not distinguish
+   any limit stop from target-miss exhaustion; B2 accepted malformed physical
+   values and followed in-root symlinks outside the declared root
+-> conservative choice
+-> repair the shared paths in `63eb47df`, add direct counterexamples, and keep
+   provider mid-request cancellation and live restart survival explicitly unproven
+-> revisit
+-> during the first approved A5/B3 live smokes
 
 ## Explanation doc
 
