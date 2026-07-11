@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   evaluateGoalContinuity,
   loadGoalContinuityManifestFromFile,
+  selectGoalContinuityCase,
   type GoalContinuityArtifactBagV1,
   type GoalContinuityCaseV1,
   type GoalContinuityLifecycleEventV1
@@ -16,6 +17,9 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const suitePath = path.join(here, "../benchmarks/continuity/goal-continuity-v1.json");
 const fixturesDir = path.join(here, "../benchmarks/continuity/fixtures");
+
+/** Offline fixtures assert oak_log inventory; use the interrupt case as the template. */
+const TEMPLATE_CASE_ID = "interrupt_and_resume_open_work";
 
 function readBag(name: string): GoalContinuityArtifactBagV1 {
   return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), "utf8")) as GoalContinuityArtifactBagV1;
@@ -26,7 +30,7 @@ function baseCase(
   overrides: Partial<GoalContinuityCaseV1> = {}
 ): GoalContinuityCaseV1 {
   const manifest = loadGoalContinuityManifestFromFile(suitePath);
-  const template = manifest.cases[0]!;
+  const template = selectGoalContinuityCase(manifest, TEMPLATE_CASE_ID);
   return {
     ...template,
     ...overrides,
@@ -49,7 +53,7 @@ function evaluateFixture(
   const continuityCase = baseCase(events, caseOverrides);
   return evaluateGoalContinuity({
     suite_id: "goal-continuity-v1",
-    suite_version: "1.0.0",
+    suite_version: "1.1.0",
     case: continuityCase,
     artifact_bag: bag
   });
@@ -208,7 +212,7 @@ test("memory prose alone never passes physical target", () => {
 
   const report = evaluateGoalContinuity({
     suite_id: "goal-continuity-v1",
-    suite_version: "1.0.0",
+    suite_version: "1.1.0",
     case: continuityCase,
     artifact_bag: bag
   });
