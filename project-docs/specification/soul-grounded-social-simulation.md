@@ -6,16 +6,17 @@ sidebar_position: 1
 
 This is the product-identity spec.
 
-The project is not "an LLM in Minecraft." It studies advisory social-material
-WAMs in Minecraft, with Soul-grounded social simulation as the motivating
-domain. The runtime should preserve raw world facts, evidence refs, memory, and
-Mineflayer affordances so actors and predictors can reason about what matters
-under ActorSoul and LifeGoal.
+The project is not "an LLM in Minecraft." It studies long-running social
+behavior among individually capable, persistent Minecraft actors. The runtime
+should preserve raw world facts, evidence refs, memory, and Mineflayer
+affordances so actors and later analyses can reason about what matters under
+ActorSoul and LifeGoal.
 
-Use [`Advisory Social-Material World Action Model`](advisory-social-material-wam.md)
+Use
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
 as the current research spine. This document explains why actor identity,
-LifeGoal continuity, memory, obligations, and relationships matter as inputs and
-outcomes for that predictor.
+LifeGoal continuity, memory, obligations, and relationships matter before and
+during interdependent social runs.
 
 ## Core Claim
 

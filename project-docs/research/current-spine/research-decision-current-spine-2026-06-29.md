@@ -1,6 +1,7 @@
 # Research Decision: Current Spine After WAM Reframe
 
-Status: active research decision record.
+Status: superseded research decision record. The active decision is V4 section
+15 in `central-plan-capability-gated-social-sandbox.md`.
 
 Search token: `CURRENT_RESEARCH_DECISION_2026_06_29`.
 

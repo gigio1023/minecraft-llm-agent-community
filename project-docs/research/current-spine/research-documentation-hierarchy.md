@@ -41,17 +41,25 @@ claims.
 
 Active:
 
-- `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
-  (V3 central plan; added 2026-07-10)
-- `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
-  (build order, seams, vertical slices, and acceptance gates for the central
-  plan; added 2026-07-10)
+- `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+  (V4 central plan; capability benchmarks, goal continuity, interdependent
+  sandbox, phenomenon discovery, controlled follow-up; added 2026-07-11)
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/no-regret-core-scenario-catalog.md` (scenario reference)
-- `project-docs/research/current-spine/society-observable-preflight.md` (deferred social-pattern branch gate)
+- `project-docs/research/current-spine/society-observable-preflight.md` (pattern-observation reference; V4 central plan governs)
+- `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+  (benchmark reference promoted as the starting point for the Stage 1 manifest;
+  V4 governs its active subset)
+
+Superseded on 2026-07-11, preserved as audit trail:
+
+- `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
+  (V3 central plan; retired because prediction and legibility were too narrow)
+- `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
+  (unexecuted V3 Session A/B work order)
 
 Superseded on 2026-07-10, preserved as audit trail:
 
@@ -73,10 +81,9 @@ Superseded on 2026-07-05, preserved as audit trail:
 Tier 1 owns the current sequence:
 
 ```text
-one preregistered lived-vs-told experiment (history families, delivery
-ladder, observer arms, statistics, stop-results built in) ->
-research-decision/v1 -> deferred branch promotion or preserved negative
-result
+individual Minecraft capability -> autonomous goal continuity ->
+interdependent social sandbox -> phenomenon records ->
+selected controlled follow-up experiment
 ```
 
 ## Tier 2 - Active Runtime Support
@@ -109,13 +116,17 @@ they are not active headline or implementation order.
 - `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
   - reference status: case library for possession, access, claims, obligations,
     refusal, repair, public affordances, and weak commons;
-  - not the active build order for the legibility experiment.
+  - V4 may select cases for interdependent scenarios, but the library is not an
+    implementation order by itself.
 - `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
   - reference status: provider-free fixture and report sanity check;
   - not evidence of open-world social behavior.
-- `project-docs/research/benchmarks/project-level-benchmark-plan.md`
-  - reference status: calibration task families and audit shape;
-  - not the current benchmark program.
+- historical or unused sections of
+  `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+  - reference status: V4 promotes only the dataset-free capability manifest,
+    target predicates, milestones, budgets, and normalized report mechanics;
+  - stale prediction-headline or provider-comparison framing does not override
+    V4.
 - `project-docs/research/reference-synthesis/research-direction-reference-synthesis.md`
   - reference status: prior-work synthesis and literature map;
   - not the current thesis.

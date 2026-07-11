@@ -1,8 +1,8 @@
 # Transition Row V1 Contract
 
-Status: active planning contract for the lived-vs-told experiment
-(`ACTIVE_CENTRAL_PLAN`; kept as load-bearing across the superseded
-no-regret and V2 co-actor legibility programs). This is not yet a runtime schema.
+Status: active planning contract for general V4 observation records
+(`ACTIVE_CENTRAL_PLAN`; kept as load-bearing across the superseded V3, V2, and
+no-regret programs). This is not yet a runtime schema.
 
 Search token: `TRANSITION_ROW_V1`.
 
@@ -10,8 +10,8 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 ## Purpose
 
-`transition-row/v1` is the first research data unit the active legibility
-experiment needs before it can score any predictor arm.
+`transition-row/v1` is a general observation unit for capability, continuity,
+social-sandbox, and later controlled-study artifacts.
 
 The row is an independent observation record:
 
@@ -277,12 +277,11 @@ post-action label evidence back into predictor context.
 
 A social-response window supports labels other than `unknown_social_response`
 only if it closes after every observed other active actor has completed at
-least one subsequent Actor Turn slot, or after a preregistered timeout.
+least one subsequent Actor Turn slot, or after a declared timeout.
 Windows closed on the immediate post-action observation are structurally
 vacuous and made every earlier control run close as `no_observable_response`.
-See `central-plan-lived-vs-told-social-history.md` (response windows are
-substrate hygiene and diagnostics under the V3 plan; the closure rule is
-unchanged).
+See `central-plan-capability-gated-social-sandbox.md`; response windows remain
+substrate hygiene and diagnostics under V4.
 
 ## What Not To Do
 

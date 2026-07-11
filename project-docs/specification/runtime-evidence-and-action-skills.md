@@ -11,10 +11,11 @@ interpret, and diagnose, but success belongs to checked runtime outcome
 evidence.
 
 For the active research direction, this is experiment hygiene rather than the
-headline. Runtime checks and evidence artifacts exist so advisory WAM
-predictions can be compared with observed deltas. Do not present verification
-itself as the differentiating contribution unless the project explicitly changes
-scope to model-based verifier research.
+headline. Runtime checks and evidence artifacts exist so individual capability,
+goal continuity, social behavior, and later controlled studies can be compared
+with observed deltas. Do not present verification itself as the differentiating
+contribution unless the project explicitly changes scope to model-based verifier
+research.
 
 ## Runtime Authority
 

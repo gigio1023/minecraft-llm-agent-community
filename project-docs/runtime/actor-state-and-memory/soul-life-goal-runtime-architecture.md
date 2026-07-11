@@ -18,13 +18,12 @@ runtime.
 
 Original proposal date: 2026-05-23.
 
-Research-direction update, 2026-06-18: this Soul/LifeGoal layer remains the
-actor frame for the active Advisory Social-Material WAM direction. The runtime
-may ask an advisory predictor what physical, material, and social consequences
-a candidate action is likely to produce, but the Actor Turn remains responsible
-for action selection and the Mineflayer runtime remains responsible for
-execution and outcome checks. Verification is expected runtime hygiene, not the
-research contribution.
+Research-direction update, 2026-07-11: this Soul/LifeGoal layer is the actor
+frame for the capability-gated social sandbox. It supports the goal-continuity
+gate and autonomous social goal formation. Actor Turn remains responsible for
+action selection and the Mineflayer runtime remains responsible for execution
+and outcome checks. Verification is expected runtime hygiene, not the research
+contribution.
 
 ## Core Decision
 

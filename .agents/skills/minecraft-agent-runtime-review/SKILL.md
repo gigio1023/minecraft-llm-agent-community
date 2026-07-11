@@ -44,7 +44,7 @@ the repo term **action skill**.
    failure modes, screenshot renderer artifacts, and product-objective gaps.
 7. When the run includes `transition-row/v1` or
    `legibility-session/v1`, read
-   `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`,
+   `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`,
    `project-docs/research/current-spine/transition-row-v1-contract.md`, and
    `project-docs/research/current-spine/transition-row-label-codebook.md`
    before making prediction, social-material, or lift claims. For historical
@@ -102,9 +102,11 @@ runs, generated Mineflayer action authoring, tool-call contract rejections,
 PlanBeads boundaries, screenshots, prismarine-viewer captures, or user comments
 about weird visible blocks/camera output.
 
-For legibility/lived-vs-told row batches, prefer the current-spine contracts
-over older social-cycle summary habits:
+For current capability, goal-continuity, and social-sandbox runs, read the V4
+central plan first. For historical legibility/lived-vs-told row batches, prefer
+the matching historical contracts over older social-cycle summary habits:
 
+- `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/seed-reset-record-v1-contract.md`

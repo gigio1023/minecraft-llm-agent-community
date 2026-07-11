@@ -11,7 +11,7 @@ that instead of pretending every verified action is research.
 - What Could Be Research Value
 - Required Separations
 - Baselines For This Project
-- The Active Legibility Substrate Constraint
+- The Active Capability And Social Substrate Constraint
 - Mineflayer Code Generation Pressure
 - LLM Minecraft Prior Pressure
 - Project Sid And Viral Society Claims
@@ -37,6 +37,8 @@ engineering hygiene.
 
 Candidate values:
 
+- A recurring social-material phenomenon that survives individual competence,
+  continuity, and scenario-script explanations.
 - A layer where plain LLM Minecraft prior is insufficient, but observed
   interaction history adds predictive signal.
 - A way to separate action consequence prediction from acting competence.
@@ -74,19 +76,22 @@ Use at least one relevant baseline in every research claim:
 - `dialogue-only`: if social interpretation could come only from chat.
 - `actor-success`: acting outcome without prediction, reported separately.
 
-## The Active Legibility Substrate Constraint
+## The Active Capability And Social Substrate Constraint
 
 Before a narrow active-plan preflight, the correct verdict for most ambitious
 claims is `substrate-first`.
 
-Do not select a headline until:
+Do not select a headline until the selected phenomenon has the relevant
+substrate:
 
-- 2-3 actors can run in a shared session with dense attributable interaction;
+- required individual Minecraft capabilities have current benchmark evidence;
+- long-horizon goal continuity is observable rather than inferred from prose;
+- actors can run in a shared session with dense attributable interaction;
 - `transition-row/v1` rows are independent of `expected_outcome`;
 - observed deltas are layer-tagged;
 - other-actor response windows are captured;
 - public-history exports pass leakage checks;
-- predictions join only by `row_id` after labels are locked;
+- optional predictions join only by `row_id` after labels are locked;
 - cost discipline is respected.
 
 The preflight thresholds are inputs to a gate, not proof of the final project.

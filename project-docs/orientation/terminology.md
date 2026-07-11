@@ -32,17 +32,36 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
    they were the research contribution. Runtime checking and audit artifacts are
    experiment hygiene unless the project is explicitly studying verifier models.
 
-## Legibility, Action-Consequence, And Advisory Predictor Names
+## Capability-Gated Social Sandbox Terms
 
-The active research headline is the **lived-vs-told experiment**: whether
-manipulated partner-directed social history, delivered as enacted episodes
-versus information-equivalent narration against an equivalent decision
-state, changes a co-actor's `material_follow_through` — and whether a
-raw-event observer can predict it — under the history families, delivery
-ladder, baselines, and stop-results in
-`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`.
+The active research direction is the **capability-gated Minecraft social
+sandbox** in
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`.
+Use these terms for current work:
 
-Lived-vs-told terms:
+- **individual capability gate**: dataset-free Minecraft scenario benchmarks
+  using natural-language goals, target-state predicates, milestones, budgets,
+  runtime evidence, efficiency, blocker recovery, and truthful failure;
+- **autonomous goal continuity gate**: long-horizon evaluation of intermediate
+  goal creation, persistence, revision, interruption recovery, and
+  evidence-grounded closure;
+- **interdependent social sandbox**: a shared Minecraft scenario whose economic,
+  cooperative, or quest structure creates material reasons to interact without
+  prescribing the social response;
+- **discovery run**: a versioned long run used to observe behavior with
+  structured artifacts, metrics, and video, not a controlled experiment;
+- **candidate phenomenon**: a recurring observation with evidence, scenario
+  provenance, alternative explanations, and a proposed distinguishing control;
+- **controlled follow-up**: a selected study with a target, baseline, falsifier,
+  competence controls, and prior-work proximity analysis.
+
+Do not call benchmark completion, clean logs, multiple connected bots, or a
+compelling video a social phenomenon by themselves.
+
+## Historical Legibility And Predictor Names
+
+The **lived-vs-told experiment** (V3) was superseded on 2026-07-11. Its terms
+remain valid when reading historical artifacts:
 
 - **history family**: a matched valence pair of partner behavior toward the
   responder (`prior_help`, `permission`, `promise`);
@@ -57,7 +76,7 @@ Lived-vs-told terms:
   primary target — the requested material act toward the partner, read only
   from typed `material-access-evidence/v1`, with intent (chosen action) and
   execution (tool result) recorded separately;
-- **same-model rule** (`SAME_MODEL_RULE`): all conditions run one base
+- **same-model rule** (`SAME_MODEL_RULE`): V3 conditions ran one base
   model and one fixed ActorSoul; soul text is never an independent variable.
 
 The **embodied co-actor legibility experiment** (V2) is superseded
@@ -74,12 +93,9 @@ historical **WAM** banner:
   deltas as the object of analysis;
 - `transition-row/v1` when discussing the current legibility data unit.
 
-**Advisory social-material WAM** is historical shorthand and a possible
-advisory-use branch reference. It should not be used as the current project
-headline. If it appears in older docs, read it through
-`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
-(the active plan; its crosswalk and the superseded V2 plan retire the
-F-native/F-loop/F-society branch names).
+**Advisory social-material WAM** is historical shorthand. It should not be used
+as the current project headline. If it appears in older docs, interpret it
+through the active V4 plan and the superseded V3/V2 audit trail.
 
 An advisory consequence predictor predicts deltas before an action and is scored
 after the action against runtime-observed deltas. It does not select the executed

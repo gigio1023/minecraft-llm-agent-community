@@ -8,29 +8,25 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
-4. `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
-5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `project-docs/orientation/documentation-map.md`
-7. `project-docs/orientation/agent-search-index.md`
-8. `project-docs/orientation/terminology.md`
-9. Task-relevant docs routed by the search index or repo-local agent skills.
+3. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+4. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+5. `project-docs/orientation/documentation-map.md`
+6. `project-docs/orientation/agent-search-index.md`
+7. `project-docs/orientation/terminology.md`
+8. Task-relevant docs routed by the search index or repo-local agent skills.
 
 `GEMINI.md` no longer exists and is not part of the active guidance surface.
 
 ## Current Direction (pointer)
 
-Active target: the preregistered lived-vs-told experiment
-(`ACTIVE_CENTRAL_PLAN`, V3 2026-07-10): manipulated partner-directed
-social history against equivalent Minecraft decision state, with the
-enacted-vs-narrated delivery gap and raw-event observer legibility as the
-two headlines, built per the implementation plan
-(`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`). Substrate premise is depth, not
-scale (`DEPTH_NOT_SCALE`): 2-3 actors, dense attributable interaction,
-matched history pairs per responder. Never scale actor count to
-rescue weak signal. Standing requirements live in `AGENTS.md` (Current
-Direction) and the two plan docs above. The V2 co-actor legibility plan is
-superseded audit trail; do not build or run from it.
+Active target: the capability-gated Minecraft social sandbox
+(`ACTIVE_CENTRAL_PLAN`, V4 2026-07-11). First verify individual Minecraft
+competence and autonomous goal continuity; then run capable actors in
+interdependent economic, cooperative, and quest scenarios; record long-run
+evidence, metrics, and video; and choose controlled studies from recurring
+phenomena. Standing requirements live in `AGENTS.md` (Current Direction) and
+the V4 plan above. The V3 lived-vs-told and V2 co-actor-legibility plans are
+superseded audit trail; do not build or run from them.
 
 ## Use Repo-Local Agent Skills
 

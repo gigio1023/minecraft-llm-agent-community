@@ -1,9 +1,8 @@
 # No-Regret Core Scenario Catalog
 
-Status: active planning catalog for row-producing scenario pressure, serving
-the lived-vs-told experiment (`ACTIVE_CENTRAL_PLAN`). This is
-not a benchmark ladder, not a society demo script, and not a runtime
-implementation plan.
+Status: active reference catalog for V4 interdependent scenario pressure
+(`ACTIVE_CENTRAL_PLAN`). This is not an individual capability benchmark, not a
+society demo script, and not a runtime implementation plan.
 
 Search token: `NO_REGRET_SCENARIO_CATALOG`.
 
@@ -11,22 +10,18 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 ## Purpose
 
-The active legibility experiment needs more than non-repeating actions. It needs
-small Minecraft situations that can produce informative `transition-row/v1` rows
-without scripting the outcome.
+The active social sandbox needs small Minecraft situations that create repeated
+material interaction opportunities without scripting the outcome.
 
-This catalog defines scenario pressure families for the first 2-3 actor runs.
-The goal is not to prove social intelligence. The goal is to create enough
-material stake, interaction opportunity, and bounded response windows for the
-embodied co-actor legibility experiment to test whether public history adds
-predictive signal beyond current observation, policy-copy, shuffled-history, and
-leakage baselines. The same families can later serve the deferred
-society-observable preflight, but they do not select that branch.
+This catalog defines reusable scenario-pressure families for initial small
+social runs. The goal is not to prove social intelligence. The goal is to create
+enough material stake, interaction opportunity, and bounded response windows to
+observe how capable, persistent actors respond. V4 governs phenomenon discovery
+and any later controlled study.
 
 Use with:
 
-- `central-plan-lived-vs-told-social-history.md`
-- `lived-vs-told-implementation-plan.md`
+- `central-plan-capability-gated-social-sandbox.md`
 - `transition-row-v1-contract.md`
 - `transition-row-label-codebook.md`
 - `society-observable-preflight.md`
@@ -44,8 +39,8 @@ Each scenario family must satisfy these constraints:
 - the family can generate both positive and negative rows;
 - the setup stays small enough for free-tier provider discipline.
 
-Each family should also name at least one control shape when it is used for the
-legibility experiment or the deferred social-pattern branch:
+Each family should also name at least one control shape when it is used for a
+V4 phenomenon record or controlled follow-up:
 
 - same action family without material stake;
 - material stake without interaction opportunity;
@@ -290,11 +285,10 @@ declared or explicitly deferred. If the project cannot define a no-stake,
 same-action/different-history, shuffled-history, or policy-copy comparison for a
 scenario, that limitation belongs in the batch audit.
 
-## Deferred Social-Pattern Target Candidates
+## Candidate Social-Pattern Observables
 
-The deferred social-pattern branch (old name: F-society) cannot be selected by
-the legibility experiment alone. It needs separate observable targets. Candidate
-targets include:
+V4 discovery runs need observable targets that do not depend on a prediction
+headline. Candidate targets include:
 
 - repeated access negotiation around the same object, station, or place;
 - refusal followed by repair, compensation, avoidance, or changed future request;

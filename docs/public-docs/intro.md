@@ -4,19 +4,17 @@ sidebar_position: 1
 
 # Overview
 
-`minecraft-llm-agent-community` is a small headless Minecraft runtime for
-studying causal social memory in embodied LLM co-actors: holding the current
-world state equivalent, does changing only an actor's social history with a
-partner change its actual material behavior; does it matter whether that
-history was lived (real episodes in its own memory) or merely told (an
-equivalent written summary); and can an outside observer read the effect
-from public events alone?
+`minecraft-llm-agent-community` is a headless Minecraft runtime for studying
+what happens when individually capable, persistent LLM actors pursue their own
+goals in a shared world where economic, cooperative, and quest activity makes
+them materially interdependent.
 
-The project is not a generic benchmark bot, a race-to-diamond agent, a large
+The project is not a generic benchmark bot, a race-to-diamond agent, a scripted
 village simulator, or a revival of loose Voyager-style generated-code
-execution. The near-term proof is a bounded 2-3 actor shared session that
-records what each actor could observe, what action executed, what changed, and
-which response window made the result scorable.
+execution. Individual task competence and long-horizon goal continuity are
+measured first. Capable actors then enter versioned interdependent social
+scenarios whose behavior is recorded in structured artifacts, metrics, and
+video.
 
 ## Why Minecraft
 
@@ -45,10 +43,9 @@ truth:
 Provider text is context, not proof. A confident explanation does not count as
 Minecraft progress unless the runtime records supporting evidence.
 That evidence is experiment hygiene, not the contribution by itself. The active
-research question is whether public history improves prediction of
-`social_response` and `material_access` labels beyond baselines such as current
-observation, majority/no-response, policy-copy, shuffled-history, and leakage
-controls.
+program uses it to separate individual capability, goal continuity, and social
+behavior before promoting a recurring phenomenon into a controlled research
+question.
 
 `transition-row/v1` records never contain predicted outcomes. Prediction
 artifacts are joined later by row id after labels are locked.

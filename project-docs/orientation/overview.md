@@ -4,50 +4,42 @@ sidebar_position: 1
 
 # Overview
 
-**minecraft-llm-agent-community** is a headless Mineflayer runtime built to
-run one preregistered experiment: lived vs told. Holding the current
-decision state equivalent, does changing only a co-actor's social history
-with a partner change its materially verified behavior; does the effect
-differ between history the actor LIVED (enacted episodes, agent-written
-memory) and history it was TOLD (an information-equivalent narration); and
-can an external observer, reading only raw public events, predict that
-behavior better than baselines that can erase the claim?
+**minecraft-llm-agent-community** is a headless Mineflayer runtime for studying
+what happens when individually capable, persistent LLM actors pursue their own
+goals in a shared Minecraft world where economic, cooperative, and quest
+activity makes them materially interdependent.
 
-Minecraft provides embodied actions and runtime-verified material
-consequences (possession, access, refusal, repair, public-affordance use).
-Only an embodied persistent world can separate lived from told history —
-in text games, history is narration. The runtime exists so material
-consequences are recorded truthfully enough to score both the actor-side
-effect and observer predictions against.
+The project first separates non-social Minecraft competence and long-horizon
+goal continuity from social interpretation. It then runs capable actors in an
+observable sandbox, records structured evidence, metrics, and video, and uses
+recurring phenomena to select later controlled experiments.
 
-Active plan: `../research/current-spine/central-plan-lived-vs-told-social-history.md`
-(`ACTIVE_CENTRAL_PLAN`). Build order:
-`../research/current-spine/lived-vs-told-implementation-plan.md`
-(`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`).
+Active plan:
+`../research/current-spine/central-plan-capability-gated-social-sandbox.md`
+(`ACTIVE_CENTRAL_PLAN`). The V3 lived-vs-told and V2 co-actor-legibility plans
+are superseded audit trail.
 
-## Substrate Premise: Depth, Not Scale
+## Program Stages
 
-The project is intentionally small — and smallness is a design decision, not
-a budget compromise (`DEPTH_NOT_SCALE`):
+1. Dataset-free scenario benchmarks establish individual Minecraft competence.
+2. Goal-continuity cases test intermediate goal creation, persistence, revision,
+   interruption recovery, and evidence-grounded closure.
+3. Economic, cooperative, and quest scenarios create material interdependence
+   without scripting the actors' social response.
+4. Long runs produce phenomenon records grounded in artifacts, metrics, and
+   synchronized video.
+5. Baselines, falsifiers, preregistration, and novelty claims are introduced
+   only for a selected follow-up question.
 
-- 2-3 concurrent actors in one shared session, with cross-actor observation
-  and chat capture wired into runtime evidence;
-- interaction density: rows must carry material stake and interaction
-  opportunity, not observe/wait filler;
-- longitudinal depth: matched history pairs accumulate per responder per
-  history family, because pairs — not cast size — carry the statistical
-  power of the matched-pair design.
-
-Actor-count scale is never a remedy for weak signal. Scale re-enters only
-as the deferred social-pattern branch or as a post-positive-result
-generalization axis.
+Initial sessions stay small enough to debug and attribute. Actor count, model
+mix, role assignment, and scenario pressure may change later as explicit
+experimental axes; scale does not excuse missing competence or weak evidence.
 
 ## What It Does
 
 - starts or connects to a local Minecraft server;
-- runs 2-3 Mineflayer actors through a bounded TypeScript loop with
-  per-actor provider routing (live LLM, scripted responder, or resampled
-  soul, by condition);
+- runs one or more Mineflayer actors through a bounded TypeScript loop with
+  per-actor provider routing;
 - lets each Actor Turn choose one visible Action Card or
   `author_mineflayer_action` at a time;
 - captures cross-actor observation and chat as runtime evidence;
@@ -56,12 +48,11 @@ generalization axis.
 - derives `runtime_retry_constraints` after exact repeated target/args
   blockers and blocks identical retries before Mineflayer execution;
 - checks progress from Minecraft state, not model text;
-- closes social/material response windows only after every other active
-  actor completed a subsequent Actor Turn slot or a preregistered timeout;
+- closes social/material response windows only after every other active actor
+  completed a subsequent Actor Turn slot or a declared timeout;
 - writes `transition-row/v1` records whose labels come from runtime
   evidence, never from tool names or self-report;
-- exports an allowlisted public-history artifact for offline observer
-  predictors, which join scored rows by `row_id` after labels are locked;
+- exports allowlisted public-history artifacts for offline analysis;
 - writes transcripts, provider inputs, evidence, and review artifacts.
 
 ## Core Model
@@ -77,12 +68,14 @@ The runtime hot path stays narrow:
 observe -> choose -> gate -> execute -> verify -> record
 ```
 
-The research path is strictly offline and joins after the fact:
+The active research path builds evidence in stages:
 
 ```text
-public history H_t + state o_t + executed action a_t
--> observer-predicted social_response / material_access labels
--> scored against locked transition-row/v1 labels (join by row_id)
+individual capability evidence
+-> goal-continuity evidence
+-> interdependent social runs
+-> phenomenon records
+-> controlled follow-up experiments
 ```
 
 ```mermaid
@@ -95,20 +88,19 @@ flowchart LR
   Runtime["Runtime gates<br/>schema, permissions, retry, verifier"]
   MC["Mineflayer + Minecraft"]
   Window["Response window<br/>closes per co-actor Actor Turn slots"]
-  Row["Transition row<br/>observed delta + locked labels"]
-  Export["Public-history export<br/>allowlisted"]
-  Predictor["Offline observer predictor arms"]
+  Row["Transition row<br/>observed delta + evidence refs"]
+  Report["Benchmarks and long-run reports"]
+  Phenomenon["Phenomenon records<br/>metrics + video refs"]
 
   Soul --> Input
   Observe --> Input
   Workspace --> Input
   Input --> LLM --> Runtime --> MC --> Window --> Row
-  Row --> Export --> Predictor --> Row
+  Row --> Report --> Phenomenon
 ```
 
-Predictor artifacts never select the executed action, fill missing
-parameters, close obligations, or override runtime checks.
-`transition-row/v1` never contains `predicted_delta`, and the actor's
+Offline analysis never selects the executed action, fills missing parameters,
+closes obligations, or overrides runtime checks. The actor's
 `expected_outcome` is never a target label.
 
 ## What It Is Not
@@ -116,10 +108,9 @@ parameters, close obligations, or override runtime checks.
 - not a Voyager clone, race-to-diamond benchmark, or house-building
   planner — Minecraft task completion is a competence gate, not the
   research target;
-- not a Project Sid-style society simulation — actor-count scale is
-  explicitly banned as a remedy for weak small-N signal;
-- not world modeling or "social simulation" as a headline — the claim is
-  legibility / other-agent modeling;
+- not a scripted society demo — social outcomes must remain open even when
+  scenarios create material interdependence;
+- not a claim that benchmark or sandbox construction alone is novel research;
 - not a verification showcase — runtime verification, screenshots, seed
   and reset records, and scoring scripts are mandatory hygiene, never the
   contribution;
@@ -129,8 +120,9 @@ parameters, close obligations, or override runtime checks.
 
 ## Read Next
 
-- [Central Plan V3: Lived Vs Told](../research/current-spine/central-plan-lived-vs-told-social-history.md)
-- [Implementation Plan](../research/current-spine/lived-vs-told-implementation-plan.md)
+- [Central Plan V4: Capability-Gated Social Sandbox](../research/current-spine/central-plan-capability-gated-social-sandbox.md)
+- [Project-Level Benchmark Plan](../research/benchmarks/project-level-benchmark-plan.md)
+- [Central Plan V3: Lived Vs Told (superseded)](../research/current-spine/central-plan-lived-vs-told-social-history.md)
 - [Central Plan V2: Embodied Co-Actor Legibility (superseded)](../research/current-spine/central-plan-embodied-co-actor-legibility.md)
 - [Research Documentation Hierarchy](../research/current-spine/research-documentation-hierarchy.md)
 - [Transition Row v1 Contract](../research/current-spine/transition-row-v1-contract.md)

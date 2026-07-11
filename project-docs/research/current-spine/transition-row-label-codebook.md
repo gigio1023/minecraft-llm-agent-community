@@ -8,8 +8,7 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `central-plan-lived-vs-told-social-history.md`
-- `lived-vs-told-implementation-plan.md`
+- `central-plan-capability-gated-social-sandbox.md`
 - `transition-row-v1-contract.md`
 - `no-regret-core-scenario-catalog.md`
 - `society-observable-preflight.md`

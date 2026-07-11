@@ -14,7 +14,7 @@ Use that file as the source of truth for:
 
 - current product direction;
 - long-term spec governance;
-- advisory social-material WAM research spine;
+- capability-gated social sandbox research spine;
 - Soul-grounded social simulation identity;
 - current rebuild scope;
 - non-negotiable runtime rules;
@@ -27,9 +27,9 @@ Detailed long-term spec pages live under `../project-docs/specification/`.
 
 The active architecture is defined by boundaries more than feature count:
 
-- **Advisory social-material WAM**: the active research object predicts
-  physical, material, and social deltas for candidate embodied Minecraft
-  actions. Acting outcome and prediction quality are separate axes.
+- **Capability-gated social sandbox**: individual task competence and goal
+  continuity are measured before interdependent social runs; recurring
+  phenomena, not benchmark success, select later controlled studies.
 - **Soul-grounded social simulation**: Minecraft is the embodied substrate for
   actors whose goals are derived from ActorSoul, LifeGoal, memory,
   relationships, obligations, and settlement state.
@@ -40,8 +40,8 @@ The active architecture is defined by boundaries more than feature count:
 - **Replayable evidence**: provider packets, turn evidence, verifier deltas, and
   review refs make failures inspectable. This is verification hygiene, not the
   research contribution by itself.
-- **Transition rows**: WAM work should emit predicted-vs-observed deltas for
-  state/action/next-state analysis.
+- **Transition rows**: benchmark and sandbox work should emit independent
+  state/action/observed-delta records for later analysis.
 - **Soul/life/cycle goal authority**: for social-agency experiments, durable
   ActorSoul and LifeGoal should steer per-cycle goals before runtime action
   selection.

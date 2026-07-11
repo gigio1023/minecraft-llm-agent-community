@@ -8,9 +8,9 @@ Search token: `ADVISORY_SOCIAL_MATERIAL_WAM`.
 
 Status: historical reference, soft-archived 2026-07-05. Superseded as
 direction by the active central plan
-(`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`;
-the intermediate V2 co-actor legibility plan is itself superseded audit
-trail).
+(`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`;
+the V3 lived-vs-told and intermediate V2 co-actor legibility plans are
+superseded audit trail).
 The "WAM" banner term is retired: by this repo's own literature a World
 Action Model is the joint `p(o', a | o, l)` object, and the term now collides
 with an established robotics usage. The verification-is-hygiene rule in this

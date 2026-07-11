@@ -1,7 +1,8 @@
 # Prior-Work Proximity: Current Goldilocks-Gated Spine
 
-Status: active research-planning artifact. This is a proximity map, not a
-literature review and not a claim that novelty is proven.
+Status: superseded research-planning artifact. V4 section 15 contains the
+current program-level proximity record. This is preserved as audit trail, not a
+claim that novelty is proven.
 
 Search token: `CURRENT_PRIOR_WORK_PROXIMITY_2026_06_29`.
 

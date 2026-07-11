@@ -1,28 +1,30 @@
 # SPEC
 
-Updated: 2026-07-10
+Updated: 2026-07-11
 
 This is the canonical gateway spec for the current rebuild.
 
-The active research direction is the **lived-vs-told experiment**
-(V3, 2026-07-10), defined in
-`project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`:
-manipulating a co-actor's partner-directed social history against an
-equivalent Minecraft decision state, measuring materially verified
-follow-through, with the enacted-vs-narrated delivery gap and raw-event
-observer legibility as the two headline questions. The build order and
-acceptance gates live in
-`project-docs/research/current-spine/lived-vs-told-implementation-plan.md`.
-The V2 co-actor legibility plan
-(`central-plan-embodied-co-actor-legibility.md`) is superseded audit trail.
-The substrate premise is depth, not scale (`DEPTH_NOT_SCALE`): a working
-2-3 actor shared session with dense, attributable, longitudinally
-accumulated interaction. Actor-count scale is not a premise and never a
-remedy for weak signal. The motivating domain
-remains Soul-grounded Minecraft social simulation. The former "advisory
-social-material WAM" framing is historical; the WAM banner term was retired
-on 2026-07-05 with user approval (it collides with the robotics World Action
-Model term and misdescribed the prediction-only object).
+The active research direction is the **capability-gated Minecraft social
+sandbox** (V4, 2026-07-11), defined in
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`.
+The program first measures non-social Minecraft competence, then long-horizon
+goal continuity, then runs capable actors in materially interdependent economic,
+cooperative, and quest scenarios. Long-run evidence, metrics, and video are used
+to discover recurring social phenomena; narrow controlled experiments are
+chosen only after a phenomenon is worth explaining.
+
+The V3 lived-vs-told plan and implementation plan are superseded audit trail.
+Prediction and observer legibility are not active headlines or deferred build
+orders. Their runtime and evidence mechanisms remain usable only where V4
+re-derives a need for them. Initial social sessions should be small enough to
+debug and attribute, but actor count is an adjustable later experimental axis,
+not a permanently banned direction and not a substitute for individual
+competence or observable interaction.
+
+The motivating domain remains Soul-grounded Minecraft social simulation. The
+former "advisory social-material WAM" framing is historical; the WAM banner term
+was retired on 2026-07-05 with user approval (it collides with the robotics World
+Action Model term and misdescribed the prediction-only object).
 
 Minecraft is the embodied substrate: raw world state, inventory, entities,
 positions, chat, blocks, tool results, and artifact refs should be preserved
@@ -31,9 +33,10 @@ The project is not a generic Minecraft LLM benchmark, a race-to-diamond agent,
 a fastest-tech tree contest, or a Voyager clone.
 
 Runtime verification is required experiment hygiene. It is not, by itself, a
-novel contribution or the main differentiator. The contribution should be framed
-around predicted-vs-observed social-material transitions, not around the mere
-fact that actions are checked.
+novel contribution or the main differentiator. Individual benchmarks and the
+sandbox have measurement and systems value before results; scientific claims
+must be framed around a recurring phenomenon and a controlled follow-up, not
+around the mere fact that actions are checked or videos were recorded.
 
 ## 1. Spec Authority And Governance
 
@@ -75,21 +78,24 @@ claims, public affordances, weak commons, and settlement state.
 Gameplay progress matters because it creates observations, material changes,
 and social consequences. It is not the top-level objective by itself.
 
-The current research object is separate from the actor:
+The current research program separates several objects before making a social
+claim:
 
 ```text
-public interaction history + state_before + executed_action
--> observer-predicted social_response / material_access labels
-   (separate artifacts, joined by row_id after labels are locked)
--> scored against runtime-observed transition-row/v1 deltas
+individual Minecraft competence
+-> autonomous goal continuity
+-> interdependent multi-actor behavior
+-> recurring candidate phenomenon
+-> controlled follow-up study
 ```
 
-Predictor artifacts are strictly offline and advisory. They never select the
-executed action, fill missing runtime parameters, decide success, close
-obligations, mutate actor truth, or override runtime checks. `transition-row/v1`
-never contains `predicted_delta`, and the actor's `expected_outcome` is never
-a target label. Actor Turn remains the action selection path and the runtime
-remains the execution boundary.
+Benchmarks, long-run analysis, videos, and optional predictor artifacts are
+strictly offline or review-only. They never select the executed action, fill
+missing runtime parameters, decide success, close obligations, mutate actor
+truth, or override runtime checks. `transition-row/v1` remains independent of
+optional predictions, and the actor's `expected_outcome` is never a target
+label. Actor Turn remains the action selection path and the runtime remains the
+execution boundary.
 
 Read the product identity spec:
 
@@ -233,15 +239,11 @@ Read these documents to understand the full spec:
 2. `project-docs/specification/soul-grounded-social-simulation.md`
    - Soul/ActorSoul identity, LifeGoal continuity, social context, and why
      Minecraft actions matter for social-material consequences.
-3. `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`
-   - active research plan: lived-vs-told experiment, history families,
-     delivery ladder, observer arms, statistics, stop-results, and build
-     plan. (`central-plan-embodied-co-actor-legibility.md` and
-     `project-docs/specification/advisory-social-material-wam.md` are
-     historical; the verification-as-hygiene rule remains binding.)
-   - `project-docs/research/current-spine/lived-vs-told-implementation-plan.md`
-     expands the build plan into seams, vertical slices, acceptance
-     criteria, and testing rules.
+3. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+   - active research program: individual capability, autonomous goal continuity,
+     interdependent social sandbox, phenomenon discovery, controlled follow-up,
+     and the build order connecting them. The V3 lived-vs-told and V2 co-actor
+     legibility plans are historical; verification-as-hygiene remains binding.
 4. `project-docs/specification/runtime-evidence-and-action-skills.md`
    - runtime-owned truth, action skills, actor workspace, verifier evidence,
      transcript artifacts, and action-skill lifecycle.
@@ -301,10 +303,12 @@ Setup docs:
 ## 4. Non-Negotiable Direction
 
 - Soul/LifeGoal continuity is the top-level simulation frame.
-- The active research spine is the lived-vs-told experiment
-  (`central-plan-lived-vs-told-social-history.md`), not task completion,
-  evidence-first benchmarking, world-model branding, persona evaluation,
-  or civilization spectacle.
+- The active research spine is the capability-gated social sandbox
+  (`central-plan-capability-gated-social-sandbox.md`): task competence and goal
+  continuity are controls, interdependent long runs are the discovery surface,
+  and controlled research claims follow recurring phenomena. It is not generic
+  benchmark optimization, evidence-first branding, persona evaluation, or
+  civilization spectacle.
 - WorldEvents are event/context records, not raw observation and not a direct
   replacement for LifeGoal.
 - Runtime owns physical truth: validation, timeout, cancellation, execution,

@@ -1,21 +1,25 @@
 # Central Plan V3: Lived Vs Told — Enacted Social History And Observer Legibility
 
-Status: ACTIVE central research and implementation plan.
+Status: **SUPERSEDED 2026-07-11** by
+`central-plan-capability-gated-social-sandbox.md` (V4). Preserved as audit
+trail. Do not build or run from this plan.
 
-Search token: `ACTIVE_CENTRAL_PLAN`. Also: `LIVED_VS_TOLD`,
+Historical search token: `SUPERSEDED_LIVED_VS_TOLD`. Also: `LIVED_VS_TOLD`,
 `HISTORY_DELIVERY_LADDER`, `MATERIAL_FOLLOW_THROUGH`, `SAME_MODEL_RULE`,
 `EXPERIMENT_DECLARATION_V1`, `DEPTH_NOT_SCALE`.
 
 Recorded: 2026-07-10 (`Asia/Seoul`).
 
-Authority: subordinate to `AGENTS.md`. This plan supersedes
+Historical authority: this plan superseded
 `central-plan-embodied-co-actor-legibility.md` (V2) and demotes
 `embodied-co-actor-legibility-implementation-plan.md` and
 `legibility-cycle-2-live-substrate-work-plan.md` to superseded work orders.
 The user approved this direction change in-session on 2026-07-10 after a
 verified first-principles review (section 1). Superseded docs stay in place
-as audit trail with superseded status headers. The V2 substrate (runtime,
-artifact chain, scorer machinery) is retained and re-targeted, not rebuilt.
+as audit trail with superseded status headers. On 2026-07-11 the user retired
+V3 because prediction and legibility were too narrow to remain the project
+center. V4 retains useful runtime and evidence mechanisms only where its staged
+capability, continuity, sandbox, and phenomenon-discovery program needs them.
 
 ## 0. TL;DR
 

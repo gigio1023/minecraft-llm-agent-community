@@ -1,20 +1,24 @@
 # Lived Vs Told: Implementation Plan
 
-Status: ACTIVE implementation plan for the active central plan.
+Status: **SUPERSEDED 2026-07-11** by
+`central-plan-capability-gated-social-sandbox.md`. Preserved as the unexecuted
+V3 work order and audit trail. Do not implement Session A or Session B from
+this document.
 
-Search token: `LIVED_VS_TOLD_IMPLEMENTATION_PLAN`. Also: `SESSION_A_BUILD`,
+Historical search token: `SUPERSEDED_LIVED_VS_TOLD_IMPLEMENTATION_PLAN`. Also: `SESSION_A_BUILD`,
 `SESSION_B_PILOT`, `HISTORY_DELIVERY_LADDER`, `DEPTH_NOT_SCALE`.
 
 Recorded: 2026-07-10 (`Asia/Seoul`).
 
-Authority: subordinate to `AGENTS.md` and to
+Historical authority: this document was subordinate to
 `central-plan-lived-vs-told-social-history.md` (`ACTIVE_CENTRAL_PLAN`).
 This document expands section 9 of the central plan into a work breakdown
 with seams, decisions, slices, and acceptance criteria. If the two
 documents disagree, the central plan wins and this file must be updated in
 the same change. It replaces `embodied-co-actor-legibility-implementation-plan.md`
-and `legibility-cycle-2-live-substrate-work-plan.md` as the active work
-order; both remain as audit trail.
+and `legibility-cycle-2-live-substrate-work-plan.md` as the active work order.
+V4 now owns direction and build sequencing; all three older work orders remain
+audit trail only.
 
 ## 0. TL;DR
 
