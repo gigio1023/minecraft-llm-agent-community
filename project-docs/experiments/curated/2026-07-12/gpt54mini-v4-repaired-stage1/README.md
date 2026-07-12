@@ -1,6 +1,6 @@
 # GPT-5.4 Mini Repaired Stage 1 Preparation
 
-Status: waiting for a current UTC-day dashboard observation and explicit user
+Status: current UTC-day dashboard usage is recorded; waiting for explicit user
 approval. No provider request has been made for this campaign.
 
 ## Provider-Free Result
@@ -45,21 +45,24 @@ larger to cover repair output or bounded code generation without approaching the
 
 ## Current Preflight Result
 
-`preflight/planning.json` was generated for UTC quota day `2026-07-12`. The
-local ledger contains 0 OpenAI requests and 0 tokens for that day, so every
-local usage check is below the proposed allowance. Final status is still
-`needs_dashboard_approval`.
+`preflight/dashboard-usage-2026-07-12.json` records a read-only observation of
+the logged-in OpenAI Usage dashboard with both date bounds set to `2026-07-12`.
+It showed 0 requests, 0 total tokens, `$0.00` total spend, and July organization
+spend of `$0.00 / $120.00`. The local ledger also contains 0 OpenAI requests
+and 0 tokens for that UTC day. `preflight/planning.json` was regenerated with
+that exact-day observation; every local usage check is below the proposed
+allowance, while final status correctly remains `needs_dashboard_approval`.
 
 `preflight/prior-dashboard-context.json` preserves the earlier 89-request,
 1,248,539-token dashboard snapshot only as historical context. Its period was
 ambiguous and belongs to the previous UTC day, so the preflight correctly did
 not count it and it is not current approval evidence.
 
-Before any live command, the user must provide or confirm a dashboard reading
-for UTC day `2026-07-12` with current requests and tokens, confirm that
-`gpt-5.4-mini` remains eligible for the complimentary pool with positive
-balance, and explicitly approve the 32-request / 1,200,000-token maximum. A new
-approved preflight must then be saved beside the planning record.
+Before any live command, the user must confirm that `gpt-5.4-mini` remains
+eligible for the complimentary pool with positive balance and explicitly
+approve the 32-request / 1,200,000-token maximum. A new approved preflight must
+then be saved beside the planning record. The recorded `$120.00` organization
+spend limit is not treated as proof of account balance or model eligibility.
 
 ## Commands After Approval
 

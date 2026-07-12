@@ -79,8 +79,8 @@ via the adaptation in the active implementation plan.
   requests, 0 tokens, and no evaluator-only fields in model input
 - all three actual 2026-07-11 raw reports re-evaluated → `unverifiable`
 - repaired Stage 1 planning preflight → `needs_dashboard_approval`; current UTC
-  day local usage 0 requests / 0 tokens, proposed maximum 32 requests /
-  1,200,000 tokens
+  day local ledger and exact-day OpenAI dashboard both showed 0 requests / 0
+  tokens, proposed maximum 32 requests / 1,200,000 tokens
 - `cd probe && bun test` → 751 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
@@ -103,6 +103,7 @@ via the adaptation in the active implementation plan.
 | Dashboard totals may include the same calls as the local ledger | Adding both would understate remaining capacity | For confirmed current UTC-day observations, add only when disjointness is explicit; otherwise use the larger value for each metric | Revisit only if the provider exposes stable per-key usage identifiers |
 | Raw reports must remain byte-identical but contain machine-local workspace roots | Rewriting the root would damage the raw audit trail | Add SHA-256-bound `report-archive-relocation/v1` sidecars and make readiness prefer the archived repository-relative root | Keep for every future archive import with a stale absolute root |
 | One full-suite run hit the wall-time test once and Bun then emitted cascading `node:test` nesting errors | The earliest test passed alone, and the full suite passed when rerun without concurrent checks | Treat the first result as a Bun runner cascade, record both runs, and keep the isolated wall-time test in future verification | Revisit if the earliest test fails independently |
+| The earlier dashboard screenshot covered an ambiguous multi-day period | A logged-in dashboard session was available and could be filtered to exactly `2026-07-12` without an API request | Record the exact-day zero usage separately, regenerate the unapproved preflight, and continue to require explicit approval and complimentary-pool eligibility confirmation | Recheck immediately before a live run if approval is delayed or the UTC day changes |
 
 ## Recent commits (this successor wave)
 
