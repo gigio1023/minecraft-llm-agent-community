@@ -14,6 +14,7 @@ import type { SocialCycleProviderId } from "../../runtime/goals/types.js";
 import {
   CapabilityRunnerError,
   isProviderFree,
+  type RunCapabilityCaseResult,
   runCapabilityCaseRepeats
 } from "./runner.js";
 
@@ -127,6 +128,79 @@ function parseArgs(argv: string[]): ParsedArgs {
   return options;
 }
 
+function capabilityStopReason(result: RunCapabilityCaseResult): string {
+  if (result.budget_status.cost_unverifiable) {
+    return "cost_unverifiable";
+  }
+  if (result.budget_status.budget_exhausted) {
+    return `budget_exhausted:${result.budget_status.exhausted_dimensions.join(",")}`;
+  }
+  if (result.budget_status.budget_stopped) {
+    return `budget_stopped:${result.budget_status.exhausted_dimensions.join(",")}`;
+  }
+  if (
+    result.normalized_report.capability_progress?.target_completion ||
+    result.normalized_report.target.status === "passed"
+  ) {
+    return "target_completed";
+  }
+  if (result.normalized_report.runtime_status === "environment_blocked") {
+    return "environment_blocked";
+  }
+  if (result.normalized_report.failure_class === "provider_blocked") {
+    return "provider_blocked";
+  }
+  if (result.normalized_report.runtime_status === "blocked") {
+    return "runtime_blocked";
+  }
+  if (result.normalized_report.runtime_status === "failed") {
+    return "runtime_failed";
+  }
+  if (result.normalized_report.runtime_status === "timeout") {
+    return "runtime_timeout";
+  }
+  return "cycles_completed";
+}
+
+export function buildCapabilityCliSummary(results: RunCapabilityCaseResult[]) {
+  const last = results.at(-1);
+  if (!last) {
+    throw new CapabilityRunnerError("Capability CLI produced no run results");
+  }
+  return {
+    suite_index_path: last.suite_index_path,
+    runs: results.map((result) => ({
+      case_id: result.declaration.case_id,
+      capability_run_id: result.declaration.capability_run_id,
+      target_status: result.normalized_report.target.status,
+      milestone_progress: {
+        passed_milestone_ids: result.normalized_report.milestones
+          .filter((milestone) => milestone.result.status === "passed")
+          .map((milestone) => milestone.milestone_id),
+        passed_count: result.normalized_report.milestones.filter(
+          (milestone) => milestone.result.status === "passed"
+        ).length,
+        total_count: result.normalized_report.milestones.length
+      },
+      interpretation: {
+        status: result.normalized_report.interpretation_status,
+        ...(result.normalized_report.failure_class
+          ? { failure_class: result.normalized_report.failure_class }
+          : {})
+      },
+      stop_reason: capabilityStopReason(result),
+      runtime_status: result.normalized_report.runtime_status,
+      declaration_path: result.declaration_path,
+      raw_report_path: result.raw_report_path,
+      normalized_report_path: result.normalized_report_path,
+      budget_status_path: result.budget_status_path,
+      budget_stopped: result.budget_status.budget_stopped,
+      budget_exhausted: result.budget_status.budget_exhausted,
+      provider_free: result.declaration.provider_free
+    }))
+  };
+}
+
 async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../../../..");
@@ -191,25 +265,9 @@ async function main() {
       repoRoot
     });
 
-    const last = results[results.length - 1]!;
     console.log(
       JSON.stringify(
-        {
-          suite_index_path: last.suite_index_path,
-          runs: results.map((result) => ({
-            case_id: result.declaration.case_id,
-            capability_run_id: result.declaration.capability_run_id,
-            declaration_path: result.declaration_path,
-            raw_report_path: result.raw_report_path,
-            normalized_report_path: result.normalized_report_path,
-            budget_status_path: result.budget_status_path,
-            interpretation_status: result.normalized_report.interpretation_status,
-            runtime_status: result.normalized_report.runtime_status,
-            budget_stopped: result.budget_status.budget_stopped,
-            budget_exhausted: result.budget_status.budget_exhausted,
-            provider_free: result.declaration.provider_free
-          }))
-        },
+        buildCapabilityCliSummary(results),
         null,
         2
       )
@@ -225,4 +283,6 @@ async function main() {
   }
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  void main();
+}

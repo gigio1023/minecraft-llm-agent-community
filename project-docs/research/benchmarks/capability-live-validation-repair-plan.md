@@ -350,7 +350,11 @@ or start social simulations from this plan.
 - [x] Add evidence-based early completion and measurements
   (action-level stop after each completed action; no duplicated current-action
   input; executed evidence survives runtime classification failure).
-- [ ] Improve failure attribution and CLI summary order.
+- [x] Improve failure attribution and CLI summary order. Missing or mismatched
+  capability context is `unverifiable`; structured action-input failures,
+  repeated blockers, runtime failures, and no-goal-progress executions remain
+  separately visible; CLI output leads with target, milestones, interpretation,
+  and stop reason.
 - [ ] Reduce repeated Action Card input without changing action availability.
 - [ ] Add external usage observations to preflight.
 - [ ] Add portable archive relocation and preflight linkage.

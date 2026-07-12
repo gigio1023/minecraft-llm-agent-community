@@ -25,6 +25,7 @@ export const CAPABILITY_FAILURE_CLASSES = [
   "manifest_invalid",
   "world_setup_failed",
   "provider_blocked",
+  "action_input_invalid",
   "model_goal_misread",
   "missing_action_capability",
   "runtime_execution_failed",
@@ -38,6 +39,23 @@ export const CAPABILITY_FAILURE_CLASSES = [
 ] as const;
 
 export type CapabilityFailureClassV1 = (typeof CAPABILITY_FAILURE_CLASSES)[number];
+
+export const CAPABILITY_ACTION_SELECTION_STATUSES = [
+  "not_observed",
+  "valid_executed",
+  "malformed_parameters",
+  "invalid_selection",
+  "repeated_blocker",
+  "no_measurable_progress"
+] as const;
+
+export type CapabilityActionSelectionStatusV1 =
+  (typeof CAPABILITY_ACTION_SELECTION_STATUSES)[number];
+
+export type CapabilityActionSelectionResultV1 = {
+  status: CapabilityActionSelectionStatusV1;
+  attempt_count: number;
+};
 
 /** Runtime exit status copied from `social-cycle-run-report/v1`. */
 export type CapabilityRuntimeStatusV1 =
@@ -127,6 +145,8 @@ export type IndividualCapabilityReportV1 = {
    * report. Never recomputed from provider prose.
    */
   capability_progress?: CapabilityProgressSummary;
+  /** Aggregate result of turning provider selections into runtime attempts. */
+  action_selection_result: CapabilityActionSelectionResultV1;
   /** Capability evaluation status after target/milestone predicates. */
   interpretation_status: CapabilityInterpretationStatusV1;
   failure_class?: CapabilityFailureClassV1;

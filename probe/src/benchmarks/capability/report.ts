@@ -12,6 +12,7 @@ import {
 } from "./predicates.js";
 import type { CapabilityEvidenceBagV1 } from "./evidenceBag.js";
 import type {
+  CapabilityActionSelectionResultV1,
   CapabilityBlockerRecordV1,
   CapabilityBudgetObservedV1,
   CapabilityFailureClassV1,
@@ -237,6 +238,68 @@ function passedMilestoneCount(milestones: CapabilityMilestoneReportV1[]): number
   return milestones.filter((entry) => entry.result.status === "passed").length;
 }
 
+type CapabilityContextStatus = "matched" | "missing" | "mismatched";
+
+function capabilityContextStatus(input: {
+  report: SocialCycleRunReport;
+  capabilityCase: IndividualCapabilityCaseV1;
+  manifestHash?: string;
+}): CapabilityContextStatus {
+  const context = input.report.capability_case_context;
+  if (!context || !input.manifestHash) {
+    return "missing";
+  }
+  return context.schema === "capability-case-context/v1" &&
+    context.case_id === input.capabilityCase.case_id &&
+    context.top_level_goal === input.capabilityCase.top_level_goal &&
+    context.manifest_hash === input.manifestHash
+    ? "matched"
+    : "mismatched";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function actionSelectionResult(input: {
+  report: SocialCycleRunReport;
+  target: CapabilityPredicateResultV1;
+  milestones: CapabilityMilestoneReportV1[];
+}): CapabilityActionSelectionResultV1 {
+  const attempts = input.report.cycles.flatMap((cycle) => cycle.action_attempts ?? []);
+  const lastAttempt = attempts.at(-1);
+  if (!lastAttempt) {
+    return { status: "not_observed", attempt_count: 0 };
+  }
+
+  const runtimeResult = isRecord(lastAttempt.runtime_result)
+    ? lastAttempt.runtime_result
+    : undefined;
+  const parameterCheck = isRecord(runtimeResult?.action_parameter_contract)
+    ? runtimeResult.action_parameter_contract
+    : undefined;
+
+  if (parameterCheck?.ok === false) {
+    return { status: "malformed_parameters", attempt_count: attempts.length };
+  }
+  if (runtimeResult?.no_minecraft_action_executed === true) {
+    return { status: "invalid_selection", attempt_count: attempts.length };
+  }
+  if (lastAttempt.retry_constraint_blocked === true) {
+    return { status: "repeated_blocker", attempt_count: attempts.length };
+  }
+  if (
+    input.target.status === "passed" ||
+    input.milestones.some((milestone) => milestone.result.status === "passed")
+  ) {
+    return { status: "valid_executed", attempt_count: attempts.length };
+  }
+  if (lastAttempt.executed_tools.length > 0) {
+    return { status: "no_measurable_progress", attempt_count: attempts.length };
+  }
+  return { status: "invalid_selection", attempt_count: attempts.length };
+}
+
 function interpretCapability(input: {
   runtime_status: SocialCycleRunReport["runtime_status"];
   target: CapabilityPredicateResultV1;
@@ -244,6 +307,8 @@ function interpretCapability(input: {
   completion_policy: IndividualCapabilityCaseV1["completion_policy"];
   report: SocialCycleRunReport;
   unsupported_success_claim_count: number;
+  context_status: CapabilityContextStatus;
+  action_selection_result: CapabilityActionSelectionResultV1;
 }): {
   interpretation_status: CapabilityInterpretationStatusV1;
   failure_class?: CapabilityFailureClassV1;
@@ -255,6 +320,21 @@ function interpretCapability(input: {
   const partialAllowed = completion_policy.partial_credit === "milestones";
   const anyMilestonePassed = passedMilestoneCount(milestones) > 0;
 
+  if (input.context_status !== "matched") {
+    notes.push(
+      input.context_status === "missing"
+        ? "Capability context or expected manifest hash is missing, so the declared goal cannot be verified as model-visible."
+        : "Capability context does not match the selected case goal and manifest hash."
+    );
+    return {
+      interpretation_status: "unverifiable",
+      failure_class: "unverifiable",
+      next_diagnostic_action:
+        "Record a matching capability-case-context/v1 before evaluating the run.",
+      diagnostic_notes: notes
+    };
+  }
+
   if (runtime_status === "environment_blocked") {
     return {
       interpretation_status: "environment_blocked",
@@ -264,11 +344,34 @@ function interpretCapability(input: {
     };
   }
 
-  if (runtime_status === "blocked" && report.provider_error) {
+  if (report.provider_error) {
     return {
       interpretation_status: "blocked",
       failure_class: "provider_blocked",
       next_diagnostic_action: "Resolve provider auth/quota/budget before re-running the case.",
+      diagnostic_notes: notes
+    };
+  }
+
+  if (
+    input.action_selection_result.status === "malformed_parameters" ||
+    input.action_selection_result.status === "invalid_selection"
+  ) {
+    return {
+      interpretation_status: "blocked",
+      failure_class: "action_input_invalid",
+      next_diagnostic_action:
+        "Inspect the structured Actor Turn selection and parameter-validation evidence.",
+      diagnostic_notes: notes
+    };
+  }
+
+  if (target.status === "passed") {
+    if (runtime_status === "timeout") {
+      notes.push("Target passed under timeout runtime_status; treat as passed on evidence only.");
+    }
+    return {
+      interpretation_status: "passed",
       diagnostic_notes: notes
     };
   }
@@ -291,6 +394,16 @@ function interpretCapability(input: {
     };
   }
 
+  if (runtime_status === "failed") {
+    return {
+      interpretation_status: anyMilestonePassed && partialAllowed ? "partial" : "failed",
+      failure_class: "runtime_execution_failed",
+      next_diagnostic_action:
+        "Inspect the failed runtime attempt while keeping target and milestone evidence separate.",
+      diagnostic_notes: notes
+    };
+  }
+
   if (target.status === "unknown") {
     notes.push("Target predicate is unverifiable because required evidence refs are missing or setup-only.");
     return {
@@ -302,19 +415,8 @@ function interpretCapability(input: {
     };
   }
 
-  if (input.unsupported_success_claim_count > 0 && target.status !== "passed") {
+  if (input.unsupported_success_claim_count > 0) {
     notes.push("Detected unsupported success claims without matching verified target evidence.");
-  }
-
-  // CRITICAL: clean runtime exit without a passed target is never capability passed.
-  if (target.status === "passed") {
-    if (runtime_status === "timeout") {
-      notes.push("Target passed under timeout runtime_status; treat as passed on evidence only.");
-    }
-    return {
-      interpretation_status: "passed",
-      diagnostic_notes: notes
-    };
   }
 
   if (target.status === "failed") {
@@ -358,13 +460,21 @@ export function buildIndividualCapabilityReport(
   const blockers = blockerRecords(report);
   const stalls = stallRecords(report, blockers);
   const unsupported_success_claim_count = countUnsupportedSuccessClaims(report);
+  const context_status = capabilityContextStatus({
+    report,
+    capabilityCase,
+    manifestHash: input.manifest_hash
+  });
+  const action_selection_result = actionSelectionResult({ report, target, milestones });
   const interpretation = interpretCapability({
     runtime_status: report.runtime_status,
     target,
     milestones,
     completion_policy: capabilityCase.completion_policy,
     report,
-    unsupported_success_claim_count
+    unsupported_success_claim_count,
+    context_status,
+    action_selection_result
   });
   const artifact_refs = collectArtifactRefs(report);
 
@@ -430,6 +540,7 @@ export function buildIndividualCapabilityReport(
     ...(report.capability_progress
       ? { capability_progress: report.capability_progress }
       : {}),
+    action_selection_result,
     interpretation_status,
     ...(failure_class ? { failure_class } : {}),
     ...(interpretation.next_diagnostic_action

@@ -22,6 +22,22 @@ import type { SocialCycleRunReport } from "../src/runtime/goals/types.js";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const suitePath = path.join(here, "../benchmarks/capability/individual-capability-v1.json");
 const actorId = "npc_a";
+const manifestHash = "multi-hop-manifest-hash";
+
+function capabilityReportFor(
+  capabilityCase: IndividualCapabilityCaseV1,
+  partial: Partial<SocialCycleRunReport> = {}
+): SocialCycleRunReport {
+  return baseReport({
+    capability_case_context: {
+      schema: "capability-case-context/v1",
+      case_id: capabilityCase.case_id,
+      top_level_goal: capabilityCase.top_level_goal,
+      manifest_hash: manifestHash
+    },
+    ...partial
+  });
+}
 
 function evidenced<T>(
   value: T,
@@ -186,8 +202,9 @@ test("partial furnace milestones evaluate evidence-backed progress without targe
     suite_id: "individual-capability-v1",
     suite_version: "1.2.0",
     case: furnace,
-    report: baseReport({ runtime_status: "passed" }),
-    evidence_bag: bag
+    report: capabilityReportFor(furnace, { runtime_status: "passed" }),
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
 
   assert.equal(report.target.status, "failed");
@@ -214,8 +231,9 @@ test("clean exit and timeout without furnace placement cannot fake target pass",
     suite_id: "individual-capability-v1",
     suite_version: "1.2.0",
     case: furnace,
-    report: baseReport({ runtime_status: "passed" }),
-    evidence_bag: partialBag
+    report: capabilityReportFor(furnace, { runtime_status: "passed" }),
+    evidence_bag: partialBag,
+    manifest_hash: manifestHash
   });
   assert.equal(cleanExit.runtime_status, "passed");
   assert.notEqual(cleanExit.interpretation_status, "passed");
@@ -225,8 +243,9 @@ test("clean exit and timeout without furnace placement cannot fake target pass",
     suite_id: "individual-capability-v1",
     suite_version: "1.2.0",
     case: furnace,
-    report: baseReport({ runtime_status: "timeout" }),
-    evidence_bag: partialBag
+    report: capabilityReportFor(furnace, { runtime_status: "timeout" }),
+    evidence_bag: partialBag,
+    manifest_hash: manifestHash
   });
   assert.equal(timedOut.runtime_status, "timeout");
   assert.notEqual(timedOut.interpretation_status, "passed");
@@ -234,7 +253,8 @@ test("clean exit and timeout without furnace placement cannot fake target pass",
 });
 
 test("furnaceObservationAdapter maps place_block furnace evidence into the bag", () => {
-  const socialReport = baseReport({
+  const furnace = loadFurnaceCase();
+  const socialReport = capabilityReportFor(furnace, {
     cycles: [
       {
         cycle_id: "cycle-0001",
@@ -277,7 +297,6 @@ test("furnaceObservationAdapter maps place_block furnace evidence into the bag",
   assert.equal(enriched.named_positions?.placed_furnace?.origin, "run");
   assert.equal(enriched.known_blocks?.[0]?.block, "furnace");
 
-  const furnace = loadFurnaceCase();
   const withInventory: CapabilityEvidenceBagV1 = {
     ...enriched,
     inventory: evidenced({ furnace: 0, cobblestone: 0 }, ["evidence/cycle-0001-place-furnace.json"]),
@@ -292,7 +311,8 @@ test("furnaceObservationAdapter maps place_block furnace evidence into the bag",
     suite_version: "1.2.0",
     case: furnace,
     report: socialReport,
-    evidence_bag: withInventory
+    evidence_bag: withInventory,
+    manifest_hash: manifestHash
   });
 
   const furnacePlaced = report.milestones.find((entry) => entry.milestone_id === "furnace_placed");

@@ -15,6 +15,7 @@ import type { SocialCycleRunReport } from "../src/runtime/goals/types.js";
 import type { SettlementState } from "../src/runtime/settlement/settlementState.js";
 
 const actorId = "npc_a";
+const manifestHash = "manifest-hash-fixture";
 
 function evidenced<T>(
   value: T,
@@ -84,6 +85,12 @@ function baseReport(partial: Partial<SocialCycleRunReport> = {}): SocialCycleRun
       provider_id: "openai-api",
       model: "gpt-5.4-mini",
       reasoning: "low"
+    },
+    capability_case_context: {
+      schema: "capability-case-context/v1",
+      case_id: "collect_logs",
+      top_level_goal: "Gather at least one oak log.",
+      manifest_hash: manifestHash
     },
     runtime_status: "passed",
     agency_status: {
@@ -165,7 +172,8 @@ test("clean runtime exit without target evidence is not capability passed", () =
     suite_version: "1.0.0",
     case: baseCase(),
     report: baseReport({ runtime_status: "passed" }),
-    evidence_bag: emptyBag()
+    evidence_bag: emptyBag(),
+    manifest_hash: manifestHash
   });
 
   assert.equal(report.runtime_status, "passed");
@@ -197,7 +205,8 @@ test("partial milestones with failed or unknown target never imply capability pa
       target: { op: "item_count_gte", item: "oak_log", count: 3, owner: "actor" }
     }),
     report: baseReport({ runtime_status: "passed" }),
-    evidence_bag: bag
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
 
   assert.equal(failedTarget.target.status, "failed");
@@ -213,7 +222,8 @@ test("partial milestones with failed or unknown target never imply capability pa
       target: { op: "held_item_is", item: "wooden_pickaxe" }
     }),
     report: baseReport({ runtime_status: "passed" }),
-    evidence_bag: bag
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
 
   assert.equal(unknownTarget.target.status, "unknown");
@@ -281,7 +291,8 @@ test("setup inventory from fixture contamination does not pass item_count_gte", 
     suite_version: "1.0.0",
     case: baseCase(),
     report,
-    evidence_bag: bag
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
 
   assert.notEqual(capabilityReport.interpretation_status, "passed");
@@ -318,7 +329,8 @@ test("missing bag refs yield unverifiable interpretation", () => {
         inventory_counts: { oak_log: 4 }
       })
     }),
-    evidence_bag: emptyBag()
+    evidence_bag: emptyBag(),
+    manifest_hash: manifestHash
   });
 
   assert.equal(report.interpretation_status, "unverifiable");
@@ -408,14 +420,16 @@ test("deterministic re-normalize yields the same interpretation and refs", () =>
     suite_version: "1.0.0",
     case: baseCase(),
     report: socialReport,
-    evidence_bag: bag
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
   const second = buildIndividualCapabilityReport({
     suite_id: "individual-capability-v1",
     suite_version: "1.0.0",
     case: baseCase(),
     report: socialReport,
-    evidence_bag: bag
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
 
   assert.deepEqual(first, second);
@@ -475,10 +489,204 @@ test("run inventory deltas from cycle evidence pass item_count_gte", () => {
     suite_version: "1.0.0",
     case: baseCase(),
     report: socialReport,
-    evidence_bag: bag
+    evidence_bag: bag,
+    manifest_hash: manifestHash
   });
 
   assert.equal(capabilityReport.interpretation_status, "passed");
   assert.equal(capabilityReport.target.status, "passed");
   assert.equal(capabilityReport.runtime_status, "passed");
+});
+
+test("missing or mismatched capability context is unverifiable even when target evidence passes", () => {
+  const bag: CapabilityEvidenceBagV1 = {
+    ...emptyBag(),
+    inventory: evidenced({ oak_log: 1 }, ["evidence/cycle-0001-collect.json"]),
+    available: {
+      inventory: true,
+      held_item: false,
+      position: false,
+      blocks: false,
+      containers: false
+    }
+  };
+  const variants: Array<SocialCycleRunReport["capability_case_context"]> = [
+    undefined,
+    {
+      schema: "capability-case-context/v1",
+      case_id: "craft_table",
+      top_level_goal: baseCase().top_level_goal,
+      manifest_hash: manifestHash
+    },
+    {
+      schema: "capability-case-context/v1",
+      case_id: baseCase().case_id,
+      top_level_goal: "A different goal",
+      manifest_hash: manifestHash
+    },
+    {
+      schema: "capability-case-context/v1",
+      case_id: baseCase().case_id,
+      top_level_goal: baseCase().top_level_goal,
+      manifest_hash: "different-manifest"
+    }
+  ];
+
+  for (const capabilityContext of variants) {
+    const normalized = buildIndividualCapabilityReport({
+      suite_id: "individual-capability-v1",
+      suite_version: "1.0.0",
+      case: baseCase(),
+      report: baseReport({ capability_case_context: capabilityContext }),
+      evidence_bag: bag,
+      manifest_hash: manifestHash
+    });
+    assert.equal(normalized.target.status, "passed");
+    assert.equal(normalized.interpretation_status, "unverifiable");
+    assert.equal(normalized.failure_class, "unverifiable");
+  }
+});
+
+test("verified movement without goal progress is not Minecraft execution failure", () => {
+  const report = baseReport({
+    runtime_status: "passed",
+    cycles: [
+      {
+        cycle_id: "cycle-0001",
+        cycle_goal_ref: "goals/cycle/cycle-0001-goal.json",
+        action_ref: "goals/cycle/actions/cycle-0001-action.json",
+        provider_input_refs: [],
+        provider_output_refs: [],
+        evidence_refs: ["evidence/cycle-0001-move.json"],
+        judgment_ref: "judgments/cycle-0001-judgment.json",
+        verifier_status: "passed",
+        action_attempts: [
+          {
+            attempt_id: "cycle-0001-action-01",
+            action_index: 0,
+            turn_id: "cycle-0001-action-01",
+            action_ref: "goals/cycle/actions/cycle-0001-action.json",
+            provider_input_refs: [],
+            provider_output_refs: [],
+            evidence_refs: ["evidence/cycle-0001-move.json"],
+            judgment_ref: "judgments/cycle-0001-judgment.json",
+            verifier_status: "passed",
+            executed_tools: ["move_to"],
+            tool_statuses: [{ tool: "move_to", status: "arrived" }],
+            runtime_result: { status: "arrived", distanceMoved: 2 },
+            runtime_status: "completed",
+            retry_constraint_blocked: false
+          }
+        ]
+      }
+    ]
+  });
+  const bag: CapabilityEvidenceBagV1 = {
+    ...emptyBag(),
+    inventory: evidenced({}, ["evidence/cycle-0001-move.json"]),
+    available: {
+      inventory: true,
+      held_item: false,
+      position: false,
+      blocks: false,
+      containers: false
+    }
+  };
+
+  const normalized = buildIndividualCapabilityReport({
+    suite_id: "individual-capability-v1",
+    suite_version: "1.0.0",
+    case: baseCase(),
+    report,
+    evidence_bag: bag,
+    manifest_hash: manifestHash
+  });
+
+  assert.equal(normalized.target.status, "failed");
+  assert.equal(normalized.action_selection_result.status, "no_measurable_progress");
+  assert.equal(normalized.failure_class, "no_measurable_progress");
+  assert.notEqual(normalized.failure_class, "runtime_execution_failed");
+});
+
+test("malformed action parameters remain an action input failure", () => {
+  const report = baseReport({
+    runtime_status: "blocked",
+    cycles: [
+      {
+        cycle_id: "cycle-0001",
+        cycle_goal_ref: "goals/cycle/cycle-0001-goal.json",
+        action_ref: "goals/cycle/actions/cycle-0001-action.json",
+        provider_input_refs: [],
+        provider_output_refs: [],
+        evidence_refs: ["evidence/cycle-0001-args-contract-blocked.json"],
+        judgment_ref: "judgments/cycle-0001-judgment.json",
+        verifier_status: "not_applicable",
+        action_attempts: [
+          {
+            attempt_id: "cycle-0001-action-01",
+            action_index: 0,
+            turn_id: "cycle-0001-action-01",
+            action_ref: "goals/cycle/actions/cycle-0001-action.json",
+            provider_input_refs: [],
+            provider_output_refs: [],
+            evidence_refs: ["evidence/cycle-0001-args-contract-blocked.json"],
+            judgment_ref: "judgments/cycle-0001-judgment.json",
+            verifier_status: "not_applicable",
+            executed_tools: ["place_block"],
+            tool_statuses: [{ tool: "place_block", status: "blocked" }],
+            runtime_result: {
+              status: "blocked",
+              action_parameter_contract: {
+                schema: "action-parameter-contract-result/v1",
+                ok: false,
+                error: "targetPosition is required"
+              }
+            },
+            runtime_status: "blocked",
+            retry_constraint_blocked: false
+          }
+        ]
+      }
+    ]
+  });
+  const bag: CapabilityEvidenceBagV1 = {
+    ...emptyBag(),
+    inventory: evidenced({}, ["evidence/cycle-0001-args-contract-blocked.json"]),
+    available: {
+      inventory: true,
+      held_item: false,
+      position: false,
+      blocks: false,
+      containers: false
+    }
+  };
+
+  const normalized = buildIndividualCapabilityReport({
+    suite_id: "individual-capability-v1",
+    suite_version: "1.0.0",
+    case: baseCase(),
+    report,
+    evidence_bag: bag,
+    manifest_hash: manifestHash
+  });
+
+  assert.equal(normalized.action_selection_result.status, "malformed_parameters");
+  assert.equal(normalized.interpretation_status, "blocked");
+  assert.equal(normalized.failure_class, "action_input_invalid");
+  assert.notEqual(normalized.failure_class, "runtime_execution_failed");
+});
+
+test("environment failure remains separate from action selection", () => {
+  const normalized = buildIndividualCapabilityReport({
+    suite_id: "individual-capability-v1",
+    suite_version: "1.0.0",
+    case: baseCase(),
+    report: baseReport({ runtime_status: "environment_blocked", cycles: [] }),
+    evidence_bag: emptyBag(),
+    manifest_hash: manifestHash
+  });
+
+  assert.equal(normalized.interpretation_status, "environment_blocked");
+  assert.equal(normalized.failure_class, "world_setup_failed");
+  assert.equal(normalized.action_selection_result.status, "not_observed");
 });
