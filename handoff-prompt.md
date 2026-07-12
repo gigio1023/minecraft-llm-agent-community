@@ -22,8 +22,8 @@ compatibility. If the specified procedure does not fit the current code, stop
 and report the mismatch instead of inventing an alternative.
 
 Use plain engineering language. Avoid inflated process terms. Preserve exact
-schema, file, command, and branch identifiers when required. Do not write “as a
-gate”; say “required check” when a check must pass before the next step.
+schema, file, command, and branch identifiers when required. Say “required
+check” when a check must pass before the next step.
 
 ## One Outcome and Mode
 
@@ -109,6 +109,7 @@ Treat these as fixed input:
     interpretation when exhausted / cost-unverifiable);
   - existing evidence already available on `social-cycle-run-report/v1`
     (`capability_case_context`, cycle / `action_attempts`, settlement blockers,
+    action-attempt `runtime_status` including `classifier_failed`, and
     actor-evidence categories such as `action_parameter_contract_failure`).
 
 No unresolved product alternative is delegated to you. Prefer reusing existing
@@ -126,10 +127,12 @@ facts — do not invent new social-runner hooks or provider tools.
 - Branch: `codex/capability-gated-social-sandbox-v4`
 - Expected at start: item 4 early completion is present, including action-level
   stop after each completed action in `probe/src/runtime/socialCycleRunner.ts`
-  via `observeCapabilityProgress`. Verify this rather than assuming only the
-  older cycle-boundary stop from `d852be2e`.
-- Ancestor commits that must be present: `b7dda428`, `773e3bca`, and early
-  completion (`d852be2e` or later commit that includes action-level stop).
+  via `observeCapabilityProgress`, unique prior-action evidence in subsequent
+  Actor Turns, and preservation of executed evidence if runtime classification
+  fails. Verify commit `0a29b1c4` rather than assuming the older cycle-boundary
+  stop from `d852be2e` or the first action-level change alone.
+- Ancestor commits that must be present: `b7dda428`, `773e3bca`, `962440af`, and
+  `0a29b1c4`.
 - No provider request or live Minecraft rerun is authorized by this packet.
 - This file is the only active root continuation prompt for the next change.
 
@@ -140,7 +143,7 @@ facts — do not invent new social-runner hooks or provider tools.
 | Declared goal delivery | Exact `case_id` / `top_level_goal` / `manifest_hash`; scenario task prose suppressed | `b7dda428` |
 | Crafting-table placement | Empty parameters rejected; no adjacent invent | `b7dda428` |
 | World scan diversity | Query-neutral sampling | `b7dda428` |
-| Early completion (item 4) | Stop after each completed **action** when target evidence passes; write-once progress measurements; not budget exhaustion | `d852be2e` plus action-level follow-through; tests in `probe/test/capabilityEarlyCompletion.test.ts` |
+| Early completion (item 4) | Stop after each completed **action** when target evidence passes; do not duplicate the current attempt in the next Actor Turn; preserve executed evidence on runtime-classifier failure; keep progress measurements separate from budget/runtime status | `962440af`, `0a29b1c4`, and `probe/test/capabilityEarlyCompletion.test.ts` |
 | Repair plan | Items 1–4 checked; item 5 next | repair plan Progress section |
 
 ## Exact Allowed Scope
@@ -269,12 +272,15 @@ Continue without pausing only if:
 - the branch is exactly `codex/capability-gated-social-sandbox-v4`;
 - early-completion ancestors are present and action-level observation after each
   completed action exists in `socialCycleRunner.ts`;
+- commit `0a29b1c4` is present, and the current cycle is excluded from prior
+  Actor Turn history while runtime-classifier failures retain their executed
+  action attempt and evidence;
 - overlapping unrelated user edits are not present on disallowed files;
 - no provider or live-run command is required.
 
-If item 4 action-level stop is missing, stop; do not reimplement item 4 under
-this packet. If these conditions match, proceed. Do not ask the user to
-reconfirm.
+If commit `0a29b1c4` or its two regression behaviors are missing, stop; do not
+reimplement item 4 under this packet. If these conditions match, proceed. Do not
+ask the user to reconfirm.
 
 ## Ordered Execution
 
@@ -346,8 +352,9 @@ or redesign the procedure.
 
 - Keep `runtime_status`, target/milestone evidence, action-selection result, and
   interpretation independent.
-- Preserve item 4 action-level early completion and `capability_progress`
-  measurement semantics.
+- Preserve item 4 action-level early completion, unique prior-action context,
+  classifier-failure evidence retention, and `capability_progress` measurement
+  semantics.
 - Preserve setup evidence exclusions and the furnace adapter.
 - Preserve typed refs and root-safe actor workspace resolution.
 - Preserve exact case-goal delivery, explicit placement, and diverse scan from
@@ -405,7 +412,7 @@ Do not begin any of these in the same execution.
 | Path | Purpose | State |
 | --- | --- | --- |
 | `project-docs/research/benchmarks/capability-live-validation-repair-plan.md` | Approved repair order; item 5 is this work | items 1–4 complete; item 5 checkbox pending |
-| `project-docs/research/benchmarks/capability-early-completion-implementation.md` | Item 4 done, including action-level stop | prerequisite; do not reopen |
+| `project-docs/research/benchmarks/capability-early-completion-implementation.md` | Item 4 done, including action-level stop, unique next-turn evidence, and classifier-failure evidence retention | prerequisite at `0a29b1c4`; do not reopen |
 | `probe/src/benchmarks/capability/reportTypes.ts` | Interpretation / failure enums and report shape | edit if action-selection field needed |
 | `probe/src/benchmarks/capability/report.ts` | Attribution logic | primary change surface |
 | `probe/src/benchmarks/capability/cli.ts` | Summary field order | primary change surface |

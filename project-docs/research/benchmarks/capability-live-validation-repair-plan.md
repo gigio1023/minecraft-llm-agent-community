@@ -198,9 +198,11 @@ optional callback from `runCapabilityCase`. The callback receives saved report
 and actor-workspace state and returns only a typed progress observation:
 
 - target status;
-- newly passed milestone identifiers;
-- evidence refs;
-- whether execution should stop.
+- passed milestone identifiers;
+- evidence refs.
+
+The generic runner owns the stop decision from that observation; the callback
+does not return stop policy.
 
 Record time, provider requests, tokens, runtime actions, and completed cycles at
 first measurable progress and at target completion. Flush the report before
@@ -346,7 +348,8 @@ or start social simulations from this plan.
 - [x] Require explicit crafting-table placement targets.
 - [x] Improve query-neutral world-scan sampling.
 - [x] Add evidence-based early completion and measurements
-  (action-level stop after each completed action; not cycle-only).
+  (action-level stop after each completed action; no duplicated current-action
+  input; executed evidence survives runtime classification failure).
 - [ ] Improve failure attribution and CLI summary order.
 - [ ] Reduce repeated Action Card input without changing action availability.
 - [ ] Add external usage observations to preflight.

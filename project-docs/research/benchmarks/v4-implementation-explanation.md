@@ -76,6 +76,7 @@ via `evidence_kind_seen` was **replaced**, not papered over (`ZERO_COST_IMPLEMEN
 | `b7dda428` | Live-validation repair — exact goal input, explicit table placement, diverse world scan |
 | `d852be2e` | Live-validation repair — stop capability runs on target evidence (cycle-boundary early completion) |
 | `962440af` | Live-validation repair — action-level early completion (after each completed action) |
+| `0a29b1c4` | Live-validation repair — remove in-progress evidence duplication and preserve executed actions when runtime classification fails |
 
 Prior on branch: `26c1f93f` (initial A1), `2c7f2193` (handoff rewrite).
 
@@ -184,7 +185,7 @@ still overstate what had been observed. The code now handles them as follows:
 ## 7. Validation evidence
 
 ```bash
-cd probe && bun test          # 737 pass after early-completion
+cd probe && bun test          # 743 pass after early-completion review repairs
 cd probe && bun run typecheck
 cd docs && npm run build
 git diff --check

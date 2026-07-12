@@ -38,8 +38,9 @@ via the adaptation in the active implementation plan.
 
 ## Validation snapshot
 
-- `cd probe && bun test test/capabilityEarlyCompletion.test.ts` → 8 pass
-- `cd probe && bun test` → 741 pass
+- `cd probe && bun test test/capabilityEarlyCompletion.test.ts` → 10 pass
+- focused runtime/capability set → 37 pass
+- `cd probe && bun test` → 743 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
 - `git diff --check` → pass
@@ -51,6 +52,8 @@ via the adaptation in the active implementation plan.
 | --- | --- | --- | --- |
 | Item 4 “after each completed action” | First land (`d852be2e`) only observed after each cycle | Treated as partial until action-level follow-up | Closed by action-level refinement |
 | Cycle upsert before observe | Adapters only see `report.cycles` | Upsert in-progress cycle + settlement refresh after each action | Keep |
+| In-progress cycle appeared in prior history for action 2 | Current action verdict and evidence were duplicated in Actor Turn input | Exclude the current cycle before adding local attempts | Closed by `0a29b1c4` |
+| Runtime classifier failed after Minecraft execution | The action attempt and capability observation were skipped and the failure was called provider failure | Write a validated fallback judgment, preserve the attempt/evidence, observe target progress, and keep runtime failure separate | Closed by `0a29b1c4` |
 | Handoff pointed at early completion after docs claimed next was attribution | Stale handoff risk | Rewrote `handoff-prompt.md` to item 5 | Keep current |
 
 ## Recent commits (this successor wave)
@@ -59,3 +62,4 @@ via the adaptation in the active implementation plan.
 | --- | --- |
 | `d852be2e` | probe: stop capability runs on target evidence |
 | `962440af` | probe: stop capability runs after each action |
+| `0a29b1c4` | probe: preserve action-level capability evidence |

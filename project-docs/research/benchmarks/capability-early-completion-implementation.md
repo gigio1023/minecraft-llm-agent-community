@@ -6,6 +6,7 @@ Branch: `codex/capability-gated-social-sandbox-v4`
 Commits:
 - `d852be2e` — cycle-boundary early stop (narrow handoff)
 - `962440af` — action-level early stop (repair-plan item 4 completion)
+- `0a29b1c4` — unique next-turn evidence and classifier-failure preservation
 
 Date: 2026-07-12  
 Authority: repair-plan item 4 in
@@ -57,7 +58,7 @@ comparison, social simulation, or paper result.
 The social runner must not import capability evaluation policy. An optional
 callback keeps the generic loop reusable.
 
-### Observation timing (repair-plan contract)
+### Observation timing
 
 After each completed action:
 
@@ -81,6 +82,7 @@ of progress truth for early stop.
 | Target passed, no `caseBudgetStop` | Leave budget stop unset; `runtime_status = "passed"` unless provider/environment failure already occurred |
 | `caseBudgetStop` already recorded or tripped at observation | Budget keeps priority → `runtime_status = "timeout"`; do not rebrand as early success |
 | Provider failure | `runtime_status = "failed"` |
+| Runtime classification failure after execution | Preserve the action, judgment, evidence, and target observation; `runtime_status = "failed"`; do not set `provider_error` |
 | Environment blocked | Keep environment status from finalize path |
 | Clean exit without target evidence | Still not capability success in the normalized report |
 
@@ -125,7 +127,7 @@ Rules:
 - later checks may update `latest_*` but must not rewrite the first measurement
   points;
 - measurement counts come from the existing report/action counts, case clock,
-  and usage observer after the completed cycle;
+  and usage observer after the completed action;
 - `evidence_refs` are the union of the passed target and passed milestones only;
 - no second usage ledger, clock, event stream, or standalone JSON schema was
   added.
@@ -138,21 +140,28 @@ runCapabilityCase
        testHooks override OR evaluateCapabilityCaseProgress
   └─ runSocialCycle(... observeCapabilityProgress ...)
        for each cycle:
-         ... execute cycle ...
-         report.cycles.push(completedCycle)
-         writeJson(raw report)                    # durable cycle first
-         if observeCapabilityProgress:
-           observation = await callback(report, actorDir)
-           observed = collectCaseBudgetObserved() # cycles/actions/wall/usage
-           applyCapabilityProgressObservation()   # write-once points
-           writeJson(raw report)                  # persist progress
-           if observation.targetStatus == passed
-              and caseBudgetStop unset:
-                earlyTargetCompleted = true
-                break
+         for each action:
+           execute action and produce runtime evidence
+           write a normal or classifier-failure judgment
+           append action attempt
+           upsert in-progress cycle
+           writeJson(raw report)                    # durable action first
+           if observeCapabilityProgress:
+             observation = await callback(report, actorDir)
+             observed = collectCaseBudgetObserved() # cycles/actions/wall/usage
+             recheck case budgets
+             applyCapabilityProgressObservation()   # write-once points
+             writeJson(raw report)                  # persist progress
+             if observation.targetStatus == passed
+                and caseBudgetStop unset:
+                  earlyTargetCompleted = true
+                  break before the next action
+           if runtime classifier failed:
+             break before the next action
+         finalize and persist the cycle
        finalize runtime_status
          caseBudgetStop → timeout
-         else providerFailed → failed
+         else providerFailed or runtimeClassifierFailed → failed
          else earlyTargetCompleted → passed
   └─ buildIndividualCapabilityReport
        copies report.capability_progress if present
@@ -174,24 +183,25 @@ Setup-origin inventory and missing evidence still yield `unknown` /
 
 ## 6. Files changed
 
-Only the handoff allowlist was edited.
-
 | File | Change |
 | --- | --- |
 | `probe/src/runtime/goals/types.ts` | Added `CapabilityProgressMeasurement`, `CapabilityProgressSummary`, and optional `SocialCycleRunReport.capability_progress` |
-| `probe/src/runtime/socialCycleRunner.ts` | Added `SocialCycleCapabilityProgressObservation`, `observeCapabilityProgress` option, measurement merge helper, post-cycle observe/stop path, early-pass `runtime_status` override |
+| `probe/src/runtime/socialCycleRunner.ts` | Observes after each completed action, excludes the in-progress cycle from the next Actor Turn's prior history, preserves classifier-failure attempts, and keeps runtime failure independent from provider failure |
+| `probe/src/runtime/socialCycleTurnCore.ts` | Builds one shared executed-action record and writes a validated fallback judgment when post-action runtime classification fails |
 | `probe/src/benchmarks/capability/runner.ts` | Added `evaluateCapabilityCaseProgress`; wired production observer into `runSocialCycle`; optional `testHooks.observeCapabilityProgress` override for deterministic orchestration tests |
 | `probe/src/benchmarks/capability/reportTypes.ts` | Optional `capability_progress` on `IndividualCapabilityReportV1` |
 | `probe/src/benchmarks/capability/report.ts` | Copies raw `capability_progress` into the normalized report |
 | `probe/src/benchmarks/capability/index.ts` | Exports `evaluateCapabilityCaseProgress` |
-| `probe/test/capabilityEarlyCompletion.test.ts` | Provider-free tests including action-level stop, disk raw/normalized copy, and budget-vs-target priority |
+| `probe/test/capabilityEarlyCompletion.test.ts` | Provider-free tests including action-level stop, unique next-turn evidence, disk raw/normalized copy, budget-vs-target priority, and classifier-failure preservation |
 
 Not changed (intentionally):
 
 - capability manifests and predicate definitions;
 - Action Cards, provider prompts, Mineflayer actions, placement, world scan;
 - provider usage tracking / quota policy;
-- CLI summary order / failure attribution (repair plan item 5);
+- general capability failure attribution and CLI summary order (repair plan
+  item 5); this work only stopped a post-action runtime-classifier failure from
+  being mislabeled as a provider failure;
 - `SPEC.md` / `AGENTS.md`.
 
 ## 7. Tests
@@ -208,6 +218,8 @@ File: `probe/test/capabilityEarlyCompletion.test.ts`.
 | 6 | Unknown target, no milestones | Measurement points omitted; no timeout from early-completion path |
 | 7 | `runCapabilityCase` disk regression | Raw and normalized reports on disk share matching `capability_progress` |
 | 8 | Target pass + budget ceiling at same observation | `runtime_status: "timeout"`; budget keeps priority |
+| 9 | Two-action continuation after in-progress cycle upsert | The second Actor Turn contains one verdict and one copy of each evidence ref for action 1 |
+| 10 | Runtime classifier failure after execution | Action attempt, fallback judgment, execution refs, and target observation persist; runtime fails without `provider_error` |
 
 Regression companions kept green:
 
@@ -220,8 +232,9 @@ Working directory: repository root unless noted.
 
 | Check | Result |
 | --- | --- |
-| Focused tests (`capabilityEarlyCompletion`) | 8 pass |
-| `cd probe && bun test` | run after action-level land |
+| Focused tests (`capabilityEarlyCompletion`) | 10 pass |
+| Focused runtime/capability set | 37 pass |
+| `cd probe && bun test` | 743 pass, 0 fail |
 | `cd probe && bun run typecheck` | pass |
 | `cd docs && npm run build` | pass when docs change |
 | `git diff --check` | pass |
@@ -231,7 +244,7 @@ Push: not authorized unless the user asks.
 No provider HTTP request, Docker/Minecraft live run, package install, or later
 repair-plan item was started in this wave.
 
-## 9. Review findings closed by the action-level refinement
+## 9. Review findings now closed
 
 1. **Cycle-only observation (P1)** — observer now runs after each completed
    action with an in-progress cycle upsert so adapters and action counts see
@@ -241,7 +254,15 @@ repair-plan item was started in this wave.
    same-boundary coverage.
 3. **Stale handoff (P2)** — `handoff-prompt.md` now points at item 5 (failure
    attribution / CLI), not a re-run of early completion.
-4. **Wording (P3)** — avoid “as a gate”; use “required check”.
+4. **Wording (P3)** — replaced the avoided process phrase with “required
+   check”.
+5. **Duplicated next-turn evidence (P1)** — the in-progress current cycle is
+   excluded from prior-cycle context before local action attempts are added, so
+   action 1 appears once in action 2's decision frame and evidence trace.
+6. **Classifier-failure evidence loss (P2)** — an action that already executed
+   now receives a validated fallback judgment and linked attempt before target
+   observation. The run remains failed, but the failure is not labeled as a
+   provider error and cannot erase physical evidence.
 
 ## 10. What this does and does not prove
 
@@ -256,6 +277,10 @@ repair-plan item was started in this wave.
 - Partial and no-progress paths remain truthful.
 - Production evaluation reuses the same adapters and predicates as final
   normalization; disk raw and normalized reports share `capability_progress`.
+- Continuing within the same cycle does not duplicate the current action in the
+  next Actor Turn input.
+- A post-action runtime classification failure preserves execution evidence and
+  target status while keeping the overall runtime result failed.
 
 ### Not proven
 
@@ -290,4 +315,3 @@ preflight, and explicit user approval.
 | `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md` | Evidence that motivated the repairs |
 | `project-docs/research/benchmarks/v4-implementation-explanation.md` | Broader V4 implementation map |
 | `implementation-notes.md` | Branch-local progress and deviations |
-
