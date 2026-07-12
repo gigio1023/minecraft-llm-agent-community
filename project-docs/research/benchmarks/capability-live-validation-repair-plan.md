@@ -321,6 +321,14 @@ Completion checks:
 - raw JSON remains byte-identical unless a separately named normalized archive
   artifact is intentionally produced.
 
+Implemented provider-free on 2026-07-12. `report-archive-relocation/v1`
+sidecars bind each unchanged raw report SHA-256 to its repository-relative
+actor workspace and exact approved preflight. The readiness checker resolves
+the sidecar before the stale absolute path, verifies all actor refs, and requires
+an operator-approved `allowed` preflight. A fresh temporary repository-copy test
+passes without creating the original path. All three archived 2026-07-11 raw
+reports now pass `--publishable` readiness with no warnings.
+
 ## Provider-Free Verification
 
 Run focused tests after each work item. Before asking for a live rerun, run:
@@ -378,6 +386,7 @@ or start social simulations from this plan.
   surface is unchanged; shared guidance and overlap IDs replace repeated prose.
 - [x] Add structured external dashboard usage observations to preflight, with
   exact-day checks and conservative overlap handling.
-- [ ] Add portable archive relocation and preflight linkage.
+- [x] Add portable archive relocation and exact approved-preflight linkage
+  without rewriting raw reports.
 - [ ] Complete all provider-free checks.
 - [ ] Request approval for two bounded live reruns.

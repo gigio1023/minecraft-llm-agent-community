@@ -22,8 +22,11 @@ Repeated Action Card guidance is shared once, direct primitive/action-skill
 overlaps are explicit, all runtime mappings remain visible, and strict function
 schemas are unchanged. Item 7 is complete provider-free: preflight accepts a
 strict dated dashboard-usage observation and records the conservative chosen
-calculation. Next is portable archived report resolution and direct preflight
-linkage. No new provider request is authorized.
+calculation. Item 8 is complete provider-free: unchanged raw reports use
+SHA-256-bound relocation sidecars for repository-relative actor workspaces and
+the exact approved preflight. Next is the complete provider-free verification
+sequence and both required capability CLI checks. No new provider request is
+authorized.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -40,6 +43,8 @@ via the adaptation in the active implementation plan.
   Card input reduction)
 - Live-validation repair item 7 (structured external dashboard usage in
   provider preflight)
+- Live-validation repair item 8 (portable archived report resolution and exact
+  approved-preflight linkage)
 
 ## Partial / blocked
 
@@ -65,7 +70,10 @@ via the adaptation in the active implementation plan.
 - same-input shared-guidance regression: 18,073 → 14,204 bytes and 4,519 →
   3,551 estimated tokens
 - `bun test probe/test/providerQuotaPreflightScript.test.ts` → 7 pass
-- `cd probe && bun test` → 747 pass
+- `bun test probe/test/reportReadinessCheckScript.test.ts` → 4 pass
+- all three archived 2026-07-11 raw reports → publishable readiness passed,
+  with archived workspaces and the approved preflight resolved from sidecars
+- `cd probe && bun test` → 751 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
 - `git diff --check` → pass
@@ -85,6 +93,8 @@ via the adaptation in the active implementation plan.
 | The plan asked for one shared Action Card explanation | Repetition also existed in every provider function description and actor-owned action-skill hint list | Put general, evidence, and grouped guidance in `action_card_shared_guidance`; keep per-card behavior/state details and strict function schemas | Revisit after the next approved live run if tool selection quality regresses |
 | A historical and a current full Actor Turn input differed in more than Action Cards | World state and capability context also changed between runs | Compare the identical 32-title Action Card surface only, then add a same-input re-expansion regression for isolated measurement | Keep both measurements with their stated scope |
 | Dashboard totals may include the same calls as the local ledger | Adding both would understate remaining capacity | For confirmed current UTC-day observations, add only when disjointness is explicit; otherwise use the larger value for each metric | Revisit only if the provider exposes stable per-key usage identifiers |
+| Raw reports must remain byte-identical but contain machine-local workspace roots | Rewriting the root would damage the raw audit trail | Add SHA-256-bound `report-archive-relocation/v1` sidecars and make readiness prefer the archived repository-relative root | Keep for every future archive import with a stale absolute root |
+| One full-suite run hit the wall-time test once and Bun then emitted cascading `node:test` nesting errors | The earliest test passed alone, and the full suite passed when rerun without concurrent checks | Treat the first result as a Bun runner cascade, record both runs, and keep the isolated wall-time test in future verification | Revisit if the earliest test fails independently |
 
 ## Recent commits (this successor wave)
 

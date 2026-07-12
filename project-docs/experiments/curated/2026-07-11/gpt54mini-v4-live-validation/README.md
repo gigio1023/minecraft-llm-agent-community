@@ -12,9 +12,10 @@ All three runs produced declarations, raw reports, normalized reports, budget
 status, suite indexes, actor workspaces, provider snapshots, runtime evidence,
 and passing report audits. Runtime-review summarization resolved every reported
 artifact ref: 14/14 for log collection, 60/60 for wooden-pickaxe crafting, and
-22/22 for the infeasible case. Report readiness warned only that each raw report
-does not embed a preflight ref; the approved preflight is preserved beside this
-report.
+22/22 for the infeasible case. On 2026-07-12, repository-relative relocation
+sidecars were added beside the unchanged raw reports. Publishable readiness now
+resolves each archived actor workspace and the exact approved preflight without
+using the original absolute `tmp/` path.
 
 Experiment verdict: the provider path and evidence path worked, but the three
 runs do not establish the intended individual-capability result.
@@ -119,13 +120,14 @@ carry a fixture-backed crafting objective through several verified material
 steps. It does not support a full wooden-pickaxe pass or natural-world
 competence.
 
-### P3 — Archive and report linkage is incomplete
+### P3 — Archive and report linkage repaired after the run
 
-The raw reports contain provider usage decisions but do not cite the adjacent
-approved preflight. The readiness checker therefore returns `warning`, not a
-publishable clean result. Raw copies also preserve their original absolute
-`tmp/` workspace paths; matching actor workspaces are archived beside them, but
-a future portable importer should record the relocation explicitly.
+The raw reports still contain their original absolute `tmp/` workspace paths
+and no embedded preflight ref, preserving the exact run output. A
+`report-archive-relocation/v1` sidecar beside each raw report now binds its
+SHA-256 to the repository-relative actor workspace and the approved preflight.
+All three raw reports pass publishable readiness through those sidecars. This
+repairs archive interpretation only; it does not change the experiment verdict.
 
 ## What Happened
 

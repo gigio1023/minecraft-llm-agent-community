@@ -1,6 +1,7 @@
 /** Regression coverage for the repo-local report readiness skill script. */
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -117,6 +118,78 @@ test("publishable provider-backed reports fail when preflight evidence is missin
     );
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("archived report sidecar resolves workspace and approved preflight from a fresh repository copy", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "report-readiness-portable-repo-"));
+  try {
+    await writeFile(path.join(root, "SPEC.md"), "# Test repository\n", "utf8");
+    const reportRef = "project-docs/experiments/raw/portable-run/raw-report.json";
+    const actorRootRef = "project-docs/experiments/raw/portable-run/actor-workspace";
+    const preflightRef = "project-docs/experiments/curated/portable-run/preflight/approved.json";
+    const reportPath = path.join(root, reportRef);
+    const actorRoot = path.join(root, actorRootRef);
+    const actorDir = path.join(actorRoot, "npc_b");
+    const preflightPath = path.join(root, preflightRef);
+    const originalActorRoot = "/original/machine/tmp/portable-run/actor-workspace";
+    await writeJson(path.join(actorDir, "evidence/action.json"), { status: "completed" });
+    await writeJson(path.join(actorDir, "provider-inputs/turn.json"), { schema: "provider-input-snapshot/v1" });
+    await writeJson(path.join(actorDir, "provider-outputs/turn.json"), { schema: "provider-output-snapshot/v1" });
+    await writeJson(preflightPath, {
+      schema: "provider-quota-preflight/v1",
+      final_status: "allowed",
+      approval: { operator_approved: true, approval_note: "Test approval" }
+    });
+    await writeJson(reportPath, {
+      schema: "custom-run-report/v1",
+      run_id: "portable-run",
+      actor_id: "npc_b",
+      actor_workspace_root_dir: originalActorRoot,
+      provider: { provider_id: "openai-api", model: "gpt-5.4-mini" },
+      provider_usage: { budget_status: [{ status: "allowed" }] },
+      cycles: [{
+        cycle_id: "cycle-0001",
+        evidence_refs: ["evidence/action.json"],
+        provider_input_refs: ["provider-inputs/turn.json"],
+        provider_output_refs: ["provider-outputs/turn.json"]
+      }]
+    });
+    const rawBefore = await readFile(reportPath);
+    const reportSha256 = createHash("sha256").update(rawBefore).digest("hex");
+    await writeJson(path.join(path.dirname(reportPath), "report-archive-relocation.json"), {
+      schema: "report-archive-relocation/v1",
+      created_at: "2026-07-12T00:00:00.000Z",
+      report_ref: reportRef,
+      report_sha256: reportSha256,
+      original_actor_workspace_root: originalActorRoot,
+      archived_actor_workspace_root_ref: actorRootRef,
+      approved_preflight_ref: preflightRef
+    });
+
+    const module = await loadReadinessModule();
+    const checked = module.checkReportReadiness(
+      [reportPath, "--json", "--publishable"],
+      { cwd: os.tmpdir(), now: new Date("2026-07-12T01:00:00.000Z") }
+    );
+    const result = JSON.parse(checked.outputText);
+    assert.equal(checked.exitCode, 0);
+    assert.equal(result.final_status, "passed");
+    assert.equal(
+      result.checks.find((check: { name: string }) => check.name === "archive_relocation_valid")?.status,
+      "passed"
+    );
+    assert.equal(
+      result.checks.find((check: { name: string }) => check.name === "actor_workspace_root")?.status,
+      "passed"
+    );
+    assert.equal(
+      result.checks.find((check: { name: string }) => check.name === "approved_preflight_valid")?.status,
+      "passed"
+    );
+    assert.deepEqual(await readFile(reportPath), rawBefore);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 

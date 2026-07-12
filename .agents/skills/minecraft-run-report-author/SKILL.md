@@ -40,6 +40,14 @@ refs, and screenshot-only conclusions.
    bun run .agents/skills/minecraft-run-report-author/scripts/report-readiness-check.ts <report-or-session.json> --publishable
    ```
 
+   If an archived raw report still contains its original absolute actor
+   workspace path, keep the raw report unchanged and place
+   `report-archive-relocation.json` beside it. The `report-archive-relocation/v1`
+   record must contain the repository-relative report, archived actor workspace,
+   and approved preflight refs plus the raw report SHA-256. Readiness resolves
+   that sidecar before the stale absolute path and verifies the approved
+   preflight artifact.
+
 5. If the report will compare models or become a public/HTML artifact, also run
    the focused audit/review commands that apply to the artifact:
 
