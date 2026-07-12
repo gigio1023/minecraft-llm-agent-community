@@ -10,10 +10,11 @@ import type { GeminiJsonProviderConfig } from "../provider/geminiApiJsonProvider
 import type { ModelScopeApiProviderConfig } from "../provider/modelscopeApiProvider.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import { writeActorGoalArtifact } from "./goals/goalJsonStore.js";
-import type {
-  ActorCycleGoal,
-  CycleJudgment,
-  SocialCycleProviderId
+import {
+  validateCycleJudgment,
+  type ActorCycleGoal,
+  type CycleJudgment,
+  type SocialCycleProviderId
 } from "./goals/types.js";
 import {
   classifyActorTurnProviderContractRejection,
@@ -23,6 +24,7 @@ import {
   type ActorTurnResolvedAction,
   type ActorTurnRuntimeClassifierResult
 } from "./goals/actorEpisode/index.js";
+import { writeCycleJudgment } from "./goals/cycleJudgmentStore.js";
 import {
   executeActorTurnAction,
   type SocialCycleExecutionResult
@@ -34,6 +36,7 @@ import {
 } from "./retryConstraints.js";
 import type { ActorActionSkillRecord } from "./actorWorkspaceStore.js";
 import type { SocialPrimitiveAttemptStatus } from "./socialCycleProgress.js";
+import { deterministicJudgmentOutcome } from "./socialCycleProgress.js";
 import type { ActionSkillPostconditionResult } from "./settlement/settlementState.js";
 import type { ObserveChatEvent } from "../tools/observe.js";
 
@@ -58,6 +61,8 @@ export type SocialCycleActionAttemptReport = {
   postcondition_results: ActionSkillPostconditionResult[];
   plan_bead_operation_result_refs: string[];
 };
+
+export type SocialCycleRuntimeClassifier = typeof classifyActorTurnRuntime;
 
 type TurnProviderConfig = {
   openAi?: OpenAiJsonProviderConfig;
@@ -110,6 +115,124 @@ export function providerRefs(input: {
     ]
       .map((ref) => actorRelativeRef(input.actorDir, ref))
       .filter((ref): ref is string => Boolean(ref))
+  };
+}
+
+function buildExecutedActionAttempt(input: {
+  actorDir: string;
+  turnId: string;
+  actionIndex: number;
+  activeEpisodeId?: string;
+  plannedActionRef: string;
+  planner: Extract<ActorTurnProviderResult, { ok: true }>;
+  execution: SocialCycleExecutionResult;
+  judgmentRef: string;
+  judgmentInputRef?: string;
+  judgmentOutputRef?: string;
+  branchRecommended?: boolean;
+  branchReason?: string;
+  runtimeStatusOverride?: string;
+}): SocialCycleActionAttemptReport {
+  const refs = providerRefs({
+    actorDir: input.actorDir,
+    inputRef: input.planner.inputRef,
+    outputRef: input.planner.outputRef,
+    intermediateInputRefs: input.planner.intermediateInputRefs,
+    intermediateOutputRefs: input.planner.intermediateOutputRefs
+  });
+  return {
+    attempt_id: input.turnId,
+    action_index: input.actionIndex,
+    turn_id: input.turnId,
+    active_episode_id: input.activeEpisodeId,
+    action_ref: input.plannedActionRef,
+    provider_input_refs: [
+      ...refs.provider_input_refs,
+      input.judgmentInputRef ? path.relative(input.actorDir, input.judgmentInputRef) : ""
+    ].filter(Boolean),
+    provider_output_refs: [
+      ...refs.provider_output_refs,
+      input.judgmentOutputRef ? path.relative(input.actorDir, input.judgmentOutputRef) : ""
+    ].filter(Boolean),
+    evidence_refs: input.execution.evidenceRefs,
+    judgment_ref: input.judgmentRef,
+    verifier_status: input.execution.verifierStatus,
+    executed_tools: input.execution.executedTools,
+    tool_statuses: input.execution.toolStatuses,
+    runtime_result: input.execution.runtimeResult,
+    runtime_status:
+      input.runtimeStatusOverride ??
+      (input.execution.gateBlocked
+        ? "blocked"
+        : input.execution.verifierStatus === "failed"
+          ? "failed"
+          : "completed"),
+    retry_constraint_blocked: input.execution.retryConstraintBlocked,
+    branch_recommended: input.branchRecommended,
+    branch_reason: input.branchReason,
+    postcondition_results: input.execution.postconditionResults,
+    plan_bead_operation_result_refs: []
+  };
+}
+
+async function writeRuntimeClassifierFailureJudgment(input: {
+  rootDir: string;
+  actorId: string;
+  runId: string;
+  cycleId: string;
+  turnId: string;
+  cycleGoal: ActorCycleGoal;
+  execution: SocialCycleExecutionResult;
+  error: string;
+}): Promise<{
+  judgment: CycleJudgment;
+  judgmentRef: string;
+  branchRecommended: true;
+  branchReason: string;
+}> {
+  const branchReason = "runtime classifier failed after action execution";
+  const judgment: CycleJudgment = {
+    schema: "cycle-judgment/v1",
+    actor_id: input.actorId,
+    cycle_id: input.cycleId,
+    run_id: input.runId,
+    cycle_goal_id: input.cycleGoal.goal_id,
+    outcome: deterministicJudgmentOutcome({
+      verifierStatus: input.execution.verifierStatus,
+      executedTools: input.execution.executedTools,
+      toolStatuses: input.execution.toolStatuses
+    }),
+    what_happened:
+      `The Minecraft action completed, but runtime result classification failed: ${input.error}. ` +
+      "The execution evidence remains authoritative and is retained on this action attempt.",
+    why_it_mattered_for_life_goal:
+      "The run must stop for runtime diagnosis without discarding verified world or inventory changes and without relabeling the failure as a provider error.",
+    verifier_status: input.execution.verifierStatus,
+    evidence_refs: [...input.execution.evidenceRefs],
+    memory_writes: [],
+    relationship_event_proposals: [],
+    next_goal_context: [
+      "Inspect the runtime classifier failure and the retained execution evidence before continuing."
+    ],
+    bead_op_proposals: []
+  };
+  const validated = validateCycleJudgment(judgment);
+  if (!validated.ok) {
+    throw new Error(
+      `failed to write runtime classifier failure judgment: ${validated.errors.join("; ")}`
+    );
+  }
+  const { ref } = await writeCycleJudgment(
+    input.rootDir,
+    input.actorId,
+    validated.judgment,
+    input.turnId
+  );
+  return {
+    judgment: validated.judgment,
+    judgmentRef: ref,
+    branchRecommended: true,
+    branchReason
   };
 }
 
@@ -256,6 +379,9 @@ export type SocialCycleTurnCoreResult =
       execution: SocialCycleExecutionResult;
       retryAttempt?: RuntimeRetryAttempt;
       judgmentResult: Extract<ActorTurnRuntimeClassifierResult, { ok: false }>;
+      judgment: CycleJudgment;
+      judgmentRef: string;
+      attempt: SocialCycleActionAttemptReport;
     };
 
 export async function runSocialCycleTurnCore(input: {
@@ -282,6 +408,8 @@ export async function runSocialCycleTurnCore(input: {
   providerConfig?: TurnProviderConfig;
   /** Case-budget abort; threaded into action execution for abort+await cleanup. */
   signal?: AbortSignal;
+  /** Test-only replacement for the deterministic post-action classifier. */
+  classifyRuntimeForTest?: SocialCycleRuntimeClassifier;
 }): Promise<SocialCycleTurnCoreResult> {
   // Prefer early abort over starting provider planning when the case budget
   // (or external) signal already fired. Deep HTTP cancel is out of scope here.
@@ -365,7 +493,7 @@ export async function runSocialCycleTurnCore(input: {
     execution
   });
 
-  const judgmentResult = await classifyActorTurnRuntime({
+  const judgmentResult = await (input.classifyRuntimeForTest ?? classifyActorTurnRuntime)({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
     actorId: input.actorId,
     cycleId: input.cycleId,
@@ -381,6 +509,16 @@ export async function runSocialCycleTurnCore(input: {
   });
 
   if (!judgmentResult.ok) {
+    const fallback = await writeRuntimeClassifierFailureJudgment({
+      rootDir: input.actorWorkspaceRootDir,
+      actorId: input.actorId,
+      runId: input.runId,
+      cycleId: input.cycleId,
+      turnId: input.turnId,
+      cycleGoal: input.cycleGoal,
+      execution,
+      error: judgmentResult.error
+    });
     return {
       status: "classifier_failed",
       planner,
@@ -388,17 +526,24 @@ export async function runSocialCycleTurnCore(input: {
       plannedRuntimeAction,
       execution,
       ...(retryAttempt ? { retryAttempt } : {}),
-      judgmentResult
+      judgmentResult,
+      judgment: fallback.judgment,
+      judgmentRef: fallback.judgmentRef,
+      attempt: buildExecutedActionAttempt({
+        actorDir: input.actorDir,
+        turnId: input.turnId,
+        actionIndex: input.actionIndex,
+        activeEpisodeId: input.activeEpisodeId,
+        plannedActionRef,
+        planner,
+        execution,
+        judgmentRef: fallback.judgmentRef,
+        branchRecommended: fallback.branchRecommended,
+        branchReason: fallback.branchReason,
+        runtimeStatusOverride: "classifier_failed"
+      })
     };
   }
-
-  const refs = providerRefs({
-    actorDir: input.actorDir,
-    inputRef: planner.inputRef,
-    outputRef: planner.outputRef,
-    intermediateInputRefs: planner.intermediateInputRefs,
-    intermediateOutputRefs: planner.intermediateOutputRefs
-  });
   const judgmentInputRef = optionalStringProperty(judgmentResult, "inputRef");
   const judgmentOutputRef = optionalStringProperty(judgmentResult, "outputRef");
   const branchRecommended = "branchRecommended" in judgmentResult
@@ -418,36 +563,19 @@ export async function runSocialCycleTurnCore(input: {
     judgment: judgmentResult.judgment,
     judgmentRef: judgmentResult.judgmentRef,
     judgmentResult,
-    attempt: {
-      attempt_id: input.turnId,
-      action_index: input.actionIndex,
-      turn_id: input.turnId,
-      active_episode_id: input.activeEpisodeId,
-      action_ref: plannedActionRef,
-      provider_input_refs: [
-        ...refs.provider_input_refs,
-        judgmentInputRef ? path.relative(input.actorDir, judgmentInputRef) : ""
-      ].filter(Boolean),
-      provider_output_refs: [
-        ...refs.provider_output_refs,
-        judgmentOutputRef ? path.relative(input.actorDir, judgmentOutputRef) : ""
-      ].filter(Boolean),
-      evidence_refs: execution.evidenceRefs,
-      judgment_ref: judgmentResult.judgmentRef,
-      verifier_status: execution.verifierStatus,
-      executed_tools: execution.executedTools,
-      tool_statuses: execution.toolStatuses,
-      runtime_result: execution.runtimeResult,
-      runtime_status: execution.gateBlocked
-        ? "blocked"
-        : execution.verifierStatus === "failed"
-          ? "failed"
-          : "completed",
-      retry_constraint_blocked: execution.retryConstraintBlocked,
-      branch_recommended: branchRecommended,
-      branch_reason: branchReason,
-      postcondition_results: execution.postconditionResults,
-      plan_bead_operation_result_refs: []
-    }
+    attempt: buildExecutedActionAttempt({
+      actorDir: input.actorDir,
+      turnId: input.turnId,
+      actionIndex: input.actionIndex,
+      activeEpisodeId: input.activeEpisodeId,
+      plannedActionRef,
+      planner,
+      execution,
+      judgmentRef: judgmentResult.judgmentRef,
+      judgmentInputRef,
+      judgmentOutputRef,
+      branchRecommended,
+      branchReason
+    })
   };
 }

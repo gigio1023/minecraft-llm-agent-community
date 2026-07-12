@@ -321,6 +321,54 @@ test("milestone after first action continues to second action in the same cycle"
   assert.equal(result.report.capability_progress?.first_measurable_progress?.runtime_action_count, 1);
 });
 
+test("in-progress cycle is not duplicated in the next Actor Turn evidence trace", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-trace-"));
+  const reportPath = path.join(outDir, "social-cycle-report.json");
+
+  const result = await runSocialCycle({
+    actorId,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 1,
+    maxActionsPerCycle: 2,
+    reportPath,
+    connectToWorld: false,
+    isolateWorkspace: true,
+    actorWorkspaceRootDir: outDir,
+    repoRoot,
+    observeCaseUsage: async () => ({ requests: 0, total_tokens: 0 }),
+    observeCapabilityProgress: async () => ({
+      targetStatus: "failed",
+      passedMilestoneIds: ["any_log_inventory"],
+      evidenceRefs: ["evidence/milestone-only.json"]
+    })
+  });
+
+  const secondAttempt = result.report.cycles[0]?.action_attempts?.[1];
+  const actorDir = path.join(result.report.actor_workspace_root_dir ?? outDir, actorId);
+  const secondInputRef = secondAttempt?.provider_input_refs.find((ref) =>
+    ref.includes("actor-turn-cycle-0001-action-02")
+  );
+  assert.ok(secondInputRef);
+  const savedInput = JSON.parse(
+    await fs.readFile(path.join(actorDir, secondInputRef), "utf8")
+  ) as {
+    input?: {
+      decision_frame?: {
+        episode_focus_status?: { evidence_refs?: string[] };
+        recent_action_verdicts?: Array<{ turn_id?: string }>;
+      };
+    };
+  };
+  const decisionFrame = savedInput.input?.decision_frame;
+  assert.deepEqual(
+    decisionFrame?.recent_action_verdicts?.map((entry) => entry.turn_id),
+    ["cycle-0001-action-01"]
+  );
+  const focusEvidenceRefs = decisionFrame?.episode_focus_status?.evidence_refs ?? [];
+  assert.deepEqual(focusEvidenceRefs, [...new Set(focusEvidenceRefs)]);
+});
+
 test("no progress omits measurement points and retains existing stop behavior", async () => {
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-early-none-"));
   const reportPath = path.join(outDir, "social-cycle-report.json");
@@ -483,4 +531,68 @@ test("budget stop retains priority when target also passes at the same boundary"
   // Progress may still be recorded; it must not override budget timeout attribution.
   assert.equal(rawReport.capability_progress?.latest_target_status, "passed");
   assert.notEqual(rawReport.runtime_status, "passed");
+});
+
+test("runtime classifier failure preserves executed action evidence and target observation", async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "capability-classifier-failure-"));
+  const reportPath = path.join(outDir, "social-cycle-report.json");
+  let actionStarts = 0;
+  let observeCalls = 0;
+
+  const result = await runSocialCycle({
+    actorId,
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 3,
+    maxActionsPerCycle: 2,
+    reportPath,
+    connectToWorld: false,
+    isolateWorkspace: true,
+    actorWorkspaceRootDir: outDir,
+    repoRoot,
+    beforeProviderOrRuntimeAction: async ({ phase }) => {
+      if (phase === "action") {
+        actionStarts += 1;
+      }
+    },
+    classifyRuntimeForTest: async () => ({
+      ok: false,
+      error: "forced runtime classifier failure"
+    }),
+    observeCaseUsage: async () => ({ requests: 1, total_tokens: 10 }),
+    observeCapabilityProgress: async () => {
+      observeCalls += 1;
+      return {
+        targetStatus: "passed",
+        passedMilestoneIds: ["any_log_inventory"],
+        evidenceRefs: ["evidence/classifier-failure-progress.json"]
+      };
+    }
+  });
+
+  assert.equal(actionStarts, 1);
+  assert.equal(observeCalls, 1);
+  assert.equal(result.report.runtime_status, "failed");
+  assert.equal(result.report.provider_error, undefined);
+  assert.equal(result.report.cycles.length, 1);
+  const attempt = result.report.cycles[0]?.action_attempts?.[0];
+  assert.ok(attempt);
+  assert.equal(attempt.runtime_status, "classifier_failed");
+  assert.ok(attempt.evidence_refs.length > 0);
+  assert.equal(
+    result.report.capability_progress?.target_completion?.runtime_action_count,
+    1
+  );
+
+  const actorDir = path.join(result.report.actor_workspace_root_dir ?? outDir, actorId);
+  const fallbackJudgment = JSON.parse(
+    await fs.readFile(path.join(actorDir, attempt.judgment_ref), "utf8")
+  ) as { what_happened?: string; evidence_refs?: string[] };
+  assert.match(fallbackJudgment.what_happened ?? "", /runtime result classification failed/i);
+  assert.deepEqual(fallbackJudgment.evidence_refs, attempt.evidence_refs);
+
+  const savedReport = JSON.parse(await fs.readFile(reportPath, "utf8")) as SocialCycleRunReport;
+  assert.equal(savedReport.runtime_status, "failed");
+  assert.equal(savedReport.cycles[0]?.action_attempts?.[0]?.runtime_status, "classifier_failed");
+  assert.equal(savedReport.capability_progress?.latest_target_status, "passed");
 });

@@ -105,10 +105,10 @@ import {
 } from "./goals/actorEpisode/index.js";
 import {
   optionalStringArrayProperty,
-  optionalStringProperty,
   providerRefs,
   runSocialCycleTurnCore,
-  type SocialCycleActionAttemptReport
+  type SocialCycleActionAttemptReport,
+  type SocialCycleRuntimeClassifier
 } from "./socialCycleTurnCore.js";
 import {
   createUnavailableVisualEvidence,
@@ -476,6 +476,8 @@ export type SocialCycleRunOptions = {
     cycleIndex: number;
     actionIndex?: number;
   }) => Promise<void>;
+  /** Test-only replacement for the deterministic post-action classifier. */
+  classifyRuntimeForTest?: SocialCycleRuntimeClassifier;
 };
 
 export type SocialCycleRunResult = {
@@ -1302,6 +1304,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     );
 
   let providerFailed = false;
+  let runtimeClassifierFailed = false;
   let anyMeaningfulProgress = false;
   let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
   let earlyTargetCompleted = false;
@@ -1857,6 +1860,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           }
         }
         const actionTurnId = `${cycleId}-action-${String(actionIndex + 1).padStart(2, "0")}`;
+        const priorRecordedCycles = report.cycles.filter(
+          (cycle) => cycle.cycle_id !== cycleId
+        );
         const actionRetryConstraints = deriveRuntimeRetryConstraints({
           actorId: input.actorId,
           attempts: runtimeRetryAttempts
@@ -1880,11 +1886,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
                 recentToolResults: settlementToolResults,
                 postconditionResults: allPostconditionResults,
                 evidenceRefs: [
-                  ...report.cycles.flatMap((cycle) => cycle.evidence_refs),
+                  ...priorRecordedCycles.flatMap((cycle) => cycle.evidence_refs),
                   ...actionAttempts.flatMap((attempt) => attempt.evidence_refs)
                 ],
                 judgmentRefs: [
-                  ...report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+                  ...priorRecordedCycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
                   ...(lastJudgmentRef ? [lastJudgmentRef] : [])
                 ],
                 memoryWriteCount,
@@ -1902,7 +1908,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         };
         report.runtime_retry_constraints = actionRetryConstraints;
         const episodeId = activeEpisodeForCycle.episode_id;
-        const priorActionAttempts = report.cycles.flatMap((cycle) => cycle.action_attempts ?? []);
+        const priorActionAttempts = priorRecordedCycles.flatMap(
+          (cycle) => cycle.action_attempts ?? []
+        );
         const { actorTurnInput, actionCardProjection } = buildActorTurnInput({
           turnId: actionTurnId,
           context: actionContext,
@@ -1951,7 +1959,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             gemini: geminiForProviderCall(),
             modelScope
           },
-          signal: caseBudgetController.signal
+          signal: caseBudgetController.signal,
+          ...(input.classifyRuntimeForTest
+            ? { classifyRuntimeForTest: input.classifyRuntimeForTest }
+            : {})
         });
         if (caseBudgetController.signal.aborted) {
           await checkCaseBudgetBeforeWork();
@@ -1993,6 +2004,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
         const plannedRuntimeAction: ReportedRuntimeAction = turnCore.plannedRuntimeAction;
         const execution = turnCore.execution;
+        const turnClassifierFailed = turnCore.status === "classifier_failed";
+        if (turnClassifierFailed) {
+          runtimeClassifierFailed = true;
+        }
         lastActionRef = turnCore.plannedActionRef;
 
         if (turnCore.retryAttempt) {
@@ -2023,26 +2038,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           recentToolResults.splice(0, recentToolResults.length - 20);
         }
 
-        if (turnCore.status === "classifier_failed") {
-          providerFailed = true;
-          report.provider_error = turnCore.judgmentResult.error;
-          appendProviderErrorRefs({
-            report,
-            actorDir: paths.actorDir,
-            stage: "actor_turn_classifier",
-            turnId: actionTurnId,
-            error: turnCore.judgmentResult.error,
-            inputRef: optionalStringProperty(turnCore.judgmentResult, "inputRef"),
-            outputRef: optionalStringProperty(turnCore.judgmentResult, "outputRef")
-          });
-          break;
-        }
-
-        const judgmentResult = turnCore.judgmentResult;
-        lastJudgmentRef = judgmentResult.judgmentRef;
+        lastJudgmentRef = turnCore.judgmentRef;
         lastJudgment = {
-          ref: judgmentResult.judgmentRef,
-          judgment: judgmentResult.judgment
+          ref: turnCore.judgmentRef,
+          judgment: turnCore.judgment
         };
         const lifecycleBeadOperations = derivePlanBeadLifecycleOperationsFromTurnEvidence({
           actorId: input.actorId,
@@ -2060,7 +2059,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleId,
           turnId: actionTurnId,
           operations: [
-            ...(judgmentResult.judgment.bead_op_proposals ?? []),
+            ...(turnCore.judgment.bead_op_proposals ?? []),
             ...lifecycleBeadOperations
           ]
         });
@@ -2084,12 +2083,12 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         const memoryWrites = await persistJudgmentMemoryWrites(
           rootDir,
           input.actorId,
-          judgmentResult.judgment,
+          turnCore.judgment,
           plannedRuntimeAction,
           execution.executedTools,
           execution.runtimeResult,
           execution.toolStatuses,
-          judgmentResult.judgmentRef
+          turnCore.judgmentRef
         );
         memoryWriteCount += memoryWrites;
         if (report.memory_reuse) {
@@ -2097,7 +2096,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         }
         const relationshipApplications = await applyCycleJudgmentRelationshipEventProposals(
           rootDir,
-          judgmentResult.judgment
+          turnCore.judgment
         );
         report.relationship_application_results?.push(...relationshipApplications);
         await bumpLifeGoalCounters(rootDir, input.actorId, { actions: 1 });
@@ -2197,6 +2196,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           }
         }
 
+        if (turnClassifierFailed) {
+          break;
+        }
         if (execution.verifierStatus === "passed" || execution.verifierStatus === "failed") {
           break;
         }
@@ -2308,7 +2310,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       // Persist the finalized cycle. Progress observation already ran after each
       // action; stop here when the target passed or a budget ceiling tripped mid-cycle.
       await writeJson(input.reportPath, report);
-      if (earlyTargetCompleted || caseBudgetStop) {
+      if (earlyTargetCompleted || caseBudgetStop || runtimeClassifierFailed) {
         break;
       }
     }
@@ -2370,7 +2372,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     // Any case-budget stop (wall_time, requests, tokens, cost) is distinct from
     // actor incompetence or provider/runtime failure.
     report.runtime_status = "timeout";
-  } else if (providerFailed) {
+  } else if (providerFailed || runtimeClassifierFailed) {
     report.runtime_status = "failed";
   } else if (earlyTargetCompleted && !environmentBlocked) {
     // Target evidence stopped the case early; not a budget timeout or blocked exit.
