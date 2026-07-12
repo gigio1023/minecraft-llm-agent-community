@@ -350,6 +350,14 @@ for `craft_wooden_pickaxe`, then inspect saved Actor Turn inputs, normalized
 reports, budget status, and artifact references. Provider-free runs prove input
 and recording shape; they do not prove Minecraft competence.
 
+Completed on 2026-07-12. The current deterministic runs saved 40 and 80 Actor
+Turn inputs respectively, with exact case/goal/hash context on every input,
+zero hidden evaluation fields, all 32 Action Cards, zero provider usage, and no
+missing refs across 468 combined actor-workspace refs. Both non-completions were
+reported as `budget_exhausted` plus `no_measurable_progress`. Re-evaluating all
+three actual 2026-07-11 raw reports returned `unverifiable` because the required
+capability context was absent.
+
 ## Future Live Check
 
 Only after all provider-free checks pass and the user approves a new current-day
@@ -388,5 +396,6 @@ or start social simulations from this plan.
   exact-day checks and conservative overlap handling.
 - [x] Add portable archive relocation and exact approved-preflight linkage
   without rewriting raw reports.
-- [ ] Complete all provider-free checks.
+- [x] Complete all provider-free checks, including both CLI runs, artifact
+  inspection, and rejection of the invalid 2026-07-11 run shape.
 - [ ] Request approval for two bounded live reruns.

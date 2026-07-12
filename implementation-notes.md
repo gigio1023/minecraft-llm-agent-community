@@ -24,9 +24,10 @@ schemas are unchanged. Item 7 is complete provider-free: preflight accepts a
 strict dated dashboard-usage observation and records the conservative chosen
 calculation. Item 8 is complete provider-free: unchanged raw reports use
 SHA-256-bound relocation sidecars for repository-relative actor workspaces and
-the exact approved preflight. Next is the complete provider-free verification
-sequence and both required capability CLI checks. No new provider request is
-authorized.
+the exact approved preflight. The complete provider-free verification sequence
+and both required capability CLI checks are now done. Planning preflight for
+the repaired two-run live campaign is `needs_dashboard_approval`; no new
+provider request is authorized.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -73,6 +74,13 @@ via the adaptation in the active implementation plan.
 - `bun test probe/test/reportReadinessCheckScript.test.ts` → 4 pass
 - all three archived 2026-07-11 raw reports → publishable readiness passed,
   with archived workspaces and the approved preflight resolved from sidecars
+- final provider-free `collect_logs` / `craft_wooden_pickaxe` runs → 40 / 80
+  Actor Turn inputs inspected, 468 actor-workspace refs resolved, 0 provider
+  requests, 0 tokens, and no evaluator-only fields in model input
+- all three actual 2026-07-11 raw reports re-evaluated → `unverifiable`
+- repaired Stage 1 planning preflight → `needs_dashboard_approval`; current UTC
+  day local usage 0 requests / 0 tokens, proposed maximum 32 requests /
+  1,200,000 tokens
 - `cd probe && bun test` → 751 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
