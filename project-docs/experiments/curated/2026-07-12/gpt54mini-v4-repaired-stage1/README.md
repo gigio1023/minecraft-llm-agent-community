@@ -116,6 +116,11 @@ smallest requested ceiling is 5 requests / 150,000 tokens;
 `craft_wooden_pickaxe` remains out of scope until the repeated run is a valid
 measurement.
 
+`preflight/planning-third-collect-logs.json` includes the current local 11
+requests / 39,627 tokens and projects 16 requests / 189,627 tokens after the
+proposed run. Local policies allow it, but its final status is correctly
+`needs_dashboard_approval` until the user approves this exact allowance.
+
 ## Commands After Approval
 
 Run log collection first and review its evidence before any second run:

@@ -32,7 +32,7 @@ because its fixed seed had no loaded log inside the declared radius. Suite
 retry reached Actor Turn but background Responses polling crossed its request
 maximum and an evidence-free stopping-time Deliberation branch raised before
 final settlement. Both paths are repaired provider-free; another live attempt
-requires a new preflight and approval.
+requires approval of the saved 5-request / 150,000-token planning preflight.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
