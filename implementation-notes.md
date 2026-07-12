@@ -20,8 +20,10 @@ status. Item 6 is also complete provider-free: model-facing goals now describe
 only Minecraft outcomes, including a neutral model-visible diamond case ID.
 Repeated Action Card guidance is shared once, direct primitive/action-skill
 overlaps are explicit, all runtime mappings remain visible, and strict function
-schemas are unchanged. Next is external dashboard usage in provider preflight.
-No new provider request is authorized.
+schemas are unchanged. Item 7 is complete provider-free: preflight accepts a
+strict dated dashboard-usage observation and records the conservative chosen
+calculation. Next is portable archived report resolution and direct preflight
+linkage. No new provider request is authorized.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -36,6 +38,8 @@ via the adaptation in the active implementation plan.
 - Live-validation repair item 5 (failure attribution and CLI summary order)
 - Live-validation repair item 6 (evaluator-neutral goals and lossless Action
   Card input reduction)
+- Live-validation repair item 7 (structured external dashboard usage in
+  provider preflight)
 
 ## Partial / blocked
 
@@ -60,6 +64,7 @@ via the adaptation in the active implementation plan.
   estimated tokens fewer; about 32.2%)
 - same-input shared-guidance regression: 18,073 → 14,204 bytes and 4,519 →
   3,551 estimated tokens
+- `bun test probe/test/providerQuotaPreflightScript.test.ts` → 7 pass
 - `cd probe && bun test` → 747 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
@@ -79,6 +84,7 @@ via the adaptation in the active implementation plan.
 | Bun's test runner did not expose nested CLI stdout through `node:child_process` | The real CLI emitted JSON outside the test runner, but nested stdout was empty under `bun test` | Extract the exact CLI summary builder, keep the subprocess artifact check, and assert field order through the same builder | Revisit only if Bun exposes nested stdout reliably |
 | The plan asked for one shared Action Card explanation | Repetition also existed in every provider function description and actor-owned action-skill hint list | Put general, evidence, and grouped guidance in `action_card_shared_guidance`; keep per-card behavior/state details and strict function schemas | Revisit after the next approved live run if tool selection quality regresses |
 | A historical and a current full Actor Turn input differed in more than Action Cards | World state and capability context also changed between runs | Compare the identical 32-title Action Card surface only, then add a same-input re-expansion regression for isolated measurement | Keep both measurements with their stated scope |
+| Dashboard totals may include the same calls as the local ledger | Adding both would understate remaining capacity | For confirmed current UTC-day observations, add only when disjointness is explicit; otherwise use the larger value for each metric | Revisit only if the provider exposes stable per-key usage identifiers |
 
 ## Recent commits (this successor wave)
 

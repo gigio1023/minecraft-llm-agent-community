@@ -30,9 +30,10 @@ Operational rule:
 
 - For `openai-api` free-token runs, treat the quota day as UTC day.
 - Do not use Korea calendar-day midnight as the reset boundary.
-- Before long runs, check the provider dashboard when available and encode
-  dashboard usage into `PROVIDER_USAGE_BUDGETS_JSON` or
-  `build/provider-usage/free-tier-budgets.json` as `already_used`.
+- Before long runs, check the provider dashboard and pass a structured
+  `provider-external-already-used/v1` observation to the repo-local preflight
+  with `--external-already-used`. Use budget `already_used` only for persistent
+  local brakes, not as the normal record of a dated dashboard observation.
 - The repo ledger uses `quota_day_utc` for `openai-api` daily budget decisions.
 
 Examples:
@@ -117,9 +118,15 @@ Operational rule:
    tail -20 build/provider-usage/provider-usage-ledger.jsonl
    ```
 
-4. If dashboard usage differs from the local ledger, encode the dashboard usage
-   as `already_used`.
-5. Run a short smoke/live cycle before a long cycle when input shape or provider
+4. If dashboard usage differs from the local ledger, write a
+   `provider-external-already-used/v1` record with its exact UTC day, observation
+   time, period certainty, source note, and whether it can overlap local calls.
+   The preflight adds only confirmed disjoint counts; otherwise it uses the
+   larger local/dashboard value. Ambiguous or stale periods remain visible but
+   do not authorize an OpenAI run.
+5. Pass that record with `--external-already-used` and preserve it beside the
+   emitted preflight JSON.
+6. Run a short smoke/live cycle before a long cycle when input shape or provider
    usage has changed.
 
 ## Related Files

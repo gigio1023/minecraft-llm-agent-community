@@ -50,7 +50,33 @@ emergency brakes, and operator approval evidence.
      --max-actions-per-cycle 3
    ```
 
-4. Run the bundled preflight script from the repo root and write the JSON next
+4. When dashboard usage is known, save one structured observation per provider.
+   Only an exact current UTC-day observation can affect OpenAI daily usage:
+
+   ```json
+   {
+     "schema": "provider-external-already-used/v1",
+     "provider_id": "openai-api",
+     "quota_day_utc": "2026-07-12",
+     "observed_at": "2026-07-12T11:00:00.000Z",
+     "period_certainty": "confirmed_exact_utc_day",
+     "overlap_with_local_ledger": "unknown",
+     "source_note": "Operator copied current UTC-day dashboard totals.",
+     "usage": {
+       "requests": 8,
+       "input_tokens": 0,
+       "output_tokens": 0,
+       "thinking_tokens": 0,
+       "total_tokens": 120000
+     }
+   }
+   ```
+
+   Use `overlap_with_local_ledger: "disjoint"` only when the dashboard count is
+   known to exclude local-ledger calls. Otherwise use `unknown` or
+   `includes_local`; the preflight uses the larger count instead of adding
+   possibly overlapping totals.
+5. Run the bundled preflight script from the repo root and write the JSON next
    to the experiment/report artifacts:
 
    ```bash
@@ -59,11 +85,12 @@ emergency brakes, and operator approval evidence.
      --estimate-requests 80 \
      --estimate-total-tokens 1700000 \
      --estimate-requests-per-minute 1 \
+     --external-already-used project-docs/experiments/curated/<date>/<run>/preflight/dashboard-usage.json \
      --out project-docs/experiments/curated/<date>/<run>/preflight/openai.json
    ```
 
-5. Treat `blocked`, `unbudgeted`, and `needs_dashboard_approval` as not runnable.
-6. For `openai-api`, even an otherwise under-cap result still requires operator
+6. Treat `blocked`, `unbudgeted`, and `needs_dashboard_approval` as not runnable.
+7. For `openai-api`, even an otherwise under-cap result still requires operator
    approval after dashboard/free-tier eligibility is checked. If the user has
    approved a dashboard-checked run, pass both:
 
@@ -118,6 +145,8 @@ The script prints JSON with:
 - current UTC/Pacific/month window keys;
 - matching policies/budgets;
 - projected usage after the planned run;
+- every `external_already_used` observation plus the per-policy local,
+  external, and selected current-day calculation;
 - per-policy quota checks;
 - final status:
   - `allowed`: local policy permits the planned usage;
@@ -136,6 +165,9 @@ The script prints JSON with:
   the exact blocking condition before any provider HTTP request.
 - Persist the preflight JSON beside the report artifacts and mention it in the
   report or final answer.
+- An `ambiguous_period` observation or a confirmed observation from another UTC
+  day is retained for audit but is not counted and cannot complete OpenAI
+  dashboard approval.
 - After provider-backed runs, compare report `provider_usage` totals and budget
   status against the preflight estimate.
 

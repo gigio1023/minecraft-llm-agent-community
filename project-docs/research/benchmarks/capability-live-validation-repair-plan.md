@@ -295,6 +295,13 @@ observations and the chosen calculation in the preflight output.
 Completion checks cover confirmed same-day usage, ambiguous periods, stale
 observations, and a dashboard value larger than the local ledger.
 
+Implemented provider-free on 2026-07-12. The preflight accepts strict
+`provider-external-already-used/v1` JSON, retains the raw observation, and emits
+the local, external, and selected usage for every matching policy. Tests cover
+current-day overlapping usage (conservative maximum), confirmed disjoint usage
+(sum), ambiguous periods, stale days, and an external token count large enough
+to block a run that the local ledger alone would allow.
+
 ### 8. Make archived reports portable
 
 Do not rewrite raw evidence silently. Add an archive relocation record that maps
@@ -369,7 +376,8 @@ or start social simulations from this plan.
 - [x] Remove evaluator wording from model-facing goals and reduce repeated
   Action Card input without changing action availability. The 32-title action
   surface is unchanged; shared guidance and overlap IDs replace repeated prose.
-- [ ] Add external usage observations to preflight.
+- [x] Add structured external dashboard usage observations to preflight, with
+  exact-day checks and conservative overlap handling.
 - [ ] Add portable archive relocation and preflight linkage.
 - [ ] Complete all provider-free checks.
 - [ ] Request approval for two bounded live reruns.
