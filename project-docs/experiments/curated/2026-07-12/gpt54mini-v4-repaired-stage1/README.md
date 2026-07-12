@@ -1,8 +1,9 @@
 # GPT-5.4 Mini Repaired Stage 1 Campaign
 
-Status: the first approved attempt ended during world setup before any provider
-request. The invalid fixed seed is repaired and verified provider-free; a new
-approval is required before repeating `collect_logs` with suite 1.3.1.
+Status: the second approved attempt reached Actor Turn but exposed request
+accounting and stopping-path defects. Both are repaired provider-free. A new
+approval is required before one more `collect_logs` attempt; no wooden-pickaxe
+run is authorized.
 
 ## Provider-Free Result
 
@@ -60,7 +61,24 @@ passed the same scenario validation on Minecraft `1.21.11`. It selected ordinary
 natural ground and observed oak logs 28.46 blocks away. Suite 1.3.1 therefore
 replaces only the invalid `collect_logs` fixed seed with `9066`; action access,
 goal wording, predicates, milestones, and budgets are unchanged. A second live
-attempt requires a refreshed preflight and explicit user approval under the Goal.
+attempt required a refreshed preflight and explicit user approval under the Goal.
+
+## Second Approved Attempt
+
+The suite 1.3.1 retry passed world setup and delivered the exact declared goal
+to two Actor Turns without evaluator-only fields. GPT-5.4 Mini first observed,
+then selected `collectLogs`. Runtime evidence truthfully blocked collection
+because the reachable oak-log hints were about 30.5 blocks away, outside the
+primitive's 24-block radius.
+
+The run is invalid because background response polling crossed the approved
+8-request ceiling before the runner regained control: the local ledger records
+11 requests and 39,627 tokens. A subsequent empty-evidence Deliberation branch
+exception prevented final report settlement. The correction disables background
+polling and internal retries whenever a case declares a request maximum, and it
+suppresses evidence-free or stopping-time branch creation. Provider-free
+verification passes at 753 tests. See
+`02-collect-logs-request-overrun-review.md`.
 
 ## Current Preflight Result
 
@@ -88,11 +106,15 @@ credit balance, API input/output sharing enabled for all projects, and the
 dashboard's complimentary-daily-token enrollment message. The repo policy
 matrix identifies `gpt-5.4-mini` as part of the applicable mini shared pool.
 
-Before another live command, the exact-day preflight must be refreshed against
-the committed suite 1.3.1 declaration and the user must explicitly approve the
-single repaired `collect_logs` attempt. The smallest requested ceiling is 8
-requests / 300,000 tokens; `craft_wooden_pickaxe` remains out of scope until the
-repeated run is a valid measurement.
+`preflight/approved-retry-collect-logs.json` records the second approval. That
+attempt exceeded its request maximum due to the now-repaired background polling
+path and consumed 11 requests / 39,627 tokens. It is not reusable authority.
+
+Before another live command, the exact-day preflight must include this local
+usage and the user must explicitly approve one more `collect_logs` attempt. The
+smallest requested ceiling is 5 requests / 150,000 tokens;
+`craft_wooden_pickaxe` remains out of scope until the repeated run is a valid
+measurement.
 
 ## Commands After Approval
 
@@ -109,9 +131,9 @@ bun run probe:capability -- \
   --cycles 2 \
   --max-actions-per-cycle 2 \
   --max-wall-time-ms 360000 \
-  --max-provider-requests 8 \
-  --max-total-tokens 300000 \
-  --out ../tmp/gpt54mini-v4-repaired-stage1/02-collect-logs-seed-9066
+  --max-provider-requests 5 \
+  --max-total-tokens 150000 \
+  --out ../tmp/gpt54mini-v4-repaired-stage1/03-collect-logs-bounded-provider
 ```
 
 Stop if goal delivery, structured arguments, evidence attribution, target

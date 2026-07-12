@@ -28,8 +28,11 @@ the exact approved preflight. The complete provider-free verification sequence
 and both required capability CLI checks are now done. The first newly approved
 `collect_logs` command stopped during world setup with zero provider requests
 because its fixed seed had no loaded log inside the declared radius. Suite
-1.3.1 changes only that seed to the provider-free-verified `9066`. Repeating
-the live command now requires a new preflight and approval.
+1.3.1 changes only that seed to the provider-free-verified `9066`. The approved
+retry reached Actor Turn but background Responses polling crossed its request
+maximum and an evidence-free stopping-time Deliberation branch raised before
+final settlement. Both paths are repaired provider-free; another live attempt
+requires a new preflight and approval.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -92,12 +95,21 @@ via the adaptation in the active implementation plan.
 - current Minecraft 1.21.11 setup with seed `9066` → provider-free fresh-world
   smoke passed with oak logs 28.46 blocks away; provider-free capability smoke
   passed setup with the nearest oak log 17.12 blocks away
-- `cd probe && bun test` → 751 pass
+- second approved `collect_logs` command → exact goal reached two Actor Turns;
+  no evaluator-only fields were present; `collectLogs` blocked with empty
+  inventory and oak-log hints about 30.5 blocks away; 11 requests / 39,627
+  tokens were recorded against the approved 8-request / 300,000-token maximum;
+  final report readiness failed because the stopping-path exception prevented
+  provider usage settlement
+- provider-free request/stop repair → focused 30 pass; request-bounded OpenAI
+  stages disable background polling and internal retries; stopping-time or
+  evidence-free Deliberation branches are not persisted
+- `cd probe && bun test` → 753 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
 - `git diff --check` → pass
-- An approved live command ran, but setup stopped before the first provider
-  request; observed provider usage remained zero
+- The first approved live command stopped before the first provider request;
+  its observed provider usage remained zero
 
 ## Deviations
 
@@ -118,6 +130,9 @@ via the adaptation in the active implementation plan.
 | The earlier dashboard screenshot covered an ambiguous multi-day period | A logged-in dashboard session was available and could be filtered to exactly `2026-07-12` without an API request | Record the exact-day zero usage separately, regenerate the unapproved preflight, and continue to require explicit approval and complimentary-pool eligibility confirmation | Recheck immediately before a live run if approval is delayed or the UTC day changes |
 | A positive balance and complimentary-token enrollment were still indirect assumptions | The logged-in Billing page showed `$3.80`, and Data controls showed API input/output sharing enabled for all projects plus the complimentary-token enrollment message | Preserve a read-only observation and narrow the blocker to the newly proposed allowance's explicit approval | Recheck account and usage state if approval arrives on a later UTC day |
 | The checked-in `collect_logs` seed used the scenario id string itself | The first approved run produced a safe spawn but no loaded log inside the scenario's declared 32-block bound, so setup failed before Actor Turn with zero provider usage | Change only the case's fixed seed to provider-free-verified seed `9066`, bump the suite to 1.3.1, and require a new live approval | Revisit if seed `9066` fails setup on the pinned Minecraft version or if the scenario's feasibility policy changes |
+| The 8-request case maximum was checked only between provider stages | Three background OpenAI stages used 11 HTTP requests because response polling happened before the runner regained control | For request-bounded runs, disable background polling and internal retries so one stage equals one request | Revisit only if provider calls gain a reservation-aware run-local request counter |
+| A budget-stopped empty cycle still evaluated context branch reasons | The branch had no new action or judgment evidence and strict validation raised before final report settlement | Do not persist Deliberation branches while stopping or without evidence refs; keep the strict validator | Revisit if context-only branches gain a typed runtime evidence source |
+| A preflight test assumed the real local ledger was empty | Current live usage changed the expected value and triggered Bun's known cascading `node:test` errors | Give the test its own empty temporary ledger, then rerun it and the full suite | Keep tests isolated from operator usage |
 
 ## Recent commits (this successor wave)
 
