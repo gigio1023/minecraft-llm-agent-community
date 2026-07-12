@@ -1,82 +1,56 @@
 import type { ActionCardProjection } from "./actionCards.js";
-import type { ActorTurnCurrentStateProjection } from "./types.js";
 import { unique } from "./projectionUtils.js";
 
 /**
- * Adds provider-visible hints without selecting, hiding, or rejecting actions.
+ * Groups repeated provider-visible hints without selecting, hiding, or rejecting actions.
  *
  * @remarks This module must stay out of the Minecraft-planner business. It may
- * surface structured current-state facts that are already in `ActorTurnInput`,
- * but it must not parse prose requirements, compute recipe eligibility, hide
- * tools, inject defaults, or decide which Action Card the LLM should choose.
+ * It may point to structured state already in `ActorTurnInput`, but it must not
+ * parse prose requirements, compute recipe eligibility, hide tools, inject
+ * defaults, or decide which Action Card the LLM should choose.
  */
-export function annotateActionCardsWithCurrentStateHints(
-  projection: ActionCardProjection,
-  currentState: ActorTurnCurrentStateProjection
+export function annotateActionCardsWithSharedGuidance(
+  projection: ActionCardProjection
 ): ActionCardProjection {
-  const actionCards = projection.action_cards.map((card) => {
-    if (card.title === "Inspect Chest" || card.title === "Inspect Shared Chest") {
-      return {
-        ...card,
-        parameter_hints: unique([
-          ...card.parameter_hints,
-          "Use empty parameters for the bounded shared-chest container snapshot/openability action.",
-          `Current shared_storage status: ${currentState.shared_storage.status}.`,
-          ...(currentState.shared_storage.items.length > 0
-            ? [
-                `Known shared_storage items: ${currentState.shared_storage.items
-                  .map((item) => `${item.name}:${item.count}`)
-                  .join(", ")}.`
-              ]
-            : []),
-          ...(currentState.shared_storage.evidence_refs.length > 0
-            ? [`Shared storage evidence refs: ${currentState.shared_storage.evidence_refs.join(", ")}.`]
-            : [])
-        ])
-      };
+  if (!projection.shared_guidance) {
+    return projection;
+  }
+  const cardIdsForTitles = (titles: readonly string[]) => projection.action_cards
+    .filter((card) => titles.includes(card.title))
+    .map((card) => card.action_card_id);
+  const groupedGuidance = [
+    {
+      action_card_ids: cardIdsForTitles(["Inspect Chest", "Inspect Shared Chest"]),
+      guidance: ["Use empty parameters for bounded shared-chest inspection."]
+    },
+    {
+      action_card_ids: cardIdsForTitles(["Deposit Shared", "Deposit Shared Items", "Handoff Item At Chest"]),
+      guidance: [
+        "Choose itemName and count from current inventory plus relevant world-event or relationship evidence, and provide both explicitly."
+      ]
+    },
+    {
+      action_card_ids: cardIdsForTitles(["Craft Item", "Craft With Table"]),
+      guidance: ["Choose itemName from current inventory and the Minecraft Basic Guide; the runtime still validates it explicitly."]
+    },
+    {
+      action_card_ids: cardIdsForTitles(["Place Block", "Place Crafting Table", "Build Pattern"]),
+      guidance: [
+        "Provide targetPosition or anchor explicitly and choose it from known nearby block coordinates; the runtime never invents placement coordinates.",
+        "Placement evidence proves the local physical change only; compare it with the active goal before continuing."
+      ]
     }
+  ].filter((group) => group.action_card_ids.length > 0);
 
-    if (card.title === "Deposit Shared" ||
-      card.title === "Deposit Shared Items" ||
-      card.title === "Handoff Item At Chest") {
-      return {
-        ...card,
-        parameter_hints: unique([
-          ...card.parameter_hints,
-          "Use current_state.inventory_counts plus source_evidence_bundle.world_event_cards or relationship cards to decide itemName/count yourself.",
-          "If choosing this Action Card, provide explicit itemName and count in parameters; runtime will not infer them from world-event prose."
-        ])
-      };
-    }
-
-    if (card.title === "Craft Item" || card.title === "Craft With Table") {
-      return {
-        ...card,
-        parameter_hints: unique([
-          ...card.parameter_hints,
-          "Use current_state.inventory_counts plus minecraft_basic_guide to choose itemName; runtime will validate structured args but will not parse current_state_requirements as a recipe gate."
-        ])
-      };
-    }
-
-    if (
-      card.title === "Place Block" ||
-      card.title === "Place Crafting Table" ||
-      card.title === "Build Pattern"
-    ) {
-      return {
-        ...card,
-        parameter_hints: unique([
-          ...card.parameter_hints,
-          "Provide an explicit targetPosition/anchor in structured parameters; runtime will not synthesize placement coordinates.",
-          "Use current_state.world_scan.named_block_examples and nearby_block_observations to choose a replaceable target next to a known support block; the runtime does not choose one for you.",
-          "Placement and pattern verifiers are local physical-evidence checks, not universal goal-completion rules; compare current_state.structure_progress with active_episode/world event wording before continuing, adapting, or pivoting."
-        ])
-      };
-    }
-
-    return card;
-  });
-
-  return { ...projection, action_cards: actionCards };
+  return {
+    ...projection,
+    shared_guidance: {
+      ...projection.shared_guidance,
+      grouped_guidance: groupedGuidance
+    },
+    action_cards: projection.action_cards.map((card) => ({
+      ...card,
+      parameter_hints: unique(card.parameter_hints)
+    }))
+  };
 }

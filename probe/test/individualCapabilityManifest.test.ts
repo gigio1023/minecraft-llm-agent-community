@@ -22,7 +22,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
   assert.equal(manifest.schema, "individual-capability-manifest/v1");
   assert.equal(manifest.suite_id, "individual-capability-v1");
-  assert.equal(manifest.version, "1.2.0");
+  assert.equal(manifest.version, "1.3.0");
   assert.deepEqual(
     manifest.cases.map((capabilityCase) => capabilityCase.case_id),
     [
@@ -34,7 +34,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
       "mine_cobblestone",
       "reach_placed_furnace",
       "contribute_shared_chest",
-      "acquire_diamond_pickaxe_infeasible"
+      "acquire_diamond_pickaxe"
     ]
   );
 
@@ -102,6 +102,11 @@ test("checked-in suite loads with A4 individual capability cases", () => {
       "recipe_steps" in capabilityCase,
       false,
       `${capabilityCase.case_id} must not declare recipe_steps`
+    );
+    assert.doesNotMatch(
+      capabilityCase.top_level_goal,
+      /named_positions|artifact|infeasib|tiny budget|provider text|structured block evidence/i,
+      `${capabilityCase.case_id} top_level_goal must describe the Minecraft outcome, not evaluation machinery`
     );
   }
 });

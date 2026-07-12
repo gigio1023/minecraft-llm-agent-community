@@ -186,7 +186,7 @@ test("capability runner sends distinct declared goals without evaluation rules o
   const expectedHash = hashCapabilityManifest(manifest);
   const cases = [
     "collect_logs",
-    "acquire_diamond_pickaxe_infeasible",
+    "acquire_diamond_pickaxe",
     "craft_wooden_pickaxe"
   ] as const;
   const savedInputs = new Map<string, Record<string, unknown>>();
@@ -238,7 +238,7 @@ test("capability runner sends distinct declared goals without evaluation rules o
   assert.notEqual(
     (savedInputs.get("collect_logs")?.capability_case_context as { top_level_goal: string })
       .top_level_goal,
-    (savedInputs.get("acquire_diamond_pickaxe_infeasible")?.capability_case_context as {
+    (savedInputs.get("acquire_diamond_pickaxe")?.capability_case_context as {
       top_level_goal: string;
     }).top_level_goal
   );

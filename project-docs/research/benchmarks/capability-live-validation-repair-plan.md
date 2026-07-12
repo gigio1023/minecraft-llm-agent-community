@@ -108,10 +108,11 @@ Completion checks:
   prerequisite sequence;
 - non-capability social-cycle behavior remains unchanged.
 
-Before any future infeasibility run, revise evaluator-oriented wording in
-`acquire_diamond_pickaxe_infeasible.top_level_goal`. A model-facing goal should
-state the desired world outcome; the tiny-budget expectation belongs in case
-metadata or report interpretation, not in the instruction to the actor.
+Before any future small-budget run, revise evaluator-oriented wording in the
+diamond-pickaxe goal and its model-visible case ID. A model-facing goal should
+state the desired world outcome; the small-budget expectation belongs in case
+metadata or report interpretation, not in the instruction to the actor. This
+was completed in suite 1.3.0 with the neutral `acquire_diamond_pickaxe` ID.
 
 ### 2. Require an explicit crafting-table placement target
 
@@ -267,6 +268,16 @@ Completion checks:
 - representative serialized Actor Turn input is smaller, with the byte and
   token estimate recorded in tests or a provider-free measurement artifact.
 
+Implemented provider-free on 2026-07-12. The archived and new representative
+inputs expose the same 32 Action Card titles. The former card array was 38,505
+bytes / 9,627 locally estimated tokens; the new card array plus its one shared
+guidance section is 26,124 bytes / 6,532 locally estimated tokens. This is a
+reduction of 12,381 bytes and 3,095 estimated tokens (about 32.2%) on the action
+surface. A same-input regression also rebuilds the repeated form and verifies
+18,073 → 14,204 bytes and 4,519 → 3,551 estimated tokens. Runtime mapping tests
+compare the generated mapping set with every executable primitive and
+actor-owned action skill, and every function schema remains strict.
+
 ### 7. Include external dashboard usage in preflight
 
 Extend the approval input with a structured `external_already_used` observation:
@@ -355,7 +366,9 @@ or start social simulations from this plan.
   repeated blockers, runtime failures, and no-goal-progress executions remain
   separately visible; CLI output leads with target, milestones, interpretation,
   and stop reason.
-- [ ] Reduce repeated Action Card input without changing action availability.
+- [x] Remove evaluator wording from model-facing goals and reduce repeated
+  Action Card input without changing action availability. The 32-title action
+  surface is unchanged; shared guidance and overlap IDs replace repeated prose.
 - [ ] Add external usage observations to preflight.
 - [ ] Add portable archive relocation and preflight linkage.
 - [ ] Complete all provider-free checks.

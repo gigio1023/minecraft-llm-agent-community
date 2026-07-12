@@ -494,8 +494,10 @@ export type ActiveEpisode = {
 export type ActionCard = {
   schema: "action-card/v1";
   action_card_id: string;
+  behavior_kind?: "direct_primitive" | "actor_owned_action_skill";
   title: string;
   description: string;
+  shared_guidance_ref?: "action-card-shared-guidance";
   parameters_schema_ref: string;
   parameter_hints: string[];
   /** Advisory provider context for selection only; runtime validators still require explicit structured args. */
@@ -504,6 +506,23 @@ export type ActionCard = {
   likely_blockers: string[];
   readiness: ActionCardReadiness;
   runtime_mapping_ref: string;
+};
+
+export type ActionCardSharedGuidance = {
+  schema: "action-card-shared-guidance/v1";
+  guidance_ref: "action-card-shared-guidance";
+  applies_to: "all_action_cards";
+  parameter_rules: string[];
+  evidence_rules: string[];
+  selection_rules: string[];
+  grouped_guidance: Array<{
+    action_card_ids: string[];
+    guidance: string[];
+  }>;
+  overlap_groups: Array<{
+    direct_primitive_action_card_id: string;
+    actor_owned_action_skill_card_ids: string[];
+  }>;
 };
 
 export type ActorTurnInput = {
@@ -517,6 +536,7 @@ export type ActorTurnInput = {
   source_evidence_bundle: ActorTurnSourceEvidenceBundle;
   relationship_context: RelationshipContextProjection;
   runtime_retry_constraints: RuntimeRetryConstraintSummary[];
+  action_card_shared_guidance?: ActionCardSharedGuidance;
   action_cards: ActionCard[];
   minecraft_basic_guide: MinecraftBasicGuideProjection;
   provider_budget_hint: ProviderBudgetHint;
