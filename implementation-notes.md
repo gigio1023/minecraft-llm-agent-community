@@ -80,7 +80,9 @@ via the adaptation in the active implementation plan.
 - all three actual 2026-07-11 raw reports re-evaluated → `unverifiable`
 - repaired Stage 1 planning preflight → `needs_dashboard_approval`; current UTC
   day local ledger and exact-day OpenAI dashboard both showed 0 requests / 0
-  tokens, proposed maximum 32 requests / 1,200,000 tokens
+  tokens; billing showed a `$3.80` credit balance and Data controls confirmed
+  complimentary daily-token enrollment for API input/output sharing; proposed
+  maximum 32 requests / 1,200,000 tokens remains unapproved
 - `cd probe && bun test` → 751 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
@@ -104,6 +106,7 @@ via the adaptation in the active implementation plan.
 | Raw reports must remain byte-identical but contain machine-local workspace roots | Rewriting the root would damage the raw audit trail | Add SHA-256-bound `report-archive-relocation/v1` sidecars and make readiness prefer the archived repository-relative root | Keep for every future archive import with a stale absolute root |
 | One full-suite run hit the wall-time test once and Bun then emitted cascading `node:test` nesting errors | The earliest test passed alone, and the full suite passed when rerun without concurrent checks | Treat the first result as a Bun runner cascade, record both runs, and keep the isolated wall-time test in future verification | Revisit if the earliest test fails independently |
 | The earlier dashboard screenshot covered an ambiguous multi-day period | A logged-in dashboard session was available and could be filtered to exactly `2026-07-12` without an API request | Record the exact-day zero usage separately, regenerate the unapproved preflight, and continue to require explicit approval and complimentary-pool eligibility confirmation | Recheck immediately before a live run if approval is delayed or the UTC day changes |
+| A positive balance and complimentary-token enrollment were still indirect assumptions | The logged-in Billing page showed `$3.80`, and Data controls showed API input/output sharing enabled for all projects plus the complimentary-token enrollment message | Preserve a read-only observation and narrow the blocker to the newly proposed allowance's explicit approval | Recheck account and usage state if approval arrives on a later UTC day |
 
 ## Recent commits (this successor wave)
 

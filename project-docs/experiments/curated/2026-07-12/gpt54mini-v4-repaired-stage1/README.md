@@ -1,7 +1,8 @@
 # GPT-5.4 Mini Repaired Stage 1 Preparation
 
-Status: current UTC-day dashboard usage is recorded; waiting for explicit user
-approval. No provider request has been made for this campaign.
+Status: current UTC-day dashboard usage and account eligibility are recorded;
+waiting for explicit user approval. No provider request has been made for this
+campaign.
 
 ## Provider-Free Result
 
@@ -58,11 +59,15 @@ allowance, while final status correctly remains `needs_dashboard_approval`.
 ambiguous and belongs to the previous UTC day, so the preflight correctly did
 not count it and it is not current approval evidence.
 
-Before any live command, the user must confirm that `gpt-5.4-mini` remains
-eligible for the complimentary pool with positive balance and explicitly
-approve the 32-request / 1,200,000-token maximum. A new approved preflight must
-then be saved beside the planning record. The recorded `$120.00` organization
-spend limit is not treated as proof of account balance or model eligibility.
+`preflight/dashboard-eligibility-2026-07-12.md` records a `$3.80` positive
+credit balance, API input/output sharing enabled for all projects, and the
+dashboard's complimentary-daily-token enrollment message. The repo policy
+matrix identifies `gpt-5.4-mini` as part of the applicable mini shared pool.
+
+Before any live command, the user must explicitly approve the 32-request /
+1,200,000-token maximum. A new approved preflight must then be saved beside the
+planning record. The earlier instruction to use GPT-5.4 Mini predates this exact
+allowance and is not reused as current authority.
 
 ## Commands After Approval
 
