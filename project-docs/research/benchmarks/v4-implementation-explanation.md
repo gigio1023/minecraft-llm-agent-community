@@ -94,7 +94,7 @@ probe/src/benchmarks/
   phenomenon/     D1 (catalog)
 
 probe/benchmarks/
-  capability/individual-capability-v1.json   (1.3.0, includes furnace progression)
+  capability/individual-capability-v1.json   (1.3.1, includes furnace progression and the repaired natural seed)
   continuity/goal-continuity-v1.json         (1.1.0, 3 cases; live blocked)
   social/interdependent-social-v1.json
   social/scenarios/{economic,cooperative,quest}-*.json

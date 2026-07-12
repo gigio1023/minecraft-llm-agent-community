@@ -5,8 +5,8 @@ Handoff: `handoff-prompt.md` (item 5 completed in the current Goal run; refresh 
 
 ## Current focus
 
-The first GPT-5.4 Mini capability campaign is complete and must not be rerun
-unchanged. The active work is
+The 2026-07-11 GPT-5.4 Mini capability campaign is complete and must not be
+rerun unchanged. The active work is
 `project-docs/research/benchmarks/capability-live-validation-repair-plan.md`.
 Items 1–4 are complete provider-free: exact goal delivery, explicit placement,
 diverse world scan, and evidence-based early completion with **action-level**
@@ -25,9 +25,11 @@ strict dated dashboard-usage observation and records the conservative chosen
 calculation. Item 8 is complete provider-free: unchanged raw reports use
 SHA-256-bound relocation sidecars for repository-relative actor workspaces and
 the exact approved preflight. The complete provider-free verification sequence
-and both required capability CLI checks are now done. Planning preflight for
-the repaired two-run live campaign is `needs_dashboard_approval`; no new
-provider request is authorized.
+and both required capability CLI checks are now done. The first newly approved
+`collect_logs` command stopped during world setup with zero provider requests
+because its fixed seed had no loaded log inside the declared radius. Suite
+1.3.1 changes only that seed to the provider-free-verified `9066`. Repeating
+the live command now requires a new preflight and approval.
 
 Implementation style: default-strength `DietrichGebert/ponytail` at `14a0d79`
 via the adaptation in the active implementation plan.
@@ -78,16 +80,24 @@ via the adaptation in the active implementation plan.
   Actor Turn inputs inspected, 468 actor-workspace refs resolved, 0 provider
   requests, 0 tokens, and no evaluator-only fields in model input
 - all three actual 2026-07-11 raw reports re-evaluated → `unverifiable`
-- repaired Stage 1 planning preflight → `needs_dashboard_approval`; current UTC
-  day local ledger and exact-day OpenAI dashboard both showed 0 requests / 0
-  tokens; billing showed a `$3.80` credit balance and Data controls confirmed
-  complimentary daily-token enrollment for API input/output sharing; proposed
-  maximum 32 requests / 1,200,000 tokens remains unapproved
+- repaired Stage 1 campaign preflight → `allowed` after explicit approval of at
+  most 32 requests / 1,200,000 tokens; current UTC day local ledger and
+  exact-day OpenAI dashboard both showed 0 requests / 0 tokens; billing showed
+  a `$3.80` credit balance and Data controls confirmed complimentary daily-token
+  enrollment for API input/output sharing
+- first approved `collect_logs` command → `environment_blocked` /
+  `world_setup_failed`, 0 cycles, 0 actions, 0 provider requests, and 0 tokens;
+  the archived report passes publishable readiness and is not capability
+  evidence
+- current Minecraft 1.21.11 setup with seed `9066` → provider-free fresh-world
+  smoke passed with oak logs 28.46 blocks away; provider-free capability smoke
+  passed setup with the nearest oak log 17.12 blocks away
 - `cd probe && bun test` → 751 pass
 - `cd probe && bun run typecheck` → pass
 - `cd docs && npm run build` → pass
 - `git diff --check` → pass
-- No live provider request in this wave
+- An approved live command ran, but setup stopped before the first provider
+  request; observed provider usage remained zero
 
 ## Deviations
 
@@ -107,6 +117,7 @@ via the adaptation in the active implementation plan.
 | One full-suite run hit the wall-time test once and Bun then emitted cascading `node:test` nesting errors | The earliest test passed alone, and the full suite passed when rerun without concurrent checks | Treat the first result as a Bun runner cascade, record both runs, and keep the isolated wall-time test in future verification | Revisit if the earliest test fails independently |
 | The earlier dashboard screenshot covered an ambiguous multi-day period | A logged-in dashboard session was available and could be filtered to exactly `2026-07-12` without an API request | Record the exact-day zero usage separately, regenerate the unapproved preflight, and continue to require explicit approval and complimentary-pool eligibility confirmation | Recheck immediately before a live run if approval is delayed or the UTC day changes |
 | A positive balance and complimentary-token enrollment were still indirect assumptions | The logged-in Billing page showed `$3.80`, and Data controls showed API input/output sharing enabled for all projects plus the complimentary-token enrollment message | Preserve a read-only observation and narrow the blocker to the newly proposed allowance's explicit approval | Recheck account and usage state if approval arrives on a later UTC day |
+| The checked-in `collect_logs` seed used the scenario id string itself | The first approved run produced a safe spawn but no loaded log inside the scenario's declared 32-block bound, so setup failed before Actor Turn with zero provider usage | Change only the case's fixed seed to provider-free-verified seed `9066`, bump the suite to 1.3.1, and require a new live approval | Revisit if seed `9066` fails setup on the pinned Minecraft version or if the scenario's feasibility policy changes |
 
 ## Recent commits (this successor wave)
 

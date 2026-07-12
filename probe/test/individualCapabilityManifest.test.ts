@@ -22,7 +22,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
   assert.equal(manifest.schema, "individual-capability-manifest/v1");
   assert.equal(manifest.suite_id, "individual-capability-v1");
-  assert.equal(manifest.version, "1.3.0");
+  assert.equal(manifest.version, "1.3.1");
   assert.deepEqual(
     manifest.cases.map((capabilityCase) => capabilityCase.case_id),
     [
@@ -40,6 +40,11 @@ test("checked-in suite loads with A4 individual capability cases", () => {
 
   const collectLogs = manifest.cases.find((capabilityCase) => capabilityCase.case_id === "collect_logs");
   assert.ok(collectLogs);
+  assert.deepEqual(collectLogs.seed_policy, {
+    kind: "fixed",
+    seeds: ["9066"],
+    repeats: 1
+  });
   assert.equal(collectLogs.target.op, "any");
   if (collectLogs.target.op === "any") {
     const items = collectLogs.target.children

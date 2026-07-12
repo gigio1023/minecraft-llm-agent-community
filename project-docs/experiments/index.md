@@ -46,6 +46,7 @@ assets that are meant to be read directly.
 
 Current curated reports:
 
+- `2026-07-12/gpt54mini-v4-repaired-stage1/README.md`
 - `2026-07-11/gpt54mini-v4-live-validation/README.md`
 - `2026-06-13/qwen-comparison-worksite/index.html`
 - `2026-06-14/qwen-60-cycle-dual-camera/index.html`
@@ -58,6 +59,7 @@ Current curated reports:
 
 Current raw research-substrate artifacts:
 
+- `raw/2026-07-12/gpt54mini-v4-repaired-stage1/`
 - `raw/2026-07-11/gpt54mini-v4-live-validation/`
 - `raw/2026-07-06/session1-legibility-smoke/session.json`
 - `raw/2026-07-06/session1-legibility-smoke/public-history.json`
