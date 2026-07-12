@@ -6,7 +6,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  buildSocialCycleOpenAiConfig,
   runSocialCycle,
+  selectDeliberationBranchEvidenceRefs,
   selectGeminiFallbackModelsForCall,
   selectGeminiModelForCall
 } from "../src/runtime/socialCycleRunner.js";
@@ -28,6 +30,57 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "test-artifacts", `social-runner-${process.pid}-${Date.now()}`);
+
+test("request-bounded OpenAI runs use one HTTP request per provider stage", () => {
+  const bounded = buildSocialCycleOpenAiConfig({
+    apiKey: "test-key",
+    model: "gpt-5.4-mini",
+    reasoning: "low",
+    repoRoot: rootDir,
+    caseBudgets: {
+      max_wall_time_ms: 60_000,
+      max_provider_requests: 8,
+      max_total_tokens: 300_000
+    }
+  });
+  assert.equal(bounded.responsesBackground, false);
+  assert.equal(bounded.maxRetries, 0);
+
+  const unbounded = buildSocialCycleOpenAiConfig({
+    apiKey: "test-key",
+    model: "gpt-5.4-mini",
+    repoRoot: rootDir
+  });
+  assert.equal(unbounded.responsesBackground, undefined);
+  assert.equal(unbounded.maxRetries, undefined);
+});
+
+test("deliberation branches require evidence and are suppressed while stopping", () => {
+  assert.deepEqual(
+    selectDeliberationBranchEvidenceRefs({
+      actionEvidenceRefs: ["evidence/action.json", "evidence/action.json"],
+      lastJudgmentRef: "judgments/latest.json",
+      stopping: false
+    }),
+    ["evidence/action.json"]
+  );
+  assert.deepEqual(
+    selectDeliberationBranchEvidenceRefs({
+      actionEvidenceRefs: [],
+      lastJudgmentRef: "",
+      stopping: false
+    }),
+    []
+  );
+  assert.deepEqual(
+    selectDeliberationBranchEvidenceRefs({
+      actionEvidenceRefs: ["evidence/action.json"],
+      lastJudgmentRef: "judgments/latest.json",
+      stopping: true
+    }),
+    []
+  );
+});
 
 type ReportActionAttempt = {
   attempt_id: string;

@@ -229,6 +229,8 @@ test("ambiguous or stale dashboard periods remain visible but do not authorize O
   const dir = await mkdtemp(path.join(os.tmpdir(), "provider-quota-external-unusable-"));
   try {
     const module = await loadPreflightModule();
+    const ledgerPath = path.join(dir, "provider-usage-ledger.jsonl");
+    await writeFile(ledgerPath, "", "utf8");
     const cases = [
       {
         name: "ambiguous",
@@ -258,6 +260,7 @@ test("ambiguous or stale dashboard periods remain visible but do not authorize O
         "--estimate-requests", "1",
         "--estimate-total-tokens", "1000",
         "--estimate-requests-per-minute", "1",
+        "--ledger", ledgerPath,
         "--external-already-used", externalPath,
         "--operator-approved",
         "--approval-note", "Dashboard observation supplied for validation."

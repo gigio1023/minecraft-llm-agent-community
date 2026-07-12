@@ -488,6 +488,46 @@ export type SocialCycleRunResult = {
   caseBudgetStop?: SocialCycleCaseBudgetStop;
 };
 
+export function buildSocialCycleOpenAiConfig(input: {
+  apiKey: string;
+  model: string;
+  reasoning?: string;
+  repoRoot: string;
+  caseBudgets?: SocialCycleCaseBudgets;
+}): OpenAiJsonProviderConfig {
+  const requestBounded = input.caseBudgets?.max_provider_requests !== undefined;
+  return {
+    apiKey: input.apiKey,
+    model: input.model,
+    reasoning: input.reasoning,
+    repoRoot: input.repoRoot,
+    ...(requestBounded
+      ? {
+          // One provider stage must equal one HTTP request when the case declares
+          // a hard request ceiling. Background polling and hidden retries would
+          // otherwise cross that ceiling before the runner regains control.
+          responsesBackground: false,
+          maxRetries: 0
+        }
+      : {})
+  };
+}
+
+export function selectDeliberationBranchEvidenceRefs(input: {
+  actionEvidenceRefs: readonly string[];
+  lastJudgmentRef?: string;
+  stopping: boolean;
+}) {
+  if (input.stopping) {
+    return [];
+  }
+  const refs = input.actionEvidenceRefs.filter((ref) => ref.trim().length > 0);
+  if (refs.length > 0) {
+    return [...new Set(refs)];
+  }
+  return input.lastJudgmentRef?.trim() ? [input.lastJudgmentRef] : [];
+}
+
 export function selectGeminiModelForCall(input: {
   rotation?: readonly string[];
   callIndex: number;
@@ -968,12 +1008,13 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
   const openAi: OpenAiJsonProviderConfig | undefined =
     input.providerId === "openai-api"
-      ? {
+      ? buildSocialCycleOpenAiConfig({
           apiKey: input.openAiApiKey ?? process.env.OPENAI_API_KEY ?? "",
           model: input.model,
           reasoning,
-          repoRoot
-        }
+          repoRoot,
+          caseBudgets: input.caseBudgets
+        })
       : undefined;
   const gemini: GeminiJsonProviderConfig | undefined =
     input.providerId === "gemini-api"
@@ -2239,17 +2280,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           activeEpisode: activeEpisodeForCycle,
           context
         });
-      if (branchReason && activeEpisodeState) {
-        const branchEvidenceRefs = actionAttempts.flatMap((attempt) => attempt.evidence_refs);
+      const branchEvidenceRefs = selectDeliberationBranchEvidenceRefs({
+        actionEvidenceRefs: actionAttempts.flatMap((attempt) => attempt.evidence_refs),
+        lastJudgmentRef,
+        stopping: Boolean(
+          earlyTargetCompleted || caseBudgetStop || runtimeClassifierFailed || providerFailed
+        )
+      });
+      if (branchReason && activeEpisodeState && branchEvidenceRefs.length > 0) {
         const branch = {
           schema: "deliberation-branch/v1" as const,
           branch_id: `branch-${cycleId}-${randomUUID()}`,
           reason: branchReason,
-          evidence_refs: branchEvidenceRefs.length > 0
-            ? branchEvidenceRefs
-            : lastJudgmentRef
-              ? [lastJudgmentRef]
-              : [],
+          evidence_refs: branchEvidenceRefs,
           current_episode_ref: activeEpisodeState.ref
         };
         const writtenBranch = await writeDeliberationBranch(rootDir, input.actorId, branch);
