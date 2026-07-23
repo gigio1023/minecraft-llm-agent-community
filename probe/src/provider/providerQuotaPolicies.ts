@@ -130,8 +130,11 @@ export function defaultProviderQuotaPolicies(): ProviderQuotaPolicy[] {
       mode: "enforce",
       quota_metric: "mixed",
       quota_authority: "operator_provided_doc",
+      requires_operator_approval: true,
+      approval_reason:
+        "Billing status for the Qwen 3.8 Max preview allocation is not established; the operator must explicitly acknowledge this before a live run.",
       source:
-        "Qwen 3.8 Max preview administrator notice: 120 RPM and 500K TPM per person, with no token usage cap. Billing status is not established by this quota policy."
+        "Qwen 3.8 Max preview administrator notice: 120 RPM and 500K TPM per person, with no token usage cap. Local accounting is UTC-minute local input-side pre-request estimate plus provider-reported post-call accounting. It is not a rolling 60-second limiter, does not reserve uncapped output/thinking tokens, and cannot guarantee one request will not cross 500K TPM. Billing status is not established by this quota policy."
     },
     {
       quota_policy_id: "gemini-gemma-4-31b-observed-request-windows",

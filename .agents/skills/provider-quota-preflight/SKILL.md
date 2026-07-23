@@ -91,11 +91,19 @@ emergency brakes, and operator approval evidence.
 
 6. Treat `blocked`, `unbudgeted`, and `needs_dashboard_approval` as not runnable.
 7. For `openai-api`, even an otherwise under-cap result still requires operator
-   approval after dashboard/free-tier eligibility is checked. If the user has
-   approved a dashboard-checked run, pass both:
+   approval after dashboard/free-tier eligibility is checked. For
+   `alibaba-model-studio-api:qwen3.8-max-preview`, under-cap local accounting
+   still requires operator billing-uncertainty acknowledgement (not a dashboard
+   observation). If the user has approved, pass both:
 
    ```bash
    --operator-approved --approval-note "User checked dashboard at <time>; <brief ref>"
+   ```
+
+   Model Studio example:
+
+   ```bash
+   --operator-approved --approval-note "Operator acknowledges Qwen 3.8 Max preview billing status is unestablished."
    ```
 
 ## Candidate Rules
@@ -118,6 +126,10 @@ emergency brakes, and operator approval evidence.
 - `gemini-api`: Pacific day. Daily RPD resets at midnight Pacific time.
 - `modelscope-api`: UTC calendar month for this repo's Qwen Ambassador monthly
   API-call guard.
+- `alibaba-model-studio-api`: UTC-minute local input-side pre-request estimate
+  plus provider-reported post-call accounting. It is not a rolling 60-second
+  limiter, does not reserve uncapped output/thinking tokens, and cannot
+  guarantee one request will not cross 500K TPM.
 
 The script reports the current window keys used by the local ledger. A reset
 window being fresh does not by itself mean a run is safe; local brakes and
@@ -150,8 +162,11 @@ The script prints JSON with:
 - per-policy quota checks;
 - final status:
   - `allowed`: local policy permits the planned usage;
-  - `needs_dashboard_approval`: local policy is under cap, but OpenAI dashboard
-    approval is still required;
+  - `needs_dashboard_approval`: local policy is under cap, but operator
+    approval is still required. For OpenAI this means dashboard/free-tier
+    eligibility acknowledgement; for Model Studio Qwen 3.8 Max preview it means
+    billing-uncertainty acknowledgement (not that a Model Studio dashboard was
+    observed);
   - `blocked`: at least one enforced budget/policy would be exceeded;
   - `unbudgeted`: no matching policy exists.
 

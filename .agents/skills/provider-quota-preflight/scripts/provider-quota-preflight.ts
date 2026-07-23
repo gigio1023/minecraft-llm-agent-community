@@ -117,7 +117,7 @@ function parseArgs(argv: string[], cwd = process.cwd()): Args {
       args.outPath = path.resolve(cwd, next);
       index += 1;
     } else if (arg === "--approval-note" && hasValue(next)) {
-      args.approvalNote = next;
+      args.approvalNote = next.trim();
       index += 1;
     } else if (arg === "--approval-note-file" && hasValue(next)) {
       args.approvalNote = fs.readFileSync(path.resolve(cwd, next), "utf8").trim();
@@ -202,7 +202,10 @@ function parseArgs(argv: string[], cwd = process.cwd()): Args {
       Math.ceil(args.estimate.total_tokens / args.estimate.requests) *
       Math.max(1, args.minuteEstimate.requests);
   }
-  if (args.operatorApproved && !args.approvalNote) {
+  if (args.approvalNote !== undefined) {
+    args.approvalNote = args.approvalNote.trim();
+  }
+  if (args.operatorApproved && !(args.approvalNote && args.approvalNote.length > 0)) {
     throw new Error("--operator-approved requires --approval-note or --approval-note-file");
   }
   const externalProviders = new Set<string>();
@@ -419,7 +422,9 @@ function currentWindows(date: Date) {
     reset_notes: {
       openai_api: "UTC day; documented reset 00:00 UTC / 09:00 KST",
       gemini_api: "Pacific day; documented reset midnight America/Los_Angeles",
-      modelscope_api: "UTC calendar month for local Qwen Ambassador API-call guard"
+      modelscope_api: "UTC calendar month for local Qwen Ambassador API-call guard",
+      alibaba_model_studio_api:
+        "UTC-minute local input-side pre-request estimate plus provider-reported post-call accounting. It is not a rolling 60-second limiter, does not reserve uncapped output/thinking tokens, and cannot guarantee one request will not cross 500K TPM."
     }
   };
 }
@@ -547,6 +552,7 @@ function evaluateCandidate(
   estimate: ProviderUsageCounts,
   minuteEstimate: ProviderUsageCounts,
   operatorApproved: boolean,
+  approvalNote: string | undefined,
   externalAlreadyUsed: ExternalAlreadyUsedObservation[],
   windows: ReturnType<typeof currentWindows>
 ) {
@@ -613,6 +619,23 @@ function evaluateCandidate(
       quota_checks
     };
   }
+  const approvalPolicies = matches.filter(
+    (budget) =>
+      budget.requires_operator_approval === true && (budget.mode ?? "enforce") !== "track"
+  );
+  const hasOperatorApprovalNote =
+    operatorApproved && typeof approvalNote === "string" && approvalNote.trim().length > 0;
+  if (approvalPolicies.length > 0 && !hasOperatorApprovalNote) {
+    const approvalReason =
+      approvalPolicies.find((budget) => typeof budget.approval_reason === "string")?.approval_reason ??
+      "Matching policy requires explicit operator approval before a live run.";
+    return {
+      ...candidate,
+      status: "needs_dashboard_approval",
+      reason: approvalReason,
+      quota_checks
+    };
+  }
   if (candidate.providerId === "openai-api" && !operatorApproved) {
     return {
       ...candidate,
@@ -659,6 +682,7 @@ export function runProviderQuotaPreflight(
       args.estimate,
       args.minuteEstimate,
       args.operatorApproved,
+      args.approvalNote,
       args.externalAlreadyUsed,
       windows
     )

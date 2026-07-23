@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildSocialCycleOpenAiConfig,
+  resolveProviderStageFailureAttribution,
+  resolveReportedProviderReasoning,
   runSocialCycle,
   selectDeliberationBranchEvidenceRefs,
   selectGeminiFallbackModelsForCall,
@@ -53,6 +55,107 @@ test("request-bounded OpenAI runs use one HTTP request per provider stage", () =
   });
   assert.equal(unbounded.responsesBackground, undefined);
   assert.equal(unbounded.maxRetries, undefined);
+});
+
+test("resolveReportedProviderReasoning forces Model Studio preview to xhigh", () => {
+  const previous = process.env.SOCIAL_CYCLE_REASONING;
+  process.env.SOCIAL_CYCLE_REASONING = "low";
+  try {
+    assert.equal(
+      resolveReportedProviderReasoning({
+        providerId: "alibaba-model-studio-api",
+        model: "qwen3.8-max-preview",
+        requestedReasoning: "medium"
+      }),
+      "xhigh"
+    );
+    assert.equal(
+      resolveReportedProviderReasoning({
+        providerId: "alibaba-model-studio-api",
+        model: "qwen3.8-max-preview"
+      }),
+      "xhigh"
+    );
+    assert.equal(
+      resolveReportedProviderReasoning({
+        providerId: "openai-api",
+        model: "gpt-5.4-mini",
+        requestedReasoning: "medium"
+      }),
+      "medium"
+    );
+    assert.equal(
+      resolveReportedProviderReasoning({
+        providerId: "openai-api",
+        model: "gpt-5.4-mini"
+      }),
+      "low"
+    );
+    assert.equal(
+      resolveReportedProviderReasoning({
+        providerId: "alibaba-model-studio-api",
+        model: "other-model",
+        requestedReasoning: "high"
+      }),
+      "high"
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.SOCIAL_CYCLE_REASONING;
+    } else {
+      process.env.SOCIAL_CYCLE_REASONING = previous;
+    }
+  }
+});
+
+test("resolveProviderStageFailureAttribution separates budget abort from provider failure", async () => {
+  let materializeCalls = 0;
+  const aborted = new AbortController();
+  aborted.abort();
+  assert.equal(
+    await resolveProviderStageFailureAttribution({
+      signal: aborted.signal,
+      materializeCaseBudgetStop: async () => {
+        materializeCalls += 1;
+      }
+    }),
+    "case_budget_stop"
+  );
+  assert.equal(materializeCalls, 1);
+
+  materializeCalls = 0;
+  const live = new AbortController();
+  assert.equal(
+    await resolveProviderStageFailureAttribution({
+      signal: live.signal,
+      materializeCaseBudgetStop: async () => {
+        materializeCalls += 1;
+      }
+    }),
+    "provider_failure"
+  );
+  assert.equal(materializeCalls, 0);
+});
+
+test("external abort without declared case budgets still reports timeout", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const reportPath = path.join(rootDir, "external-abort-no-budgets-report.json");
+  const result = await runSocialCycle({
+    actorId: "npc_b",
+    providerId: "deterministic-social",
+    model: "deterministic-social",
+    cycles: 1,
+    maxActionsPerCycle: 1,
+    reportPath,
+    connectToWorld: false,
+    actorWorkspaceRootDir: path.join(rootDir, "external-abort-no-budgets-actors"),
+    signal: controller.signal
+  });
+
+  assert.equal(result.report.runtime_status, "timeout");
+  assert.equal(result.report.provider_error, undefined);
+  assert.equal(result.caseBudgetStop, undefined);
 });
 
 test("deliberation branches require evidence and are suppressed while stopping", () => {

@@ -690,3 +690,24 @@ test("environment failure remains separate from action selection", () => {
   assert.equal(normalized.failure_class, "world_setup_failed");
   assert.equal(normalized.action_selection_result.status, "not_observed");
 });
+
+test("capability report inherits Model Studio preview xhigh from social-cycle provider report", () => {
+  const normalized = buildIndividualCapabilityReport({
+    suite_id: "individual-capability-v1",
+    suite_version: "1.0.0",
+    case: baseCase(),
+    report: baseReport({
+      provider: {
+        provider_id: "alibaba-model-studio-api",
+        model: "qwen3.8-max-preview",
+        reasoning: "xhigh"
+      }
+    }),
+    evidence_bag: emptyBag(),
+    manifest_hash: manifestHash
+  });
+
+  assert.equal(normalized.provider.provider_id, "alibaba-model-studio-api");
+  assert.equal(normalized.provider.model, "qwen3.8-max-preview");
+  assert.equal(normalized.provider.reasoning, "xhigh");
+});

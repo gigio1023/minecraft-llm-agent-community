@@ -299,3 +299,87 @@ test("provider quota scripts reject unknown options", async () => {
     /Unknown or incomplete option --typo/
   );
 });
+
+test("Model Studio preflight requires operator billing acknowledgement", async () => {
+  const { outputJson } = await runPreflight([
+    "--candidate", "alibaba-model-studio-api:qwen3.8-max-preview",
+    "--estimate-requests", "1",
+    "--estimate-total-tokens", "1000",
+    "--estimate-requests-per-minute", "1",
+    "--estimate-total-tokens-per-minute", "1000"
+  ]);
+  const result = JSON.parse(outputJson);
+  assert.equal(result.final_status, "needs_dashboard_approval");
+  assert.match(
+    String(result.results[0]?.reason ?? ""),
+    /Billing status for the Qwen 3\.8 Max preview allocation is not established/
+  );
+});
+
+test("Model Studio preflight allows under-quota runs with approval and non-empty note", async () => {
+  const { outputJson } = await runPreflight([
+    "--candidate", "alibaba-model-studio-api:qwen3.8-max-preview",
+    "--estimate-requests", "1",
+    "--estimate-total-tokens", "1000",
+    "--estimate-requests-per-minute", "1",
+    "--estimate-total-tokens-per-minute", "1000",
+    "--operator-approved",
+    "--approval-note", "Operator acknowledges unestablished Model Studio preview billing."
+  ]);
+  const result = JSON.parse(outputJson);
+  assert.equal(result.final_status, "allowed");
+  assert.equal(
+    result.approval.approval_note,
+    "Operator acknowledges unestablished Model Studio preview billing."
+  );
+});
+
+test("Model Studio preflight rejects whitespace-only approval notes", async () => {
+  const module = await loadPreflightModule();
+  assert.throws(
+    () => module.runProviderQuotaPreflight([
+      "--candidate", "alibaba-model-studio-api:qwen3.8-max-preview",
+      "--estimate-requests", "1",
+      "--estimate-total-tokens", "1000",
+      "--estimate-requests-per-minute", "1",
+      "--estimate-total-tokens-per-minute", "1000",
+      "--operator-approved",
+      "--approval-note", "   \t  "
+    ], { cwd: repoRoot }),
+    /--operator-approved requires --approval-note/
+  );
+
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-quota-model-studio-note-"));
+  try {
+    const notePath = path.join(dir, "note.txt");
+    await writeFile(notePath, "  \n\t  \n", "utf8");
+    assert.throws(
+      () => module.runProviderQuotaPreflight([
+        "--candidate", "alibaba-model-studio-api:qwen3.8-max-preview",
+        "--estimate-requests", "1",
+        "--estimate-total-tokens", "1000",
+        "--estimate-requests-per-minute", "1",
+        "--estimate-total-tokens-per-minute", "1000",
+        "--operator-approved",
+        "--approval-note-file", notePath
+      ], { cwd: repoRoot }),
+      /--operator-approved requires --approval-note/
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Model Studio preflight keeps over-quota blocked even with approval", async () => {
+  const { outputJson } = await runPreflight([
+    "--candidate", "alibaba-model-studio-api:qwen3.8-max-preview",
+    "--estimate-requests", "1",
+    "--estimate-total-tokens", "1000",
+    "--estimate-requests-per-minute", "1",
+    "--estimate-total-tokens-per-minute", "500001",
+    "--operator-approved",
+    "--approval-note", "Operator acknowledges billing uncertainty."
+  ]);
+  const result = JSON.parse(outputJson);
+  assert.equal(result.final_status, "blocked");
+});

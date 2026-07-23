@@ -414,7 +414,7 @@ export async function runSocialCycleTurnCore(input: {
   classifyRuntimeForTest?: SocialCycleRuntimeClassifier;
 }): Promise<SocialCycleTurnCoreResult> {
   // Prefer early abort over starting provider planning when the case budget
-  // (or external) signal already fired. Deep HTTP cancel is out of scope here.
+  // (or external) signal already fired.
   if (input.signal?.aborted) {
     return {
       status: "provider_failed",
@@ -442,10 +442,21 @@ export async function runSocialCycleTurnCore(input: {
     modelScope: input.providerConfig?.modelScope,
     modelStudio: input.providerConfig?.modelStudio,
     defaultPrimitive: input.defaultPrimitive,
-    runId: input.runId
+    runId: input.runId,
+    ...(input.signal ? { signal: input.signal } : {})
   });
 
   if (!planner.ok) {
+    if (input.signal?.aborted) {
+      const { failureKind: _failureKind, ...abortedPlanner } = planner;
+      return {
+        status: "provider_failed",
+        planner: {
+          ...abortedPlanner,
+          errorKind: "aborted"
+        }
+      };
+    }
     if (actorTurnProviderFailureKind(planner) === "provider_contract_rejection") {
       const rejection = await buildActorTurnProviderContractRejectionAttempt({
         rootDir: input.actorWorkspaceRootDir,

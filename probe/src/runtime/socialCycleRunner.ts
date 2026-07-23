@@ -514,6 +514,31 @@ export function buildSocialCycleOpenAiConfig(input: {
   };
 }
 
+export function resolveReportedProviderReasoning(input: {
+  providerId: string;
+  model: string;
+  requestedReasoning?: string;
+}): string {
+  if (
+    input.providerId === "alibaba-model-studio-api" &&
+    input.model === "qwen3.8-max-preview"
+  ) {
+    return "xhigh";
+  }
+  return input.requestedReasoning ?? process.env.SOCIAL_CYCLE_REASONING ?? "low";
+}
+
+export async function resolveProviderStageFailureAttribution(input: {
+  signal: AbortSignal;
+  materializeCaseBudgetStop: () => Promise<void>;
+}): Promise<"case_budget_stop" | "provider_failure"> {
+  if (input.signal.aborted) {
+    await input.materializeCaseBudgetStop();
+    return "case_budget_stop";
+  }
+  return "provider_failure";
+}
+
 export function selectDeliberationBranchEvidenceRefs(input: {
   actionEvidenceRefs: readonly string[];
   lastJudgmentRef?: string;
@@ -975,7 +1000,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       ? path.join(workspaceBaseDir, "social-runs", runId)
       : workspaceBaseDir;
   const profile = getActorProfile(input.actorId);
-  const reasoning = input.reasoning ?? process.env.SOCIAL_CYCLE_REASONING ?? "low";
+  const reasoning = resolveReportedProviderReasoning({
+    providerId: input.providerId,
+    model: input.model,
+    requestedReasoning: input.reasoning
+  });
 
   const report = createEmptySocialCycleReport({
     runId,
@@ -1045,7 +1074,6 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           workspaceId: process.env.MODEL_STUDIO_WORKSPACE_ID ?? "",
           model: input.model,
           requestTimeoutMs: 180_000,
-          maxRetries: input.caseBudgets?.max_provider_requests !== undefined ? 0 : 1,
           repoRoot
         }
       : undefined;
@@ -1360,16 +1388,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
   let runtimeClassifierFailed = false;
   let anyMeaningfulProgress = false;
   let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
+  let externalAbortStop = false;
   let earlyTargetCompleted = false;
   const nowMs = input.nowMs ?? (() => Date.now());
   const caseBudgetStartedAtMs = input.caseStartedAtMs ?? nowMs();
   const caseBudgetController = new AbortController();
   const onExternalAbort = () => {
+    externalAbortStop = true;
     if (!caseBudgetController.signal.aborted) {
       caseBudgetController.abort();
     }
   };
   if (input.signal?.aborted) {
+    externalAbortStop = true;
     caseBudgetController.abort();
   } else if (input.signal) {
     input.signal.addEventListener("abort", onExternalAbort, { once: true });
@@ -1412,6 +1443,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
   const checkCaseBudgetBeforeWork = async (): Promise<boolean> => {
     if (!input.caseBudgets) {
+      if (caseBudgetController.signal.aborted) {
+        externalAbortStop = true;
+      }
       return caseBudgetController.signal.aborted;
     }
     const observed = await collectCaseBudgetObserved();
@@ -1691,9 +1725,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           gemini: geminiForProviderCall(),
           modelScope,
           modelStudio,
-          runId
+          runId,
+          signal: caseBudgetController.signal
         });
         if (!deliberation.ok) {
+          const attribution = await resolveProviderStageFailureAttribution({
+            signal: caseBudgetController.signal,
+            materializeCaseBudgetStop: async () => {
+              await checkCaseBudgetBeforeWork();
+            }
+          });
+          if (attribution === "case_budget_stop") {
+            break;
+          }
           providerFailed = true;
           report.provider_error = deliberation.error;
           appendProviderErrorRefs({
@@ -1836,10 +1880,20 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           modelStudio,
           allowedActionSkillIds: allowedSkillIds,
           allowedPrimitiveIds: allowedPrimitives,
-          runId
+          runId,
+          signal: caseBudgetController.signal
         });
 
         if (!cycleGoalProvider.ok) {
+          const attribution = await resolveProviderStageFailureAttribution({
+            signal: caseBudgetController.signal,
+            materializeCaseBudgetStop: async () => {
+              await checkCaseBudgetBeforeWork();
+            }
+          });
+          if (attribution === "case_budget_stop") {
+            break;
+          }
           providerFailed = true;
           report.provider_error = cycleGoalProvider.error;
           appendProviderErrorRefs({
@@ -2038,8 +2092,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
         if (turnCore.status === "provider_failed") {
           // Budget abort before/during planning returns provider_failed shape but
-          // must not be attributed as provider failure when caseBudgetStop is set.
-          if (caseBudgetStop) {
+          // must not be attributed as provider failure when cancellation is materialized.
+          if (caseBudgetStop || externalAbortStop) {
             break;
           }
           providerFailed = true;
@@ -2426,9 +2480,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     environmentBlocked
   });
 
-  if (caseBudgetStop) {
-    // Any case-budget stop (wall_time, requests, tokens, cost) is distinct from
-    // actor incompetence or provider/runtime failure.
+  if (caseBudgetStop || externalAbortStop) {
+    // Case-budget exhaustion and its external cancellation signal are distinct
+    // from actor incompetence or provider/runtime failure.
     report.runtime_status = "timeout";
   } else if (providerFailed || runtimeClassifierFailed) {
     report.runtime_status = "failed";

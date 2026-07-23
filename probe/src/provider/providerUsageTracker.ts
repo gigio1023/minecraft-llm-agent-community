@@ -49,6 +49,9 @@ export type ProviderUsageBudget = {
   already_used_this_month?: Partial<ProviderUsageCounts>;
   mode?: "enforce" | "track";
   source?: string;
+  /** Preflight-only; runtime quota guard must not consume these fields. */
+  requires_operator_approval?: boolean;
+  approval_reason?: string;
 };
 
 export type ProviderUsageQuotaCheck = {

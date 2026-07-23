@@ -16,12 +16,14 @@ import {
 } from "./modelscopeApiProvider.js";
 import type { ProviderUsageCallContext } from "./providerUsageTracker.js";
 
+/** Exact preview model supported by the Model Studio adapter. */
+export const MODEL_STUDIO_SUPPORTED_MODEL = "qwen3.8-max-preview";
+
 export type ModelStudioApiProviderConfig = {
   apiKey: string;
   workspaceId: string;
   model: string;
   requestTimeoutMs?: number;
-  maxRetries?: number;
   repoRoot?: string;
   usageLedgerPath?: string;
   fetchImpl?: typeof fetch;
@@ -51,14 +53,28 @@ function compatibleConfig(
     apiKeyEnvName: "MODEL_STUDIO_API_KEY",
     disableThinking: false,
     requestTimeoutMs: config.requestTimeoutMs ?? 180_000,
-    maxRetries: config.maxRetries ?? 1,
+    maxRetries: 0,
     repoRoot: config.repoRoot,
     usageLedgerPath: config.usageLedgerPath,
     fetchImpl: config.fetchImpl
   };
 }
 
-function invalidConfigResult(
+function invalidModelResult(
+  config: ModelStudioApiProviderConfig
+): Extract<ModelScopeFunctionToolCallResult, { ok: false }> {
+  return {
+    ok: false,
+    errorKind: "invalid_config",
+    message:
+      `Alibaba Model Studio supports only ${MODEL_STUDIO_SUPPORTED_MODEL}; ` +
+      `received ${config.model.trim() || "(empty)"}.`,
+    elapsedMs: 0,
+    model: config.model
+  };
+}
+
+function invalidWorkspaceResult(
   config: ModelStudioApiProviderConfig
 ): Extract<ModelScopeFunctionToolCallResult, { ok: false }> {
   return {
@@ -71,6 +87,19 @@ function invalidConfigResult(
   };
 }
 
+function resolveCompatibleConfig(config: ModelStudioApiProviderConfig):
+  | { ok: true; config: ModelScopeApiProviderConfig }
+  | { ok: false; result: Extract<ModelScopeFunctionToolCallResult, { ok: false }> } {
+  if (config.model !== MODEL_STUDIO_SUPPORTED_MODEL) {
+    return { ok: false, result: invalidModelResult(config) };
+  }
+  const resolved = compatibleConfig(config);
+  if (!resolved) {
+    return { ok: false, result: invalidWorkspaceResult(config) };
+  }
+  return { ok: true, config: resolved };
+}
+
 export async function callModelStudioJsonSchema<T>(input: {
   config: ModelStudioApiProviderConfig;
   schemaName: string;
@@ -78,12 +107,21 @@ export async function callModelStudioJsonSchema<T>(input: {
   system: string;
   user: string;
   usageContext?: ProviderUsageCallContext;
+  signal?: AbortSignal;
 }): Promise<ModelScopeJsonCallResult<T>> {
-  const config = compatibleConfig(input.config);
-  if (!config) {
-    return invalidConfigResult(input.config);
+  const resolved = resolveCompatibleConfig(input.config);
+  if (!resolved.ok) {
+    return resolved.result;
   }
-  return callModelScopeJsonSchema<T>({ ...input, config });
+  return callModelScopeJsonSchema<T>({
+    config: resolved.config,
+    schemaName: input.schemaName,
+    schema: input.schema,
+    system: input.system,
+    user: input.user,
+    usageContext: input.usageContext,
+    ...(input.signal ? { signal: input.signal } : {})
+  });
 }
 
 export async function callModelStudioFunctionToolSelection(input: {
@@ -92,10 +130,18 @@ export async function callModelStudioFunctionToolSelection(input: {
   user: string;
   tools: FunctionTool[];
   usageContext?: ProviderUsageCallContext;
+  signal?: AbortSignal;
 }): Promise<ModelScopeFunctionToolCallResult> {
-  const config = compatibleConfig(input.config);
-  if (!config) {
-    return invalidConfigResult(input.config);
+  const resolved = resolveCompatibleConfig(input.config);
+  if (!resolved.ok) {
+    return resolved.result;
   }
-  return callModelScopeFunctionToolSelection({ ...input, config });
+  return callModelScopeFunctionToolSelection({
+    config: resolved.config,
+    system: input.system,
+    user: input.user,
+    tools: input.tools,
+    usageContext: input.usageContext,
+    ...(input.signal ? { signal: input.signal } : {})
+  });
 }

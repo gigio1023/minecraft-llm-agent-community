@@ -108,7 +108,7 @@ Current built-in quota policy types:
 | `openai-api` | documented mini/nano data-sharing group | total tokens | UTC day | 10M/day shared pool |
 | `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Max` | API calls | calendar month | 2500 calls/month |
 | `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Plus` | API calls | calendar month | 10000 calls/month |
-| `alibaba-model-studio-api` | `qwen3.8-max-preview` | requests/tokens | rolling minute | 120 RPM and 500K TPM per person |
+| `alibaba-model-studio-api` | `qwen3.8-max-preview` | requests/tokens | UTC minute | 120 RPM and 500K TPM per person |
 | `gemini-api` | configured Gemini/Gemma free-tier references | requests/tokens | Pacific day/minute | operator-observed RPM/RPD/TPM brakes |
 
 Budget JSON shape:
@@ -304,9 +304,17 @@ adds provider conversation history, it must pass back the complete
 `reasoning_content` unchanged rather than concatenating it into `content`.
 
 The built-in guard records the announced 120 RPM and 500K TPM per-person
-capacity. Those limits do **not** establish whether the preview is billed.
-Until the administrator confirms billing treatment, treat billing status as
-unknown and keep live tests deliberately small.
+capacity. Local accounting is UTC-minute local input-side pre-request estimate
+plus provider-reported post-call accounting. It is not a rolling 60-second
+limiter, does not reserve uncapped output/thinking tokens, and cannot guarantee
+one request will not cross 500K TPM. Those limits do **not** establish whether
+the preview is billed. Until the administrator confirms billing treatment,
+treat billing status as unknown, require explicit operator acknowledgement in
+preflight, and keep live tests deliberately small.
+
+Operational rule: only one Model Studio-backed process may run at a time for
+this per-person preview allocation, regardless of ledger path. Concurrent
+safety is unverified and outside this patch.
 
 ## Gameplay Provider Switch
 

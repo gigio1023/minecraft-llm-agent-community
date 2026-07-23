@@ -29,7 +29,11 @@ import {
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
-import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
+import {
+  modelStudioRawProviderOutputField,
+  rawOutputFromProviderResult,
+  writeProviderOutputSnapshot
+} from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import { listActorMemoryRefs } from "../memory/actorMemory.js";
 import { buildGoalMindProviderInput } from "./socialCycleProviderInputs.js";
@@ -195,6 +199,7 @@ export async function runSocialCycleGoalProvider(input: {
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
   runId?: string;
+  signal?: AbortSignal;
 }): Promise<CycleGoalProviderResult> {
   const snapshotId = `goal-mind-${input.cycleId}-${randomUUID()}`;
   const turnId = input.cycleId;
@@ -359,7 +364,8 @@ If observation or previous judgments include blocked evidence, use that context 
     };
   }>({
     config: input.modelStudio!,
-    ...providerCall
+    ...providerCall,
+    ...(input.signal ? { signal: input.signal } : {})
   }) : await callOpenAiJsonSchema<{
     strategic_goal_updates: Array<{
       summary: string;
@@ -397,7 +403,11 @@ If observation or previous judgments include blocked evidence, use that context 
         budget_decision: result.budgetDecision as unknown as JsonValue
       },
       proposal: { error: result.message },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
     return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
   }
@@ -428,7 +438,11 @@ If observation or previous judgments include blocked evidence, use that context 
       raw_output_text: result.rawText,
       parsed_output: result.parsed as unknown as JsonValue,
       proposal: { error: "missing_cycle_goal" },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
     return {
       ok: false,
@@ -493,7 +507,11 @@ If observation or previous judgments include blocked evidence, use that context 
       raw_output_text: result.rawText,
       parsed_output: { validation_errors: validated.errors },
       proposal: { error: "invalid_cycle_goal" },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
     return {
       ok: false,
@@ -519,7 +537,11 @@ If observation or previous judgments include blocked evidence, use that context 
     raw_output_text: result.rawText,
     parsed_output: result.parsed as unknown as JsonValue,
     proposal: { cycle_goal_ref: cycleGoalRef },
-    usage: result.usageRecord
+    usage: result.usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput: rawOutputFromProviderResult(result)
+    })
   });
 
   return {

@@ -26,7 +26,11 @@ import {
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { callOpenAiJsonSchema, type OpenAiJsonProviderConfig } from "./openaiApiJsonProvider.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
-import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
+import {
+  modelStudioRawProviderOutputField,
+  rawOutputFromProviderResult,
+  writeProviderOutputSnapshot
+} from "./providerOutputStore.js";
 import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import {
   buildMineflayerCodegenProviderPayload,
@@ -180,6 +184,7 @@ async function writeFailureOutput(input: {
   model: string;
   snapshotId: string;
   rawText?: string;
+  rawOutput?: JsonValue;
   error: string;
   usageRecord?: ProviderUsageRecord;
 }) {
@@ -197,7 +202,11 @@ async function writeFailureOutput(input: {
       schema: "mineflayer-codegen-provider-failure/v1",
       error: input.error
     },
-    usage: input.usageRecord
+    usage: input.usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput: input.rawOutput
+    })
   });
 }
 
@@ -217,6 +226,7 @@ export async function runMineflayerCodegenProvider(input: {
   modelStudio?: ModelStudioApiProviderConfig;
   runId?: string;
   snapshotId: string;
+  signal?: AbortSignal;
 }): Promise<MineflayerCodegenProviderResult> {
   const intermediateInputRefs: string[] = [];
   const intermediateOutputRefs: string[] = [];
@@ -224,6 +234,24 @@ export async function runMineflayerCodegenProvider(input: {
   let lastFailure: Extract<MineflayerCodegenProviderResult, { ok: false }> | undefined;
 
   for (let repairIndex = 0; repairIndex <= 1; repairIndex++) {
+    if (repairIndex > 0 && input.signal?.aborted) {
+      return lastFailure ?? {
+        ok: false,
+        error: "Mineflayer codegen provider aborted before validation repair",
+        request: buildMineflayerCodegenRequest({
+          requestId: `${input.snapshotId}-aborted-request`,
+          actorTurnInput: input.actorTurnInput,
+          rawOuterToolCall: input.rawOuterToolCall,
+          parsedAuthorToolArgs: input.parsedAuthorToolArgs,
+          previousValidationError
+        }),
+        requestRef: "",
+        inputRef: "",
+        outputRef: "",
+        intermediateInputRefs,
+        intermediateOutputRefs
+      };
+    }
     const snapshotId = repairIndex === 0 ? input.snapshotId : `${input.snapshotId}-repair-1`;
     const request = buildMineflayerCodegenRequest({
       requestId: `${snapshotId}-request`,
@@ -274,7 +302,8 @@ export async function runMineflayerCodegenProvider(input: {
       : input.providerId === "alibaba-model-studio-api"
         ? await callModelStudioJsonSchema<{ mineflayer_codegen: unknown }>({
             config: input.modelStudio!,
-            ...payload
+            ...payload,
+            ...(input.signal ? { signal: input.signal } : {})
           })
       : await callGeminiJsonSchema<{ mineflayer_codegen: unknown }>({
           config: input.gemini!,
@@ -290,6 +319,7 @@ export async function runMineflayerCodegenProvider(input: {
         model: result.model,
         snapshotId,
         rawText,
+        rawOutput: rawOutputFromProviderResult(result),
         error: result.message,
         usageRecord: result.usageRecord
       });
@@ -318,6 +348,7 @@ export async function runMineflayerCodegenProvider(input: {
         model: result.model,
         snapshotId,
         rawText,
+        rawOutput: rawOutputFromProviderResult(result),
         error,
         usageRecord: result.usageRecord
       });
@@ -332,6 +363,9 @@ export async function runMineflayerCodegenProvider(input: {
         intermediateOutputRefs
       };
       if (repairIndex === 0) {
+        if (input.signal?.aborted) {
+          return lastFailure;
+        }
         intermediateInputRefs.push(inputRef);
         intermediateOutputRefs.push(outputRef);
         previousValidationError = error;
@@ -356,7 +390,11 @@ export async function runMineflayerCodegenProvider(input: {
         mineflayer_codegen: parsed.output as unknown as JsonValue,
         repaired_from_previous_validation_error: previousValidationError ?? null
       },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
 
     return {

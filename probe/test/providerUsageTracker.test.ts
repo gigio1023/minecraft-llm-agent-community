@@ -442,9 +442,10 @@ test("default ModelScope Qwen policies enforce Ambassador monthly API-call quota
   }
 });
 
-test("default Model Studio Qwen 3.8 policy enforces preview RPM and TPM limits", async () => {
+test("default Model Studio Qwen 3.8 policy uses UTC-minute local accounting for RPM/TPM projections", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-model-studio-default-"));
   const ledgerPath = path.join(dir, "ledger.jsonl");
+  const now = new Date("2026-07-23T01:02:03.000Z");
   try {
     await withUsageEnv(
       {
@@ -454,19 +455,50 @@ test("default Model Studio Qwen 3.8 policy enforces preview RPM and TPM limits",
         PROVIDER_USAGE_LEDGER_PATH: ledgerPath
       },
       async () => {
+        await appendProviderUsageRecord({
+          providerId: "alibaba-model-studio-api",
+          model: "qwen3.8-max-preview",
+          status: "succeeded",
+          usageSource: "provider_reported",
+          usage: {
+            requests: 119,
+            input_tokens: 10,
+            output_tokens: 0,
+            thinking_tokens: 0,
+            total_tokens: 10
+          },
+          context: { ledgerPath },
+          now
+        });
+
+        await guardProviderUsageRequest({
+          providerId: "alibaba-model-studio-api",
+          model: "qwen3.8-max-preview",
+          estimatedUsage: {
+            requests: 1,
+            input_tokens: 1,
+            output_tokens: 0,
+            thinking_tokens: 0,
+            total_tokens: 1
+          },
+          context: { ledgerPath },
+          now,
+          maxAutoDelayMs: 0
+        });
+
         await assert.rejects(
           guardProviderUsageRequest({
             providerId: "alibaba-model-studio-api",
             model: "qwen3.8-max-preview",
             estimatedUsage: {
-              requests: 121,
+              requests: 2,
               input_tokens: 1,
-              output_tokens: 1,
+              output_tokens: 0,
               thinking_tokens: 0,
-              total_tokens: 2
+              total_tokens: 1
             },
             context: { ledgerPath },
-            now: new Date("2026-07-23T01:02:03.000Z"),
+            now,
             maxAutoDelayMs: 0
           }),
           (error) =>
@@ -486,7 +518,7 @@ test("default Model Studio Qwen 3.8 policy enforces preview RPM and TPM limits",
               total_tokens: 500_001
             },
             context: { ledgerPath },
-            now: new Date("2026-07-23T01:02:03.000Z"),
+            now: new Date("2026-07-23T01:03:03.000Z"),
             maxAutoDelayMs: 0
           }),
           (error) =>

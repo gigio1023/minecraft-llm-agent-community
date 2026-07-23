@@ -46,6 +46,7 @@ export type ModelScopeErrorKind =
   | "quota"
   | "rate_limit"
   | "timeout"
+  | "aborted"
   | "server_error"
   | "tool_call_error"
   | "parse_error"
@@ -125,6 +126,8 @@ type ChatCompletionResponse = {
   error?: unknown;
 };
 
+type AbortSource = "external" | "timeout";
+
 function modelScopeBaseUrl(config: ModelScopeApiProviderConfig) {
   return (config.baseUrl?.trim() || "https://api-inference.modelscope.ai/v1").replace(/\/+$/, "");
 }
@@ -139,6 +142,10 @@ function providerLabel(config: ModelScopeApiProviderConfig) {
 
 function apiKeyEnvName(config: ModelScopeApiProviderConfig) {
   return config.apiKeyEnvName?.trim() || "MODELSCOPE_API_KEY";
+}
+
+function isModelStudioProvider(config: ModelScopeApiProviderConfig) {
+  return providerId(config) === "alibaba-model-studio-api";
 }
 
 function thinkingRequestFields(config: ModelScopeApiProviderConfig) {
@@ -163,7 +170,22 @@ function toJsonValue(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
+function abortSourceOf(error: unknown): AbortSource | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+  const source = (error as { abortSource?: unknown }).abortSource;
+  return source === "external" || source === "timeout" ? source : undefined;
+}
+
 function classifyModelScopeError(error: unknown, status?: number): ModelScopeErrorKind {
+  const abortSource = abortSourceOf(error);
+  if (abortSource === "external") {
+    return "aborted";
+  }
+  if (abortSource === "timeout") {
+    return "timeout";
+  }
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
   if (status === 429 || lower.includes("rate limit")) {
@@ -187,6 +209,9 @@ function shouldRetryModelScopeError(
   retries: number
 ) {
   if (attemptIndex >= retries) {
+    return false;
+  }
+  if (errorKind === "aborted") {
     return false;
   }
   return errorKind === "server_error" || errorKind === "timeout" || errorKind === "rate_limit";
@@ -220,40 +245,95 @@ function rawOutputFromResponse(input: {
   });
 }
 
+function abortedBeforeTransportResult(input: {
+  config: ModelScopeApiProviderConfig;
+  model: string;
+  started: number;
+}): Extract<ModelScopeFunctionToolCallResult, { ok: false }> {
+  return {
+    ok: false,
+    errorKind: "aborted",
+    message: `${providerLabel(input.config)} request aborted before transport`,
+    elapsedMs: Date.now() - input.started,
+    model: input.model
+  };
+}
+
 async function postModelScopeChatCompletion(input: {
   config: ModelScopeApiProviderConfig;
   body: Record<string, unknown>;
+  signal?: AbortSignal;
 }): Promise<{ response: ChatCompletionResponse; headers: Headers; rawText: string }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs(input.config));
-  try {
-    const fetchImpl = input.config.fetchImpl ?? fetch;
-    const response = await fetchImpl(`${modelScopeBaseUrl(input.config)}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${input.config.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(input.body),
-      signal: controller.signal
-    });
-    const rawText = await response.text();
-    let parsed: ChatCompletionResponse;
-    try {
-      parsed = JSON.parse(rawText) as ChatCompletionResponse;
-    } catch {
-      parsed = { error: rawText };
+  let abortSource: AbortSource | undefined;
+  const onExternalAbort = () => {
+    if (abortSource === undefined) {
+      abortSource = "external";
     }
-    if (!response.ok) {
-      throw Object.assign(new Error(rawText || `${providerLabel(input.config)} HTTP ${response.status}`), {
-        status: response.status,
-        rawOutput: rawOutputFromResponse({ response: parsed, headers: response.headers }),
-        rawText
+    controller.abort();
+  };
+  const timeout = setTimeout(() => {
+    if (abortSource === undefined) {
+      abortSource = "timeout";
+    }
+    controller.abort();
+  }, requestTimeoutMs(input.config));
+
+  try {
+    if (input.signal?.aborted) {
+      throw Object.assign(new Error(`${providerLabel(input.config)} request aborted`), {
+        abortSource: "external" as const
       });
     }
-    return { response: parsed, headers: response.headers, rawText };
+    if (input.signal) {
+      input.signal.addEventListener("abort", onExternalAbort);
+    }
+
+    const fetchImpl = input.config.fetchImpl ?? fetch;
+    try {
+      const response = await fetchImpl(`${modelScopeBaseUrl(input.config)}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${input.config.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input.body),
+        signal: controller.signal
+      });
+      const rawText = await response.text();
+      let parsed: ChatCompletionResponse;
+      try {
+        parsed = JSON.parse(rawText) as ChatCompletionResponse;
+      } catch {
+        parsed = { error: rawText };
+      }
+      if (!response.ok) {
+        throw Object.assign(new Error(rawText || `${providerLabel(input.config)} HTTP ${response.status}`), {
+          status: response.status,
+          rawOutput: rawOutputFromResponse({ response: parsed, headers: response.headers }),
+          rawText
+        });
+      }
+      return { response: parsed, headers: response.headers, rawText };
+    } catch (error) {
+      if (abortSource !== undefined || controller.signal.aborted) {
+        const source = abortSource ?? "timeout";
+        throw Object.assign(
+          new Error(
+            source === "external"
+              ? `${providerLabel(input.config)} request aborted`
+              : `${providerLabel(input.config)} request timed out`
+          ),
+          { abortSource: source }
+        );
+      }
+      throw error;
+    }
   } finally {
     clearTimeout(timeout);
+    if (input.signal) {
+      input.signal.removeEventListener("abort", onExternalAbort);
+    }
   }
 }
 
@@ -289,6 +369,21 @@ function modelScopeUsage(raw: unknown, fallback: ReturnType<typeof buildEstimate
   return normalizeOpenAiUsage(raw, fallback);
 }
 
+async function guardUsage(input: {
+  config: ModelScopeApiProviderConfig;
+  model: string;
+  estimatedUsage: ReturnType<typeof buildEstimatedUsage>;
+  usageContext: ProviderUsageCallContext & { repoRoot?: string; ledgerPath?: string };
+}): Promise<ProviderUsageBudgetDecision> {
+  return guardProviderUsageRequest({
+    providerId: providerId(input.config),
+    model: input.model,
+    estimatedUsage: input.estimatedUsage,
+    context: input.usageContext,
+    ...(isModelStudioProvider(input.config) ? { maxAutoDelayMs: 0 } : {})
+  });
+}
+
 export async function callModelScopeJsonSchema<T>(input: {
   config: ModelScopeApiProviderConfig;
   schemaName: string;
@@ -296,6 +391,7 @@ export async function callModelScopeJsonSchema<T>(input: {
   system: string;
   user: string;
   usageContext?: ProviderUsageCallContext;
+  signal?: AbortSignal;
 }): Promise<ModelScopeJsonCallResult<T>> {
   const started = Date.now();
   const model = input.config.model;
@@ -315,6 +411,10 @@ export async function callModelScopeJsonSchema<T>(input: {
     inputText: `${schemaInstruction}\n${input.user}`
   });
 
+  if (input.signal?.aborted) {
+    return abortedBeforeTransportResult({ config: input.config, model, started });
+  }
+
   if (!input.config.apiKey.trim()) {
     return {
       ok: false,
@@ -327,13 +427,17 @@ export async function callModelScopeJsonSchema<T>(input: {
 
   let lastFailure: Extract<ModelScopeJsonCallResult<T>, { ok: false }> | undefined;
   for (let attemptIndex = 0; attemptIndex <= retries; attemptIndex++) {
+    if (input.signal?.aborted) {
+      return lastFailure ?? abortedBeforeTransportResult({ config: input.config, model, started });
+    }
+
     let budgetDecision: ProviderUsageBudgetDecision | undefined;
     try {
-      budgetDecision = await guardProviderUsageRequest({
-        providerId: providerId(input.config),
+      budgetDecision = await guardUsage({
+        config: input.config,
         model,
         estimatedUsage,
-        context: usageContext
+        usageContext
       });
     } catch (error) {
       if (error instanceof ProviderUsageBudgetError) {
@@ -352,6 +456,7 @@ export async function callModelScopeJsonSchema<T>(input: {
     try {
       const { response, headers } = await postModelScopeChatCompletion({
         config: input.config,
+        signal: input.signal,
         body: {
           model,
           messages: [
@@ -402,7 +507,7 @@ export async function callModelScopeJsonSchema<T>(input: {
           usageRecord,
           budgetDecision
         };
-        if (attemptIndex < retries) {
+        if (attemptIndex < retries && !input.signal?.aborted) {
           await delay(1_000 * 2 ** attemptIndex);
           continue;
         }
@@ -431,7 +536,7 @@ export async function callModelScopeJsonSchema<T>(input: {
           usageRecord,
           budgetDecision
         };
-        if (attemptIndex < retries) {
+        if (attemptIndex < retries && !input.signal?.aborted) {
           await delay(1_000 * 2 ** attemptIndex);
           continue;
         }
@@ -465,7 +570,10 @@ export async function callModelScopeJsonSchema<T>(input: {
         usageRecord,
         budgetDecision
       };
-      if (shouldRetryModelScopeError(errorKind, attemptIndex, retries)) {
+      if (
+        shouldRetryModelScopeError(errorKind, attemptIndex, retries) &&
+        !input.signal?.aborted
+      ) {
         await delay(1_000 * 2 ** attemptIndex);
         continue;
       }
@@ -488,6 +596,7 @@ export async function callModelScopeFunctionToolSelection(input: {
   user: string;
   tools: FunctionTool[];
   usageContext?: ProviderUsageCallContext;
+  signal?: AbortSignal;
 }): Promise<ModelScopeFunctionToolCallResult> {
   const started = Date.now();
   const model = input.config.model;
@@ -502,6 +611,10 @@ export async function callModelScopeFunctionToolSelection(input: {
     inputText: `${input.system}\n${input.user}\n${JSON.stringify(chatTools)}`
   });
 
+  if (input.signal?.aborted) {
+    return abortedBeforeTransportResult({ config: input.config, model, started });
+  }
+
   if (!input.config.apiKey.trim()) {
     return {
       ok: false,
@@ -514,13 +627,17 @@ export async function callModelScopeFunctionToolSelection(input: {
 
   let lastFailure: Extract<ModelScopeFunctionToolCallResult, { ok: false }> | undefined;
   for (let attemptIndex = 0; attemptIndex <= retries; attemptIndex++) {
+    if (input.signal?.aborted) {
+      return lastFailure ?? abortedBeforeTransportResult({ config: input.config, model, started });
+    }
+
     let budgetDecision: ProviderUsageBudgetDecision | undefined;
     try {
-      budgetDecision = await guardProviderUsageRequest({
-        providerId: providerId(input.config),
+      budgetDecision = await guardUsage({
+        config: input.config,
         model,
         estimatedUsage,
-        context: usageContext
+        usageContext
       });
     } catch (error) {
       if (error instanceof ProviderUsageBudgetError) {
@@ -539,6 +656,7 @@ export async function callModelScopeFunctionToolSelection(input: {
     try {
       const { response, headers } = await postModelScopeChatCompletion({
         config: input.config,
+        signal: input.signal,
         body: {
           model,
           messages: [
@@ -595,7 +713,7 @@ export async function callModelScopeFunctionToolSelection(input: {
           usageRecord,
           budgetDecision
         };
-        if (attemptIndex < retries) {
+        if (attemptIndex < retries && !input.signal?.aborted) {
           await delay(1_000 * 2 ** attemptIndex);
           continue;
         }
@@ -639,7 +757,10 @@ export async function callModelScopeFunctionToolSelection(input: {
         usageRecord,
         budgetDecision
       };
-      if (shouldRetryModelScopeError(errorKind, attemptIndex, retries)) {
+      if (
+        shouldRetryModelScopeError(errorKind, attemptIndex, retries) &&
+        !input.signal?.aborted
+      ) {
         await delay(1_000 * 2 ** attemptIndex);
         continue;
       }
