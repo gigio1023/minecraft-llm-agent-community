@@ -65,10 +65,26 @@ const PICKAXE_ITEM_NAMES = [
   "netherite_pickaxe"
 ] as const;
 
+const PICKAXE_HARVEST_LEVEL: Record<(typeof PICKAXE_ITEM_NAMES)[number], number> = {
+  wooden_pickaxe: 0,
+  golden_pickaxe: 0,
+  stone_pickaxe: 1,
+  iron_pickaxe: 2,
+  diamond_pickaxe: 3,
+  netherite_pickaxe: 4
+};
+
 const BLOCK_DROPS: Record<string, string> = {
   stone: "cobblestone",
   coal_ore: "coal",
-  deepslate_coal_ore: "coal"
+  deepslate_coal_ore: "coal",
+  iron_ore: "raw_iron",
+  deepslate_iron_ore: "raw_iron"
+};
+
+const BLOCK_MINIMUM_PICKAXE_LEVEL: Record<string, number> = {
+  iron_ore: 1,
+  deepslate_iron_ore: 1
 };
 
 function delay(ms: number) {
@@ -149,14 +165,19 @@ async function runPathfinderGoto(input: {
   }
 }
 
-async function equipPickaxeIfAvailable(bot: MineBlockBot) {
+async function equipPickaxeIfAvailable(bot: MineBlockBot, minimumLevel: number) {
   if (!bot.equip || !bot.inventory) {
     return undefined;
   }
 
-  const pickaxe = bot.inventory.items().find((item) =>
-    PICKAXE_ITEM_NAMES.includes(item.name as (typeof PICKAXE_ITEM_NAMES)[number])
-  );
+  const pickaxe = bot.inventory.items()
+    .filter((item): item is { name: (typeof PICKAXE_ITEM_NAMES)[number]; count: number } =>
+      PICKAXE_ITEM_NAMES.includes(item.name as (typeof PICKAXE_ITEM_NAMES)[number]) &&
+      PICKAXE_HARVEST_LEVEL[item.name as (typeof PICKAXE_ITEM_NAMES)[number]] >= minimumLevel
+    )
+    .sort((left, right) =>
+      PICKAXE_HARVEST_LEVEL[left.name] - PICKAXE_HARVEST_LEVEL[right.name]
+    )[0];
 
   if (!pickaxe) {
     return undefined;
@@ -315,16 +336,19 @@ export async function mineBlock({
 
   const beforeCount = countInventoryItem(bot, itemName);
   const attemptedBlocks: MineBlockResult["attemptedBlocks"] = [];
-  const equippedTool = await equipPickaxeIfAvailable(bot);
+  const minimumPickaxeLevel = BLOCK_MINIMUM_PICKAXE_LEVEL[blockName] ?? 0;
+  const equippedTool = await equipPickaxeIfAvailable(bot, minimumPickaxeLevel);
 
   if (!equippedTool) {
+    const requirement =
+      minimumPickaxeLevel >= 1 ? "a stone_pickaxe or better" : "a pickaxe";
     return {
       status: "blocked",
       blockName,
       itemName,
       attemptedBlocks,
       beforeCount,
-      reason: `mine_block requires a pickaxe before mining ${blockName}`
+      reason: `mine_block requires ${requirement} before mining ${blockName}`
     };
   }
 

@@ -342,10 +342,19 @@ export function evaluateCapabilityCaseProgress(input: {
       .filter((entry) => entry.result.status === "passed")
       .flatMap((entry) => entry.result.evidence_refs)
   ]);
+  const milestoneEvidenceRefs = Object.fromEntries(
+    milestoneResults
+      .filter((entry) => entry.result.status === "passed")
+      .map((entry) => [
+        entry.milestone_id,
+        sortUniqueStrings(entry.result.evidence_refs)
+      ])
+  );
   return {
     targetStatus: target.status,
     passedMilestoneIds,
-    evidenceRefs
+    evidenceRefs,
+    milestoneEvidenceRefs
   };
 }
 

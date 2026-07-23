@@ -99,6 +99,31 @@ satisfy acquisition or placement targets.
 - Minecraft ids through `minecraft-data`, not custom synonym lists.
 - `block_observed_at` requires positioned run-origin block facts.
 
+### 4.1 Current long-horizon extension
+
+Suite `1.4.0` adds `prepare_first_iron_batch` as the primary A5 case. The
+minimal cases remain calibration and failure-localization probes; they are not
+the main provider comparison.
+
+The long case uses `first-iron-batch-flat-benchmark-v1` with empty starting
+inventory and fixed exposed wood, stone, coal ore, and iron ore. Setup
+availability is never progress. The final evaluator requires all of:
+
+- `raw_iron >= 3`;
+- `coal >= 1`;
+- `stone_pickaxe` in inventory or hand;
+- a current-run observed placed furnace.
+
+Three raw iron is enough for the first iron pickaxe after smelting. The target
+stops before smelting because furnace operation is not yet a verified runtime
+action. `mine_block` now maps iron ore to raw iron and refuses iron extraction
+without a stone-tier-or-better pickaxe.
+
+`capability_progress.milestone_first_observations` records the first action,
+cycle, wall time, provider request/token counts, and evidence refs for each
+milestone. This preserves acquisition history for items later consumed by
+crafting or placement.
+
 ## 5. How to use the API (offline)
 
 ```ts

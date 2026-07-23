@@ -398,6 +398,7 @@ export type SocialCycleCapabilityProgressObservation = {
   targetStatus: "passed" | "failed" | "unknown";
   passedMilestoneIds: string[];
   evidenceRefs: string[];
+  milestoneEvidenceRefs?: Record<string, string[]>;
 };
 
 export type SocialCycleRunOptions = {
@@ -876,10 +877,33 @@ function applyCapabilityProgressObservation(input: {
   const passedMilestoneIds = sortUniqueStrings(input.observation.passedMilestoneIds);
   const evidenceRefs = sortUniqueStrings(input.observation.evidenceRefs);
   const previous = input.report.capability_progress;
+  const milestoneFirstObservations = [
+    ...(previous?.milestone_first_observations ?? [])
+  ];
+  const alreadyObserved = new Set(
+    milestoneFirstObservations.map((observation) => observation.milestone_id)
+  );
+  for (const milestoneId of passedMilestoneIds) {
+    if (alreadyObserved.has(milestoneId)) {
+      continue;
+    }
+    milestoneFirstObservations.push({
+      milestone_id: milestoneId,
+      ...input.measurement,
+      evidence_refs: sortUniqueStrings(
+        input.observation.milestoneEvidenceRefs?.[milestoneId] ?? evidenceRefs
+      )
+    });
+  }
+  milestoneFirstObservations.sort((left, right) =>
+    left.runtime_action_count - right.runtime_action_count ||
+    left.milestone_id.localeCompare(right.milestone_id)
+  );
   const summary: CapabilityProgressSummary = {
     schema: "capability-progress-summary/v1",
     latest_target_status: input.observation.targetStatus,
     latest_passed_milestone_ids: passedMilestoneIds,
+    milestone_first_observations: milestoneFirstObservations,
     ...(previous?.first_measurable_progress
       ? { first_measurable_progress: previous.first_measurable_progress }
       : {}),

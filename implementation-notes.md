@@ -5,6 +5,14 @@ Handoff: `handoff-prompt.md` (item 5 completed in the current Goal run; refresh 
 
 ## Current focus
 
+The active A5 target is now `prepare_first_iron_batch` in capability suite
+`1.4.0`, not five disconnected wood-only cases. Its controlled fixture begins
+with empty inventory and exposes wood, stone, coal ore, and iron ore without
+crediting setup. The final predicate requires `raw_iron >= 3`, `coal >= 1`, a
+`stone_pickaxe`, and a placed furnace. Per-milestone first observations retain
+action/cycle, elapsed time, provider usage, and evidence even after transient
+items such as crafting tables or furnace items are consumed.
+
 The 2026-07-11 GPT-5.4 Mini capability campaign is complete and must not be
 rerun unchanged. The active work is
 `project-docs/research/benchmarks/capability-live-validation-repair-plan.md`.
@@ -135,6 +143,9 @@ via the adaptation in the active implementation plan.
 | A preflight test assumed the real local ledger was empty | Current live usage changed the expected value and triggered Bun's known cascading `node:test` errors | Give the test its own empty temporary ledger, then rerun it and the full suite | Keep tests isolated from operator usage |
 | Public OpenAI documentation listed models beyond the operator's active dashboard notice | The operator clarified that only the supplied dashboard aliases may be complimentary-usage candidates and selected exact `gpt-5.4` | Make the operator list the executable allowlist, remove snapshots/GPT-5.5/GPT-5.6, and use public docs only for general eligibility/reset/overage rules | Update only when the operator supplies a new dashboard notice |
 | Removing an unlisted OpenAI model from built-in policies still left a historical local budget capable of matching it | A local brake could accidentally promote `gpt-5.5` into preflight/runtime eligibility | Require every `openai-api` model to pass the operator-provided built-in allowlist before local budgets are evaluated | Add a separate explicit paid-model authority contract if paid OpenAI runs are later desired |
+| The 2026-07-24 provider plan treated five isolated wood-only cases as the primary experiment | Those cases mostly measured short resets and could not test retention across Minecraft's real wood → stone → iron dependency boundary | Keep them as calibration probes and make one `prepare_first_iron_batch` run the primary A5 measurement | Revisit difficulty after one artifact-complete Qwen 3.8 run |
+| A first iron pickaxe would be the clearest next outcome | Furnace interaction/smelting is not an implemented runtime action, so requiring ingots would measure a known substrate gap | Stop at the exact ready-to-smelt state: three raw iron, one coal, stone pickaxe retained, furnace placed | Extend to smelted ingots only after a verified furnace-use action lands |
+| Final inventory snapshots were expected to describe the item path | Placed crafting tables and furnaces disappear from inventory, erasing when those items were first acquired | Persist write-once `milestone_first_observations` after every action with usage and evidence refs | Keep; add report visualization only after the first live artifact shows it is useful |
 
 ## Recent commits (this successor wave)
 

@@ -22,7 +22,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
   assert.equal(manifest.schema, "individual-capability-manifest/v1");
   assert.equal(manifest.suite_id, "individual-capability-v1");
-  assert.equal(manifest.version, "1.3.1");
+  assert.equal(manifest.version, "1.4.0");
   assert.deepEqual(
     manifest.cases.map((capabilityCase) => capabilityCase.case_id),
     [
@@ -33,6 +33,7 @@ test("checked-in suite loads with A4 individual capability cases", () => {
       "craft_wooden_pickaxe",
       "mine_cobblestone",
       "reach_placed_furnace",
+      "prepare_first_iron_batch",
       "contribute_shared_chest",
       "acquire_diamond_pickaxe"
     ]
@@ -86,6 +87,33 @@ test("checked-in suite loads with A4 individual capability cases", () => {
   assert.equal("recipe_steps" in furnace, false);
   assert.ok(!/logs?\s*→|first gather|then craft|prerequisite chain/i.test(furnace.top_level_goal));
 
+  const firstIron = manifest.cases.find(
+    (capabilityCase) => capabilityCase.case_id === "prepare_first_iron_batch"
+  );
+  assert.ok(firstIron);
+  assert.equal(firstIron.world_scenario_id, "first-iron-batch-flat-benchmark-v1");
+  assert.equal(firstIron.fixture_class, "command_fixture");
+  assert.equal(firstIron.target.op, "all");
+  assert.equal(firstIron.milestones.reduce((sum, milestone) => sum + milestone.weight, 0), 100);
+  assert.deepEqual(
+    firstIron.milestones
+      .filter((milestone) => milestone.order === null)
+      .map((milestone) => milestone.milestone_id),
+    [
+      "first_iron_furnace_item",
+      "first_iron_coal_inventory",
+      "first_iron_raw_iron_1",
+      "first_iron_raw_iron_3",
+      "first_iron_furnace_placed"
+    ]
+  );
+  assert.match(firstIron.top_level_goal, /three raw_iron/);
+  assert.match(firstIron.top_level_goal, /one coal/);
+  assert.match(firstIron.top_level_goal, /stone_pickaxe/);
+  assert.match(firstIron.top_level_goal, /place one furnace/);
+  assert.equal("recommended_actions" in firstIron, false);
+  assert.equal("recipe_steps" in firstIron, false);
+
   for (const capabilityCase of manifest.cases) {
     assert.ok(Number.isInteger(capabilityCase.budgets.max_cycles));
     assert.ok(capabilityCase.budgets.max_cycles > 0);
@@ -123,7 +151,7 @@ test("valid suite round-trips without injecting evaluation defaults", () => {
   if (!again.ok) {
     return;
   }
-  assert.equal(again.manifest.cases.length, 9);
+  assert.equal(again.manifest.cases.length, 10);
   assert.equal(again.manifest.cases[0]?.completion_policy.require_target, true);
 });
 

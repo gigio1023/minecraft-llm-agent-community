@@ -191,6 +191,18 @@ test("passed target after first cycle stops without budget stop and records both
   assert.deepEqual(result.report.capability_progress?.first_measurable_progress?.evidence_refs, [
     "evidence/cycle-0001-collect.json"
   ]);
+  assert.deepEqual(result.report.capability_progress?.milestone_first_observations, [
+    {
+      milestone_id: "any_log_inventory",
+      cycle_count: 1,
+      runtime_action_count: 1,
+      wall_time_ms:
+        result.report.capability_progress?.milestone_first_observations[0]?.wall_time_ms,
+      provider_requests: 2,
+      total_tokens: 40,
+      evidence_refs: ["evidence/cycle-0001-collect.json"]
+    }
+  ]);
 });
 
 test("passed target after first action stops second action in the same cycle", async () => {
@@ -304,10 +316,23 @@ test("milestone after first action continues to second action in the same cycle"
     },
     observeCapabilityProgress: async () => {
       observeCalls += 1;
+      if (observeCalls === 1) {
+        return {
+          targetStatus: "failed",
+          passedMilestoneIds: ["crafting_table_item"],
+          evidenceRefs: ["evidence/table-item.json"],
+          milestoneEvidenceRefs: {
+            crafting_table_item: ["evidence/table-item.json"]
+          } as Record<string, string[]>
+        };
+      }
       return {
         targetStatus: "failed",
-        passedMilestoneIds: ["any_log_inventory"],
-        evidenceRefs: ["evidence/milestone-only.json"]
+        passedMilestoneIds: ["crafting_table_placed"],
+        evidenceRefs: ["evidence/table-placed.json"],
+        milestoneEvidenceRefs: {
+          crafting_table_placed: ["evidence/table-placed.json"]
+        } as Record<string, string[]>
       };
     }
   });
@@ -319,6 +344,28 @@ test("milestone after first action continues to second action in the same cycle"
   assert.ok(result.report.capability_progress?.first_measurable_progress);
   assert.equal(result.report.capability_progress?.target_completion, undefined);
   assert.equal(result.report.capability_progress?.first_measurable_progress?.runtime_action_count, 1);
+  assert.deepEqual(result.report.capability_progress?.latest_passed_milestone_ids, [
+    "crafting_table_placed"
+  ]);
+  assert.deepEqual(
+    result.report.capability_progress?.milestone_first_observations.map((observation) => ({
+      milestone_id: observation.milestone_id,
+      runtime_action_count: observation.runtime_action_count,
+      evidence_refs: observation.evidence_refs
+    })),
+    [
+      {
+        milestone_id: "crafting_table_item",
+        runtime_action_count: 1,
+        evidence_refs: ["evidence/table-item.json"]
+      },
+      {
+        milestone_id: "crafting_table_placed",
+        runtime_action_count: 2,
+        evidence_refs: ["evidence/table-placed.json"]
+      }
+    ]
+  );
 });
 
 test("in-progress cycle is not duplicated in the next Actor Turn evidence trace", async () => {

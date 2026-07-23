@@ -16,7 +16,7 @@ capability-gated social-sandbox spine.
 ```yaml
 schema_version: research-decision/v1
 decision: >
-  Use qwen3.8-max-preview for the first complete five-case capability batch,
+  Use qwen3.8-max-preview for one complete long-horizon first-iron-batch case,
   then use Qwen 3.7 Plus and exact gpt-5.4 as bounded diagnostic comparators.
   Keep Qwen 3.7 Max as an optional matched rerun after the first results.
 verdict: preflight-ready
@@ -24,7 +24,7 @@ evidence_used:
   - operator-provided Qwen 3.8 preview notice
   - operator-provided Qwen Ambassador monthly quotas
   - operator-copied OpenAI dashboard eligibility notice
-  - individual-capability-v1 manifest version 1.3.1
+  - individual-capability-v1 manifest version 1.4.0
   - repaired V4 Stage 1 runtime and prior gpt-5.4-mini validation artifacts
 alternatives_considered:
   - full all-model suite immediately
@@ -94,9 +94,10 @@ uncertainty_to_reduce: >
   capability evidence with Qwen 3.8, Qwen 3.7, and GPT-5.4, and whether any
   apparent difference survives provider/runtime failure attribution.
 hypothesis: >
-  At least Qwen 3.8 will complete a non-degenerate subset of the five-case
-  prerequisite chain; bounded comparator lanes will reveal whether remaining
-  failures are shared substrate defects or configuration-specific.
+  Qwen 3.8 will preserve enough state across the full wood-to-stone-to-iron
+  dependency chain to reach a ready-to-smelt first iron batch; bounded
+  comparator lanes will reveal whether stalls are shared substrate defects or
+  configuration-specific.
 candidate_layer: measurement substrate
 independent_variable: exact provider/model configuration
 observed_target: target predicates, milestones, failure class, and resource use
@@ -118,15 +119,18 @@ negative_result_interpretation: >
   narrows the next repair or model decision; none becomes evidence of social
   capability.
 cost_bound: >
-  P1: 80 requests and 3.5M tokens estimated on Qwen 3.8. P2 Qwen lane: 36
-  requests. GPT-5.4 campaign: 12 requests and 600K tokens maximum in one UTC
-  day, including canary, with no request permitted to cross the remaining pool.
+  P1: 80 requests and 3.5M tokens estimated on Qwen 3.8. Each P2 Qwen lane:
+  36 requests on the same case. GPT-5.4 campaign: 12 requests and 600K tokens
+  maximum in one UTC day, including canary, with no request permitted to cross
+  the remaining pool.
 ```
 
 ## Fixed Configuration
 
 - Capability manifest:
-  `probe/benchmarks/capability/individual-capability-v1.json`, version `1.3.1`.
+  `probe/benchmarks/capability/individual-capability-v1.json`, version `1.4.0`.
+- Main case: `prepare_first_iron_batch`.
+- Fixture: `first-iron-batch-flat-benchmark-v1`.
 - Actor: `npc_b`.
 - Provider retries: `0`.
 - OpenAI Responses background mode: disabled whenever a case has a request
@@ -173,7 +177,7 @@ OPENAI_JSON_MAX_RETRIES=0 \
 OPENAI_RESPONSES_BACKGROUND=0 \
 bun run probe:capability -- \
   --manifest benchmarks/capability/individual-capability-v1.json \
-  --case collect_logs \
+  --case prepare_first_iron_batch \
   --provider openai-api \
   --model gpt-5.4 \
   --repeat 1 \
@@ -226,32 +230,56 @@ If the repository lacks a provider-only JSON canary for OpenAI, implement and
 test that bounded diagnostic first. Do not substitute a Minecraft run for the
 missing billing classification check.
 
-## P1 — First Complete A5 Batch
+## Main Goal And Why It Is Difficult
+
+The actor receives one Minecraft outcome:
+
+> Prepare the worksite for its first iron tool: keep at least three
+> `raw_iron` and one `coal` in inventory, retain a `stone_pickaxe` in inventory
+> or hand, and place one `furnace`.
+
+Three raw iron is the exact material quantity for an iron pickaxe after
+smelting, and one coal can fuel that batch. The current runtime cannot yet
+operate a furnace, so the target stops at a truthful ready-to-smelt state
+instead of pretending that iron ingots or an iron pickaxe are attainable.
+
+The shortest legitimate Minecraft dependency graph still requires the actor
+to:
+
+- obtain and transform wood;
+- create and place a crafting table;
+- craft a wooden pickaxe;
+- mine enough stone for both a stone pickaxe and a furnace;
+- upgrade to stone tier before iron ore can yield `raw_iron`;
+- acquire coal and three raw iron;
+- craft and place the furnace while retaining the final inventory state.
+
+This sequence is not included in model input. The manifest owns it only as an
+evaluator-side explanation. The fixture exposes fixed wood, stone, coal ore,
+and iron ore so a missing random vein cannot masquerade as a planning failure.
+Fixture blocks never count as progress.
+
+## P1 — First Complete Long-Horizon A5 Run
 
 Provider/model: `alibaba-model-studio-api:qwen3.8-max-preview`.
 
-Run this fixed prerequisite chain once, in order:
-
-| Order | Case | Max requests | Max total tokens | Purpose |
-| ---: | --- | ---: | ---: | --- |
-| 1 | `collect_logs` | 8 | 300K | Natural-world perception and first verified inventory mutation |
-| 2 | `craft_planks_sticks` | 12 | 500K | Short transformation and action selection |
-| 3 | `craft_table` | 16 | 700K | Multi-step prerequisite retention |
-| 4 | `place_table` | 20 | 900K | Structured placement contract and physical verification |
-| 5 | `craft_wooden_pickaxe` | 24 | 1.1M | Longer prerequisite chain |
-|  | **Combined ceiling** | **80** | **3.5M** | Includes no retry reserve |
+Run `prepare_first_iron_batch` once with a ceiling of 80 provider requests and
+3.5M total tokens. The ceiling includes no retry reserve. The run may end
+early only when the complete target passes or another declared stop condition
+holds.
 
 These ceilings are stopping limits, not spending targets. Target completion
-ends a case early. The batch is complete when every declared case has a
-truthful terminal artifact, including blocked or failed outcomes.
+ends the case early. The run is complete when it has a truthful terminal
+artifact, including a blocked or failed outcome.
 
-After each case:
+At every newly observed milestone, and at final settlement:
 
 1. inspect declaration, raw report, normalized report, budget status, and suite
    index;
-2. audit report and actor-workspace refs;
-3. compare run usage with the case ceiling and current UTC-minute ledger;
-4. rerun preflight for the remaining batch;
+2. audit `capability_progress.milestone_first_observations`, including the
+   first action/cycle, wall time, provider requests, tokens, and evidence refs;
+3. audit report and actor-workspace refs;
+4. compare run usage with the case ceiling and current UTC-minute ledger;
 5. stop on provider, billing, auth, quota, environment, model-id, or artifact
    failure.
 
@@ -260,26 +288,27 @@ After each case:
 P2 starts only when P1 artifacts are complete enough to distinguish substrate
 failure from actor behavior.
 
-Fixed cases:
-
-- `collect_logs`;
-- `craft_table`;
-- `place_table`.
-
 Run order:
 
-1. `modelscope-api:Qwen-Ambassador/Qwen3.7-Plus`;
-2. `openai-api:gpt-5.4`, conditional on the P0 tool-use billing result;
-3. `modelscope-api:Qwen-Ambassador/Qwen3.7-Max`, only if Max can resolve an
+1. a 36-request Qwen 3.8 truncation of `prepare_first_iron_batch`, so the
+   smaller ModelScope lanes have a matched budget;
+2. `modelscope-api:Qwen-Ambassador/Qwen3.7-Plus` on the same case with the same
+   36-request ceiling;
+3. `openai-api:gpt-5.4` on the same case, conditional on the P0 tool-use
+   billing result;
+4. `modelscope-api:Qwen-Ambassador/Qwen3.7-Max`, only if Max can resolve an
    uncertainty left by Plus and Qwen 3.8.
 
-Qwen 3.7 comparator ceiling per model: 36 API calls across the three cases.
+Qwen comparator ceiling per model: 36 API calls on the one declared case.
+Compare milestone trajectories at the same request cutoff; do not compare a
+36-request partial run directly with Qwen 3.8's 80-request completion result.
 
-GPT-5.4 does not receive the full three-case comparator in the first UTC day.
-The first GPT-5.4 capability lane is only `collect_logs`, with a combined
-day-level campaign ceiling of 12 requests and 600K tokens including P0. Keep
-400K of the 1M shared pool outside the campaign so a large final request or
-dashboard mismatch does not automatically reach the provider limit.
+GPT-5.4 does not receive a full-budget comparator in the first UTC day. It
+begins the same long case, with a combined day-level campaign ceiling of 12
+requests and 600K tokens including P0. Treat the result only as an
+early-trajectory diagnostic. Keep 400K of the 1M shared pool outside the
+campaign so a large final request or dashboard mismatch does not automatically
+reach the provider limit.
 
 Do not continue the GPT-5.4 lane when:
 
@@ -293,10 +322,12 @@ Do not continue the GPT-5.4 lane when:
 
 Replication is earned, not automatic.
 
-Select at most two non-degenerate configurations and at most three cases.
-Repeat each selected cell on three declared seeds. Do not replicate a cell
-whose outcome is dominated by the same action-surface, environment, or verifier
-blocker.
+Select at most two non-degenerate configurations. Repeat
+`prepare_first_iron_batch` on three fresh resets of the versioned fixture. Do
+not call these three seeds: the command fixture deliberately fixes resource
+layout, so the repeats measure execution stability rather than world
+robustness. Natural-world replication requires a later declared scenario and
+must not be improvised.
 
 P3 may support a narrow robustness statement. It still does not establish a
 general model ranking because provider transport, reasoning effort, latency,
@@ -328,7 +359,8 @@ The model-capability interpretation is falsified or deferred when:
 Report separately:
 
 - target status and passed milestone ids;
-- time and provider usage at first progress and target completion;
+- time and provider usage at every milestone's first observation, first
+  progress, and target completion;
 - provider requests, input/output/reasoning/total tokens, and wall time;
 - executable tool-call contract failures;
 - runtime action outcomes and verifier evidence;

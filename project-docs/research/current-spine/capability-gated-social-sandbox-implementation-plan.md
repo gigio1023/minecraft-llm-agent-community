@@ -573,13 +573,15 @@ Acceptance:
 
 Evidence:
 
-- suite: `probe/benchmarks/capability/individual-capability-v1.json` (`1.1.0`)
+- suite: `probe/benchmarks/capability/individual-capability-v1.json`
+  (initial A1 surface `1.1.0`; current extended suite `1.4.0`)
 - tests: `probe/test/individualCapabilityManifest.test.ts`
 
 ### Step A5 — First Provider-Backed Capability Batch
 
 Status: **planned, execution blocked**. The 2026-07-24 subordinate plan fixes
-`alibaba-model-studio-api:qwen3.8-max-preview` for the first complete batch,
+`alibaba-model-studio-api:qwen3.8-max-preview` for the first complete
+`prepare_first_iron_batch` run,
 `modelscope-api:Qwen-Ambassador/Qwen3.7-Plus` as the first comparator, and
 `openai-api:gpt-5.4` as the only selected OpenAI comparator. Whole-run planning
 estimates and preflight statuses are recorded in
@@ -597,8 +599,10 @@ Before execution:
 
 Deliver:
 
-- at least one complete declared batch;
+- at least one complete declared long-horizon case;
 - normalized per-case and suite reports;
+- first-observation timing and usage for every passed milestone, including
+  transient crafted items later consumed by placement;
 - failure analysis that separates provider, action surface, runtime, verifier,
   and actor behavior;
 - no model ranking unless runs are comparable and denominators are explicit.

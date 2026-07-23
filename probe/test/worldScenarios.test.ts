@@ -75,6 +75,33 @@ test("parses the wooden pickaxe flat benchmark scenario without crediting fixtur
   assert.ok(commands.some((command) => command.args.join(" ") === "fill 8 64 -2 10 65 2 minecraft:oak_log replace"));
 });
 
+test("builds the first iron batch fixture with exposed resources but no progress credit", () => {
+  const scenario = getWorldScenario(parseWorldScenarioId("first-iron-batch-flat-benchmark-v1"));
+  const config = applyWorldScenarioToConfig(loadProbeConfig(), scenario);
+  const manifest = createWorldScenarioManifest(scenario);
+  const commands = buildWorldScenarioCommands({
+    scenario,
+    phase: "pre_bot",
+    serverVersion: "1.21.11"
+  });
+  const commandText = commands.map((command) => command.args.join(" "));
+
+  assert.equal(scenario.lane, "fixture_probe");
+  assert.equal(config.world.seed, "first-iron-batch-flat-benchmark-v1");
+  assert.equal(manifest.resource_fixture?.credited_as_actor_progress, false);
+  assert.match(manifest.description, /stone-tier iron extraction/);
+  assert.ok(commandText.includes("fill 8 64 -2 10 65 2 minecraft:oak_log replace"));
+  assert.ok(commandText.includes("fill -10 64 -3 -7 66 3 minecraft:stone replace"));
+  assert.ok(commandText.includes("fill -3 64 8 -1 65 10 minecraft:coal_ore replace"));
+  assert.ok(commandText.includes("fill 2 64 8 4 65 10 minecraft:iron_ore replace"));
+  assert.equal(
+    commands
+      .filter((command) => command.args[0] === "fill")
+      .every((command) => command.required),
+    true
+  );
+});
+
 test("records optional RCON command failures without blocking required fixture setup", async () => {
   const commandRun = await runWorldScenarioCommands({
     phase: "pre_bot",

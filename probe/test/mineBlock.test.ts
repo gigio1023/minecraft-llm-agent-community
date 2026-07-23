@@ -99,6 +99,88 @@ test("mineBlock blocks before digging when no pickaxe is available", async () =>
   assert.equal(digCalled, false);
 });
 
+test("mineBlock requires stone tier for iron ore and records raw iron", async () => {
+  const block = { name: "iron_ore", position: { x: 2, y: 0, z: 0 } };
+  let blockRemoved = false;
+  let rawIronCount = 0;
+  let equippedTool = "";
+
+  const bot = {
+    entity: {
+      position: { x: 0, y: 0, z: 0 }
+    },
+    inventory: {
+      items() {
+        return [
+          { name: "wooden_pickaxe", count: 1 },
+          { name: "stone_pickaxe", count: 1 },
+          { name: "raw_iron", count: rawIronCount }
+        ];
+      }
+    },
+    findBlock() {
+      return block;
+    },
+    blockAt() {
+      return blockRemoved ? { name: "air", position: block.position } : block;
+    },
+    canDigBlock() {
+      return true;
+    },
+    async dig() {
+      blockRemoved = true;
+      rawIronCount += 1;
+    },
+    nearestEntity() {
+      return null;
+    },
+    setControlState() {},
+    async equip(item: { name: string }) {
+      equippedTool = item.name;
+    }
+  };
+
+  const result = await mineBlock({
+    bot,
+    blockName: "iron_ore"
+  });
+
+  assert.equal(result.status, "mined");
+  assert.equal(result.itemName, "raw_iron");
+  assert.equal(result.inventoryDelta, 1);
+  assert.equal(result.equippedTool, "stone_pickaxe");
+  assert.equal(equippedTool, "stone_pickaxe");
+});
+
+test("mineBlock rejects iron ore when only a wooden pickaxe is available", async () => {
+  let digCalled = false;
+  const result = await mineBlock({
+    bot: {
+      entity: {
+        position: { x: 0, y: 0, z: 0 }
+      },
+      inventory: {
+        items() {
+          return [{ name: "wooden_pickaxe", count: 1 }];
+        }
+      },
+      findBlock() {
+        return { name: "iron_ore", position: { x: 2, y: 0, z: 0 } };
+      },
+      async dig() {
+        digCalled = true;
+      },
+      setControlState() {},
+      async equip() {}
+    },
+    blockName: "iron_ore"
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.match(result.reason, /stone_pickaxe or better/);
+  assert.equal(digCalled, false);
+});
+
 test("mineBlock blocks optimistic success without inventory increase", async () => {
   const block = { name: "stone", position: { x: 2, y: 0, z: 0 } };
   let blockRemoved = false;

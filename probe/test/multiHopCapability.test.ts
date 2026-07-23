@@ -107,13 +107,13 @@ function baseReport(partial: Partial<SocialCycleRunReport> = {}): SocialCycleRun
 function loadFurnaceCase(): IndividualCapabilityCaseV1 {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
   const furnace = manifest.cases.find((entry) => entry.case_id === "reach_placed_furnace");
-  assert.ok(furnace, "reach_placed_furnace must exist in suite 1.3.1");
+  assert.ok(furnace, "reach_placed_furnace must exist in suite 1.4.0");
   return furnace;
 }
 
 test("loader accepts the multi-hop furnace case with manifest-owned milestone order", () => {
   const manifest = loadIndividualCapabilityManifestFromFile(suitePath);
-  assert.equal(manifest.version, "1.3.1");
+  assert.equal(manifest.version, "1.4.0");
   const furnace = loadFurnaceCase();
   assert.equal(furnace.fixture_class, "natural_world");
   assert.equal(furnace.world_scenario_id, "natural-safe-spawn-v1");
