@@ -139,8 +139,16 @@ project/provider dashboard state still matter.
 
 OpenAI API is the most sensitive case in this repo:
 
+- Only exact model aliases in the operator-provided dashboard notice recorded
+  by `project-docs/operations/setup/openai-tier3-free-usage.md` are candidates.
+  Public documentation does not expand that list.
+- The selected upcoming OpenAI candidate is exactly `gpt-5.4`; GPT-5.5,
+  GPT-5.6, and dated snapshots must remain `unbudgeted`.
 - The data-sharing complimentary pool applies only when the org/project/model is
   eligible and the account has positive balance.
+- The public offer excludes tool use. Actor Turn function-tool traffic requires
+  a separately approved canary and before/after dashboard evidence before it
+  can be treated as complimentary.
 - If one request crosses the free-token pool, that entire request can be billed.
 - A local ledger under cap is not proof that the dashboard/free-tier pool is
   still available.

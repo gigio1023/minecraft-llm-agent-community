@@ -143,6 +143,44 @@ test("provider quota preflight requires explicit OpenAI approval note", async ()
   );
 });
 
+test("provider quota preflight allows only operator-provided OpenAI model candidates", async () => {
+  const module = await loadPreflightModule();
+  for (const model of ["gpt-5.4", "gpt-5.2", "o3-mini"]) {
+    const { outputJson } = module.runProviderQuotaPreflight([
+      "--candidate", `openai-api:${model}`,
+      "--estimate-requests", "1",
+      "--estimate-total-tokens", "1000",
+      "--estimate-requests-per-minute", "1"
+    ], {
+      cwd: repoRoot,
+      now: new Date("2026-07-23T03:00:00.000Z")
+    });
+    const result = JSON.parse(outputJson);
+    assert.equal(result.final_status, "needs_dashboard_approval");
+    assert.equal(result.results[0]?.status, "needs_dashboard_approval");
+    assert.equal(result.results[0]?.quota_checks?.length, 1);
+  }
+
+  for (const model of ["gpt-5.4-2026-03-05", "gpt-5.5", "gpt-5.6-sol"]) {
+    const { outputJson } = module.runProviderQuotaPreflight([
+      "--candidate", `openai-api:${model}`,
+      "--estimate-requests", "1",
+      "--estimate-total-tokens", "1000",
+      "--estimate-requests-per-minute", "1"
+    ], {
+      cwd: repoRoot,
+      now: new Date("2026-07-24T03:00:00.000Z")
+    });
+    const excluded = JSON.parse(outputJson);
+    assert.equal(excluded.final_status, "blocked");
+    assert.equal(excluded.results[0]?.status, "unbudgeted");
+    assert.match(
+      String(excluded.results[0]?.reason ?? ""),
+      /operator-provided complimentary-usage candidate list/
+    );
+  }
+});
+
 test("provider quota preflight rejects missing whole-run estimates", async () => {
   const module = await loadPreflightModule();
   assert.throws(

@@ -578,8 +578,14 @@ Evidence:
 
 ### Step A5 — First Provider-Backed Capability Batch
 
-Status: **blocked** pending exact `(provider_id, model)`, whole-run estimate,
-quota preflight, and explicit user approval.
+Status: **planned, execution blocked**. The 2026-07-24 subordinate plan fixes
+`alibaba-model-studio-api:qwen3.8-max-preview` for the first complete batch,
+`modelscope-api:Qwen-Ambassador/Qwen3.7-Plus` as the first comparator, and
+`openai-api:gpt-5.4` as the only selected OpenAI comparator. Whole-run planning
+estimates and preflight statuses are recorded in
+`project-docs/research/benchmarks/provider-capability-experiment-plan-2026-07-24.md`.
+Live execution still requires a current-window preflight and explicit approval
+for the exact lane.
 
 Before execution:
 
@@ -948,10 +954,12 @@ because an older plan used a name.
 Provider-free A3 budget stopping and B2 saved-evidence loading are accepted.
 Remaining work requires live-run decisions:
 
-1. A5 needs exact `(provider_id, model)`, whole-run estimate, quota preflight,
-   and explicit user approval. Its first live smoke must verify request counting
-   and show what happens when wall time expires during an SDK request; the
-   provider-free tests do not establish mid-request cancellation.
+1. A5 follows
+   `project-docs/research/benchmarks/provider-capability-experiment-plan-2026-07-24.md`.
+   Exact candidates and planning estimates are fixed. P0 still needs a
+   current-window preflight and explicit approval. GPT-5.4 also needs separate
+   JSON/tool canaries and dashboard classification because OpenAI's supporting
+   offer text excludes tool use.
 2. B3 live continuity (including real process restart / durable reload) needs
    the same provider gate; offline declarations and bag loading are not live
    proof.

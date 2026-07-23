@@ -4,7 +4,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { defaultProviderQuotaPolicies } from "../../../../probe/src/provider/providerQuotaPolicies.ts";
+import {
+  defaultProviderQuotaPolicies,
+  isOperatorProvidedOpenAiComplimentaryCandidate
+} from "../../../../probe/src/provider/providerQuotaPolicies.ts";
 import type {
   ProviderUsageBudget,
   ProviderUsageCounts,
@@ -556,6 +559,18 @@ function evaluateCandidate(
   externalAlreadyUsed: ExternalAlreadyUsedObservation[],
   windows: ReturnType<typeof currentWindows>
 ) {
+  if (
+    candidate.providerId === "openai-api" &&
+    !isOperatorProvidedOpenAiComplimentaryCandidate(candidate.model)
+  ) {
+    return {
+      ...candidate,
+      status: "unbudgeted",
+      reason:
+        "OpenAI model is absent from the operator-provided complimentary-usage candidate list; local budgets cannot promote it.",
+      matching_policies: []
+    };
+  }
   const matches = budgets.filter((budget) => matchesBudget(budget, candidate.providerId, candidate.model));
   if (matches.length === 0) {
     return {
