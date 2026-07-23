@@ -285,6 +285,7 @@ export type SocialCycleProviderId =
   | "openai-api"
   | "gemini-api"
   | "modelscope-api"
+  | "alibaba-model-studio-api"
   | "deterministic-social"
   | "scripted-social";
 

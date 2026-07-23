@@ -245,7 +245,8 @@ export function resolveDefaultModel(providerId: SocialCycleProviderId, model?: s
   if (
     providerId === "openai-api" ||
     providerId === "gemini-api" ||
-    providerId === "modelscope-api"
+    providerId === "modelscope-api" ||
+    providerId === "alibaba-model-studio-api"
   ) {
     throw new CapabilityRunnerError(
       `--model is required for provider ${providerId}; do not rely on env defaults for capability runs`

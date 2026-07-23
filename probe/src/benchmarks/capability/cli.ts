@@ -40,6 +40,7 @@ function normalizeProvider(value: string | undefined): SocialCycleProviderId | u
     value === "openai-api" ||
     value === "gemini-api" ||
     value === "modelscope-api" ||
+    value === "alibaba-model-studio-api" ||
     value === "deterministic-social" ||
     value === "scripted-social"
   ) {
@@ -205,7 +206,14 @@ async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../../../..");
   loadRepoDotEnv(repoRoot, {
-    overrideKeys: ["OPENAI_API_KEY"]
+    overrideKeys: [
+      "OPENAI_API_KEY",
+      "GEMINI_API_KEY",
+      "MODELSCOPE_API_KEY",
+      "MODELSCOPE_BASE_URL",
+      "MODEL_STUDIO_API_KEY",
+      "MODEL_STUDIO_WORKSPACE_ID"
+    ]
   });
 
   let parsed: ParsedArgs;

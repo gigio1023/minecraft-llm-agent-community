@@ -36,8 +36,8 @@ Provider-backed paths are useful for:
 
 The social-cycle provider path is separate from the `openai-codex` gameplay and
 reviewer providers. It can use Gemini API (`gemini-api`), OpenAI API
-(`openai-api`), or ModelScope API-Inference (`modelscope-api`) from the
-repo-root `.env`.
+(`openai-api`), ModelScope API-Inference (`modelscope-api`), or Alibaba Cloud
+Model Studio (`alibaba-model-studio-api`) from the repo-root `.env`.
 
 Private Qwen models exposed through ModelScope API-Inference are documented in
 `project-docs/operations/setup/modelscope-qwen-api-access.md`. The `modelscope-api`
@@ -108,6 +108,7 @@ Current built-in quota policy types:
 | `openai-api` | documented mini/nano data-sharing group | total tokens | UTC day | 10M/day shared pool |
 | `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Max` | API calls | calendar month | 2500 calls/month |
 | `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Plus` | API calls | calendar month | 10000 calls/month |
+| `alibaba-model-studio-api` | `qwen3.8-max-preview` | requests/tokens | rolling minute | 120 RPM and 500K TPM per person |
 | `gemini-api` | configured Gemini/Gemma free-tier references | requests/tokens | Pacific day/minute | operator-observed RPM/RPD/TPM brakes |
 
 Budget JSON shape:
@@ -176,11 +177,11 @@ continuing a run.
 ## Social-Cycle Model Selection
 
 `probe:social-cycle` does not choose live provider models from environment
-fallbacks. For `openai-api`, `gemini-api`, and `modelscope-api`, pass the exact
-model id with `--model` on every run. The CLI intentionally ignores
-`OPENAI_MODEL`, `GEMINI_MODEL`, `MODELSCOPE_MODEL`, and `SOCIAL_CYCLE_MODEL`
-for social-cycle model selection so benchmark reports cannot hide which model
-was evaluated.
+fallbacks. For `openai-api`, `gemini-api`, `modelscope-api`, and
+`alibaba-model-studio-api`, pass the exact model id with `--model` on every run.
+The CLI intentionally ignores provider model environment fallbacks and
+`SOCIAL_CYCLE_MODEL` for social-cycle model selection so benchmark reports
+cannot hide which model was evaluated.
 
 `deterministic-social` remains the local baseline and uses
 `model: "deterministic-social"` as a harness label, not as an external model
@@ -259,6 +260,53 @@ bun run probe:social-cycle -- \
 The CLI default provider is `deterministic-social`; pass `--provider gemini-api`
 or `SOCIAL_CYCLE_PROVIDER=gemini-api` to make live calls explicit. Live provider
 runs must also pass `--model`.
+
+## Social-Cycle Alibaba Cloud Model Studio
+
+Qwen 3.8 Max preview is served by Alibaba Cloud **Model Studio**, not
+ModelScope. The adapter uses the workspace-scoped Singapore
+OpenAI-compatible endpoint and keeps a separate provider identity so
+credentials, usage records, and quota policy cannot be confused with
+`modelscope-api`.
+
+Repo-root `.env`:
+
+```text
+MODEL_STUDIO_WORKSPACE_ID=...
+MODEL_STUDIO_API_KEY=...
+```
+
+The runtime constructs this endpoint from the workspace id:
+
+```text
+https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+```
+
+Run it only with the exact preview model id:
+
+```bash
+cd probe
+bun run probe:social-cycle -- \
+  --provider alibaba-model-studio-api \
+  --model qwen3.8-max-preview \
+  --actor npc_b \
+  --cycles 1 \
+  --no-dashboard
+```
+
+The adapter intentionally omits `enable_thinking` and `reasoning_effort`.
+The preview therefore keeps the administrator-announced behavior: thinking is
+always enabled and the service default `reasoning_effort=xhigh` remains in
+effect. The raw Chat Completions result includes `reasoning_content`, and Actor
+Turn snapshots retain that raw provider output. The current runtime sends each
+request statelessly and does not replay conversation history. If a future path
+adds provider conversation history, it must pass back the complete
+`reasoning_content` unchanged rather than concatenating it into `content`.
+
+The built-in guard records the announced 120 RPM and 500K TPM per-person
+capacity. Those limits do **not** establish whether the preview is billed.
+Until the administrator confirms billing treatment, treat billing status as
+unknown and keep live tests deliberately small.
 
 ## Gameplay Provider Switch
 

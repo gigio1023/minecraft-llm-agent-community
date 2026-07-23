@@ -22,6 +22,10 @@ import {
   callModelScopeJsonSchema,
   type ModelScopeApiProviderConfig
 } from "./modelscopeApiProvider.js";
+import {
+  callModelStudioJsonSchema,
+  type ModelStudioApiProviderConfig
+} from "./modelStudioApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
@@ -187,6 +191,7 @@ export async function runSocialCycleGoalProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
   runId?: string;
@@ -201,7 +206,12 @@ export async function runSocialCycleGoalProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId,
+    model:
+      input.openAi?.model ??
+      input.gemini?.model ??
+      input.modelScope?.model ??
+      input.modelStudio?.model ??
+      input.providerId,
     created_at: new Date().toISOString(),
     input: providerInput
   });
@@ -330,6 +340,25 @@ If observation or previous judgments include blocked evidence, use that context 
     };
   }>({
     config: input.modelScope!,
+    ...providerCall
+  }) : input.providerId === "alibaba-model-studio-api" ? await callModelStudioJsonSchema<{
+    strategic_goal_updates: Array<{
+      summary: string;
+      rationale: string;
+      success_direction: string;
+      current_blockers: string[];
+    }>;
+    cycle_goal: {
+      summary: string;
+      rationale: string;
+      success_verifier: string;
+      evidence_required: string[];
+      stop_conditions: string[];
+      allowed_action_skill_ids: string[];
+      allowed_primitive_ids: string[];
+    };
+  }>({
+    config: input.modelStudio!,
     ...providerCall
   }) : await callOpenAiJsonSchema<{
     strategic_goal_updates: Array<{

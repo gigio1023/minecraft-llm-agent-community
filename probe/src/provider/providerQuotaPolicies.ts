@@ -122,6 +122,18 @@ export function defaultProviderQuotaPolicies(): ProviderQuotaPolicy[] {
         "Qwen Ambassador monthly quota: Qwen 3.7 Plus has 10000 API calls/month; usage resets at the end of each calendar month."
     },
     {
+      quota_policy_id: "alibaba-model-studio-qwen38-max-preview",
+      provider_id: "alibaba-model-studio-api",
+      model: "qwen3.8-max-preview",
+      request_limit_per_minute: 120,
+      total_token_limit_per_minute: 500_000,
+      mode: "enforce",
+      quota_metric: "mixed",
+      quota_authority: "operator_provided_doc",
+      source:
+        "Qwen 3.8 Max preview administrator notice: 120 RPM and 500K TPM per person, with no token usage cap. Billing status is not established by this quota policy."
+    },
+    {
       quota_policy_id: "gemini-gemma-4-31b-observed-request-windows",
       provider_id: "gemini-api",
       model: "gemma-4-31b-it",

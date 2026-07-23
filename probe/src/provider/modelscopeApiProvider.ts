@@ -1,11 +1,10 @@
 /**
- * ModelScope API-Inference Chat Completions provider.
+ * OpenAI-compatible Qwen Chat Completions transport.
  *
- * @remarks ModelScope's private Qwen endpoint is OpenAI-compatible at the
- * Chat Completions transport layer, not at the OpenAI Responses API layer used
- * by `openai-api` in this repo. Keep the adapter explicit so ModelScope
- * request quirks, usage headers, and tool-call behavior do not leak into the
- * OpenAI provider path.
+ * @remarks The default configuration remains ModelScope API-Inference. The
+ * explicit Alibaba Model Studio wrapper supplies a separate endpoint,
+ * provider identity, credentials label, thinking behavior, and usage policy.
+ * Neither path shares the OpenAI Responses API adapter used by `openai-api`.
  */
 import type {
   FunctionTool,
@@ -29,14 +28,20 @@ export type ModelScopeApiProviderConfig = {
   apiKey: string;
   model: string;
   baseUrl?: string;
+  providerId?: "modelscope-api" | "alibaba-model-studio-api";
+  providerLabel?: string;
+  apiKeyEnvName?: string;
+  disableThinking?: boolean;
   requestTimeoutMs?: number;
   maxRetries?: number;
   repoRoot?: string;
   usageLedgerPath?: string;
+  fetchImpl?: typeof fetch;
 };
 
-type ModelScopeErrorKind =
+export type ModelScopeErrorKind =
   | "missing_api_key"
+  | "invalid_config"
   | "usage_budget_exceeded"
   | "quota"
   | "rate_limit"
@@ -124,6 +129,24 @@ function modelScopeBaseUrl(config: ModelScopeApiProviderConfig) {
   return (config.baseUrl?.trim() || "https://api-inference.modelscope.ai/v1").replace(/\/+$/, "");
 }
 
+function providerId(config: ModelScopeApiProviderConfig) {
+  return config.providerId ?? "modelscope-api";
+}
+
+function providerLabel(config: ModelScopeApiProviderConfig) {
+  return config.providerLabel?.trim() || "ModelScope";
+}
+
+function apiKeyEnvName(config: ModelScopeApiProviderConfig) {
+  return config.apiKeyEnvName?.trim() || "MODELSCOPE_API_KEY";
+}
+
+function thinkingRequestFields(config: ModelScopeApiProviderConfig) {
+  return config.disableThinking === false
+    ? {}
+    : { chat_template_kwargs: { enable_thinking: false } };
+}
+
 function requestTimeoutMs(config: ModelScopeApiProviderConfig) {
   return config.requestTimeoutMs ?? Number(process.env.MODELSCOPE_REQUEST_TIMEOUT_MS ?? 180_000);
 }
@@ -188,6 +211,10 @@ function rawOutputFromResponse(input: {
       requests_remaining: input.headers.get("modelscope-ratelimit-requests-remaining"),
       model_requests_limit: input.headers.get("modelscope-ratelimit-model-requests-limit"),
       model_requests_remaining: input.headers.get("modelscope-ratelimit-model-requests-remaining"),
+      standard_requests_limit: input.headers.get("x-ratelimit-limit-requests"),
+      standard_requests_remaining: input.headers.get("x-ratelimit-remaining-requests"),
+      standard_tokens_limit: input.headers.get("x-ratelimit-limit-tokens"),
+      standard_tokens_remaining: input.headers.get("x-ratelimit-remaining-tokens"),
       retry_after: input.headers.get("retry-after")
     }
   });
@@ -200,7 +227,8 @@ async function postModelScopeChatCompletion(input: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs(input.config));
   try {
-    const response = await fetch(`${modelScopeBaseUrl(input.config)}/chat/completions`, {
+    const fetchImpl = input.config.fetchImpl ?? fetch;
+    const response = await fetchImpl(`${modelScopeBaseUrl(input.config)}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${input.config.apiKey}`,
@@ -217,7 +245,7 @@ async function postModelScopeChatCompletion(input: {
       parsed = { error: rawText };
     }
     if (!response.ok) {
-      throw Object.assign(new Error(rawText || `ModelScope HTTP ${response.status}`), {
+      throw Object.assign(new Error(rawText || `${providerLabel(input.config)} HTTP ${response.status}`), {
         status: response.status,
         rawOutput: rawOutputFromResponse({ response: parsed, headers: response.headers }),
         rawText
@@ -250,7 +278,7 @@ function normalizeModelScopeToolCalls(
   return (calls ?? []).map((call, index) => ({
     type: "function_call",
     name: typeof call.function?.name === "string" ? call.function.name : "",
-    call_id: typeof call.id === "string" ? call.id : `modelscope-function-call-${index + 1}`,
+    call_id: typeof call.id === "string" ? call.id : `compatible-function-call-${index + 1}`,
     arguments: typeof call.function?.arguments === "string"
       ? call.function.arguments
       : JSON.stringify(call.function?.arguments ?? {})
@@ -291,7 +319,7 @@ export async function callModelScopeJsonSchema<T>(input: {
     return {
       ok: false,
       errorKind: "missing_api_key",
-      message: "MODELSCOPE_API_KEY is missing. Add it to the repo-local .env file.",
+      message: `${apiKeyEnvName(input.config)} is missing. Add it to the repo-local .env file.`,
       elapsedMs: Date.now() - started,
       model
     };
@@ -302,7 +330,7 @@ export async function callModelScopeJsonSchema<T>(input: {
     let budgetDecision: ProviderUsageBudgetDecision | undefined;
     try {
       budgetDecision = await guardProviderUsageRequest({
-        providerId: "modelscope-api",
+        providerId: providerId(input.config),
         model,
         estimatedUsage,
         context: usageContext
@@ -331,14 +359,14 @@ export async function callModelScopeJsonSchema<T>(input: {
             { role: "user", content: input.user }
           ],
           response_format: { type: "json_object" },
-          chat_template_kwargs: { enable_thinking: false },
+          ...thinkingRequestFields(input.config),
           stream: false
         }
       });
       const rawOutput = rawOutputFromResponse({ response, headers });
       const normalizedUsage = modelScopeUsage(response.usage, estimatedUsage);
       const usageRecord = await appendProviderUsageRecord({
-        providerId: "modelscope-api",
+        providerId: providerId(input.config),
         model,
         status: Array.isArray(response.choices) ? "succeeded" : "failed",
         usage: normalizedUsage.usage,
@@ -353,7 +381,7 @@ export async function callModelScopeJsonSchema<T>(input: {
         return {
           ok: false,
           errorKind: "api_error",
-          message: "ModelScope returned no choices",
+          message: `${providerLabel(input.config)} returned no choices`,
           elapsedMs: Date.now() - started,
           model,
           rawText,
@@ -366,7 +394,7 @@ export async function callModelScopeJsonSchema<T>(input: {
         lastFailure = {
           ok: false,
           errorKind: "empty_output",
-          message: "ModelScope returned empty completion content",
+          message: `${providerLabel(input.config)} returned empty completion content`,
           elapsedMs: Date.now() - started,
           model,
           rawText,
@@ -395,7 +423,7 @@ export async function callModelScopeJsonSchema<T>(input: {
         lastFailure = {
           ok: false,
           errorKind: "parse_error",
-          message: "ModelScope output was not valid JSON",
+          message: `${providerLabel(input.config)} output was not valid JSON`,
           elapsedMs: Date.now() - started,
           model,
           rawText,
@@ -415,7 +443,7 @@ export async function callModelScopeJsonSchema<T>(input: {
         : undefined;
       const errorKind = classifyModelScopeError(error, typeof status === "number" ? status : undefined);
       const usageRecord = await appendProviderUsageRecord({
-        providerId: "modelscope-api",
+        providerId: providerId(input.config),
         model,
         status: "failed",
         usage: estimatedUsage,
@@ -448,7 +476,7 @@ export async function callModelScopeJsonSchema<T>(input: {
   return lastFailure ?? {
     ok: false,
     errorKind: "api_error",
-    message: "ModelScope request failed without a captured error",
+    message: `${providerLabel(input.config)} request failed without a captured error`,
     elapsedMs: Date.now() - started,
     model
   };
@@ -478,7 +506,7 @@ export async function callModelScopeFunctionToolSelection(input: {
     return {
       ok: false,
       errorKind: "missing_api_key",
-      message: "MODELSCOPE_API_KEY is missing. Add it to the repo-local .env file.",
+      message: `${apiKeyEnvName(input.config)} is missing. Add it to the repo-local .env file.`,
       elapsedMs: Date.now() - started,
       model
     };
@@ -489,7 +517,7 @@ export async function callModelScopeFunctionToolSelection(input: {
     let budgetDecision: ProviderUsageBudgetDecision | undefined;
     try {
       budgetDecision = await guardProviderUsageRequest({
-        providerId: "modelscope-api",
+        providerId: providerId(input.config),
         model,
         estimatedUsage,
         context: usageContext
@@ -520,14 +548,14 @@ export async function callModelScopeFunctionToolSelection(input: {
           tools: chatTools,
           tool_choice: "auto",
           parallel_tool_calls: false,
-          chat_template_kwargs: { enable_thinking: false },
+          ...thinkingRequestFields(input.config),
           stream: false
         }
       });
       const rawOutput = rawOutputFromResponse({ response, headers });
       const normalizedUsage = modelScopeUsage(response.usage, estimatedUsage);
       const usageRecord = await appendProviderUsageRecord({
-        providerId: "modelscope-api",
+        providerId: providerId(input.config),
         model,
         status: Array.isArray(response.choices) ? "succeeded" : "failed",
         usage: normalizedUsage.usage,
@@ -546,7 +574,7 @@ export async function callModelScopeFunctionToolSelection(input: {
         return {
           ok: false,
           errorKind: "api_error",
-          message: "ModelScope returned no choices",
+          message: `${providerLabel(input.config)} returned no choices`,
           elapsedMs: Date.now() - started,
           model,
           rawText,
@@ -559,7 +587,7 @@ export async function callModelScopeFunctionToolSelection(input: {
         lastFailure = {
           ok: false,
           errorKind: "tool_call_error",
-          message: "ModelScope returned no tool_calls",
+          message: `${providerLabel(input.config)} returned no tool_calls`,
           elapsedMs: Date.now() - started,
           model,
           rawText,
@@ -589,7 +617,7 @@ export async function callModelScopeFunctionToolSelection(input: {
         : undefined;
       const errorKind = classifyModelScopeError(error, typeof status === "number" ? status : undefined);
       const usageRecord = await appendProviderUsageRecord({
-        providerId: "modelscope-api",
+        providerId: providerId(input.config),
         model,
         status: "failed",
         usage: estimatedUsage,
@@ -622,7 +650,7 @@ export async function callModelScopeFunctionToolSelection(input: {
   return lastFailure ?? {
     ok: false,
     errorKind: "api_error",
-    message: "ModelScope request failed without a captured error",
+    message: `${providerLabel(input.config)} request failed without a captured error`,
     elapsedMs: Date.now() - started,
     model
   };

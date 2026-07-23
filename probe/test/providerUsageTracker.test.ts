@@ -442,6 +442,64 @@ test("default ModelScope Qwen policies enforce Ambassador monthly API-call quota
   }
 });
 
+test("default Model Studio Qwen 3.8 policy enforces preview RPM and TPM limits", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-model-studio-default-"));
+  const ledgerPath = path.join(dir, "ledger.jsonl");
+  try {
+    await withUsageEnv(
+      {
+        PROVIDER_USAGE_BUDGETS_JSON: undefined,
+        PROVIDER_USAGE_BUDGETS_PATH: path.join(dir, "missing-budgets.json"),
+        PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS: undefined,
+        PROVIDER_USAGE_LEDGER_PATH: ledgerPath
+      },
+      async () => {
+        await assert.rejects(
+          guardProviderUsageRequest({
+            providerId: "alibaba-model-studio-api",
+            model: "qwen3.8-max-preview",
+            estimatedUsage: {
+              requests: 121,
+              input_tokens: 1,
+              output_tokens: 1,
+              thinking_tokens: 0,
+              total_tokens: 2
+            },
+            context: { ledgerPath },
+            now: new Date("2026-07-23T01:02:03.000Z"),
+            maxAutoDelayMs: 0
+          }),
+          (error) =>
+            error instanceof ProviderUsageBudgetError &&
+            /request_limit_per_minute/.test(error.message)
+        );
+
+        await assert.rejects(
+          guardProviderUsageRequest({
+            providerId: "alibaba-model-studio-api",
+            model: "qwen3.8-max-preview",
+            estimatedUsage: {
+              requests: 1,
+              input_tokens: 500_000,
+              output_tokens: 1,
+              thinking_tokens: 0,
+              total_tokens: 500_001
+            },
+            context: { ledgerPath },
+            now: new Date("2026-07-23T01:02:03.000Z"),
+            maxAutoDelayMs: 0
+          }),
+          (error) =>
+            error instanceof ProviderUsageBudgetError &&
+            /total_token_limit_per_minute/.test(error.message)
+        );
+      }
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("default OpenAI mini policy aggregates the shared complimentary token pool", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "provider-usage-openai-mini-pool-"));
   const ledgerPath = path.join(dir, "ledger.jsonl");

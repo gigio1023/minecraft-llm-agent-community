@@ -31,6 +31,10 @@ import {
   callModelScopeFunctionToolSelection,
   type ModelScopeApiProviderConfig
 } from "./modelscopeApiProvider.js";
+import {
+  callModelStudioFunctionToolSelection,
+  type ModelStudioApiProviderConfig
+} from "./modelStudioApiProvider.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
 import type {
@@ -492,7 +496,10 @@ async function writeToolSelectionArtifact(input: {
 }
 
 async function requestLlmActorTurnToolSelection(input: {
-  providerId: Extract<SocialCycleProviderId, "openai-api" | "gemini-api" | "modelscope-api">;
+  providerId: Extract<
+    SocialCycleProviderId,
+    "openai-api" | "gemini-api" | "modelscope-api" | "alibaba-model-studio-api"
+  >;
   actorWorkspaceRootDir: string;
   actorId: string;
   actorTurnInput: ActorTurnInput;
@@ -500,6 +507,7 @@ async function requestLlmActorTurnToolSelection(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   runId?: string;
   snapshotId: string;
   inputRef: string;
@@ -520,6 +528,14 @@ async function requestLlmActorTurnToolSelection(input: {
     : input.providerId === "modelscope-api"
       ? await callModelScopeFunctionToolSelection({
           config: input.modelScope!,
+          system: payload.system,
+          user: payload.user,
+          tools: payload.tools,
+          usageContext: payload.usageContext
+        })
+    : input.providerId === "alibaba-model-studio-api"
+      ? await callModelStudioFunctionToolSelection({
+          config: input.modelStudio!,
           system: payload.system,
           user: payload.user,
           tools: payload.tools,
@@ -622,6 +638,7 @@ async function requestLlmActorTurnToolSelection(input: {
     openAi: input.openAi,
     gemini: input.gemini,
     modelScope: input.modelScope,
+    modelStudio: input.modelStudio,
     runId: input.runId,
     snapshotId: `${input.snapshotId}-mineflayer-codegen`
   });
@@ -704,6 +721,7 @@ async function requestActorTurn(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   defaultPrimitive?: string;
   runId?: string;
   snapshotId: string;
@@ -742,7 +760,8 @@ async function requestActorTurn(input: {
   if (
     input.providerId === "openai-api" ||
     input.providerId === "gemini-api" ||
-    input.providerId === "modelscope-api"
+    input.providerId === "modelscope-api" ||
+    input.providerId === "alibaba-model-studio-api"
   ) {
     return requestLlmActorTurnToolSelection({
       providerId: input.providerId,
@@ -753,6 +772,7 @@ async function requestActorTurn(input: {
       openAi: input.openAi,
       gemini: input.gemini,
       modelScope: input.modelScope,
+      modelStudio: input.modelStudio,
       runId: input.runId,
       snapshotId: input.snapshotId,
       inputRef: inputPath
@@ -774,11 +794,17 @@ export async function runSocialActorTurnProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   defaultPrimitive?: string;
   runId?: string;
 }): Promise<ActorTurnProviderResult> {
   const snapshotId = `actor-turn-${input.actorTurnInput.turn_id}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId;
+  const model =
+    input.openAi?.model ??
+    input.gemini?.model ??
+    input.modelScope?.model ??
+    input.modelStudio?.model ??
+    input.providerId;
   let actorTurnInput = input.actorTurnInput;
   let actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
   const intermediateInputRefs: string[] = [];

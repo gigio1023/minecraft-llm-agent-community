@@ -34,6 +34,7 @@ import { runSocialDeliberationProvider } from "../provider/socialDeliberationPro
 import type { OpenAiJsonProviderConfig } from "../provider/openaiApiJsonProvider.js";
 import type { GeminiJsonProviderConfig } from "../provider/geminiApiJsonProvider.js";
 import type { ModelScopeApiProviderConfig } from "../provider/modelscopeApiProvider.js";
+import type { ModelStudioApiProviderConfig } from "../provider/modelStudioApiProvider.js";
 import { summarizeProviderUsage } from "../provider/providerUsageTracker.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import {
@@ -1037,6 +1038,17 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           repoRoot
         }
       : undefined;
+  const modelStudio: ModelStudioApiProviderConfig | undefined =
+    input.providerId === "alibaba-model-studio-api"
+      ? {
+          apiKey: process.env.MODEL_STUDIO_API_KEY ?? "",
+          workspaceId: process.env.MODEL_STUDIO_WORKSPACE_ID ?? "",
+          model: input.model,
+          requestTimeoutMs: 180_000,
+          maxRetries: input.caseBudgets?.max_provider_requests !== undefined ? 0 : 1,
+          repoRoot
+        }
+      : undefined;
   let geminiProviderCallIndex = 0;
   const geminiForProviderCall = () => {
     if (!gemini) {
@@ -1678,6 +1690,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           openAi,
           gemini: geminiForProviderCall(),
           modelScope,
+          modelStudio,
           runId
         });
         if (!deliberation.ok) {
@@ -1820,6 +1833,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           openAi,
           gemini: geminiForProviderCall(),
           modelScope,
+          modelStudio,
           allowedActionSkillIds: allowedSkillIds,
           allowedPrimitiveIds: allowedPrimitives,
           runId
@@ -1998,7 +2012,8 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           providerConfig: {
             openAi,
             gemini: geminiForProviderCall(),
-            modelScope
+            modelScope,
+            modelStudio
           },
           signal: caseBudgetController.signal,
           ...(input.classifyRuntimeForTest

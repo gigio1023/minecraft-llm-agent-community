@@ -8,6 +8,7 @@ import {
 import type { OpenAiJsonProviderConfig } from "../provider/openaiApiJsonProvider.js";
 import type { GeminiJsonProviderConfig } from "../provider/geminiApiJsonProvider.js";
 import type { ModelScopeApiProviderConfig } from "../provider/modelscopeApiProvider.js";
+import type { ModelStudioApiProviderConfig } from "../provider/modelStudioApiProvider.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import { writeActorGoalArtifact } from "./goals/goalJsonStore.js";
 import {
@@ -68,6 +69,7 @@ type TurnProviderConfig = {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
 };
 
 export function actorRelativeRef(actorDir: string, ref: string | undefined) {
@@ -438,6 +440,7 @@ export async function runSocialCycleTurnCore(input: {
     openAi: input.providerConfig?.openAi,
     gemini: input.providerConfig?.gemini,
     modelScope: input.providerConfig?.modelScope,
+    modelStudio: input.providerConfig?.modelStudio,
     defaultPrimitive: input.defaultPrimitive,
     runId: input.runId
   });

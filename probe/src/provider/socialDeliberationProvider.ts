@@ -16,6 +16,10 @@ import {
   callModelScopeJsonSchema,
   type ModelScopeApiProviderConfig
 } from "./modelscopeApiProvider.js";
+import {
+  callModelStudioJsonSchema,
+  type ModelStudioApiProviderConfig
+} from "./modelStudioApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
 import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
@@ -798,11 +802,17 @@ export async function runSocialDeliberationProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   runId?: string;
 }): Promise<DeliberationProviderResult> {
   const turnId = `${input.cycleId}-deliberation`;
   const snapshotId = `deliberation-${turnId}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId;
+  const model =
+    input.openAi?.model ??
+    input.gemini?.model ??
+    input.modelScope?.model ??
+    input.modelStudio?.model ??
+    input.providerId;
   const providerInput = buildDeliberationProviderInput({
     branch: input.branch,
     currentEpisode: input.currentEpisode,
@@ -854,6 +864,11 @@ export async function runSocialDeliberationProvider(input: {
       : input.providerId === "modelscope-api"
         ? await callModelScopeJsonSchema<{ deliberation: unknown }>({
             config: input.modelScope!,
+            ...providerCall
+          })
+      : input.providerId === "alibaba-model-studio-api"
+        ? await callModelStudioJsonSchema<{ deliberation: unknown }>({
+            config: input.modelStudio!,
             ...providerCall
           })
       : await callOpenAiJsonSchema<{ deliberation: unknown }>({
