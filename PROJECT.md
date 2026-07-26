@@ -176,6 +176,14 @@ artifacts make every failure class and unsupported claim inspectable.
 Supersede a decision in this table instead of deleting it. Record the new
 decision, provenance, evidence, and the artifact that replaces its authority.
 
+### Superseded direction (pre-dating this file)
+
+| Superseded call | Replaced by |
+| --- | --- |
+| V3: lived-vs-told prediction as the active headline. | D1: the capability-gated, phenomenon-first V4 program. |
+| V2: co-actor legibility as the research center. | D1: the same V4 adoption; legibility may return only via an observed phenomenon. |
+| WAM (advisory social material) as a headline mechanism. | D7: retained only as evidence or analysis substrate, never active authority. |
+
 ## Project-Wide Done Criteria
 
 A work unit is done only when all applicable conditions hold:
