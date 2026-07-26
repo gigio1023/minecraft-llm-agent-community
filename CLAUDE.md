@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Claude Code Repo Guidance
 
 `AGENTS.md` is the binding authority for this repository. This file is only a
@@ -8,13 +10,14 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
-4. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
-5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `project-docs/orientation/documentation-map.md`
-7. `project-docs/orientation/agent-search-index.md`
-8. `project-docs/orientation/terminology.md`
-9. Task-relevant docs routed by the search index or repo-local agent skills.
+3. `PROJECT.md`
+4. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+5. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+6. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+7. `project-docs/orientation/documentation-map.md`
+8. `project-docs/orientation/agent-search-index.md`
+9. `project-docs/orientation/terminology.md`
+10. Task-relevant docs routed by the search index or repo-local agent skills.
 
 `GEMINI.md` no longer exists and is not part of the active guidance surface.
 

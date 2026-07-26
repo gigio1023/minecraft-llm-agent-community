@@ -18,7 +18,8 @@ guidance.
 | `PROJECT_DOCS_ROOT` | Internal specs, architecture notes, setup notes, handoffs, terminology, and routing live under `project-docs/` | `project-docs/orientation/documentation-map.md`, `AGENTS.md`, `SPEC.md` |
 | `PUBLIC_DOCS_ROOT` | Docusaurus-exposed public docs live under `docs/public-docs/`; do not add internal docs under this tree | `project-docs/orientation/documentation-map.md`, `docs/README.md`, `docs/sidebars.js`, `docs/docusaurus.config.js` |
 | `BLOG_ROOT` | `docs/blog/` is only for explicitly dated public blog posts, not internal docs or setup notes | `project-docs/orientation/documentation-map.md`, `docs/blog/` |
-| `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
+| `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, project intent, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `PROJECT.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
+| `PROJECT_INTENT` | Durable project diagnosis, pillars, non-goals, judgment rules, current risk, current position, settled decisions, and project-wide done criteria | `PROJECT.md`, `AGENTS.md` |
 | `RESEARCH_ARCHIVE` | Historical research, literature reviews, paper dumps, and stale public plans are preserved but not active build instructions | `project-docs/references/`, `project-docs/archive/` |
 | `KARPATHY_GUIDELINES` | Think before coding, keep changes simple and surgical, and define verifiable success criteria | `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` |
 | `MANDATORY_AGENT_SKILL_ROUTING` | Repeated workflows route through repo-local agent skills before free-form execution | `AGENTS.md`, `.agents/skills/provider-quota-preflight/SKILL.md`, `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md`, `.agents/skills/mineflayer-code-generation/SKILL.md` |
@@ -146,48 +147,49 @@ For any onboarding developer or agent, read in this order:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CLAUDE.md` when using Claude Code
-4. `project-docs/research/current-spine/research-documentation-hierarchy.md`
-5. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
-6. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
-7. `project-docs/research/current-spine/research-value-harness.md`
-8. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
-9. `project-docs/research/current-spine/transition-row-v1-contract.md`
-10. `project-docs/research/current-spine/transition-row-label-codebook.md`
-11. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
-12. `project-docs/research/current-spine/society-observable-preflight.md`
-13. `README.md`
-14. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-15. `project-docs/orientation/documentation-map.md`
-16. `project-docs/orientation/terminology.md`
-17. `project-docs/specification/advisory-social-material-wam.md`
-18. `project-docs/specification/soul-grounded-social-simulation.md`
-19. `project-docs/specification/evidence-grounded-minecraft-society.md`
-20. `project-docs/specification/runtime-evidence-and-action-skills.md`
-21. `project-docs/specification/engineering-governance-and-testing.md`
-22. `project-docs/specification/reference-adaptation-guide.md`
-23. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
-24. `project-docs/runtime/overview/runtime-loop-and-verification.md`
-25. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
-26. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-27. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-28. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-29. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
-30. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
-31. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-32. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-33. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
-34. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
-35. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-36. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
-37. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
-38. `project-docs/runtime/overview/minecraft-basic-guide.md`
-39. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
-40. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-41. `project-docs/operations/setup/headless-server.md`
-42. `project-docs/operations/setup/provider-setup.md`
-43. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
-44. `project-docs/operations/setup/modelscope-qwen-api-access.md`
+3. `PROJECT.md`
+4. `CLAUDE.md` when using Claude Code
+5. `project-docs/research/current-spine/research-documentation-hierarchy.md`
+6. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+7. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+8. `project-docs/research/current-spine/research-value-harness.md`
+9. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+10. `project-docs/research/current-spine/transition-row-v1-contract.md`
+11. `project-docs/research/current-spine/transition-row-label-codebook.md`
+12. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
+13. `project-docs/research/current-spine/society-observable-preflight.md`
+14. `README.md`
+15. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+16. `project-docs/orientation/documentation-map.md`
+17. `project-docs/orientation/terminology.md`
+18. `project-docs/specification/advisory-social-material-wam.md`
+19. `project-docs/specification/soul-grounded-social-simulation.md`
+20. `project-docs/specification/evidence-grounded-minecraft-society.md`
+21. `project-docs/specification/runtime-evidence-and-action-skills.md`
+22. `project-docs/specification/engineering-governance-and-testing.md`
+23. `project-docs/specification/reference-adaptation-guide.md`
+24. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
+25. `project-docs/runtime/overview/runtime-loop-and-verification.md`
+26. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
+27. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+28. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+29. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+30. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
+31. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
+32. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+33. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+34. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
+35. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
+36. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+37. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
+38. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
+39. `project-docs/runtime/overview/minecraft-basic-guide.md`
+40. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
+41. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+42. `project-docs/operations/setup/headless-server.md`
+43. `project-docs/operations/setup/provider-setup.md`
+44. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
+45. `project-docs/operations/setup/modelscope-qwen-api-access.md`
 
 ## Active vs Archived
 

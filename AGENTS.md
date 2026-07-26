@@ -21,15 +21,33 @@ When guidance conflicts, prefer this order:
 `CLAUDE.md` is only an adapter for Claude Code. `GEMINI.md` is intentionally not
 part of this repo's active agent guidance surface.
 
+<!-- gigio-project-setup:start -->
+## Durable Project Intent
+
+`PROJECT.md` is the durable intent digest for significant judgments and
+completion claims. Consult it after `SPEC.md` and this file; it summarizes but
+does not override their authority or the active V4 central and implementation
+plans.
+
+The human-owned top half of `PROJECT.md` requires current-turn user approval
+before editing. Keep the model-updated bottom half current from repository
+evidence and supersede settled decisions instead of silently relitigating them.
+
+Local task plans live under the gitignored `.plans/` directory. Use
+`gigio-write-plan` to plan sizable chosen work and `gigio-execute-plan` to
+execute or resume one of those plans.
+<!-- gigio-project-setup:end -->
+
 ## Read First
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/orientation/documentation-map.md`
-5. `project-docs/orientation/agent-search-index.md`
-6. `project-docs/orientation/terminology.md`
-7. Active docs selected from the search index for the task.
+3. `PROJECT.md`
+4. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+5. `project-docs/orientation/documentation-map.md`
+6. `project-docs/orientation/agent-search-index.md`
+7. `project-docs/orientation/terminology.md`
+8. Active docs selected from the search index for the task.
 
 Do not bulk-read every long spec for narrow work. Use the search index and
 agent skills to load the relevant slice.
