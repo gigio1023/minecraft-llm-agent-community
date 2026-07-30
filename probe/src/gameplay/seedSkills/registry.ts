@@ -53,6 +53,7 @@ export type SeedActionSkill = {
   validRoles: RoleId[];
   preconditions: string[];
   primitiveIds: RuntimePrimitiveId[];
+  inputSchema?: Record<string, unknown>;
   missingPrimitives?: string[];
 };
 
@@ -259,6 +260,23 @@ const survivalUtilityActionSkills: SeedActionSkill[] = [
     intentKinds: ["bootstrap_progress", "recover_basic_tools"],
     validRoles: ["crafter", "quartermaster", "settler"],
     preconditions: ["inventory has crafting_table", "no usable crafting_table already known"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        targetPosition: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            x: { type: "number" },
+            y: { type: "number" },
+            z: { type: "number" }
+          },
+          required: ["x", "y", "z"]
+        }
+      },
+      required: ["targetPosition"]
+    },
     primitiveIds: ["observe", "place_block", "wait"]
   },
   {

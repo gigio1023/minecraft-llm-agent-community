@@ -8,7 +8,7 @@ Search token: `PROVIDER_FREE_TIER_RESET_WINDOWS`.
 
 Status: active provider-budget operation reference.
 
-Recorded: 2026-06-01.
+Recorded: 2026-06-01. OpenAI candidate scope updated 2026-07-24.
 
 This page records the reset windows that agents must check before long
 provider-backed Minecraft runs. It is about API provider usage for this repo,
@@ -21,6 +21,12 @@ Official source:
 - OpenAI Help Center: "Sharing feedback, evaluation and fine-tuning data, and
   API inputs and outputs with OpenAI."
 
+Candidate authority:
+
+- The exact model aliases copied from the operator's active dashboard and
+  recorded in `openai-tier3-free-usage.md`.
+- The public article does not add model candidates for this repo.
+
 Reset rule:
 
 - OpenAI states that the free-token counter resets daily at `00:00 UTC`.
@@ -29,10 +35,14 @@ Reset rule:
 Operational rule:
 
 - For `openai-api` free-token runs, treat the quota day as UTC day.
+- Accept only exact aliases from the operator-provided list. The selected
+  upcoming candidate is `openai-api:gpt-5.4`; GPT-5.5, GPT-5.6, and dated
+  snapshots are `unbudgeted`.
 - Do not use Korea calendar-day midnight as the reset boundary.
-- Before long runs, check the provider dashboard when available and encode
-  dashboard usage into `PROVIDER_USAGE_BUDGETS_JSON` or
-  `build/provider-usage/free-tier-budgets.json` as `already_used`.
+- Before long runs, check the provider dashboard and pass a structured
+  `provider-external-already-used/v1` observation to the repo-local preflight
+  with `--external-already-used`. Use budget `already_used` only for persistent
+  local brakes, not as the normal record of a dated dashboard observation.
 - The repo ledger uses `quota_day_utc` for `openai-api` daily budget decisions.
 
 Examples:
@@ -117,9 +127,15 @@ Operational rule:
    tail -20 build/provider-usage/provider-usage-ledger.jsonl
    ```
 
-4. If dashboard usage differs from the local ledger, encode the dashboard usage
-   as `already_used`.
-5. Run a short smoke/live cycle before a long cycle when input shape or provider
+4. If dashboard usage differs from the local ledger, write a
+   `provider-external-already-used/v1` record with its exact UTC day, observation
+   time, period certainty, source note, and whether it can overlap local calls.
+   The preflight adds only confirmed disjoint counts; otherwise it uses the
+   larger local/dashboard value. Ambiguous or stale periods remain visible but
+   do not authorize an OpenAI run.
+5. Pass that record with `--external-already-used` and preserve it beside the
+   emitted preflight JSON.
+6. Run a short smoke/live cycle before a long cycle when input shape or provider
    usage has changed.
 
 ## Related Files

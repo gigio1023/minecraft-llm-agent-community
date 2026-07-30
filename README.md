@@ -1,49 +1,49 @@
 # minecraft-llm-agent-community
 
-Headless Minecraft runtime-loop research on the legibility of embodied LLM
-co-actors: can an observer model predict a soul-grounded co-actor's
-social-material responses from public interaction history alone?
+Headless Minecraft research on what happens when individually capable,
+persistent LLM actors pursue their own goals in a shared world where economic,
+cooperative, and quest activity makes their roles materially interdependent.
 
 This repository is not a Voyager clone, a race-to-diamond benchmark, or a
-house-building planner. Minecraft task completion is a competence gate, not
-the final research target. The active plan is
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`;
-the former "advisory social-material WAM" framing is historical and the WAM
-term is retired.
+house-building planner. Minecraft task completion and long-horizon goal
+continuity are competence gates, not the final research target. The active plan
+is `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`;
+the V3 lived-vs-told plan, V2 co-actor legibility plan, and former "advisory
+social-material WAM" framing are historical.
+
+Detailed build order:
+`project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`.
 
 Runtime verification, evidence artifacts, seed/reset records, screenshots, and
 scoring scripts are mandatory experiment hygiene. They are not the research
-claim by themselves. Prediction quality and acting outcome are always reported
+claim by themselves. Acting outcome, physical competence, goal continuity,
+social consequence, efficiency, and any later prediction quality are reported
 separately.
 
 [Documentation & Web Portal](https://gigio1023.github.io/minecraft-llm-agent-community/)
 
 ## Current Direction
 
-Goal — one preregistered experiment, both outcomes informative:
+Goal — a staged path from capable individuals to observable social phenomena:
 
-- measure whether an observer model, given only public interaction history,
-  predicts a soul-grounded co-actor's next-turn social-response and
-  material-access labels better than baselines that can erase the claim
-  (policy-copy, leakage, shuffled-history, current-observation), across
-  disposition-consistency conditions (scripted positive control, stable
-  soul, resampled-soul null), with preregistered stop-results K1-K8;
-- active plan:
-  `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`;
-- build order and acceptance gates:
-  `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+1. **Individual capability:** dataset-free scenario benchmarks verify item
+   acquisition, crafting, navigation, multi-hop goals, efficiency, truthful
+   failure, and blocker recovery.
+2. **Goal continuity:** long-horizon cases test whether actors create, retain,
+   revise, resume, and close intermediate work using memory and PlanBeads
+   without claiming unsupported progress.
+3. **Interdependent sandbox:** economic, cooperative, and quest scenarios give
+   actors repeated material reasons to affect one another without scripting the
+   social response.
+4. **Phenomenon discovery:** long-run structured evidence, metrics, and video
+   are reviewed for recurring behavior.
+5. **Controlled follow-up:** baselines, falsifiers, and preregistration are
+   introduced after a phenomenon is worth explaining.
 
-Substrate premise — depth, not scale (`DEPTH_NOT_SCALE`):
-
-- the experiment presupposes a working 2-3 actor shared session with
-  cross-actor observation and chat capture, interaction density at the K6
-  floor, and longitudinal history accumulated per responder;
-- actor-count scale is not a premise and never a remedy: power comes from
-  rows per responder x conditions, and more actors dilutes attribution and
-  power at fixed budget;
-- do not scale actor count to hide a weak small-run result; scale re-enters
-  only as the deferred social-pattern branch or a post-result
-  generalization axis.
+Start with a small session that is easy to debug and attribute. Actor count,
+role strength, model mix, and scenario pressure may expand later as explicit
+experimental axes; scale never substitutes for missing individual competence or
+unobservable interaction.
 
 Near-term proof:
 
@@ -57,21 +57,21 @@ Near-term proof:
 - PlanBeads preserve passive open work, blockers, obligations, and followups;
 - Minecraft progress requires runtime execution and ordinary runtime checks;
 - response windows close only after every other active actor completed a
-  subsequent Actor Turn slot or a preregistered timeout;
-- a deterministic provider-free end-to-end smoke gates any live provider
-  spend.
+  subsequent Actor Turn slot or a declared timeout;
+- deterministic calibration and provider quota preflight gate relevant live
+  provider runs.
 
 Long-term north star:
 
-- measuring embodied co-actor legibility with disposition consistency as the
-  manipulated variable, held-out-family observer predictors, and
-  policy-fingerprint baselines that can erase the claim;
-- actors with role context, memory, relationships, action skill ownership,
-  obligations, material claims, public affordances, weak commons, and visible
-  consequences that persist after one immediate task is completed;
-- a bounded coding-agent autoresearch loop that improves prompts, predictor
-  code, action-skill candidates, scenarios, and reporting only against locked
-  transition-scoring targets.
+- actors with strong Minecraft competence, persistent goals, role context,
+  memory, relationships, action skill ownership, obligations, material claims,
+  public affordances, weak commons, and visible consequences that persist after
+  one immediate task is completed;
+- long-running social behavior that is inspectable in both metrics and video;
+- recurring phenomena that generate research questions instead of being forced
+  into a preselected narrow headline;
+- controlled follow-up studies that separate social behavior from competence,
+  scenario scripting, prompt effects, and evaluator imagination.
 
 Research framing:
 
@@ -81,10 +81,9 @@ Research framing:
   or task competence, not material claims, obligations, or social consequences;
 - existing LLM social simulations provide useful social vocabulary but often
   resolve outcomes in text rather than through embodied material change;
-- this project measures observer-predicted vs runtime-observed social-material
-  responses in natural open-world Minecraft seeds — possession, access,
-  refusal, repair, public-affordance use, and continuation — scored separately
-  from acting success.
+- this project first separates individual competence and goal continuity from
+  social interpretation, then studies recurring social-material behavior in
+  natural and explicitly fixture-labeled Minecraft scenarios.
 
 ## Runtime Shape
 
@@ -94,13 +93,14 @@ flowchart LR
   Observe["Observation<br/>world, inventory, actors"]
   Workspace["Actor workspace<br/>memory, PlanBeads, evidence"]
   Input["ActorTurnInput<br/>current_state + source_evidence_bundle"]
-  Predictor["Offline observer predictor<br/>public history only"]
+  Analysis["Offline reports and metrics"]
+  Review["Video-linked phenomenon review"]
   LLM["Actor Turn LLM<br/>one function tool call"]
   Card["Visible Action Card<br/>strict parameters"]
   Author["author_mineflayer_action<br/>full-context codegen request"]
   Runtime["Runtime gates<br/>schema, permissions, retry, verifier"]
   MC["Mineflayer + Minecraft"]
-  Row["Transition row<br/>observed delta + locked labels"]
+  Row["Transition row<br/>observed delta + evidence refs"]
   Evidence["Artifacts<br/>reports, memory, PlanBeads"]
 
   Soul --> Input
@@ -110,14 +110,14 @@ flowchart LR
   LLM --> Card --> Runtime
   LLM --> Author --> Runtime
   Runtime --> MC --> Row --> Evidence --> Workspace
-  Evidence --> Predictor --> Row
+  Evidence --> Analysis --> Review
 ```
 
 The LLM chooses directly, but it does not own Minecraft truth. Structured tool
 parameters, generated-source guards, retry constraints, timeouts, Mineflayer
 execution, runtime checks, and actor-workspace artifacts decide what happened.
-Offline observer predictors see only the exported public history; their
-prediction artifacts join transition rows by `row_id` after labels are locked.
+Offline reports, metrics, video review, and optional predictors analyze recorded
+artifacts after runtime execution. They never become action or success authority.
 
 ## Context Philosophy
 
@@ -146,9 +146,8 @@ a typed contract, strict schema, permission gate, retry constraint, or verifier.
 - PlanBeads are passive issue-like actor state, not executable authority.
 - Actor Turn actions are direct tool selections with schema-bound parameters.
 - External Minecraft-agent papers are references to adapt, not product specs.
-- Predictor artifacts are offline and advisory; they never select the executed
-  action, fill missing parameters, close obligations, or override runtime
-  checks.
+- Offline analysis is advisory; it never selects the executed action, fills
+  missing parameters, closes obligations, or overrides runtime checks.
 - Verification is audit hygiene, not a headline contribution.
 
 ## Key Documents
@@ -158,19 +157,20 @@ Read in this order:
 1. `SPEC.md`
 2. `AGENTS.md`
 3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-5. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-6. `project-docs/orientation/documentation-map.md`
-7. `project-docs/orientation/agent-search-index.md`
-8. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-9. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-10. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-11. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-12. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-13. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-14. `project-docs/runtime/overview/minecraft-basic-guide.md`
-15. `project-docs/operations/setup/headless-server.md`
-16. `project-docs/operations/setup/provider-setup.md`
+4. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+5. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+6. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+7. `project-docs/orientation/documentation-map.md`
+8. `project-docs/orientation/agent-search-index.md`
+9. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+10. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+11. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+12. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+13. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+14. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+15. `project-docs/runtime/overview/minecraft-basic-guide.md`
+16. `project-docs/operations/setup/headless-server.md`
+17. `project-docs/operations/setup/provider-setup.md`
 
 ## Running Checks
 

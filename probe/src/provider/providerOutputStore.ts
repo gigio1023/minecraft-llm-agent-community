@@ -18,7 +18,31 @@ export type ProviderOutputSnapshot = {
   proposal: JsonValue;
   /** Provider-reported or estimated usage for post-run cost/rate-limit audit. */
   usage?: ProviderUsageRecord;
+  /**
+   * Top-level raw provider response/error payload. Populated only for Model
+   * Studio when the transport supplied `result.rawOutput`.
+   */
+  raw_provider_output?: JsonValue;
 };
+
+/** Additive top-level raw evidence for Model Studio snapshots only. */
+export function modelStudioRawProviderOutputField(input: {
+  providerId: string;
+  rawOutput?: JsonValue;
+}): Pick<ProviderOutputSnapshot, "raw_provider_output"> {
+  if (input.providerId === "alibaba-model-studio-api" && input.rawOutput !== undefined) {
+    return { raw_provider_output: input.rawOutput };
+  }
+  return {};
+}
+
+/** Read optional transport rawOutput from a mixed provider-result union. */
+export function rawOutputFromProviderResult(result: unknown): JsonValue | undefined {
+  if (result !== null && typeof result === "object" && "rawOutput" in result) {
+    return (result as { rawOutput?: JsonValue }).rawOutput;
+  }
+  return undefined;
+}
 
 export async function writeProviderOutputSnapshot(
   actorWorkspaceRootDir: string,

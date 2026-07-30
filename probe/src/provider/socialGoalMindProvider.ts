@@ -22,10 +22,18 @@ import {
   callModelScopeJsonSchema,
   type ModelScopeApiProviderConfig
 } from "./modelscopeApiProvider.js";
+import {
+  callModelStudioJsonSchema,
+  type ModelStudioApiProviderConfig
+} from "./modelStudioApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { asStringArray } from "./llmJsonArrays.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
-import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
+import {
+  modelStudioRawProviderOutputField,
+  rawOutputFromProviderResult,
+  writeProviderOutputSnapshot
+} from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import { listActorMemoryRefs } from "../memory/actorMemory.js";
 import { buildGoalMindProviderInput } from "./socialCycleProviderInputs.js";
@@ -187,9 +195,11 @@ export async function runSocialCycleGoalProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   allowedActionSkillIds: string[];
   allowedPrimitiveIds: string[];
   runId?: string;
+  signal?: AbortSignal;
 }): Promise<CycleGoalProviderResult> {
   const snapshotId = `goal-mind-${input.cycleId}-${randomUUID()}`;
   const turnId = input.cycleId;
@@ -201,7 +211,12 @@ export async function runSocialCycleGoalProvider(input: {
     actor_id: input.actorId,
     turn_id: turnId,
     provider_id: input.providerId,
-    model: input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId,
+    model:
+      input.openAi?.model ??
+      input.gemini?.model ??
+      input.modelScope?.model ??
+      input.modelStudio?.model ??
+      input.providerId,
     created_at: new Date().toISOString(),
     input: providerInput
   });
@@ -331,6 +346,26 @@ If observation or previous judgments include blocked evidence, use that context 
   }>({
     config: input.modelScope!,
     ...providerCall
+  }) : input.providerId === "alibaba-model-studio-api" ? await callModelStudioJsonSchema<{
+    strategic_goal_updates: Array<{
+      summary: string;
+      rationale: string;
+      success_direction: string;
+      current_blockers: string[];
+    }>;
+    cycle_goal: {
+      summary: string;
+      rationale: string;
+      success_verifier: string;
+      evidence_required: string[];
+      stop_conditions: string[];
+      allowed_action_skill_ids: string[];
+      allowed_primitive_ids: string[];
+    };
+  }>({
+    config: input.modelStudio!,
+    ...providerCall,
+    ...(input.signal ? { signal: input.signal } : {})
   }) : await callOpenAiJsonSchema<{
     strategic_goal_updates: Array<{
       summary: string;
@@ -368,7 +403,11 @@ If observation or previous judgments include blocked evidence, use that context 
         budget_decision: result.budgetDecision as unknown as JsonValue
       },
       proposal: { error: result.message },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
     return { ok: false, error: result.message, inputRef: inputPath, outputRef: outputPath };
   }
@@ -399,7 +438,11 @@ If observation or previous judgments include blocked evidence, use that context 
       raw_output_text: result.rawText,
       parsed_output: result.parsed as unknown as JsonValue,
       proposal: { error: "missing_cycle_goal" },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
     return {
       ok: false,
@@ -464,7 +507,11 @@ If observation or previous judgments include blocked evidence, use that context 
       raw_output_text: result.rawText,
       parsed_output: { validation_errors: validated.errors },
       proposal: { error: "invalid_cycle_goal" },
-      usage: result.usageRecord
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: rawOutputFromProviderResult(result)
+      })
     });
     return {
       ok: false,
@@ -490,7 +537,11 @@ If observation or previous judgments include blocked evidence, use that context 
     raw_output_text: result.rawText,
     parsed_output: result.parsed as unknown as JsonValue,
     proposal: { cycle_goal_ref: cycleGoalRef },
-    usage: result.usageRecord
+    usage: result.usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput: rawOutputFromProviderResult(result)
+    })
   });
 
   return {

@@ -1,9 +1,9 @@
 # Seed Reset Record V1 Contract
 
-Status: active planning contract for seed/reset provenance under the embodied
-co-actor legibility experiment (`ACTIVE_CENTRAL_PLAN`; kept from the
-superseded no-regret program as load-bearing). This is not a runtime schema
-yet and not a research contribution by itself.
+Status: active planning contract for seed/reset and scenario-version provenance
+under V4 (`ACTIVE_CENTRAL_PLAN`; kept as load-bearing across the superseded V3,
+V2, and no-regret programs). This is not a runtime schema yet and not a research
+contribution by itself.
 
 Search token: `SEED_RESET_RECORD_V1`.
 
@@ -11,8 +11,7 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `central-plan-embodied-co-actor-legibility.md`
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-capability-gated-social-sandbox.md`
 - `transition-row-v1-contract.md`
 - `no-regret-core-scenario-catalog.md`
 - `society-observable-preflight.md`
@@ -26,15 +25,15 @@ came from. Its job is narrow:
 prevent hindsight laundering of fresh seeds, reset sessions, and offline controls
 ```
 
-A seed/reset record does not prove the legibility claim, predictor quality, or
-the deferred social-pattern branch. It only makes later row batches auditable by
-world/setup provenance and counting status.
+A seed/reset record does not prove individual capability, goal continuity, a
+social phenomenon, or predictor quality. It only makes later batches auditable
+by world/setup provenance and counting status.
 
 ## Why It Exists
 
-The active legibility experiment requires evidence across declared fresh seeds
-or auditable reset sessions. Without a separate record, these cases can be
-confused:
+The active benchmark and sandbox program requires evidence across declared
+fresh seeds or auditable reset sessions. Without a separate record, these cases
+can be confused:
 
 - a newly generated Minecraft world seed;
 - a restored/reset session from a known setup;

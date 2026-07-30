@@ -6,6 +6,14 @@ Status: planning document.
 
 Recorded: 2026-06-13 (`Asia/Seoul`).
 
+V4 direction update, recorded 2026-07-11: the active central plan promotes this
+document's dataset-free goal cases, target predicates, milestones, budgets,
+failure classes, and normalized report mechanics as the starting point for the
+`INDIVIDUAL_CAPABILITY_GATE`. Historical WAM/prediction framing below is
+reference only. This file is not the active central plan; use
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+for sequencing and research authority.
+
 Material-economy update, recorded 2026-06-15: target-state Minecraft goals
 remain useful calibration gates, but the current social benchmark direction is
 defined by personal possession, material claims, public affordances, weak
@@ -51,7 +59,6 @@ It should evaluate the full loop:
 
 ```text
 ActorSoul + LifeGoal + current observation + memory + PlanBeads + action surface
--> optional advisory prediction for candidate action consequences
 -> provider/model Actor Turn
 -> runtime action selection
 -> action-skill or primitive gate

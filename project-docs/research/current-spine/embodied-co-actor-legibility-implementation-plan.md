@@ -1,8 +1,14 @@
 # Embodied Co-Actor Legibility: Implementation Plan
 
-Status: ACTIVE implementation plan for the active central plan.
+Status: SUPERSEDED on 2026-07-10 by
+`lived-vs-told-implementation-plan.md` (`LIVED_VS_TOLD_IMPLEMENTATION_PLAN`),
+the work order for central plan V3. Preserved as audit trail. The
+substrate this plan built (shared session, observation/chat capture,
+windows, export, scorer machinery) carries over into V3; the science layer
+(scripted responder, predictor arms, targets) is replaced there. Session 2
+(Phase B) never ran and must not run under this plan.
 
-Search token: `LEGIBILITY_IMPLEMENTATION_PLAN`. Also: `DEPTH_NOT_SCALE`,
+Search token: `LEGIBILITY_IMPLEMENTATION_PLAN` (historical). Also:
 `SESSION_1_BUILD`, `SESSION_2_PILOT`.
 
 Recorded: 2026-07-06 (`Asia/Seoul`).
@@ -222,6 +228,72 @@ artifacts under
 The legacy `probe:social-cycle` single-actor runner remains available for
 older runtime work; it is not the Session 1 legibility entrypoint.
 
+Status caveat (2026-07-06, post-merge review): the S1 boxes below were
+satisfied under **fixture semantics** — the smoke's actors are in-memory
+stubs, labels come from fixture heuristics, and the smoke's
+`history_grounded` arm is a placeholder. The live counterparts (real
+2-3 bot shared session, evidence-grounded labeling, real predictor arms,
+real leakage checks) are broken down as Phase A of
+`legibility-cycle-2-live-substrate-work-plan.md`
+(`LEGIBILITY_CYCLE_2_WORK_PLAN`); Session 2 below starts only after that
+plan's C2-G live provider-free gate holds.
+
+Live C2-1 follow-up status (2026-07-06):
+
+- [x] provider-free 2-bot `fresh_world` live session runs through
+      `probe:legibility-live-session` with distinct per-actor provider routes
+      and resolvable runtime evidence refs:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-1/`;
+- [x] `probe:social-cycle` behavior-lock tests and the full `probe` Bun suite
+      still pass after the per-turn core extraction;
+- [x] the live runner consumes provider routes without condition-keyed runtime
+      branches.
+
+Live C2-2 follow-up status (2026-07-06):
+
+- [x] provider-free 2-bot live session with two slots per actor records a
+      Mineflayer chat event as `structured-chat-event/v1`, then carries that
+      event into the receiving actor's later `observe` evidence:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-2-slots2/`;
+- [x] `observed_by` is derived from the typed live roster/range policy stored
+      with the chat-event evidence, not assumed from the actor list;
+- [x] receiving observation evidence records
+      `loadedWorldScope.absence_claims_exhaustive: false`.
+
+Live C2-3 follow-up status (2026-07-06):
+
+- [x] provider-free live timeout fixture records a closed
+      `response-window/v1` with `close_reason: timeout`, distinct from the
+      slot-completion closure path:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-3-timeout/`;
+- [x] transition rows are materialized only from closed, non-vacuous windows;
+- [x] live window opening is keyed by focal-turn action properties
+      (`say` opens, `observe`/`wait` do not), not by a hardcoded actor id.
+
+Live C2-4 follow-up status (2026-07-06):
+
+- [x] live rows use the evidence-grounded C2-4 labeler; in the provider-free
+      C2-4 artifact, material remains `unknown_material_delta` because no
+      typed material evidence exists:
+      `project-docs/experiments/raw/2026-07-06/c2-live-shared-session-c2-4-labeler/`;
+- [x] a negative unit test verifies chat containing material-label keywords
+      (`available`, `cannot`) cannot create material access labels without
+      typed runtime evidence;
+- [x] social and material label decisions carry nonempty `evidence_refs`; the
+      legacy Session 1 regex labelers are marked `session1-fixture-labeler/v1`
+      and are not live-label authority.
+
+Live C2-7 follow-up status (2026-07-06):
+
+- [x] provider-free C2-7 rehearsal declares `scripted_responder`,
+      `stable_soul`, and `resampled_soul` in one layout and attributes
+      rows by condition through the routing map;
+- [x] `seed-reset-record/v1` creation and validation link
+      `resampled_soul` rows to recorded condition, seed/reset, soul-instance,
+      and held-out-family provenance without private soul text;
+- [x] grep-level guard is covered by
+      `cd probe && bun test test/legibilitySession1.test.ts -t 'C2-7|condition literal'`.
+
 **S1-1. Shared-session scheduler with per-actor provider routing**
 
 - What: the social-cycle runner starts N (2-3) actors in one session,
@@ -324,6 +396,17 @@ older runtime work; it is not the Session 1 legibility entrypoint.
   - [x] the smoke is a repo script runnable via `bun run`, and its
         artifacts land under the experiments tree.
 - Blocked by: S1-3, S1-6.
+
+Cycle 2 live-substrate status (2026-07-06): the provider-free live C2-G
+smoke now writes the full live artifact chain under
+`project-docs/experiments/raw/2026-07-06/c2-g-live-provider-free-smoke/`
+with checked public history, real public-history predictor arms, and one
+typed material-access label from `material-access-evidence/v1`. The live
+exit gate remains failed because `history_grounded` lift over
+per-condition majority is negative (`max_lift:
+-0.15000000000000002`), recorded in
+`c2-g-gate-summary.json`. Treat this as a K1-shaped Phase B blocker, not
+as a provider-budget or environment blocker.
 
 ### Session 2 — preregistered live pilot
 

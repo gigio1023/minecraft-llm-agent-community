@@ -8,7 +8,7 @@ import { soulRef } from "../actorSoulStore.js";
 import { lifeGoalRef } from "../lifeGoalStore.js";
 import type { SocialCycleContextPacket } from "../cycleContextAssembler.js";
 import { buildActionCardProjection, type ActionCardProjection } from "./actionCards.js";
-import { annotateActionCardsWithCurrentStateHints } from "./actionCardSelection.js";
+import { annotateActionCardsWithSharedGuidance } from "./actionCardSelection.js";
 import { buildActorTurnCurrentStateProjection } from "./currentStateProjection.js";
 import { buildActorTurnDecisionFrame } from "./decisionFrame.js";
 import {
@@ -22,6 +22,7 @@ import { buildActorTurnSourceEvidenceBundle } from "./sourceEvidenceBundle.js";
 import type {
   ActiveEpisode,
   ActorTurnInput,
+  CapabilityCaseContext,
   EvidenceTraceEntry,
   ProviderBudgetHint
 } from "./types.js";
@@ -33,12 +34,12 @@ export function buildActorTurnInput(input: {
   currentObservationRefs: readonly string[];
   recentEvidenceTrace?: readonly EvidenceTraceEntry[];
   providerBudgetHint?: ProviderBudgetHint;
+  capabilityCaseContext?: CapabilityCaseContext;
 }): { actorTurnInput: ActorTurnInput; actionCardProjection: ActionCardProjection } {
   const currentState = buildActorTurnCurrentStateProjection(input.context);
   const recentEvidenceTrace = [...(input.recentEvidenceTrace ?? [])];
-  const actionCardProjection = annotateActionCardsWithCurrentStateHints(
-    buildActionCardProjection(input.context.action_surface),
-    currentState
+  const actionCardProjection = annotateActionCardsWithSharedGuidance(
+    buildActionCardProjection(input.context.action_surface)
   );
   const planBeadHints = planBeadHintsFromContext(input.context);
   const activeEpisode = anchorActiveEpisodeToPlanBeadContext({
@@ -48,6 +49,9 @@ export function buildActorTurnInput(input: {
   const actorTurnInput: ActorTurnInput = {
     schema: "actor-turn-input/v1",
     turn_id: input.turnId,
+    ...(input.capabilityCaseContext
+      ? { capability_case_context: { ...input.capabilityCaseContext } }
+      : {}),
     decision_frame: buildActorTurnDecisionFrame({
       activeEpisode,
       currentState,
@@ -71,6 +75,9 @@ export function buildActorTurnInput(input: {
     }),
     relationship_context: buildRelationshipContextProjection(input.context),
     runtime_retry_constraints: retryConstraintSummaries(input.context),
+    ...(actionCardProjection.shared_guidance
+      ? { action_card_shared_guidance: actionCardProjection.shared_guidance }
+      : {}),
     action_cards: actionCardProjection.action_cards,
     minecraft_basic_guide: buildMinecraftBasicGuideProjection(),
     provider_budget_hint: input.providerBudgetHint ?? {

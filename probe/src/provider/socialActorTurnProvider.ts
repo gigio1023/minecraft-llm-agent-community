@@ -31,8 +31,15 @@ import {
   callModelScopeFunctionToolSelection,
   type ModelScopeApiProviderConfig
 } from "./modelscopeApiProvider.js";
+import {
+  callModelStudioFunctionToolSelection,
+  type ModelStudioApiProviderConfig
+} from "./modelStudioApiProvider.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
-import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
+import {
+  modelStudioRawProviderOutputField,
+  writeProviderOutputSnapshot
+} from "./providerOutputStore.js";
 import type {
   ProviderUsageBudgetDecision,
   ProviderUsageRecord
@@ -270,7 +277,11 @@ async function writeFailureOutput(input: {
       error_kind: input.errorKind ?? null,
       raw_provider_output: input.rawOutput ?? null
     },
-    usage: input.usageRecord
+    usage: input.usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput: input.rawOutput
+    })
   });
 }
 
@@ -492,7 +503,10 @@ async function writeToolSelectionArtifact(input: {
 }
 
 async function requestLlmActorTurnToolSelection(input: {
-  providerId: Extract<SocialCycleProviderId, "openai-api" | "gemini-api" | "modelscope-api">;
+  providerId: Extract<
+    SocialCycleProviderId,
+    "openai-api" | "gemini-api" | "modelscope-api" | "alibaba-model-studio-api"
+  >;
   actorWorkspaceRootDir: string;
   actorId: string;
   actorTurnInput: ActorTurnInput;
@@ -500,9 +514,11 @@ async function requestLlmActorTurnToolSelection(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   runId?: string;
   snapshotId: string;
   inputRef: string;
+  signal?: AbortSignal;
 }): Promise<ActorTurnProviderAttempt> {
   const payload = buildActorTurnToolSelectionPayload({
     actorTurnInput: input.actorTurnInput,
@@ -524,6 +540,15 @@ async function requestLlmActorTurnToolSelection(input: {
           user: payload.user,
           tools: payload.tools,
           usageContext: payload.usageContext
+        })
+    : input.providerId === "alibaba-model-studio-api"
+      ? await callModelStudioFunctionToolSelection({
+          config: input.modelStudio!,
+          system: payload.system,
+          user: payload.user,
+          tools: payload.tools,
+          usageContext: payload.usageContext,
+          ...(input.signal ? { signal: input.signal } : {})
         })
     : await callGeminiFunctionToolSelection({
         config: input.gemini!,
@@ -622,8 +647,10 @@ async function requestLlmActorTurnToolSelection(input: {
     openAi: input.openAi,
     gemini: input.gemini,
     modelScope: input.modelScope,
+    modelStudio: input.modelStudio,
     runId: input.runId,
-    snapshotId: `${input.snapshotId}-mineflayer-codegen`
+    snapshotId: `${input.snapshotId}-mineflayer-codegen`,
+    ...(input.signal ? { signal: input.signal } : {})
   });
   if (!codegen.ok) {
     const outerOutputRef = await writeProviderOutputSnapshot(input.actorWorkspaceRootDir, {
@@ -643,14 +670,36 @@ async function requestLlmActorTurnToolSelection(input: {
         mineflayer_codegen_failed: true,
         mineflayer_codegen_output_ref: codegen.outputRef
       },
-	      proposal: {
-	        actor_turn_tool_selection: parsed.selection as unknown as JsonValue,
-	        actor_turn_tool_selection_ref: toolSelectionRef,
-	        mineflayer_codegen_failed: true,
-	        mineflayer_codegen_output_ref: codegen.outputRef
-	      },
-      usage: result.usageRecord
+      proposal: {
+        actor_turn_tool_selection: parsed.selection as unknown as JsonValue,
+        actor_turn_tool_selection_ref: toolSelectionRef,
+        mineflayer_codegen_failed: true,
+        mineflayer_codegen_output_ref: codegen.outputRef
+      },
+      usage: result.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: result.rawOutput
+      })
     });
+    if (input.signal?.aborted) {
+      return {
+        ok: false,
+        errorKind: "aborted",
+        error: codegen.error,
+        inputRef: input.inputRef,
+        outputRef: codegen.outputRef,
+        intermediateInputRefs: [
+          ...(codegen.intermediateInputRefs ?? []),
+          codegen.inputRef
+        ],
+        intermediateOutputRefs: [
+          outerOutputRef,
+          ...(codegen.intermediateOutputRefs ?? []),
+          codegen.outputRef
+        ]
+      };
+    }
     return {
       ok: false,
       failureKind: "provider_contract_rejection",
@@ -704,10 +753,12 @@ async function requestActorTurn(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   defaultPrimitive?: string;
   runId?: string;
   snapshotId: string;
   model: string;
+  signal?: AbortSignal;
 }): Promise<ActorTurnProviderAttempt> {
   const inputPath = await writeActorTurnAttemptSnapshot({
     actorWorkspaceRootDir: input.actorWorkspaceRootDir,
@@ -742,7 +793,8 @@ async function requestActorTurn(input: {
   if (
     input.providerId === "openai-api" ||
     input.providerId === "gemini-api" ||
-    input.providerId === "modelscope-api"
+    input.providerId === "modelscope-api" ||
+    input.providerId === "alibaba-model-studio-api"
   ) {
     return requestLlmActorTurnToolSelection({
       providerId: input.providerId,
@@ -753,9 +805,11 @@ async function requestActorTurn(input: {
       openAi: input.openAi,
       gemini: input.gemini,
       modelScope: input.modelScope,
+      modelStudio: input.modelStudio,
       runId: input.runId,
       snapshotId: input.snapshotId,
-      inputRef: inputPath
+      inputRef: inputPath,
+      ...(input.signal ? { signal: input.signal } : {})
     });
   }
 
@@ -774,11 +828,18 @@ export async function runSocialActorTurnProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   defaultPrimitive?: string;
   runId?: string;
+  signal?: AbortSignal;
 }): Promise<ActorTurnProviderResult> {
   const snapshotId = `actor-turn-${input.actorTurnInput.turn_id}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId;
+  const model =
+    input.openAi?.model ??
+    input.gemini?.model ??
+    input.modelScope?.model ??
+    input.modelStudio?.model ??
+    input.providerId;
   let actorTurnInput = input.actorTurnInput;
   let actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
   const intermediateInputRefs: string[] = [];
@@ -791,7 +852,7 @@ export async function runSocialActorTurnProvider(input: {
     model
   });
   if (!attempt.ok) {
-    if (!isRepairableActorTurnProviderError(attempt.error)) {
+    if (!isRepairableActorTurnProviderError(attempt.error) || input.signal?.aborted) {
       return attempt;
     }
     intermediateInputRefs.push(attempt.inputRef, ...(attempt.intermediateInputRefs ?? []));
@@ -802,6 +863,13 @@ export async function runSocialActorTurnProvider(input: {
       rawRejectedOutput: attempt.rawRejectedOutput
     });
     actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
+    if (input.signal?.aborted) {
+      return {
+        ...attempt,
+        intermediateInputRefs,
+        intermediateOutputRefs
+      };
+    }
     attempt = await requestActorTurn({
       ...input,
       actorTurnInput,
@@ -846,10 +914,10 @@ export async function runSocialActorTurnProvider(input: {
       proposal: {
         actor_turn_output: actorTurnArtifactOutput(attempt.actorTurn),
         ...(attempt.toolSelection
-	          ? {
-	              actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
-	              actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null
-	            }
+          ? {
+              actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
+              actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null
+            }
           : {}),
         ...(attempt.codegen
           ? {
@@ -861,9 +929,28 @@ export async function runSocialActorTurnProvider(input: {
         resolution_errors: resolution.errors,
         repair_requested: true
       },
-      usage: attempt.usageRecord
+      usage: attempt.usageRecord,
+      ...modelStudioRawProviderOutputField({
+        providerId: input.providerId,
+        rawOutput: attempt.rawProviderOutput
+      })
     });
     intermediateOutputRefs.push(rejectionRef);
+    if (input.signal?.aborted) {
+      return {
+        ok: false,
+        errorKind: "aborted",
+        error: "Actor Turn resolution stopped because the case signal was aborted.",
+        inputRef: attempt.inputRef,
+        outputRef: rejectionRef,
+        rawRejectedOutput: attempt.actorTurn as unknown as JsonValue,
+        intermediateInputRefs: [
+          ...intermediateInputRefs,
+          ...(attempt.intermediateInputRefs ?? [])
+        ],
+        intermediateOutputRefs
+      };
+    }
     actorTurnInput = buildRepairActorTurnInput({
       actorTurnInput,
       rejectedOutput: attempt.actorTurn,
@@ -871,6 +958,21 @@ export async function runSocialActorTurnProvider(input: {
       rawRejectedToolCall: attempt.toolSelection?.raw_tool_call
     });
     actionCardProjection = projectionForActorTurnInput(input.actionCardProjection, actorTurnInput);
+    if (input.signal?.aborted) {
+      return {
+        ok: false,
+        errorKind: "aborted",
+        error: "Actor Turn repair stopped because the case signal was aborted.",
+        inputRef: attempt.inputRef,
+        outputRef: rejectionRef,
+        rawRejectedOutput: attempt.actorTurn as unknown as JsonValue,
+        intermediateInputRefs: [
+          ...intermediateInputRefs,
+          ...(attempt.intermediateInputRefs ?? [])
+        ],
+        intermediateOutputRefs
+      };
+    }
     attempt = await requestActorTurn({
       ...input,
       actorTurnInput,
@@ -967,10 +1069,10 @@ export async function runSocialActorTurnProvider(input: {
     proposal: {
       actor_turn_output: actorTurnArtifactOutput(attempt.actorTurn),
       ...(attempt.toolSelection
-	          ? {
-	            actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
-	            actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null
-	          }
+        ? {
+            actor_turn_tool_selection: attempt.toolSelection as unknown as JsonValue,
+            actor_turn_tool_selection_ref: attempt.toolSelectionRef ?? null
+          }
         : {}),
       ...(attempt.codegen
         ? {
@@ -980,7 +1082,11 @@ export async function runSocialActorTurnProvider(input: {
         : {}),
       action_ref: actionRef
     },
-    usage: attempt.usageRecord
+    usage: attempt.usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput: attempt.rawProviderOutput
+    })
   });
 
   return {

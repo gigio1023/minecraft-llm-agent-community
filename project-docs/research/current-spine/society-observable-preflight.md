@@ -1,9 +1,9 @@
 # Society Observable Preflight
 
-Status: active gate for the deferred social-pattern branch (old name:
-F-society). This does not select the branch as the headline; under
-`DEPTH_NOT_SCALE`, actor-count scale stays banned as a remedy for weak
-small-run results.
+Status: active **reference measurement protocol** under V4. Its candidate
+observables, denominators, and failure warnings remain useful, but its old fixed
+branch-promotion thresholds and `DEPTH_NOT_SCALE` gate do not override the V4
+phenomenon-first program or create a global stop rule.
 
 Search token: `SOCIETY_OBSERVABLE_PREFLIGHT`.
 
@@ -11,17 +11,17 @@ Recorded: 2026-06-29 (`Asia/Seoul`).
 
 Use with:
 
-- `central-plan-embodied-co-actor-legibility.md`
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-capability-gated-social-sandbox.md`
 - `no-regret-core-scenario-catalog.md`
 - `transition-row-label-codebook.md`
 - `project-docs/specification/evidence-grounded-minecraft-society.md`
 
 ## Purpose
 
-The active embodied co-actor legibility experiment can weaken or motivate later
-predictor/advisory-use branches. It cannot by itself prove or kill the deferred
-social-pattern branch.
+V4 uses this file as a vocabulary and review aid for discovery runs. The user
+retains authority to iterate scenarios and select phenomena. A future controlled
+claim must still define its own baseline, falsifier, competence controls, and
+prior-work review.
 
 The social-pattern branch needs a different question:
 
@@ -31,7 +31,7 @@ patterns when individual goals collide with possession, access, place, need,
 refusal, repair, and continuation?
 ```
 
-This preflight is a gate for that question. It is not a society headline, not a
+This preflight helps inspect that question. It is not a society headline, not a
 Project Sid-style scale-up, and not a claim of human-like society.
 
 ## Research Object
@@ -71,8 +71,9 @@ friendship, culture, law, religion, or role identity.
 
 ## Required Inputs
 
-The preflight may start only after the active legibility substrate has produced
-an auditable small-N batch with non-vacuous response windows.
+These legacy reference thresholds describe what an auditable small-N batch can
+look like after the V4 capability and continuity gates. They do not block V4
+discovery runs or bind the user's scenario-iteration decisions.
 
 Minimum smoke input:
 
@@ -87,7 +88,7 @@ Minimum smoke input:
 - label decisions follow `Transition-Row-Label-Codebook.md`.
 
 Smoke input can expose obvious negative results or broken observables. It cannot
-promote the social-pattern branch beyond `core-first` or `defer`.
+promote a scientific headline by itself.
 
 Minimum branch-triage input:
 
@@ -256,27 +257,18 @@ The first positive society-observable preflight should still produce a next
 experiment, not a society headline. The claim becomes stronger only when the
 observable repeats under controls that could have erased it.
 
-## Relationship To The Active Legibility Experiment
+## Relationship To V4
 
-The active experiment and this deferred gate answer different questions.
+V4 owns the active sequence. This document supplies candidate observables and a
+historical small-N audit shape; it no longer selects a separate branch.
 
-| Gate | Main question | Can select |
+| Surface | Main question | Can select |
 | --- | --- | --- |
-| Embodied co-actor legibility | Does public history improve prediction of a co-actor's response beyond baselines? | current research decision |
-| Society observable preflight | Do recurring social-material patterns appear under small embodied constraints? | deferred social-pattern candidate |
+| V4 discovery run | What recurring social-material patterns appear among capable, persistent actors under interdependence? | candidate phenomenon |
+| Controlled follow-up | Does the selected phenomenon survive a named baseline or alternative explanation? | research decision |
 
-One gate can be positive while the other is negative. A strong prediction result
-does not prove society. A weak prediction result does not kill the social-pattern
-branch unless the society observable also fails.
-
-Decision interaction:
-
-| Prediction gate | Society gate | Result |
-| --- | --- | --- |
-| positive | positive | both branches may deserve separate confirming experiments |
-| positive | negative | pursue predictor/advisory-use follow-up, defer social-pattern |
-| negative | positive | social-pattern remains alive under its own target |
-| negative | negative | preserve negative result, revise labels/scenarios, or defer |
+Prediction may be chosen later as one follow-up mechanism. It has no privileged
+position in discovery-run interpretation.
 
 ## What Not To Do
 

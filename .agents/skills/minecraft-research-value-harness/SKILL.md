@@ -5,16 +5,17 @@ description: >
   project before implementation. Use for prompts about "research direction",
   "research gap", "paper-worthy", "experiment design", "legibility",
   "co-actor", "observer prediction", "논문감", "연구 가치", "실험 설계",
-  "유의미한 연구 주제", or historical WAM/F-native/F-loop/F-society plans that
-  need re-evaluation under the current active plan. Trigger when a plan hides
+  "유의미한 연구 주제", capability benchmarks, goal continuity, phenomenon
+  discovery, or historical WAM/F-native/F-loop/F-society/V3 plans that need
+  re-evaluation under the current active plan. Trigger when a plan hides
   behind verified/structured/validated instead of proving a substantive claim.
 ---
 
 # Minecraft Research Value Harness
 
 Use this skill to decide whether a proposed Minecraft agent direction is a real
-research target, a weak slogan, ordinary engineering hygiene, or a deferred idea
-blocked on the active embodied co-actor legibility substrate.
+research target, a weak slogan, ordinary engineering hygiene, a discovery-stage
+phenomenon, or substrate work under the capability-gated social sandbox.
 
 This is an **agent skill** for research judgment. It is not a runtime action
 skill, benchmark runner, paper generator, or permission for model text to bypass
@@ -23,9 +24,9 @@ runtime authority.
 ## Quick Start
 
 1. Read the active central plan:
-   `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-   and its build companion
-   `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`.
+   `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`.
+   (The V3 lived-vs-told and V2 co-actor legibility plans are superseded audit
+   trail.)
 2. Read `references/protocol.md` for the end-to-end workflow.
 3. If the task asks "is this paper-worthy?", "what is the research gap?", or
    "what experiment should we run?", read `references/research-value-rubric.md`.
@@ -99,13 +100,13 @@ Use the verdict labels exactly:
   layer may be too easy for trained-predictor/advisory-use claims and should be
   treated as a control.
 - If a proposal needs many actors, institutions, laws, religion, taxes, or big
-  society claims before 2-3 actors are non-degenerate, label it
-  `substrate-first` or `defer`.
+  society claims before individual competence, goal continuity, and small
+  attributable interaction work, label it `substrate-first` or `defer`.
 - If Project Sid-style material is used, separate useful case ideas from
   unverified promotional claims.
 - If a model-generated review approves the idea, still run baseline pressure and
   execution-collapse analysis. Optimistic research self-evaluation is a known
   failure mode.
-- Historical WAM/F-native/F-loop/F-society names are translation inputs, not
-  active contribution labels. Map them to trained-predictor, advisory-use, or
-  social-pattern only when the active plan makes that mapping explicit.
+- Historical WAM/F-native/F-loop/F-society/lived-vs-told names are translation
+  inputs, not active contribution labels. Reuse a mechanism only when the active
+  plan or a selected controlled follow-up re-derives its need.

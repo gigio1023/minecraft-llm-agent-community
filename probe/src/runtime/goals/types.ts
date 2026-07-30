@@ -150,6 +150,48 @@ export type WorldEvent = {
   run_id?: string;
 };
 
+/** Model-visible capability identity; scoring predicates remain evaluator-only. */
+export type CapabilityCaseContext = {
+  schema: "capability-case-context/v1";
+  case_id: string;
+  top_level_goal: string;
+  manifest_hash: string;
+};
+
+/** Usage and evidence snapshot recorded when capability progress is first observed. */
+export type CapabilityProgressMeasurement = {
+  cycle_count: number;
+  runtime_action_count: number;
+  wall_time_ms: number;
+  provider_requests: number;
+  total_tokens: number;
+  passed_milestone_ids: string[];
+  evidence_refs: string[];
+};
+
+/** Write-once measurement of the first runtime observation for one milestone. */
+export type CapabilityMilestoneFirstObservation = Omit<
+  CapabilityProgressMeasurement,
+  "passed_milestone_ids"
+> & {
+  milestone_id: string;
+};
+
+/**
+ * Raw-report progress summary for early completion measurement.
+ * First measurement points are write-once; latest_* may update later. Per-
+ * milestone observations preserve transient acquisition states after an item
+ * is consumed by crafting or placement.
+ */
+export type CapabilityProgressSummary = {
+  schema: "capability-progress-summary/v1";
+  latest_target_status: "passed" | "failed" | "unknown";
+  latest_passed_milestone_ids: string[];
+  milestone_first_observations: CapabilityMilestoneFirstObservation[];
+  first_measurable_progress?: CapabilityProgressMeasurement;
+  target_completion?: CapabilityProgressMeasurement;
+};
+
 export type GeneratedActionSkillCandidate = {
   schema: "generated-action-skill-candidate/v1";
   proposed_skill_id: string;
@@ -254,6 +296,7 @@ export type SocialCycleProviderId =
   | "openai-api"
   | "gemini-api"
   | "modelscope-api"
+  | "alibaba-model-studio-api"
   | "deterministic-social"
   | "scripted-social";
 
@@ -301,6 +344,9 @@ export type SocialCycleRunReport = {
     model: string;
     reasoning: string;
   };
+  capability_case_context?: CapabilityCaseContext;
+  /** Runtime-recorded capability progress; never derived from provider prose. */
+  capability_progress?: CapabilityProgressSummary;
   action_hot_path?: "actor_turn";
   provider_usage?: ProviderUsageSummary;
   runtime_status: "passed" | "failed" | "blocked" | "timeout" | "environment_blocked";

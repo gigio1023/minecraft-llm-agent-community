@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 function usage() {
@@ -81,6 +82,146 @@ function readSiblingJson(baseDir, fileName) {
     return { filePath, value: null };
   }
   return { filePath, value: readJson(filePath) };
+}
+
+function isRecord(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function findRepositoryRoot(startDir) {
+  let current = path.resolve(startDir);
+  while (true) {
+    if (fs.existsSync(path.join(current, "SPEC.md")) &&
+      fs.existsSync(path.join(current, "project-docs"))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
+function resolveRepositoryRef(repoRoot, ref) {
+  if (!repoRoot || typeof ref !== "string" || ref.length === 0 || path.isAbsolute(ref)) {
+    return null;
+  }
+  const resolved = path.resolve(repoRoot, ref);
+  const relative = path.relative(repoRoot, resolved);
+  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    return resolved;
+  }
+  return null;
+}
+
+function sha256File(filePath) {
+  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function readArchiveRelocation({ reportPath, reportDir, report, repoRoot }) {
+  const sidecarPath = path.join(reportDir, "report-archive-relocation.json");
+  if (!fs.existsSync(sidecarPath)) {
+    return {
+      present: false,
+      sidecar_path: sidecarPath,
+      valid: true,
+      errors: [],
+      archived_actor_workspace_root: null,
+      approved_preflight_path: null,
+      value: null
+    };
+  }
+  const errors = [];
+  let value = null;
+  try {
+    value = readJson(sidecarPath);
+  } catch (error) {
+    errors.push(`cannot parse sidecar: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!isRecord(value)) {
+    errors.push("sidecar must be a JSON object");
+  } else {
+    const allowedKeys = new Set([
+      "schema",
+      "created_at",
+      "report_ref",
+      "report_sha256",
+      "original_actor_workspace_root",
+      "archived_actor_workspace_root_ref",
+      "approved_preflight_ref"
+    ]);
+    const extraKeys = Object.keys(value).filter((key) => !allowedKeys.has(key));
+    if (extraKeys.length > 0) {
+      errors.push(`unknown sidecar fields: ${extraKeys.join(", ")}`);
+    }
+    if (value.schema !== "report-archive-relocation/v1") {
+      errors.push("schema must be report-archive-relocation/v1");
+    }
+    if (typeof value.created_at !== "string" || !Number.isFinite(Date.parse(value.created_at))) {
+      errors.push("created_at must be an ISO date-time");
+    }
+  }
+  const reportRefPath = isRecord(value)
+    ? resolveRepositoryRef(repoRoot, value.report_ref)
+    : null;
+  const archivedActorWorkspaceRoot = isRecord(value)
+    ? resolveRepositoryRef(repoRoot, value.archived_actor_workspace_root_ref)
+    : null;
+  const approvedPreflightPath = isRecord(value)
+    ? resolveRepositoryRef(repoRoot, value.approved_preflight_ref)
+    : null;
+  if (!repoRoot) {
+    errors.push("repository root could not be found");
+  }
+  if (!reportRefPath || path.resolve(reportRefPath) !== path.resolve(reportPath)) {
+    errors.push("report_ref must resolve to the checked report inside the repository");
+  }
+  if (!archivedActorWorkspaceRoot) {
+    errors.push("archived_actor_workspace_root_ref must be a repository-relative path");
+  }
+  if (!approvedPreflightPath) {
+    errors.push("approved_preflight_ref must be a repository-relative path");
+  }
+  if (isRecord(value) && value.original_actor_workspace_root !== report.actor_workspace_root_dir) {
+    errors.push("original_actor_workspace_root must match the raw report");
+  }
+  if (isRecord(value) &&
+    (typeof value.report_sha256 !== "string" || value.report_sha256 !== sha256File(reportPath))) {
+    errors.push("report_sha256 does not match the raw report bytes");
+  }
+  return {
+    present: true,
+    sidecar_path: sidecarPath,
+    valid: errors.length === 0,
+    errors,
+    archived_actor_workspace_root: archivedActorWorkspaceRoot,
+    approved_preflight_path: approvedPreflightPath,
+    value
+  };
+}
+
+function inspectApprovedPreflight(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { path: filePath, valid: false, reason: "missing" };
+  }
+  try {
+    const value = readJson(filePath);
+    const valid = value?.schema === "provider-quota-preflight/v1" &&
+      value?.final_status === "allowed" &&
+      value?.approval?.operator_approved === true;
+    return {
+      path: filePath,
+      valid,
+      reason: valid ? "approved" : "preflight is not an operator-approved allowed result"
+    };
+  } catch (error) {
+    return {
+      path: filePath,
+      valid: false,
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 function allLeakageChecksPassed(publicHistory) {
@@ -262,6 +403,7 @@ export function checkReportReadiness(argv, options = {}) {
   const reportPath = path.resolve(cwd, reportArg);
   const reportDir = path.dirname(reportPath);
   const report = readJson(reportPath);
+  const repoRoot = options.repoRoot ?? findRepositoryRoot(reportDir);
 
   if (report.schema === "legibility-session/v1") {
     return checkLegibilitySessionReadiness({
@@ -274,10 +416,19 @@ export function checkReportReadiness(argv, options = {}) {
     });
   }
 
-  const actorWorkspaceRoot = resolveMaybe(
+  const archiveRelocation = readArchiveRelocation({
+    reportPath,
+    reportDir,
+    report,
+    repoRoot
+  });
+  const originalActorWorkspaceRoot = resolveMaybe(
     reportDir,
     report.actor_workspace_root_dir ?? path.join("..", "data", "actors", "social-runs", report.run_id ?? "")
   );
+  const actorWorkspaceRoot = archiveRelocation.present && archiveRelocation.valid
+    ? archiveRelocation.archived_actor_workspace_root
+    : originalActorWorkspaceRoot;
   const actorDir = path.join(actorWorkspaceRoot ?? "", report.actor_id ?? "");
 
   const cycles = Array.isArray(report.cycles) ? report.cycles : [];
@@ -328,11 +479,32 @@ export function checkReportReadiness(argv, options = {}) {
 
   const providerId = report.provider?.provider_id ?? "";
   const providerBacked = providerId && !providerId.startsWith("deterministic") && providerId !== "builtin-planner";
-  const preflightRefs = [
+  const reportPreflightRefs = [
     ...(Array.isArray(report.preflight_refs) ? report.preflight_refs : []),
     ...(Array.isArray(report.provider_preflight_refs) ? report.provider_preflight_refs : []),
     ...(Array.isArray(report.artifact_refs?.preflight) ? report.artifact_refs.preflight : [])
   ];
+  const preflightRefs = [
+    ...reportPreflightRefs,
+    ...(archiveRelocation.present && isRecord(archiveRelocation.value)
+      ? [archiveRelocation.value.approved_preflight_ref]
+      : [])
+  ].filter((ref) => typeof ref === "string" && ref.length > 0);
+  const resolvedReportPreflights = reportPreflightRefs.map((ref) => {
+    const candidates = [resolveMaybe(reportDir, ref), resolveRepositoryRef(repoRoot, ref)].filter(Boolean);
+    return candidates.find((candidate) => existsMaybe(candidate)) ?? candidates[0] ?? null;
+  });
+  const resolvedPreflightPaths = [
+    ...resolvedReportPreflights,
+    ...(archiveRelocation.approved_preflight_path
+      ? [archiveRelocation.approved_preflight_path]
+      : [])
+  ];
+  const missingPreflightRefs = resolvedPreflightPaths.filter((ref) => !existsMaybe(ref));
+  const approvedPreflightInspections = [...new Set(resolvedPreflightPaths)]
+    .filter((ref) => existsMaybe(ref))
+    .map(inspectApprovedPreflight);
+  const hasApprovedPreflight = approvedPreflightInspections.some((inspection) => inspection.valid);
   const hasPreflightRef = preflightRefs.length > 0;
   const hasProviderUsage = Boolean(report.provider_usage);
 
@@ -345,7 +517,20 @@ export function checkReportReadiness(argv, options = {}) {
     {
       name: "actor_workspace_root",
       status: existsMaybe(actorWorkspaceRoot) ? "passed" : "warning",
-      detail: actorWorkspaceRoot
+      detail: {
+        selected: actorWorkspaceRoot,
+        source: archiveRelocation.present && archiveRelocation.valid ? "archive_relocation" : "raw_report",
+        original: originalActorWorkspaceRoot
+      }
+    },
+    {
+      name: "archive_relocation_valid",
+      status: archiveRelocation.present
+        ? archiveRelocation.valid ? "passed" : "failed"
+        : "not_applicable",
+      detail: archiveRelocation.present
+        ? { sidecar_path: archiveRelocation.sidecar_path, errors: archiveRelocation.errors }
+        : "missing"
     },
     {
       name: "evidence_refs_exist",
@@ -376,6 +561,24 @@ export function checkReportReadiness(argv, options = {}) {
       name: "preflight_ref_present",
       status: providerBacked ? (hasPreflightRef ? "passed" : publishableMode ? "failed" : "warning") : "not_applicable",
       detail: preflightRefs
+    },
+    {
+      name: "preflight_refs_exist",
+      status: providerBacked
+        ? !hasPreflightRef
+          ? "not_applicable"
+          : missingPreflightRefs.length === 0 ? "passed" : "failed"
+        : "not_applicable",
+      detail: missingPreflightRefs
+    },
+    {
+      name: "approved_preflight_valid",
+      status: providerBacked
+        ? hasApprovedPreflight
+          ? "passed"
+          : publishableMode ? "failed" : "warning"
+        : "not_applicable",
+      detail: approvedPreflightInspections
     },
     {
       name: "transition_row_refs_exist",

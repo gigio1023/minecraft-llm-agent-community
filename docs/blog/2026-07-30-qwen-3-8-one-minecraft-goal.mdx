@@ -1,0 +1,713 @@
+---
+slug: qwen-3-8-one-minecraft-goal
+title: "I Gave Qwen 3.8 Max One Minecraft Goal"
+description: "Qwen 3.8 Max crafted and retained a wooden pickaxe in a fresh natural Minecraft world. The target succeeded in cycle 8, then the longer run ended on a provider timeout."
+authors: [gigio1023]
+tags: [qwen, minecraft, llm-agents, function-calling, evaluation]
+image: /img/qwen38-natural-goal/initial-first-person.png
+---
+
+import initialFrame from '@site/static/img/qwen38-natural-goal/initial-first-person.png';
+import finalFrame from '@site/static/img/qwen38-natural-goal/final-first-person.png';
+
+export const milestones = [
+  {cycle: 0, label: 'Fresh natural spawn', detail: 'Empty inventory', tone: 'start'},
+  {cycle: 1, label: 'Logs', detail: 'Verified inventory gain', tone: 'progress'},
+  {cycle: 2, label: 'Materials', detail: 'Planks and sticks', tone: 'progress'},
+  {cycle: 4, label: 'Crafting table', detail: 'Crafted', tone: 'progress'},
+  {cycle: 7, label: 'Work point', detail: 'Table placed', tone: 'progress'},
+  {cycle: 8, label: 'Goal reached', detail: 'Wooden pickaxe 0 → 1', tone: 'target'},
+  {cycle: 13, label: 'Stone attempt', detail: 'Mining timed out', tone: 'blocked'},
+  {cycle: 15, label: 'Shelter attempt', detail: '4 blocks, incomplete', tone: 'partial'},
+  {cycle: 18, label: 'Last cycle', detail: 'Pickaxe still retained', tone: 'progress'},
+  {cycle: 19, label: 'Run stopped', detail: 'Provider timeout', tone: 'stop'}
+];
+
+export const outcomes = [
+  {label: 'Verified progress', value: 11, tone: 'verified'},
+  {label: 'Partial progress', value: 1, tone: 'partial'},
+  {label: 'No progress', value: 5, tone: 'none'},
+  {label: 'Blocked', value: 1, tone: 'blocked'}
+];
+
+export const finalItems = [
+  ['wooden pickaxe', 1],
+  ['oak planks', 4],
+  ['white bed', 1],
+  ['sticks', 2],
+  ['oak logs', 2]
+];
+
+export function OutcomeDistribution() {
+  const total = outcomes.reduce((sum, outcome) => sum + outcome.value, 0);
+  return (
+    <figure className="q38Outcome">
+      <div className="q38OutcomeBar" aria-label="Cycle outcome distribution">
+        {outcomes.map((outcome) => (
+          <span
+            key={outcome.label}
+            className={outcome.tone}
+            style={{width: `${(outcome.value / total) * 100}%`}}
+            title={`${outcome.label}: ${outcome.value}`}
+          />
+        ))}
+      </div>
+      <figcaption>
+        {outcomes.map((outcome) => (
+          <span key={outcome.label} className={outcome.tone}>
+            <b>{outcome.value}</b> {outcome.label}
+          </span>
+        ))}
+      </figcaption>
+    </figure>
+  );
+}
+
+export function MilestoneTimeline() {
+  return (
+    <figure className="q38Timeline">
+      <div className="q38TimelineViewport">
+        <div className="q38TimelineTrack" aria-label="Milestones over the planned 20 cycles">
+          <div className="q38TimelineAxis" aria-hidden="true">
+            {[0, 5, 10, 15, 20].map((cycle) => (
+              <span key={cycle} style={{left: `${(cycle / 20) * 100}%`}}>{cycle}</span>
+            ))}
+          </div>
+          {milestones.map((event, index) => (
+            <div
+              key={`${event.cycle}-${event.label}`}
+              className={`q38Event ${event.tone} ${index % 2 ? 'lower' : 'upper'}`}
+              style={{left: `${(event.cycle / 20) * 100}%`}}
+            >
+              <i aria-hidden="true" />
+              <span>
+                <b>Cycle {event.cycle}</b>
+                <strong>{event.label}</strong>
+                <small>{event.detail}</small>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <figcaption>
+        The requested state appeared at cycle 8. Everything to its right happened
+        after the goal was already satisfied.
+      </figcaption>
+    </figure>
+  );
+}
+
+export function InventoryState() {
+  return (
+    <ul className="q38Inventory" aria-label="Final consolidated inventory">
+      {finalItems.map(([name, count]) => (
+        <li key={name}>
+          <span>{name}</span>
+          <b>x{count}</b>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+<style>{`
+.q38Report {
+  --q38-ink: #1c1a23;
+  --q38-muted: #66616f;
+  --q38-line: #ded9e5;
+  --q38-paper: #fbf9f5;
+  --q38-purple: #6c3cc7;
+  --q38-purple-dark: #482287;
+  --q38-green: #367a55;
+  --q38-amber: #b76d12;
+  --q38-red: #b44444;
+  color: var(--q38-ink);
+}
+.q38Report h2 {
+  margin-top: 2.4rem;
+  letter-spacing: -0.025em;
+}
+.q38Hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, .95fr);
+  overflow: hidden;
+  margin: 1rem 0 1.5rem;
+  border: 1px solid var(--q38-line);
+  border-radius: 18px;
+  background: #17131d;
+  color: #fff;
+}
+.q38HeroCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: clamp(24px, 5vw, 54px);
+}
+.q38Kicker,
+.q38Label {
+  margin: 0 0 8px;
+  color: #cbb6f5;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.q38Hero h2 {
+  max-width: 620px;
+  margin: 0 0 14px;
+  color: #fff;
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  line-height: .98;
+}
+.q38HeroIntro {
+  max-width: 58ch;
+  margin: 0;
+  color: #ded6e8;
+  font-size: 17px;
+}
+.q38HeroStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 24px;
+}
+.q38HeroStats span {
+  padding-top: 10px;
+  border-top: 1px solid #4c4356;
+  color: #bcb3c6;
+  font-size: 12px;
+}
+.q38HeroStats b {
+  display: block;
+  color: #fff;
+  font-size: 22px;
+}
+.q38HeroVisual {
+  position: relative;
+  min-height: 390px;
+  margin: 0;
+  background: #282230;
+}
+.q38HeroVisual img {
+  width: 100%;
+  height: 100%;
+  min-height: 390px;
+  object-fit: cover;
+}
+.q38HeroVisual figcaption {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  max-width: 250px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgb(18 15 23 / 86%);
+  color: #e9e2ef;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.q38Lead {
+  margin: 1.5rem 0;
+  padding: 18px 20px;
+  border-left: 4px solid var(--q38-purple);
+  background: #f4effd;
+  font-size: 1.06rem;
+}
+.q38Goal {
+  margin: 1.4rem 0;
+  padding: 20px;
+  border: 1px solid var(--q38-line);
+  border-radius: 12px;
+  background: var(--q38-paper);
+}
+.q38Goal .q38Label { color: var(--q38-purple-dark); }
+.q38Goal blockquote {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--q38-ink);
+  font-size: 1.12rem;
+  font-weight: 650;
+}
+.q38Facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 1.2rem 0;
+}
+.q38Fact {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--q38-line);
+  border-radius: 10px;
+  background: #fff;
+}
+.q38Fact small {
+  display: block;
+  color: var(--q38-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.q38Fact b {
+  display: block;
+  margin-top: 5px;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+.q38Timeline {
+  margin: 1.4rem 0 2rem;
+  padding: 18px 16px 10px;
+  border: 1px solid var(--q38-line);
+  border-radius: 14px;
+  background: var(--q38-paper);
+}
+.q38TimelineViewport {
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+}
+.q38TimelineTrack {
+  position: relative;
+  width: 100%;
+  min-width: 820px;
+  height: 330px;
+  margin: 0 auto;
+}
+.q38TimelineTrack::before {
+  content: '';
+  position: absolute;
+  top: 164px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: #bbb4c4;
+}
+.q38TimelineAxis span {
+  position: absolute;
+  top: 169px;
+  color: var(--q38-muted);
+  font-size: 10px;
+  transform: translateX(-50%);
+}
+.q38Event {
+  position: absolute;
+  top: 155px;
+  width: 1px;
+}
+.q38Event i {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  border: 4px solid var(--q38-paper);
+  border-radius: 50%;
+  background: var(--q38-green);
+  box-shadow: 0 0 0 1px #87808f;
+  transform: translateX(-50%);
+}
+.q38Event span {
+  position: absolute;
+  left: 0;
+  width: 118px;
+  padding-left: 9px;
+  border-left: 1px solid #aaa2b2;
+  transform: translateX(-1px);
+}
+.q38Event.upper span { bottom: 15px; padding-bottom: 12px; }
+.q38Event.lower span { top: 18px; padding-top: 12px; }
+.q38Event b,
+.q38Event strong,
+.q38Event small { display: block; }
+.q38Event b {
+  color: var(--q38-muted);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.q38Event strong { font-size: 12px; line-height: 1.2; }
+.q38Event small { margin-top: 3px; color: var(--q38-muted); font-size: 10px; line-height: 1.25; }
+.q38Event.target i { background: var(--q38-purple); transform: translateX(-50%) scale(1.25); }
+.q38Event.target strong { color: var(--q38-purple-dark); }
+.q38Event.blocked i,
+.q38Event.stop i { background: var(--q38-red); }
+.q38Event.partial i { background: var(--q38-amber); }
+.q38Timeline figcaption,
+.q38Outcome figcaption {
+  color: var(--q38-muted);
+  font-size: 12px;
+}
+.q38Outcome {
+  margin: 1.1rem 0 1.8rem;
+}
+.q38OutcomeBar {
+  display: flex;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #eeeaf1;
+}
+.q38OutcomeBar .verified { background: var(--q38-green); }
+.q38OutcomeBar .partial { background: var(--q38-amber); }
+.q38OutcomeBar .none { background: #aaa4af; }
+.q38OutcomeBar .blocked { background: var(--q38-red); }
+.q38Outcome figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 8px;
+}
+.q38Outcome figcaption span::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.q38Outcome figcaption .verified { color: var(--q38-green); }
+.q38Outcome figcaption .partial { color: var(--q38-amber); }
+.q38Outcome figcaption .none { color: #77717d; }
+.q38Outcome figcaption .blocked { color: var(--q38-red); }
+.q38EvidenceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 1.4rem 0;
+}
+.q38Capture {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--q38-line);
+  border-radius: 12px;
+  background: #fff;
+}
+.q38Capture img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.q38Capture figcaption { padding: 12px 14px 15px; color: var(--q38-muted); font-size: 12px; }
+.q38Capture figcaption b { display: block; margin-bottom: 4px; color: var(--q38-ink); font-size: 14px; }
+.q38StateGrid {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  margin: 1.4rem 0;
+}
+.q38StateCard {
+  padding: 18px;
+  border: 1px solid var(--q38-line);
+  border-radius: 12px;
+  background: var(--q38-paper);
+}
+.q38StateCard h3 { margin-top: 0; }
+.q38Inventory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.q38Inventory li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--q38-line);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 13px;
+}
+.q38Inventory b { color: var(--q38-purple-dark); }
+.q38UsageBar {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  margin: 12px 0 8px;
+  border-radius: 5px;
+  background: #ece8ef;
+}
+.q38UsageBar .input { width: 89.4%; background: var(--q38-purple); }
+.q38UsageBar .output { width: 10.6%; background: #bba2e6; }
+.q38UsageLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--q38-muted);
+  font-size: 12px;
+}
+.q38Callout {
+  margin: 1.5rem 0;
+  padding: 18px 20px;
+  border-radius: 11px;
+  background: #fff3dc;
+}
+.q38Callout b { color: #7c4709; }
+.q38Report table { font-size: 14px; }
+@media (max-width: 820px) {
+  .q38Hero { grid-template-columns: 1fr; }
+  .q38HeroVisual,
+  .q38HeroVisual img { min-height: 260px; }
+  .q38Facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .q38EvidenceGrid,
+  .q38StateGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .q38HeroStats { grid-template-columns: 1fr; }
+  .q38Facts { grid-template-columns: 1fr; }
+}
+`}</style>
+
+<div className="q38Report">
+
+<section className="q38Hero" aria-label="Qwen 3.8 Max Minecraft experiment summary">
+  <div className="q38HeroCopy">
+    <p className="q38Kicker">One model. One sentence. One natural world.</p>
+    <h2>The pickaxe appeared in cycle 8.</h2>
+    <div className="q38HeroIntro">
+      Qwen 3.8 Max chose the intermediate steps, placed a crafting table, crafted
+      the target item, and still held it at the end of the recorded run.
+    </div>
+    <div className="q38HeroStats">
+      <span><b>8</b>cycles to target</span>
+      <span><b>18/20</b>cycles recorded</span>
+      <span><b>570k</b>main-run tokens</span>
+    </div>
+  </div>
+  <figure className="q38HeroVisual">
+    <img src={initialFrame} alt="Initial Prismarine Viewer first-person frame in a natural Minecraft world with visible texture rendering artifacts" />
+    <figcaption>
+      Initial first-person capture. The red and blue pixels are a known
+      Prismarine Viewer texture-version caveat, not evidence of placed blocks.
+    </figcaption>
+  </figure>
+</section>
+
+</div>
+
+<!--truncate-->
+
+<div className="q38Report">
+
+<div className="q38Lead">
+  The Minecraft objective succeeded. The 20-cycle run did not. Both statements
+  come from the same artifact bundle: the wooden pickaxe was verified at cycle 8,
+  while the provider request that would have started cycle 19 timed out.
+</div>
+
+Alibaba Cloud currently lists `qwen3.8-max-preview` as a
+[preview model available through Token Plan](https://help.aliyun.com/en/model-studio/models).
+Its OpenAI-compatible chat documentation gives it a default reasoning effort of
+[`xhigh`](https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions),
+and the model appears in the official
+[function-calling support list](https://help.aliyun.com/en/model-studio/qwen-function-calling).
+That made it a useful candidate for a tool-driven Minecraft run where text alone
+cannot count as progress.
+
+## The experiment
+
+I kept the setup deliberately small. There was no model comparison and no staged
+progress fixture.
+
+<div className="q38Goal">
+  <p className="q38Label">The complete actor-facing goal</p>
+  <blockquote>
+    Starting from an empty inventory in this fresh natural world, craft and
+    retain one wooden pickaxe. Choose the intermediate steps yourself. Count only
+    inventory or world-state changes as progress.
+  </blockquote>
+</div>
+
+<div className="q38Facts" aria-label="Experiment configuration">
+  <div className="q38Fact"><small>model</small><b>qwen3.8-max-preview</b></div>
+  <div className="q38Fact"><small>provider</small><b>Alibaba Model Studio</b></div>
+  <div className="q38Fact"><small>world</small><b>fresh natural seed</b></div>
+  <div className="q38Fact"><small>runtime</small><b>1 action per cycle</b></div>
+  <div className="q38Fact"><small>scenario</small><b>natural-safe-spawn-v1</b></div>
+  <div className="q38Fact"><small>seed</small><b>4167799982467607063</b></div>
+  <div className="q38Fact"><small>Minecraft</small><b>1.21.11</b></div>
+  <div className="q38Fact"><small>reasoning</small><b>xhigh</b></div>
+</div>
+
+The scenario generated a fresh natural world and validated a safe spawn. It did
+not place logs, a crafting table, or the target item. Qwen saw the available
+Minecraft action cards and current observations. The runtime executed structured
+tool calls through Mineflayer and wrote an evidence artifact for every attempt.
+
+## The shortest path was eight cycles
+
+<MilestoneTimeline />
+
+The useful chain was straightforward:
+
+| Cycle | Selected action | Evidence-backed result |
+| ---: | --- | --- |
+| 1 | `collect_logs` | log inventory increased |
+| 2 | `craftPlanksAndSticks` | planks and sticks crafted |
+| 4 | `craftCraftingTable` | crafting table crafted |
+| 7 | `placeCraftingTable` | table verified at `(10, 111, -11)` |
+| 8 | `craftWoodenPickaxe` | wooden pickaxe count changed from `0` to `1` |
+
+Cycle 8 is the key row. Its `craft_with_table` result says
+`wooden_pickaxe` increased from zero to one, and the postcondition passed. The
+final consolidated inventory still contained one wooden pickaxe. A later observe
+record also showed it as the held item.
+
+The actor was not given that five-step sequence in the goal. It had to select the
+intermediate actions from the runtime's exposed action surface.
+
+## What happened across all recorded cycles
+
+<OutcomeDistribution />
+
+Eleven of eighteen completed cycles produced verified progress. One more produced
+a real but incomplete world mutation: the shelter action placed four blocks, while
+its own verifier correctly refused to call the shelter complete.
+
+The five no-progress cycles were mostly post-goal behavior: one observation, three
+equipment checks, and one memory write. The blocked cycle was a cobblestone mining
+attempt that timed out.
+
+This split matters. If I looked only at the top-level status, I would call the run
+a failure. If I looked only at the target item, I would hide the provider timeout
+and the ten cycles spent after success. The evidence supports a narrower reading:
+
+- Qwen completed this specific material objective.
+- The harness failed to stop when the target predicate became true.
+- The longer lane later ended on a provider timeout.
+
+## The screenshots are useful because they are weak
+
+<div className="q38EvidenceGrid">
+  <figure className="q38Capture">
+    <img src={initialFrame} alt="Initial first-person Prismarine Viewer capture with a natural spawn and visible renderer artifacts" />
+    <figcaption>
+      <b>Initial frame, cycle 0</b>
+      This establishes the visual context. Version-skewed textures create red and
+      blue artifacts, so the image cannot identify every visible block reliably.
+    </figcaption>
+  </figure>
+  <figure className="q38Capture">
+    <img src={finalFrame} alt="Final first-person Prismarine Viewer capture pointed into nearby blocks and terrain" />
+    <figcaption>
+      <b>Final frame, after cycle 18</b>
+      The camera points into nearby blocks. It is too obstructed to prove the final
+      inventory or even show the pickaxe clearly.
+    </figcaption>
+  </figure>
+</div>
+
+The final image is a useful warning for visual agent reports. It would be tempting
+to treat a disappointing screenshot as a failed task. Here the pixels answer only
+one question: what did this camera see? The item claim comes from the cycle 8
+inventory delta, the later held-item observation, and the final consolidated state.
+
+| Claim | Runtime authority |
+| --- | --- |
+| Pickaxe crafted | cycle 8 `craft_with_table`, count `0 → 1` |
+| Pickaxe retained | final consolidated inventory plus held-item observation |
+| Crafting table placed | cycle 7 `place_block` and world position evidence |
+| Shelter incomplete | cycle 15 local pattern verifier |
+| Main run stopped | top-level provider timeout after 18 cycles |
+| Visual appearance | two capture artifacts, used only for review |
+
+## The final state
+
+<div className="q38StateGrid">
+  <section className="q38StateCard">
+    <h3>Consolidated inventory</h3>
+    <InventoryState />
+  </section>
+  <section className="q38StateCard">
+    <h3>World state</h3>
+    <div>
+      The crafting table remained known at <code>(10, 111, -11)</code>. A later
+      shelter attempt placed four oak-plank blocks, but the verifier measured zero
+      roof coverage and kept the shelter status at <code>progressing</code>.
+    </div>
+  </section>
+</div>
+
+After completing the pickaxe, Qwen did not simply stop. It observed, equipped the
+pickaxe several times, recorded a memory, attempted to mine cobblestone, began a
+small shelter, gathered more logs, and crafted more planks.
+
+That behavior is not part of the requested success criterion. It reveals a harness
+design issue: the run had a fixed 20-cycle budget but no early-stop predicate tied
+to the natural-language target. Ten post-goal cycles added cost and introduced new
+failure opportunities without strengthening the original result.
+
+## Provider usage and the timeout
+
+The main lane was preflighted for at most 30 requests and 1.2 million total
+tokens. It stopped at 23 requests and 570,145 total tokens.
+
+<div className="q38StateCard">
+  <p className="q38Label">Main-run token accounting</p>
+  <div className="q38UsageBar" aria-label="509,867 input tokens and 60,278 output tokens">
+    <span className="input" />
+    <span className="output" />
+  </div>
+  <div className="q38UsageLegend">
+    <span><b>509,867</b> input</span>
+    <span><b>60,278</b> output</span>
+    <span><b>45,104</b> reasoning tokens reported within completion accounting</span>
+  </div>
+</div>
+
+A separate one-cycle canary used one request and 17,420 tokens. It confirmed the
+exact model name, raw reasoning content, provider-reported usage, and no retry.
+The main run recorded no fallback judgments and no invalid model outputs.
+
+The final request timed out. The runtime did not retry it or silently switch to
+another model. It preserved the 18 completed cycles and wrote
+`runtime_status: failed` with `provider_error: Alibaba Model Studio request timed
+out`.
+
+<div className="q38Callout">
+  <b>Billing caveat:</b> this run was approved against a local request/token
+  ceiling, but that policy did not establish whether the preview allocation was
+  billable. Qwen 3.8 Max is a preview, Token Plan-only offering at the time of
+  writing. Check the current Model Studio plan terms before reproducing the run.
+</div>
+
+## What I would test next
+
+The next experiment does not need a larger benchmark. It needs a cleaner stop
+condition:
+
+```text
+Stop the lane as soon as runtime evidence confirms wooden_pickaxe >= 1.
+```
+
+On this run that would have ended the experiment at cycle 8. It would remove ten
+post-goal cycles, reduce provider usage, and make “cycles to verified target”
+unambiguous.
+
+A harder follow-up goal, such as crafting and retaining a stone pickaxe, becomes
+useful only after that measurement boundary is in place. Otherwise the result
+mixes competence with whatever the actor chooses to do after it has already
+finished.
+
+## Limits of this result
+
+- One model, one seed, one natural-language goal, one run.
+- No Qwen 3.7, OpenAI, or Gemini comparator.
+- No leaderboard or general model-quality claim.
+- Eighteen completed cycles out of twenty planned.
+- A provider timeout after the target was reached.
+- Two review captures, both with visual limitations.
+- No evidence for social behavior or long-run autonomy.
+
+The result is still worth sharing. Qwen 3.8 Max turned a short natural-language
+goal into a verified Minecraft material chain and reached the target in eight
+cycles. The same run also exposed the next measurement problem clearly: once the
+world says the goal is complete, the benchmark should listen.
+
+</div>

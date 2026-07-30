@@ -12,6 +12,10 @@ import type { ActorTurnResolvedAction } from "../runtime/goals/actorEpisode/type
 import type { ActionCardProjection } from "../runtime/goals/actorEpisode/actionCards.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import { createExperimentDeclaration, writeExperimentDeclaration } from "./declaration.js";
+import {
+  createFixtureOraclePredictions,
+  createPublicHistoryPredictions
+} from "./predictors.js";
 import { exportPublicHistory } from "./publicHistory.js";
 import { ResponseWindowTracker } from "./responseWindows.js";
 import { scoreLegibilityPredictions } from "./scoring.js";
@@ -19,7 +23,6 @@ import { runSharedSessionSchedule } from "./sharedSessionScheduler.js";
 import type {
   ActorProviderRoute,
   ActorTurnSlotCompletionEvent,
-  LegibilityPrediction,
   LegibilitySessionArtifact,
   ResponseWindowRecord,
   StructuredChatEvent,
@@ -219,13 +222,15 @@ function readText(action: ActorTurnResolvedAction) {
   return typeof parameters.text === "string" ? parameters.text : "acknowledged";
 }
 
-function socialLabelForChat(message: string) {
+const SESSION1_FIXTURE_LABELER_SCHEMA = "session1-fixture-labeler/v1";
+
+function fixtureOnlySocialLabelForChat(message: string) {
   return /cannot|need a visible material stake|not yet/i.test(message)
     ? "reply_refuse_or_disagree" as const
     : "reply_accept_or_acknowledge" as const;
 }
 
-function materialLabelForResponder(input: {
+function fixtureOnlyMaterialLabelForResponder(input: {
   message: string;
   responderHasMaterial: boolean;
 }) {
@@ -233,25 +238,6 @@ function materialLabelForResponder(input: {
     return "possession_or_access_granted" as const;
   }
   return "possession_or_access_refused" as const;
-}
-
-function prediction(input: {
-  row: TransitionRowV1;
-  layer: "social_response" | "material_access";
-  arm: string;
-  label: string;
-  createdAt: string;
-}): LegibilityPrediction {
-  return {
-    schema_version: "legibility-prediction/v1",
-    prediction_id: `${input.row.row_id}-${input.layer}-${input.arm}`,
-    row_id: input.row.row_id,
-    predictor_arm: input.arm,
-    layer: input.layer,
-    predicted_label: input.label as LegibilityPrediction["predicted_label"],
-    probabilities: { [input.label]: 1 },
-    created_at: input.createdAt
-  };
 }
 
 export async function runSession1LegibilitySmoke(input: {
@@ -320,11 +306,17 @@ export async function runSession1LegibilitySmoke(input: {
     const response = window.response_chat_events[0];
     const message = response?.message ?? "";
     const responderHasMaterial = /make oak_log available/i.test(message);
-    const materialLabel = materialLabelForResponder({ message, responderHasMaterial });
+    const materialLabel = fixtureOnlyMaterialLabelForResponder({ message, responderHasMaterial });
     const materialEvidencePath = await writeJson(
       path.join(outputDir, "evidence", `${window.window_id}-material-access.json`),
       {
         schema: "material-access-fixture-event/v1",
+        labeler_scope: {
+          schema: SESSION1_FIXTURE_LABELER_SCHEMA,
+          live_labeler: false,
+          quarantine_reason:
+            "Session 1 smoke keeps regex fixture labels for legacy positive-control coverage; live C2-4 rows use evidenceLabeler.ts."
+        },
         window_id: window.window_id,
         actor_id: "npc_b",
         target_actor_id: "npc_a",
@@ -385,7 +377,7 @@ export async function runSession1LegibilitySmoke(input: {
         },
         social_response: {
           response_window: window,
-          classes: [socialLabelForChat(message)],
+          classes: [fixtureOnlySocialLabelForChat(message)],
           evidence_refs: response?.evidence_refs ?? []
         },
         exclusions: []
@@ -394,7 +386,10 @@ export async function runSession1LegibilitySmoke(input: {
         verdict: "valid",
         inclusion_tags: ["interaction_opportunity", "material_stake"],
         exclusion_reasons: [],
-        notes: ["Session 1 provider-free fixture row; not a live Minecraft evidence claim."]
+        notes: [
+          "Session 1 provider-free fixture row; not a live Minecraft evidence claim.",
+          `Fixture-only labeler marker: ${SESSION1_FIXTURE_LABELER_SCHEMA}.`
+        ]
       },
       metadata: {
         provider: pending.slot.provider_id,
@@ -560,46 +555,39 @@ export async function runSession1LegibilitySmoke(input: {
     transition_rows: rows
   };
   const sessionPath = await writeJson(path.join(outputDir, "session.json"), session);
-  const publicHistory = exportPublicHistory(session);
+  const publicHistory = exportPublicHistory(session, { createdAt: declaredAt });
   const publicHistoryPath = await writeJson(path.join(outputDir, "public-history.json"), publicHistory);
 
   const predictionCreatedAt = "2026-07-06T00:01:00.000Z";
-  const majoritySocial = rows[0]?.observed_delta.social_response.classes[0] ?? "no_observable_response";
-  const majorityMaterial = rows[0]?.observed_delta.material.classes[0] ?? "no_material_delta";
-  const predictions = rows.flatMap((row) => [
-    prediction({
-      row,
-      layer: "social_response",
-      arm: "majority_or_no_response",
-      label: majoritySocial,
-      createdAt: predictionCreatedAt
-    }),
-    prediction({
-      row,
-      layer: "material_access",
-      arm: "majority_or_no_response",
-      label: majorityMaterial,
-      createdAt: predictionCreatedAt
-    }),
-    prediction({
-      row,
-      layer: "social_response",
-      arm: "history_grounded",
-      label: row.observed_delta.social_response.classes[0],
-      createdAt: predictionCreatedAt
-    }),
-    prediction({
-      row,
-      layer: "material_access",
-      arm: "history_grounded",
-      label: row.observed_delta.material.classes[0],
-      createdAt: predictionCreatedAt
-    })
-  ]);
+  const publicHistoryPredictions = createPublicHistoryPredictions({
+    publicHistory,
+    declaration,
+    createdAt: predictionCreatedAt,
+    arms: [
+      "majority_or_no_response",
+      "last_response_carried_forward",
+      "policy_copy",
+      "actor_id_only",
+      "first_m_public_responses",
+      "action_family_by_responder",
+      "public_profile_only"
+    ],
+    policyCopyMinCount: 1
+  });
+  const fixtureOraclePredictions = createFixtureOraclePredictions({
+    rows,
+    createdAt: predictionCreatedAt,
+    arms: ["history_grounded"]
+  });
+  const predictions = [
+    ...publicHistoryPredictions,
+    ...fixtureOraclePredictions
+  ];
   const predictionsPath = await writeJson(path.join(outputDir, "predictions.json"), predictions);
   const scoreReport = scoreLegibilityPredictions({
     declaration,
     declarationRef: relative(outputDir, declarationPath),
+    publicHistory,
     rows,
     predictions
   });

@@ -26,6 +26,7 @@ import {
   parseMineflayerCodegenProviderOutput,
   parseActorTurnToolSelection
 } from "../src/provider/socialActorTurnProvider.js";
+import { estimateTextTokens } from "../src/provider/providerUsageTracker.js";
 import type { ActorTurnAuthorMineflayerActionArgs } from "../src/provider/socialActorTurnToolParser.js";
 import type { ActorTurnInput } from "../src/runtime/goals/actorEpisode/index.js";
 import type { PlanBeadPacket } from "../src/runtime/goals/planBeads/index.js";
@@ -134,6 +135,41 @@ function primitiveContract(primitiveId: string) {
   };
 }
 
+function sharedGuidanceForCardTitle(input: ActorTurnInput, title: string) {
+  const card = input.action_cards.find((candidate) => candidate.title === title);
+  assert.ok(card, `missing Action Card ${title}`);
+  const shared = input.action_card_shared_guidance;
+  assert.ok(shared, "missing shared Action Card guidance");
+  return shared.grouped_guidance
+    .filter((group) => group.action_card_ids.includes(card.action_card_id))
+    .flatMap((group) => group.guidance);
+}
+
+function expandSharedActionCardGuidance(input: ActorTurnInput): ActorTurnInput {
+  const shared = input.action_card_shared_guidance;
+  assert.ok(shared);
+  return {
+    ...input,
+    action_card_shared_guidance: undefined,
+    action_cards: input.action_cards.map((card) => {
+      const grouped = shared.grouped_guidance
+        .filter((group) => group.action_card_ids.includes(card.action_card_id))
+        .flatMap((group) => group.guidance);
+      return {
+        ...card,
+        shared_guidance_ref: undefined,
+        parameter_hints: [
+          ...card.parameter_hints,
+          ...shared.parameter_rules,
+          ...shared.selection_rules,
+          ...grouped
+        ],
+        expected_evidence: [...card.expected_evidence, ...shared.evidence_rules]
+      };
+    })
+  };
+}
+
 function buildPlaceCraftingTableRecord() {
   return {
     schema: "actor-action-skill/v1" as const,
@@ -148,7 +184,24 @@ function buildPlaceCraftingTableRecord() {
     success_verifier: "placed or confirmed reachable crafting_table",
     known_failure_modes: ["target cell occupied", "crafting_table already usable"],
     evidence_refs: [],
-    review_refs: []
+    review_refs: [],
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        targetPosition: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            x: { type: "number" },
+            y: { type: "number" },
+            z: { type: "number" }
+          },
+          required: ["x", "y", "z"]
+        }
+      },
+      required: ["targetPosition"]
+    }
   };
 }
 
@@ -380,28 +433,42 @@ test("Action Card projection exposes primitive/action-skill choice through cards
   );
   const placeBlockNearbyCard = projection.action_cards.find((card) => card.title === "Place Block Nearby");
   assert.ok(placeBlockNearbyCard);
-  assert.match(placeBlockNearbyCard.description, /Advisory current-state hints/);
-  assert.ok(
-    placeBlockNearbyCard.parameter_hints.some((hint) =>
-      hint.includes("Advisory current_state hint: inventory contains the block item")
-    )
-  );
+  assert.equal(placeBlockNearbyCard.behavior_kind, "actor_owned_action_skill");
+  assert.equal(placeBlockNearbyCard.shared_guidance_ref, "action-card-shared-guidance");
+  assert.deepEqual(placeBlockNearbyCard.parameter_hints, []);
   assert.ok(
     placeBlockNearbyCard.current_state_requirements.includes("inventory contains the block item")
   );
-  assert.ok(
-    placeBlockNearbyCard.likely_blockers.some((blocker) =>
-      blocker.includes("risky if current_state lacks support")
-    )
-  );
+  assert.deepEqual(placeBlockNearbyCard.likely_blockers, []);
   const placeBlockCard = projection.action_cards.find((card) => card.title === "Place Block");
   assert.ok(placeBlockCard);
+  assert.equal(placeBlockCard.behavior_kind, "direct_primitive");
+  assert.ok(
+    projection.shared_guidance?.overlap_groups.some((group) =>
+      group.direct_primitive_action_card_id === placeBlockCard.action_card_id &&
+      group.actor_owned_action_skill_card_ids.includes(placeBlockNearbyCard.action_card_id)
+    )
+  );
   const mapping = resolveActionCardMapping(projection, placeBlockCard.action_card_id);
   assert.deepEqual(mapping, {
     kind: "use_primitive",
     action_card_id: placeBlockCard.action_card_id,
     primitive_id: "place_block"
   });
+  const expectedRuntimeTargets = [
+    ...context.action_surface.direct_primitives
+      .filter((primitive) => primitive.executable && primitive.primitive_id !== "run_mineflayer_program")
+      .map((primitive) => `primitive:${primitive.primitive_id}`),
+    ...context.action_surface.direct_action_skills
+      .filter((skill) => skill.executable && skill.action_skill_id !== "runBoundedMineflayerProgram")
+      .map((skill) => `action_skill:${skill.action_skill_id}`)
+  ];
+  const actualRuntimeTargets = projection.runtime_mappings.map((runtimeMapping) =>
+    runtimeMapping.kind === "use_primitive"
+      ? `primitive:${runtimeMapping.primitive_id}`
+      : `action_skill:${runtimeMapping.action_skill_id}`
+  );
+  assert.deepEqual(actualRuntimeTargets, expectedRuntimeTargets);
 
   const activeEpisode = buildActiveEpisodeFromCycleGoal({
     episodeId: "episode-cycle-0001",
@@ -471,6 +538,22 @@ test("Action Card projection exposes primitive/action-skill choice through cards
 
   assert.ok(actionCardProjection.action_cards.length <= projection.action_cards.length);
   assert.equal(validateActorTurnInput(actorTurnInput).ok, true);
+  const compactInput = JSON.stringify(actorTurnInput);
+  const repeatedInput = JSON.stringify(expandSharedActionCardGuidance(actorTurnInput));
+  const inputReductionMeasurement = {
+    repeated_form_bytes: Buffer.byteLength(repeatedInput),
+    shared_form_bytes: Buffer.byteLength(compactInput),
+    repeated_form_estimated_tokens: estimateTextTokens(repeatedInput),
+    shared_form_estimated_tokens: estimateTextTokens(compactInput)
+  };
+  assert.ok(inputReductionMeasurement.shared_form_bytes < inputReductionMeasurement.repeated_form_bytes);
+  assert.ok(
+    inputReductionMeasurement.shared_form_estimated_tokens <
+      inputReductionMeasurement.repeated_form_estimated_tokens
+  );
+  if (process.env.RECORD_ACTION_CARD_MEASUREMENT === "1") {
+    process.stderr.write(`${JSON.stringify(inputReductionMeasurement)}\n`);
+  }
   assert.deepEqual(actorTurnInput.current_state.inventory_counts, { crafting_table: 1 });
   assert.equal(actorTurnInput.current_state.position?.x, 0);
   assert.equal(actorTurnInput.current_state.visible_actors[0]?.id, "npc_a");
@@ -532,15 +615,20 @@ test("Action Card projection exposes primitive/action-skill choice through cards
     )
   );
   assert.ok(placeBlockTool);
-  assert.equal(placeBlockTool.strict, true);
-  assert.equal(
-    (placeBlockTool.parameters as { additionalProperties?: unknown }).additionalProperties,
-    false
-  );
-  assert.equal(
-    toolPayload.tools.some((tool) => tool.name === "author_mineflayer_action" && tool.strict === true),
-    true
-  );
+  for (const tool of toolPayload.tools) {
+    assert.equal(tool.strict, true);
+    assert.equal(
+      (tool.parameters as { additionalProperties?: unknown }).additionalProperties,
+      false
+    );
+  }
+  for (const tool of toolPayload.tools.filter((candidate) =>
+    candidate.name !== "author_mineflayer_action")) {
+    assert.doesNotMatch(
+      tool.description ?? "",
+      /Parameter schema ref|Runtime mapping refs|Current-state hints are advisory|Expected evidence:|Likely blockers:/
+    );
+  }
 });
 
 test("Actor Turn input keeps retry-constrained Action Cards visible while exposing structured retry args", async () => {
@@ -1215,13 +1303,13 @@ test("Actor Turn input exposes shared-storage source evidence without preselecti
   assert.ok(depositCard);
   assert.ok(handoffCard);
   assert.ok(
-    depositCard.parameter_hints.some((hint) =>
-      hint.includes("source_evidence_bundle.world_event_cards")
+    sharedGuidanceForCardTitle(actorTurnInput, "Deposit Shared").some((hint) =>
+      hint.includes("relevant world-event or relationship evidence")
     )
   );
   assert.ok(
-    handoffCard.parameter_hints.some((hint) =>
-      hint.includes("provide explicit itemName and count")
+    sharedGuidanceForCardTitle(actorTurnInput, "Handoff Item At Chest").some((hint) =>
+      hint.includes("provide both explicitly")
     )
   );
   assert.equal(actorTurnInput.decision_frame.episode_focus_status.status, "open");
@@ -1282,15 +1370,11 @@ test("Actor Turn input marks Inspect Chest as the bounded container openability 
   const inspectCard = actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest");
   assert.ok(inspectCard);
   assert.ok(
-    inspectCard.parameter_hints.some((hint) =>
-      hint.includes("bounded shared-chest container snapshot")
+    sharedGuidanceForCardTitle(actorTurnInput, "Inspect Chest").some((hint) =>
+      hint.includes("bounded shared-chest inspection")
     )
   );
-  assert.ok(
-    inspectCard.parameter_hints.some((hint) =>
-      hint.includes("Current shared_storage status")
-    )
-  );
+  assert.equal(inspectCard.parameter_hints.some((hint) => hint.includes("Current shared_storage status")), false);
 });
 
 test("Actor Turn input does not keep a completed one-item shared-storage request socially requested", async () => {
@@ -1380,13 +1464,13 @@ test("Actor Turn input does not keep a completed one-item shared-storage request
   assert.ok(depositCard);
   assert.ok(actorTurnInput.action_cards.find((card) => card.title === "Inspect Chest"));
   assert.ok(
-    depositCard.parameter_hints.some((hint) =>
-      hint.includes("source_evidence_bundle.world_event_cards")
+    sharedGuidanceForCardTitle(actorTurnInput, "Deposit Shared").some((hint) =>
+      hint.includes("relevant world-event or relationship evidence")
     )
   );
   assert.ok(
-    depositCard.parameter_hints.some((hint) =>
-      hint.includes("provide explicit itemName and count")
+    sharedGuidanceForCardTitle(actorTurnInput, "Deposit Shared").some((hint) =>
+      hint.includes("provide both explicitly")
     )
   );
   assert.equal(
@@ -1738,6 +1822,11 @@ test("Actor Turn input keeps crafting-table placement visible with advisory curr
   );
   assert.ok(placeCraftingTableCard);
   assert.ok(
+    sharedGuidanceForCardTitle(actorTurnInput, "Place Crafting Table").some((hint) =>
+      hint.includes("known nearby block coordinates")
+    )
+  );
+  assert.ok(
     placeCraftingTableCard.current_state_requirements.includes("no usable crafting_table already known")
   );
   assert.equal(
@@ -1745,6 +1834,22 @@ test("Actor Turn input keeps crafting-table placement visible with advisory curr
       mapping.kind === "use_action_skill" && mapping.action_skill_id === "placeCraftingTable"
     ),
     true
+  );
+  const toolPayload = buildActorTurnToolSelectionPayload({
+    actorTurnInput,
+    actionCardProjection
+  });
+  const placementTool = toolPayload.tools.find((tool) =>
+    typeof tool.description === "string" &&
+    tool.description.includes(placeCraftingTableCard.title)
+  );
+  assert.ok(placementTool);
+  const placementToolProperties = (
+    placementTool.parameters as { properties: Record<string, unknown> }
+  ).properties;
+  assert.deepEqual(
+    (placementToolProperties.parameters as { required?: unknown }).required,
+    ["targetPosition"]
   );
   assert.ok(
     actorTurnInput.action_cards.some((card) => card.title === "Place Block")
@@ -2744,8 +2849,8 @@ test("Actor Turn input gives table-bound recipe cards context without computing 
   const craftWithTable = actorTurnInput.action_cards.find((card) => card.title === "Craft With Table");
   assert.ok(craftWithTable);
   assert.ok(
-    craftWithTable.parameter_hints.some((hint) =>
-      hint.includes("Use current_state.inventory_counts plus minecraft_basic_guide")
+    sharedGuidanceForCardTitle(actorTurnInput, "Craft With Table").some((hint) =>
+      hint.includes("current inventory and the Minecraft Basic Guide")
     )
   );
 });
@@ -2803,8 +2908,8 @@ test("Actor Turn input keeps Craft Item visible and leaves inventory-grid recipe
   const craftItemCard = actorTurnInput.action_cards.find((card) => card.title === "Craft Item");
   assert.ok(craftItemCard);
   assert.ok(
-    craftItemCard.parameter_hints.some((hint) =>
-      hint.includes("Use current_state.inventory_counts plus minecraft_basic_guide")
+    sharedGuidanceForCardTitle(actorTurnInput, "Craft Item").some((hint) =>
+      hint.includes("current inventory and the Minecraft Basic Guide")
     )
   );
   assert.equal(

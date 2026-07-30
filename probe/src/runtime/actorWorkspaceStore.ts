@@ -41,6 +41,7 @@ export type ActorActionSkillRecord = {
   known_failure_modes: string[];
   evidence_refs: string[];
   review_refs: string[];
+  input_schema?: Record<string, unknown>;
   supersession?: {
     superseded_by_skill_id: string;
     reason: string;
@@ -166,6 +167,9 @@ export function materializeSeedActionSkillRecord(
     known_failure_modes: [],
     evidence_refs: [],
     review_refs: [],
+    ...(seedActionSkill.inputSchema
+      ? { input_schema: structuredClone(seedActionSkill.inputSchema) }
+      : {}),
     ...(supersession ? { supersession } : {}),
     notes: seedActionSkill.summary
   };

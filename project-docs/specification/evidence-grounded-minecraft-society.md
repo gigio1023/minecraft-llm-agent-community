@@ -10,12 +10,12 @@ Status: active conceptual spec.
 
 Recorded: 2026-06-15 (`Asia/Seoul`).
 
-Direction note, 2026-06-18: this file name is retained for link stability, but
-the active research spine is now
-[`Advisory Social-Material World Action Model`](advisory-social-material-wam.md).
+Direction note, 2026-07-11: this file name is retained for link stability. The
+active research spine is the capability-gated social sandbox in
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`.
 Evidence and verification are audit hygiene, not the contribution. This document
-defines the social-material variables that the WAM should predict and the
-runtime should observe.
+defines social-material vocabulary and candidate observables for discovery runs
+and later controlled studies.
 
 ## Purpose
 
@@ -310,12 +310,10 @@ Who asked for X, who accepted or refused, what changed in the world, who used
 the change, what was remembered, and what did the group do next?
 ```
 
-For the active research spine, also report:
-
-- predicted physical/material/social delta;
-- observed physical/material/social delta;
-- prediction accuracy or calibration by layer;
-- acting outcome separately from prediction outcome.
+For the active research spine, also report individual capability, goal
+continuity, observed physical/material/social deltas, efficiency, and scenario
+provenance separately. Prediction accuracy is included only when a selected
+follow-up study actually uses a predictor.
 
 ## Design Boundary
 

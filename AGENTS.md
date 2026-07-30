@@ -21,15 +21,33 @@ When guidance conflicts, prefer this order:
 `CLAUDE.md` is only an adapter for Claude Code. `GEMINI.md` is intentionally not
 part of this repo's active agent guidance surface.
 
+<!-- gigio-project-setup:start -->
+## Durable Project Intent
+
+`PROJECT.md` is the durable intent digest for significant judgments and
+completion claims. Consult it after `SPEC.md` and this file; it summarizes but
+does not override their authority or the active V4 central and implementation
+plans.
+
+The human-owned top half of `PROJECT.md` requires current-turn user approval
+before editing. Keep the model-updated bottom half current from repository
+evidence and supersede settled decisions instead of silently relitigating them.
+
+Local task plans live under the gitignored `.plans/` directory. Use
+`gigio-write-plan` to plan sizable chosen work and `gigio-execute-plan` to
+execute or resume one of those plans.
+<!-- gigio-project-setup:end -->
+
 ## Read First
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-4. `project-docs/orientation/documentation-map.md`
-5. `project-docs/orientation/agent-search-index.md`
-6. `project-docs/orientation/terminology.md`
-7. Active docs selected from the search index for the task.
+3. `PROJECT.md`
+4. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+5. `project-docs/orientation/documentation-map.md`
+6. `project-docs/orientation/agent-search-index.md`
+7. `project-docs/orientation/terminology.md`
+8. Active docs selected from the search index for the task.
 
 Do not bulk-read every long spec for narrow work. Use the search index and
 agent skills to load the relevant slice.
@@ -98,43 +116,65 @@ Minecraft runtime. It is not a Voyager clone, a fastest-tech-tree benchmark, a
 house-building architecture, or a pre-committed village simulator.
 
 The active research plan is
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-(2026-07-05, user-approved; amended 2026-07-06 with the depth-not-scale
-premise). One preregistered experiment: can an observer model predict a
-soul-grounded co-actor's next-turn social-response and material-access
-labels from public interaction history alone, across
-disposition-consistency conditions (scripted positive control, stable soul,
-resampled-soul null), with held-out-family predictors and policy-copy /
-leakage baselines that can erase the claim. Stop-results K1-K8 are
-preregistered in that plan. The build order, seams, vertical slices, and
-acceptance gates live in
-`project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-(`LEGIBILITY_IMPLEMENTATION_PLAN`).
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+(V4, 2026-07-11, user-approved). It replaces the V3 lived-vs-told experiment
+and its implementation plan, which are superseded audit trail and must not
+drive builds or runs.
 
-Substrate premise (`DEPTH_NOT_SCALE`): the experiment presupposes a working
-2-3 actor shared session with cross-actor observation and chat capture,
-interaction density at the K6 floor, and longitudinal public history
-accumulated per responder. Actor-count scale is not a premise and never a
-remedy for weak signal: do not scale actor count to hide a weak small-run
-result. Scale re-enters only as the deferred social-pattern branch (gated
-by `society-observable-preflight.md`) or as a post-positive-result
-generalization axis. Structurally information-poor small-N interaction is a
-K6/K7-shaped substrate failure, not a scale-up signal.
+The active build order and acceptance gates live in
+`project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+(`CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN`).
+
+The active sequence is:
+
+1. establish non-social Minecraft competence with dataset-free scenario
+   benchmarks, target predicates, milestones, budgets, and runtime evidence;
+2. establish autonomous goal continuity: intermediate goal creation,
+   persistence, revision, interruption recovery, and evidence-grounded closure;
+3. run capable actors in materially interdependent economic, cooperative, and
+   quest scenarios without scripting their social response;
+4. record long-run structured evidence, metrics, and synchronized video to
+   discover recurring social phenomena;
+5. select narrow controlled experiments only after a phenomenon is worth
+   explaining.
+
+Initial sessions should be small enough to debug and attribute. Actor count,
+role assignment, model heterogeneity, and scenario pressure are adjustable
+experimental parameters after the competence, continuity, and observability
+surfaces work. Never use scale to hide missing individual capability,
+interaction-poor scenarios, or unattributable evidence.
 
 Standing requirements:
 
 - produce truthful `transition-row/v1` records; labels come from runtime
   evidence, never from tool names, scenario text, or actor self-report;
+- individual benchmark success comes from declared target-state predicates and
+  verifier evidence, not provider prose or video;
+- social scenarios must declare the individual capabilities they depend on and
+  cite current benchmark evidence for them;
+- goal continuity artifacts may prove retained work state but never physical
+  completion without runtime evidence;
+- interdependent scenarios may create reasons to exchange, cooperate, compete,
+  or negotiate, but must not prescribe the observed social conclusion;
 - social-response windows close only after each other active actor completed
-  at least one subsequent Actor Turn slot or a preregistered timeout;
+  at least one subsequent Actor Turn slot or a declared timeout;
 - log `(state_before, executed_action, observed_delta)` independently of the
   actor's self-declared expected outcome;
-- keep prediction quality, acting outcome, physical competence, social
-  consequence, continuity, robustness, and efficiency separate in reports.
+- keep prediction quality, acting outcome (intent), physical competence
+  (execution), social consequence, continuity, robustness, and efficiency
+  separate in reports.
+- screenshots and video are review evidence paired with same-run structured
+  artifacts; pixels alone never prove Minecraft or social state;
+- discovery runs may iterate without a global preregistered kill condition, but
+  scenario versions, negative runs, and alternative explanations must remain
+  visible;
+- benchmark, logging, verification, and sandbox construction are systems or
+  measurement work until a recurring phenomenon supports a controlled claim.
 
-The old F-native/F-loop/F-society branches are deferred under new names
-(trained-predictor / advisory-use / social-pattern); see the crosswalk in the
-active plan. "WAM" is retired as a banner term.
+The old V3 lived-vs-told, V2 co-actor-legibility, and WAM-era branches are
+historical inputs only. Prediction or legibility may return as a mechanism in a
+future controlled study, but not because an older plan already exists. "WAM"
+remains retired as a banner term.
 
 Runtime evidence, verification, screenshots, ledgers, seed/reset records, and
 scoring scripts are mandatory audit hygiene. Do not present them as the

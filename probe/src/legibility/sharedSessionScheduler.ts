@@ -48,6 +48,7 @@ export async function runSharedSessionSchedule(input: {
   actorRoutes: readonly ActorProviderRoute[];
   slotsPerActor: number;
   turnHandler: SharedSessionTurnHandler;
+  onSlotCompleted?: (event: ActorTurnSlotCompletionEvent) => Promise<void> | void;
 }): Promise<ActorTurnSlotCompletionEvent[]> {
   assertActorRoutes(input.actorRoutes);
   const routesByActor = new Map(input.actorRoutes.map((route) => [route.actor_id, route]));
@@ -75,7 +76,7 @@ export async function runSharedSessionSchedule(input: {
     });
     const startedAt = result.started_at ?? new Date().toISOString();
     const completedAt = result.completed_at ?? startedAt;
-    events.push({
+    const event: ActorTurnSlotCompletionEvent = {
       schema: "actor-turn-slot-completion/v1",
       session_id: input.session_id,
       slot_index: slotIndex,
@@ -89,7 +90,9 @@ export async function runSharedSessionSchedule(input: {
       started_at: startedAt,
       completed_at: completedAt,
       evidence_refs: [...result.evidence_refs]
-    });
+    };
+    events.push(event);
+    await input.onSlotCompleted?.(event);
   }
   return events;
 }

@@ -18,7 +18,8 @@ guidance.
 | `PROJECT_DOCS_ROOT` | Internal specs, architecture notes, setup notes, handoffs, terminology, and routing live under `project-docs/` | `project-docs/orientation/documentation-map.md`, `AGENTS.md`, `SPEC.md` |
 | `PUBLIC_DOCS_ROOT` | Docusaurus-exposed public docs live under `docs/public-docs/`; do not add internal docs under this tree | `project-docs/orientation/documentation-map.md`, `docs/README.md`, `docs/sidebars.js`, `docs/docusaurus.config.js` |
 | `BLOG_ROOT` | `docs/blog/` is only for explicitly dated public blog posts, not internal docs or setup notes | `project-docs/orientation/documentation-map.md`, `docs/blog/` |
-| `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
+| `REPO_ROOT_INTERNAL_DOCS` | Root docs guide contributors, agents, project intent, implementation review, and spec authority | `README.md`, `SPEC.md`, `AGENTS.md`, `PROJECT.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md` |
+| `PROJECT_INTENT` | Durable project diagnosis, pillars, non-goals, judgment rules, current risk, current position, settled decisions, and project-wide done criteria | `PROJECT.md`, `AGENTS.md` |
 | `RESEARCH_ARCHIVE` | Historical research, literature reviews, paper dumps, and stale public plans are preserved but not active build instructions | `project-docs/references/`, `project-docs/archive/` |
 | `KARPATHY_GUIDELINES` | Think before coding, keep changes simple and surgical, and define verifiable success criteria | `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` |
 | `MANDATORY_AGENT_SKILL_ROUTING` | Repeated workflows route through repo-local agent skills before free-form execution | `AGENTS.md`, `.agents/skills/provider-quota-preflight/SKILL.md`, `.agents/skills/minecraft-run-report-author/SKILL.md`, `.agents/skills/minecraft-agent-runtime-review/SKILL.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md`, `.agents/skills/mineflayer-code-generation/SKILL.md` |
@@ -29,23 +30,37 @@ guidance.
 
 | Search Token | Meaning | Primary References |
 |--------------|---------|--------------------|
-| `ACTIVE_CENTRAL_PLAN` | Current research spine: the preregistered embodied co-actor legibility experiment with built-in positive control, null condition, killer baselines, and stop-results | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `AGENTS.md` |
-| `CO_ACTOR_LEGIBILITY` | Can an observer model predict a soul-grounded co-actor's social-material responses from public interaction history alone, across disposition-consistency conditions | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/transition-row-label-codebook.md` |
-| `LEGIBILITY_IMPLEMENTATION_PLAN` | Active build order for the legibility experiment: seams, salvage verdicts, vertical slices with acceptance criteria, testing rules, and the Session 1 / Session 2 gates | `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
-| `DEPTH_NOT_SCALE` | Binding substrate premise: 2-3 actors with dense attributable interaction and longitudinal per-responder public history; actor-count scale is never a remedy for weak signal | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `AGENTS.md`, `README.md` |
-| `NO_REGRET_CORE` | Superseded 2026-07-05: the staged substrate program; its data-quality thresholds live on as per-condition diagnostics in the V2 plan | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/no-regret-core-research-protocol.md`, `project-docs/research/current-spine/transition-row-v1-contract.md` |
+| `ACTIVE_CENTRAL_PLAN` | Current research spine: verify individual Minecraft competence and autonomous goal continuity, then run materially interdependent social sandboxes, catalog recurring phenomena, and choose controlled follow-up studies | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `AGENTS.md` |
+| `CAPABILITY_GATED_SOCIAL_SANDBOX` | V4 staged program connecting individual capability, goal continuity, economic/cooperative/quest interdependence, long-run observation, and discovery-to-experiment promotion | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/benchmarks/project-level-benchmark-plan.md` |
+| `CAPABILITY_GATED_SOCIAL_SANDBOX_IMPLEMENTATION_PLAN` | Active V4 build order: manifest/predicates, normalized reports, capability runs, goal continuity, interdependent scenarios, long-run bundles, phenomenon records, and controlled follow-up | `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`, `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md` |
+| `CAPABILITY_MANIFEST_V1_A1` | A1/A1R implementation note: strict manifest loader, evidenced bag with setup/run origin, three-valued predicates without prose authority; not the research-direction doc | `project-docs/research/benchmarks/individual-capability-manifest-a1.md`, `probe/src/benchmarks/capability/`, `probe/benchmarks/capability/individual-capability-v1.json` |
+| `V4_IMPLEMENTATION_EXPLANATION_2026_07_11` | Reviewed state: A1R–A4/B1/B2 accepted provider-free; A3 includes setup time and separates stop from target-miss exhaustion; B2 deeply validates physical values and rejects symlink traversal; live provider cancellation, A5/B3-live, and D2 remain unresolved | `project-docs/research/benchmarks/v4-implementation-explanation.md`, `implementation-notes.md`, `handoff-prompt.md` |
+| `CAPABILITY_EARLY_COMPLETION_IMPLEMENTATION_2026_07_12` | Provider-free early stop on target evidence after each completed action: unique next-turn evidence, write-once progress measurements, disk raw/normalized parity, and preserved execution evidence when runtime classification fails | `project-docs/research/benchmarks/capability-early-completion-implementation.md`, `probe/test/capabilityEarlyCompletion.test.ts`, `handoff-prompt.md` |
+| `PROVIDER_CAPABILITY_EXPERIMENT_2026_07_24` | Staged A5 provider plan: Qwen 3.8 complete prerequisite batch, Qwen 3.7 diagnostic comparators, and exact `openai-api:gpt-5.4` bounded canary/lane under the operator-provided free-tier candidate list | `project-docs/research/benchmarks/provider-capability-experiment-plan-2026-07-24.md`, `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`, `project-docs/operations/setup/openai-tier3-free-usage.md` |
+| `GPT54MINI_V4_LIVE_VALIDATION` | Completed three-scenario live Minecraft validation using only `openai-api:gpt-5.4-mini`; provider/evidence paths worked, natural manifest goals were absent from Actor Turn, and controlled crafting exposed implicit placement targeting | `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md`, `project-docs/research/benchmarks/gpt54mini-v4-live-validation-plan.md`, `project-docs/experiments/raw/2026-07-11/gpt54mini-v4-live-validation/` |
+| `CAPABILITY_LIVE_VALIDATION_REPAIR_2026_07_11` | Active repair plan derived from the GPT-5.4 Mini runs: items 1–4 complete provider-free (goal, placement, scan, action-level early completion); remaining: attribution/CLI, Action Card reduction, dashboard usage, portable archives, live reruns | `project-docs/research/benchmarks/capability-live-validation-repair-plan.md`, `project-docs/research/benchmarks/capability-early-completion-implementation.md`, `project-docs/experiments/curated/2026-07-11/gpt54mini-v4-live-validation/README.md` |
+| `INDIVIDUAL_CAPABILITY_GATE` | Dataset-free scenario benchmarks with natural-language goals, target predicates, milestones, budgets, verifier evidence, efficiency, blocker recovery, and truthful failure | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/benchmarks/project-level-benchmark-plan.md`, `project-docs/research/benchmarks/individual-capability-manifest-a1.md` |
+| `AUTONOMOUS_GOAL_CONTINUITY_GATE` | Long-horizon benchmark for intermediate-goal creation, persistence, revision, interruption recovery, and evidence-grounded closure | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md` |
+| `INTERDEPENDENT_SOCIAL_SANDBOX` | Economic, cooperative, and quest scenarios create material reasons for actors to interact without scripting the social response | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md` |
+| `PHENOMENON_FIRST` | Long-run structured evidence, metrics, and video are used to discover recurring behavior before selecting a narrow scientific headline | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/research/current-spine/society-observable-preflight.md` |
+| `DISCOVERY_TO_EXPERIMENT` | A candidate phenomenon receives baselines, falsifiers, competence controls, prior-work review, and preregistration only when selected for controlled study | `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md` |
+| `LIVED_VS_TOLD` | Superseded 2026-07-11 (V3): enacted-vs-narrated social history and raw-event observer legibility; preserved as audit trail, not an active or deferred build order | `project-docs/research/current-spine/central-plan-lived-vs-told-social-history.md`, `project-docs/research/current-spine/lived-vs-told-implementation-plan.md` |
+| `CO_ACTOR_LEGIBILITY` | Superseded 2026-07-10 (V2): observer prediction across disposition-consistency conditions; preserved as audit trail | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
+| `LEGIBILITY_IMPLEMENTATION_PLAN` | Superseded V2/V3 build orders; useful runtime mechanisms carry forward only when V4 re-derives a need | `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`, `project-docs/research/current-spine/lived-vs-told-implementation-plan.md` |
+| `LEGIBILITY_CYCLE_2_WORK_PLAN` | Superseded 2026-07-10: Phase A substrate work and C2-G failure preserved as implementation evidence | `project-docs/research/current-spine/legibility-cycle-2-live-substrate-work-plan.md` |
+| `NO_REGRET_CORE` | Superseded 2026-07-05: the staged substrate program; its data-quality thresholds live on as batch diagnostics (V2 section 7, carried into the V3 plan) | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/no-regret-core-research-protocol.md`, `project-docs/research/current-spine/transition-row-v1-contract.md` |
 | `GOLDILOCKS_GATE` | Superseded 2026-07-05: the branch-triage preflight; absorbed into the V2 plan arms/metrics/stop-results, which add the previously missing shuffled-history, policy-copy, leakage, and held-out-family arms | `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`, `project-docs/research/current-spine/goldilocks-preflight-protocol.md` |
-| `SOCIETY_OBSERVABLE_PREFLIGHT` | Deferred social-pattern branch gate (was F-society): look for recurring social-material patterns under small embodied constraints; prediction lift alone does not decide it | `project-docs/research/current-spine/society-observable-preflight.md`, `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
+| `SOCIETY_OBSERVABLE_PREFLIGHT` | Reference measurement vocabulary for recurring social-material patterns; V4 owns current discovery sequencing and does not inherit the old fixed branch gate | `project-docs/research/current-spine/society-observable-preflight.md`, `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md` |
 | `RESEARCH_VALUE_HARNESS` | Research-planning harness for pressure-testing novelty, closest prior work, falsifiable claims, and experiment sketches before implementation | `project-docs/research/current-spine/research-value-harness.md`, `.agents/skills/minecraft-research-value-harness/SKILL.md`, `project-docs/research/current-spine/prior-work-proximity-current-spine-2026-06-29.md` |
-| `ADVISORY_SOCIAL_MATERIAL_WAM` | Historical/reference framing (soft-archived 2026-07-05) and possible advisory-use branch: advisory consequence prediction is not the project headline; the WAM term is retired | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md` |
-| `TRANSITION_ROW_V1` | Current data unit for the embodied co-actor legibility experiment: independent state/action/observed-delta rows, separate from actor self-declared expected outcomes and offline predictor artifacts | `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/transition-row-label-codebook.md`, `project-docs/research/current-spine/seed-reset-record-v1-contract.md` |
+| `ADVISORY_SOCIAL_MATERIAL_WAM` | Historical/reference prediction framing; the WAM term remains retired and prediction is not an active headline | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md` |
+| `TRANSITION_ROW_V1` | General observation unit for independent state/action/observed-delta evidence, separate from actor self-declared outcomes and optional offline analysis | `project-docs/research/current-spine/transition-row-v1-contract.md`, `project-docs/research/current-spine/transition-row-label-codebook.md`, `project-docs/research/current-spine/seed-reset-record-v1-contract.md` |
 | `SOCIAL_MATERIAL_TRANSITION` | Older name for related WAM-era dataset thinking; translate active work to `transition-row/v1` unless quoting archive material | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/orientation/terminology.md`, `project-docs/research/current-spine/transition-row-v1-contract.md` |
 | `VERIFICATION_IS_HYGIENE` | Runtime verification, screenshots, logs, ledgers, and scoring scripts are mandatory audit hygiene, not the research contribution by themselves | `project-docs/specification/advisory-social-material-wam.md`, `project-docs/specification/runtime-evidence-and-action-skills.md`, `AGENTS.md`, `project-docs/orientation/terminology.md` |
 | `SOUL_GROUNDED_SOCIAL_SIMULATION` | Minecraft is observation and evidence for Soul/LifeGoal-grounded social simulation, not a generic benchmark | `SPEC.md`, `project-docs/specification/soul-grounded-social-simulation.md`, `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md` |
-| `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational definition of society, organization, settlement, and village; interpreted through the active legibility plan as social-material label vocabulary, not evidence as contribution | `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/specification/advisory-social-material-wam.md`, `project-docs/specification/soul-grounded-social-simulation.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md` |
-| `PROJECT_SID_2411_00114_REVIEW` | Primary overlap review for Project Sid's many-agent Minecraft civilization work; this repo's 2-3 actor legibility scope is the deliberate contrast (`DEPTH_NOT_SCALE`) | `project-docs/references/external-project-notes/project-sid-2411-00114-review-2026-06-15.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md` |
+| `EVIDENCE_GROUNDED_MINECRAFT_SOCIETY` | Operational vocabulary for society, organization, settlement, and village; useful for V4 phenomenon review but not evidence-as-contribution | `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/specification/soul-grounded-social-simulation.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md` |
+| `PROJECT_SID_2411_00114_REVIEW` | Reference review for many-agent Minecraft civilization mechanisms and overclaim risks; V4 may adapt scenario ideas without inheriting promotional claims | `project-docs/references/external-project-notes/project-sid-2411-00114-review-2026-06-15.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md` |
 | `PROJECT_SID_HARNESS_ABSORPTION` | First-pass active plan for absorbing Project Sid as NPC harness robustness: action awareness, chat/action coherence, cross-actor causality, and continuity audit | `project-docs/research/reference-synthesis/project-sid-harness-absorption-plan.md`, `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`, `probe/src/objectives/socialTrajectory/harnessAudit.ts` |
-| `RESEARCH_DIRECTION_REFERENCE_SYNTHESIS` | Reference synthesis (Tier 3), subordinated to the active legibility plan: references are mapped to prediction object, actor substrate, benchmark measurement, or autoresearch method | `project-docs/research/reference-synthesis/research-direction-reference-synthesis.md`, `project-docs/specification/advisory-social-material-wam.md`, `project-docs/references/literature-reviews/deep-social-wam-literature-review-2026-06-16/`, `project-docs/references/literature-reviews/sdk-autoresearch-social-wam-positioning-2026-06-17/` |
+| `RESEARCH_DIRECTION_REFERENCE_SYNTHESIS` | Tier 3 reference synthesis for actor substrate, capability benchmarks, social simulation, prediction, and autoresearch mechanisms; V4 decides what remains active | `project-docs/research/reference-synthesis/research-direction-reference-synthesis.md`, `project-docs/references/literature-reviews/deep-social-wam-literature-review-2026-06-16/`, `project-docs/references/literature-reviews/sdk-autoresearch-social-wam-positioning-2026-06-17/` |
 | `REFERENCE_SWEEP_BEYOND_PROJECT_SID_2026_06_16` | Dated literature sweep for research direction beyond Project Sid, including human-grounded Minecraft collaboration, MineCollab, SOTOPIA-style social evaluation, Concordia-style social simulation, and SimBench-style validation warnings | `project-docs/references/literature-sweeps/reference-sweep-beyond-project-sid-2026-06-16.md`, `project-docs/research/reference-synthesis/research-direction-reference-synthesis.md` |
 | `NITROGEN_2601_02427_ANALYSIS` | Dated analysis of NitroGen as a generalist visual game-action foundation model: useful as future low-level policy substrate and contrast class, not as the current Minecraft social benchmark target | `project-docs/references/external-project-notes/nitrogen-2601-02427-analysis-2026-06-16.md`, `project-docs/research/reference-synthesis/research-direction-reference-synthesis.md` |
 | `EXPANDED_RELATED_WORK_SWEEP_2026_06_16` | Expanded literature sweep for Minecraft social-trajectory research: MineExplorer, MCU, MineStudio, Plancraft, Odyssey, Echo, MineLand, ALEM, Craftax, Melting Pot, PARTNR, TEACh, GLEE, MultiAgentBench, and validation-boundary papers | `project-docs/references/literature-sweeps/expanded-related-work-sweep-2026-06-16.md`, `project-docs/research/reference-synthesis/research-direction-reference-synthesis.md` |
@@ -70,7 +85,7 @@ guidance.
 | `ACTOR_EPISODE_ACTOR_TURN` | Target replacement for the per-cycle goal/action/judgment hot path: Active Episode, Actor Turn, Action Cards, Evidence Trace, branch-only Deliberation | `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`, `project-docs/orientation/terminology.md` |
 | `LOW_COST_SOCIAL_SIMULATION_CAMPAIGN` | Campaign-level spec, gates, social proof scenarios, and implementation sequence for proving cheap-model Actor Turn behavior | `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md` |
 | `GROUNDED_SOCIAL_TRAJECTORY_BENCHMARK` | Legacy provider-free smoke contract for social trajectories; useful for ledger/report sanity and transition-row fixtures, not the headline research target | `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`, `project-docs/specification/advisory-social-material-wam.md`, `project-docs/experiments/curated/2026-06-15/grounded-social-trajectory-smoke/README.md`, `probe/src/objectives/socialTrajectory/` |
-| `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK` | Reference case library for possession, access, claims, obligations, refusal, repair, public affordances, and weak commons; not the active build order for the legibility experiment | `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`, `project-docs/research/current-spine/research-documentation-hierarchy.md`, `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/orientation/terminology.md` |
+| `MATERIAL_CLAIMS_SOCIAL_ECONOMY_BENCHMARK` | Reference case library for V4 interdependent economic and cooperative scenarios: possession, access, claims, obligations, refusal, repair, public affordances, and weak commons | `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`, `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`, `project-docs/specification/evidence-grounded-minecraft-society.md`, `project-docs/orientation/terminology.md` |
 | `PASSIVE_PLANBEADS_ACTOR_TURN_GOAL` | Compact `/goal` companion for the current pivot: Actor Turn as hot path, PlanBeads as passive issue-like state, branch-only Deliberation | `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`, `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`, `project-docs/operations/handoffs/current-handoff-and-next-work.md` |
 | `ACTOR_TURN_TOOL_CALLING_FULL_CONTEXT_CODEGEN` | Actor Turn target: direct Responses function-tool selection, no provider/codegen-facing compressed planner action, no prose/regex hidden policy, and full original ActorTurnInput passed into Mineflayer codegen | `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`, `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`, `project-docs/operations/handoffs/current-handoff-and-next-work.md` |
 | `CONTEXT_PROJECTION_SOURCE_EVIDENCE` | Actor Turn context rule: bounded facts may be compacted, but observation/action/social/work history must carry source evidence cards and refs beside summaries | `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`, `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`, `AGENTS.md` |
@@ -132,47 +147,49 @@ For any onboarding developer or agent, read in this order:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CLAUDE.md` when using Claude Code
-4. `project-docs/research/current-spine/research-documentation-hierarchy.md`
-5. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-6. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-7. `project-docs/research/current-spine/research-value-harness.md`
-8. `project-docs/research/current-spine/transition-row-v1-contract.md`
-9. `project-docs/research/current-spine/transition-row-label-codebook.md`
-10. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
-11. `project-docs/research/current-spine/society-observable-preflight.md`
-12. `README.md`
-13. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-14. `project-docs/orientation/documentation-map.md`
-15. `project-docs/orientation/terminology.md`
-16. `project-docs/specification/advisory-social-material-wam.md`
-17. `project-docs/specification/soul-grounded-social-simulation.md`
-18. `project-docs/specification/evidence-grounded-minecraft-society.md`
-19. `project-docs/specification/runtime-evidence-and-action-skills.md`
-20. `project-docs/specification/engineering-governance-and-testing.md`
-21. `project-docs/specification/reference-adaptation-guide.md`
-22. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
-23. `project-docs/runtime/overview/runtime-loop-and-verification.md`
-24. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
-25. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-26. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
-27. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-28. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
-29. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
-30. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
-31. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
-32. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
-33. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
-34. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
-35. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
-36. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
-37. `project-docs/runtime/overview/minecraft-basic-guide.md`
-38. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
-39. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-40. `project-docs/operations/setup/headless-server.md`
-41. `project-docs/operations/setup/provider-setup.md`
-42. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
-43. `project-docs/operations/setup/modelscope-qwen-api-access.md`
+3. `PROJECT.md`
+4. `CLAUDE.md` when using Claude Code
+5. `project-docs/research/current-spine/research-documentation-hierarchy.md`
+6. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+7. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+8. `project-docs/research/current-spine/research-value-harness.md`
+9. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+10. `project-docs/research/current-spine/transition-row-v1-contract.md`
+11. `project-docs/research/current-spine/transition-row-label-codebook.md`
+12. `project-docs/research/current-spine/no-regret-core-scenario-catalog.md`
+13. `project-docs/research/current-spine/society-observable-preflight.md`
+14. `README.md`
+15. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+16. `project-docs/orientation/documentation-map.md`
+17. `project-docs/orientation/terminology.md`
+18. `project-docs/specification/advisory-social-material-wam.md`
+19. `project-docs/specification/soul-grounded-social-simulation.md`
+20. `project-docs/specification/evidence-grounded-minecraft-society.md`
+21. `project-docs/specification/runtime-evidence-and-action-skills.md`
+22. `project-docs/specification/engineering-governance-and-testing.md`
+23. `project-docs/specification/reference-adaptation-guide.md`
+24. `project-docs/runtime/actor-state-and-memory/soul-life-goal-runtime-architecture.md`
+25. `project-docs/runtime/overview/runtime-loop-and-verification.md`
+26. `project-docs/runtime/actor-turn/actor-turn-passive-planbeads-goal-brief.md`
+27. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+28. `project-docs/runtime/actor-turn/context-projection-and-source-evidence.md`
+29. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+30. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-implementation-plan.md`
+31. `project-docs/research/benchmarks/low-cost-social-simulation-campaign-spec.md`
+32. `project-docs/research/benchmarks/material-claims-and-social-economy-benchmark-plan.md`
+33. `project-docs/research/benchmarks/grounded-social-trajectory-benchmark-spec.md`
+34. `project-docs/runtime/actor-state-and-memory/actor-workspace-and-action-skill-memory.md`
+35. `project-docs/runtime/actor-state-and-memory/actor-memory-observation-and-action-space-plan.md`
+36. `project-docs/runtime/planbeads/actor-persistent-state-and-planbeads.md`
+37. `project-docs/runtime/planbeads/planbeads-implementation-campaign.md`
+38. `project-docs/runtime/action-skills/action-selection-gated-action-skill-authoring-plan.md`
+39. `project-docs/runtime/overview/minecraft-basic-guide.md`
+40. `project-docs/runtime/actor-turn/social-cycle-llm-input-cleanup-plan.md`
+41. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+42. `project-docs/operations/setup/headless-server.md`
+43. `project-docs/operations/setup/provider-setup.md`
+44. `project-docs/operations/setup/provider-free-tier-reset-windows.md`
+45. `project-docs/operations/setup/modelscope-qwen-api-access.md`
 
 ## Active vs Archived
 

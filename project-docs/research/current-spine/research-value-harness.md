@@ -10,9 +10,9 @@ This harness exists to stop the project from mistaking polished implementation
 language for research value.
 
 It should be used before rewriting the central plan, proposing a paper framing,
-adding a Qwen/VLA/training branch, promoting the deferred social-pattern branch,
-or designing any experiment that might mistake verification hygiene for research
-value.
+adding a Qwen/VLA/training branch, promoting a discovery-run observation into a
+claim, or designing any experiment that might mistake verification hygiene for
+research value.
 
 The associated agent skill is:
 
@@ -81,13 +81,14 @@ The artifacts are documented in:
 .agents/skills/minecraft-research-value-harness/references/artifact-templates.md
 ```
 
-The current project-level instances are:
+The current project-level instance is:
 
-- `central-plan-embodied-co-actor-legibility.md` sections 11-12
-- `embodied-co-actor-legibility-implementation-plan.md`
+- `central-plan-capability-gated-social-sandbox.md` section 15
 
-The 2026-06-29 prior-work and decision files are superseded audit trail unless a
-current Tier 1 document explicitly cites a detail from them.
+The V3 instances inside `central-plan-lived-vs-told-social-history.md`, the
+2026-06-29 prior-work and decision files, and the V2 instances inside
+`central-plan-embodied-co-actor-legibility.md` are superseded audit trail unless
+a current Tier 1 document explicitly cites a detail from them.
 
 ## Decision Labels
 
@@ -95,15 +96,15 @@ Use these labels exactly:
 
 - `kill`: not a research claim yet.
 - `defer`: interesting but not testable now.
-- `core-first`: blocked on the legibility substrate or another named core
-  measurement dependency.
+- `substrate-first`: blocked on individual competence, goal continuity,
+  interdependent interaction, observability, or another named dependency.
 - `preflight-ready`: the required substrate exists and the candidate can enter a
   preregistered uncertainty-reducing test.
 - `headline-candidate`: evidence after the preregistered test supports selecting
   or preserving the claim.
 
-Most ambitious claims before the Session 1 smoke and Session 2 preregistered
-batch should be `core-first`, not headline candidates.
+Most ambitious claims before capability, continuity, and a credible candidate
+phenomenon should be `substrate-first`, not headline candidates.
 
 ## Minecraft-Specific Pressure
 
@@ -118,36 +119,37 @@ The harness treats these as weak research claims by default:
 
 The harness looks for stronger claims:
 
-- observed history improves consequence prediction beyond an LLM prior;
-- action consequence prediction can be separated from acting competence;
+- a recurring social-material phenomenon survives individual competence and
+  scenario-script explanations;
+- action consequence prediction, when selected, can be separated from acting
+  competence;
 - social-material deltas are observable without relying on actor self-report;
 - negative results kill or narrow attractive but weak framings;
-- Minecraft as an embodied substrate changes what can be measured.
-- policy-copy, shuffled-history, leakage, and held-out-family baselines fail to
-  erase the active legibility claim.
+- Minecraft as an embodied substrate changes what can be measured;
+- a controlled follow-up names a baseline capable of erasing the selected
+  phenomenon claim.
 
 ## Relationship To The Central Plan
 
 This document supports the active central plan:
 
 ```text
-project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md
+project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md
 ```
 
 The harness does not replace the central plan. It provides the review machinery
 that should be used before changing it.
 
-The current order remains:
+The current order is:
 
 ```text
-Session 1 provider-free deterministic smoke -> Session 2 preregistered live
-pilot -> research-decision/v1 -> branch deferral, confirming experiment, or
-preserved negative result
+individual capability -> goal continuity -> interdependent sandbox ->
+phenomenon record -> selected controlled follow-up -> research-decision/v1
 ```
 
 The harness mainly improves how the project decides whether a proposed direction
-deserves to change the active central plan or enter a later branch after the
-legibility experiment produces a decision.
+deserves to change the active central plan or whether a discovery-run
+observation is ready for a controlled claim.
 
 ## How To Use
 
@@ -165,8 +167,8 @@ For a new research proposal:
 For the current project, the most important `what_not_to_do_next` is usually:
 
 ```text
-Do not add Qwen/VLA arms, model training, society-scale episodes, or new
-protocol layers before the active legibility substrate produces a decision.
-Do not present schemas, logs, tests, or verified actions as the contribution by
-themselves.
+Do not add model training, society-scale features, or new protocol layers before
+individual competence, goal continuity, and attributable interdependent runs
+work. Do not present schemas, logs, tests, verified actions, benchmark scores,
+or compelling video as the contribution by themselves.
 ```

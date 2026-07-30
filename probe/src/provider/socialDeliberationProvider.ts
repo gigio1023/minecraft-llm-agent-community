@@ -16,9 +16,17 @@ import {
   callModelScopeJsonSchema,
   type ModelScopeApiProviderConfig
 } from "./modelscopeApiProvider.js";
+import {
+  callModelStudioJsonSchema,
+  type ModelStudioApiProviderConfig
+} from "./modelStudioApiProvider.js";
 import { normalizeOpenAiJsonPayload } from "./normalizeOpenAiJsonPayload.js";
 import { writeProviderInputSnapshot } from "./providerInputStore.js";
-import { writeProviderOutputSnapshot } from "./providerOutputStore.js";
+import {
+  modelStudioRawProviderOutputField,
+  rawOutputFromProviderResult,
+  writeProviderOutputSnapshot
+} from "./providerOutputStore.js";
 import type { JsonValue } from "./inputSnapshot.js";
 import type { ProviderUsageRecord } from "./providerUsageTracker.js";
 import type { SocialCycleContextPacket } from "../runtime/goals/cycleContextAssembler.js";
@@ -768,6 +776,7 @@ async function writeFailureOutput(input: {
   model: string;
   snapshotId: string;
   rawText?: string;
+  rawOutput?: JsonValue;
   error: string;
   usageRecord?: ProviderUsageRecord;
 }) {
@@ -782,7 +791,11 @@ async function writeFailureOutput(input: {
     raw_output_text: input.rawText ?? "",
     parsed_output: { error: input.error },
     proposal: { error: input.error },
-    usage: input.usageRecord
+    usage: input.usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput: input.rawOutput
+    })
   });
 }
 
@@ -798,11 +811,18 @@ export async function runSocialDeliberationProvider(input: {
   openAi?: OpenAiJsonProviderConfig;
   gemini?: GeminiJsonProviderConfig;
   modelScope?: ModelScopeApiProviderConfig;
+  modelStudio?: ModelStudioApiProviderConfig;
   runId?: string;
+  signal?: AbortSignal;
 }): Promise<DeliberationProviderResult> {
   const turnId = `${input.cycleId}-deliberation`;
   const snapshotId = `deliberation-${turnId}-${randomUUID()}`;
-  const model = input.openAi?.model ?? input.gemini?.model ?? input.modelScope?.model ?? input.providerId;
+  const model =
+    input.openAi?.model ??
+    input.gemini?.model ??
+    input.modelScope?.model ??
+    input.modelStudio?.model ??
+    input.providerId;
   const providerInput = buildDeliberationProviderInput({
     branch: input.branch,
     currentEpisode: input.currentEpisode,
@@ -822,6 +842,7 @@ export async function runSocialDeliberationProvider(input: {
 
   let deliberation: DeliberationOutput;
   let rawText = "";
+  let rawOutput: JsonValue | undefined;
   let usageRecord: ProviderUsageRecord | undefined;
   if (input.providerId === "deterministic-social" || input.providerId === "scripted-social") {
     deliberation = sanitizeDeliberationForCurrentState({
@@ -856,11 +877,18 @@ export async function runSocialDeliberationProvider(input: {
             config: input.modelScope!,
             ...providerCall
           })
+      : input.providerId === "alibaba-model-studio-api"
+        ? await callModelStudioJsonSchema<{ deliberation: unknown }>({
+            config: input.modelStudio!,
+            ...providerCall,
+            ...(input.signal ? { signal: input.signal } : {})
+          })
       : await callOpenAiJsonSchema<{ deliberation: unknown }>({
           config: input.openAi!,
           ...providerCall
         });
     rawText = result.rawText ?? "";
+    rawOutput = rawOutputFromProviderResult(result);
     usageRecord = result.usageRecord;
     if (!result.ok) {
       const outputRef = await writeFailureOutput({
@@ -871,6 +899,7 @@ export async function runSocialDeliberationProvider(input: {
         model: result.model,
         snapshotId,
         rawText,
+        rawOutput,
         error: result.message,
         usageRecord
       });
@@ -896,6 +925,7 @@ export async function runSocialDeliberationProvider(input: {
         model: result.model,
         snapshotId,
         rawText,
+        rawOutput,
         error,
         usageRecord
       });
@@ -923,7 +953,11 @@ export async function runSocialDeliberationProvider(input: {
       active_episode_ref: episodeWrite.ref,
       plan_bead_op_proposals: deliberation.plan_bead_op_proposals as unknown as JsonValue
     },
-    usage: usageRecord
+    usage: usageRecord,
+    ...modelStudioRawProviderOutputField({
+      providerId: input.providerId,
+      rawOutput
+    })
   });
 
   return {

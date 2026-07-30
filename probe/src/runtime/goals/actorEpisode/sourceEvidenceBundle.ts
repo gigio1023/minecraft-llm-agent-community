@@ -141,6 +141,22 @@ export function buildActorTurnSourceEvidenceBundle(input: {
               absence_claims_exhaustive: worldScan.absence_claims_exhaustive,
               total_verified_blocks: worldScan.total_verified_blocks,
               truncated: worldScan.truncated,
+              ...(worldScan.sampling
+                ? {
+                    sampling: {
+                      ...worldScan.sampling,
+                      distance_bands_retained: [
+                        ...worldScan.sampling.distance_bands_retained
+                      ],
+                      direction_sectors_retained: [
+                        ...worldScan.sampling.direction_sectors_retained
+                      ],
+                      vertical_bands_retained: [
+                        ...worldScan.sampling.vertical_bands_retained
+                      ]
+                    }
+                  }
+                : {}),
               nearest_blocks: worldScan.nearest_blocks.map((block) => ({
                 name: block.name,
                 position: { ...block.position },

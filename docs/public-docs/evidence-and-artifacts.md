@@ -8,16 +8,19 @@ The project treats artifacts as audit hygiene. They are the way to check what a
 run did, not the research contribution by themselves. This matters because LLM
 text can sound successful even when Minecraft state did not change.
 
-For the active legibility experiment, artifacts should support independent
-`transition-row/v1` records:
+For the active capability-gated social sandbox, artifacts should support
+independent review of individual task competence, goal continuity,
+interdependent scenario conditions, and long-run social behavior. The common
+observation unit remains:
 
 ```text
 state_before + executed_action + observed_delta + evidence_refs
 ```
 
-Prediction artifacts are separate. They are joined to locked rows by `row_id`
-only during offline analysis, so the actor's expected outcome and provider
-rationale never become ground truth.
+Optional prediction or analysis artifacts stay separate from runtime truth, so
+the actor's expected outcome and provider rationale never become ground truth.
+Videos and screenshots are synchronized review surfaces, not substitutes for
+the structured row and verifier evidence.
 
 ## What Counts As Evidence
 

@@ -1,6 +1,6 @@
-import type { GeneratedActionSkillCandidate } from "../types.js";
+import type { CapabilityCaseContext, GeneratedActionSkillCandidate } from "../types.js";
 
-export type { GeneratedActionSkillCandidate };
+export type { CapabilityCaseContext, GeneratedActionSkillCandidate };
 
 export type JsonValue =
   | string
@@ -207,6 +207,15 @@ export type ActorTurnSourceEvidenceBundle = {
       absence_claims_exhaustive: boolean;
       total_verified_blocks: number;
       truncated: boolean;
+      sampling?: {
+        method: string;
+        query_count: number;
+        candidate_verified: number;
+        retained: number;
+        distance_bands_retained: number[];
+        direction_sectors_retained: number[];
+        vertical_bands_retained: number[];
+      };
       nearest_blocks: Array<{
         name: string;
         position: { x: number; y: number; z: number };
@@ -315,6 +324,15 @@ export type ActorTurnCurrentStateProjection = {
     absence_claims_exhaustive: boolean;
     total_verified_blocks: number;
     truncated: boolean;
+    sampling?: {
+      method: string;
+      query_count: number;
+      candidate_verified: number;
+      retained: number;
+      distance_bands_retained: number[];
+      direction_sectors_retained: number[];
+      vertical_bands_retained: number[];
+    };
     retained_block_counts: Array<{ name: string; count: number }>;
     nearest_blocks: Array<{
       name: string;
@@ -476,8 +494,10 @@ export type ActiveEpisode = {
 export type ActionCard = {
   schema: "action-card/v1";
   action_card_id: string;
+  behavior_kind?: "direct_primitive" | "actor_owned_action_skill";
   title: string;
   description: string;
+  shared_guidance_ref?: "action-card-shared-guidance";
   parameters_schema_ref: string;
   parameter_hints: string[];
   /** Advisory provider context for selection only; runtime validators still require explicit structured args. */
@@ -488,9 +508,27 @@ export type ActionCard = {
   runtime_mapping_ref: string;
 };
 
+export type ActionCardSharedGuidance = {
+  schema: "action-card-shared-guidance/v1";
+  guidance_ref: "action-card-shared-guidance";
+  applies_to: "all_action_cards";
+  parameter_rules: string[];
+  evidence_rules: string[];
+  selection_rules: string[];
+  grouped_guidance: Array<{
+    action_card_ids: string[];
+    guidance: string[];
+  }>;
+  overlap_groups: Array<{
+    direct_primitive_action_card_id: string;
+    actor_owned_action_skill_card_ids: string[];
+  }>;
+};
+
 export type ActorTurnInput = {
   schema: "actor-turn-input/v1";
   turn_id: string;
+  capability_case_context?: CapabilityCaseContext;
   decision_frame: ActorTurnDecisionFrame;
   active_episode: ActiveEpisode;
   actor_context: ActorSoulAndLifeGoalProjection;
@@ -498,6 +536,7 @@ export type ActorTurnInput = {
   source_evidence_bundle: ActorTurnSourceEvidenceBundle;
   relationship_context: RelationshipContextProjection;
   runtime_retry_constraints: RuntimeRetryConstraintSummary[];
+  action_card_shared_guidance?: ActionCardSharedGuidance;
   action_cards: ActionCard[];
   minecraft_basic_guide: MinecraftBasicGuideProjection;
   provider_budget_hint: ProviderBudgetHint;

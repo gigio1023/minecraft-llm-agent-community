@@ -19,14 +19,14 @@ questions quickly:
 3. How do Actor Turn, Action Cards, PlanBeads, and generated action skills fit
    together?
 4. How does the runtime distinguish real Minecraft progress from fake progress?
-5. Where does the embodied co-actor legibility substrate fit?
+5. Where does the shared-session experiment substrate fit?
 6. What are the largest current implementation risks?
 
 In one sentence: this repository is building a **bounded, observable headless
-Minecraft runtime where Soul/LifeGoal-grounded actors act in a shared 2-3 actor
-session, while independent `transition-row/v1` records, public-history exports,
-and offline predictors make the embodied co-actor legibility experiment
-scorable**.
+Minecraft runtime where Soul/LifeGoal-grounded actors first demonstrate
+individual competence and goal continuity, then act in materially interdependent
+shared sessions whose long-run evidence, metrics, and video support phenomenon
+discovery and controlled follow-up studies**.
 
 The important boundary is that the LLM/provider does not own Minecraft truth.
 During Actor Turn, the provider chooses one visible Action Card function tool or
@@ -37,11 +37,11 @@ evidence, memory, PlanBeads, relationships, and generated action-skill state
 into later turns.
 
 Runtime verification is mandatory hygiene, not the research contribution. The
-active research object is whether an observer model can predict a co-actor's
-next-turn `social_response` and `material_access` labels from public
-interaction history alone, with baselines and stop-results that can erase the
-claim. Acting success, physical competence, social consequence, continuity,
-robustness, efficiency, and prediction quality must be reported separately.
+active program separates individual task competence, autonomous goal
+continuity, interdependent social behavior, and later scientific claims.
+Acting success, physical competence, social consequence, continuity,
+robustness, efficiency, and any optional prediction quality must be reported
+separately.
 
 ## One-Page Mental Model
 
@@ -60,9 +60,9 @@ flowchart LR
   MC["Mineflayer + Minecraft"]
   Row["transition-row/v1<br/>state_before + executed_action + observed_delta"]
   Window["response window<br/>other actor subsequent turns or timeout"]
-  Public["public-history export<br/>allowlisted runtime evidence only"]
-  Predict["offline predictor artifacts<br/>joined after label lock"]
-  Score["scorer + research-decision/v1"]
+  Report["capability, continuity,<br/>and long-run reports"]
+  Video["synchronized review video"]
+  Phenomenon["candidate phenomenon<br/>and follow-up study"]
   Evidence["Evidence Trace append<br/>reports and artifacts"]
 
   Soul --> Input
@@ -73,33 +73,40 @@ flowchart LR
   Choice --> Author --> Codegen --> Runtime
   Runtime --> MC --> Row
   Row --> Window --> Evidence --> Workspace
-  Evidence --> Public --> Predict --> Score
+  Evidence --> Report --> Phenomenon
+  Evidence --> Video --> Phenomenon
 ```
 
 Arrows show information and artifact flow, not authority transfer. Provider text
 does not establish execution or success. Only validated runtime actions,
 Mineflayer execution, and runtime-observed evidence create Minecraft progress.
-Offline predictor artifacts are analysis-only. They do not select actions, fill
+Offline analysis and video are review-only. They do not select actions, fill
 runtime parameters, decide success, mutate actor state, or override runtime
 checks.
 
 ## Current Product Scope
 
-The active direction is the embodied co-actor legibility experiment in
-Minecraft, motivated by Soul/LifeGoal-grounded social-material interaction.
-The current delivery target is Session 1 of the implementation plan:
-provider-free integrated substrate for a 2-actor smoke before any live provider
-pilot.
+The active direction is defined in
+`central-plan-capability-gated-social-sandbox.md`. The provider-free
+implementation now includes individual capability manifests/reports with full
+case budget stopping, continuity bag loading and offline evaluation, declared
+continuity cases, interdependent scenario files, long-run observation formats,
+and a fixture-only phenomenon index. A5, live B3, and live multi-actor C2/C3
+still require provider approval and current-run evidence.
+
+The detailed sequence and current status are in
+`capability-gated-social-sandbox-implementation-plan.md`. No provider-backed
+batch or live multi-actor V4 session has been run.
 
 | Scope | Current target |
 | --- | --- |
-| Actor count | 2-3 actors in one shared session; single-actor runs are calibration/smoke only |
+| Actor count | single actor for competence/continuity gates; small attributable multi-actor sessions first; scale later as an explicit axis |
 | Minecraft client | multiple Mineflayer bots in one server session |
 | Runtime loop | observe -> Actor Turn slot -> gate -> execute/trial -> verify -> record row -> close response window |
-| Provider hot path | per-actor provider routing; `scripted-social` is a provider behind the same seam |
+| Provider hot path | per-actor provider routing; deterministic providers remain calibration tools |
 | Generated behavior | Actor Turn-only `author_mineflayer_action`, then bounded codegen/trial |
 | Continuity | actor workspace evidence, memory, PlanBeads, relationships, action skill state |
-| Research data | `transition-row/v1` observed rows, public-history export, label lock, offline prediction join/scorer |
+| Research data | benchmark reports, goal-lifecycle artifacts, `transition-row/v1` observations, long-run reports, metrics, and video refs |
 
 Current non-goals:
 
@@ -112,9 +119,11 @@ Current non-goals:
 - provider prose being treated as runtime authority;
 - verification, screenshots, logs, or benchmark artifacts being presented as
   the research contribution.
+- a preselected prediction or legibility experiment driving the build before a
+  recurring phenomenon is observed.
 - Qwen-AgentWorld, JarvisVLA, VLA arms, model training, fine-tuning, or
-  society-scale episodes before the preregistered legibility experiment produces
-  a decision.
+  society-scale claims before capability, continuity, and attributable social
+  runs work.
 
 ## Actor Perspective
 
@@ -170,9 +179,9 @@ runtime evidence, after the runtime has recorded action and observation truth.
 | PlanBeads | passive actor-owned work graph for open work, blockers, obligations, followups. |
 | Evidence Trace | compact window of runtime-backed action/evidence results for the next Actor Turn. |
 | actor workspace | source of truth for actor artifacts: evidence, memory, PlanBeads, relationships, provider snapshots, generated action skills. |
-| `transition-row/v1` | independent state/action/observed-delta row used for the legibility experiment; no `predicted_delta`. |
-| public-history export | allowlisted predictor-facing artifact derived from runtime evidence; excludes ActorSoul, LifeGoal, memory, PlanBeads, provider IO, and private workspace fields of the target. |
-| response window | bounded post-action period that closes only after every other active actor has completed a subsequent Actor Turn slot or a preregistered timeout fires. |
+| `transition-row/v1` | independent state/action/observed-delta row used across benchmarks, sandbox runs, and later studies; no embedded prediction authority. |
+| public-history export | allowlisted analysis artifact derived from runtime evidence; excludes ActorSoul, LifeGoal, memory, PlanBeads, provider IO, and private workspace fields of the target. |
+| response window | bounded post-action period that closes only after every other active actor has completed a subsequent Actor Turn slot or a declared timeout fires. |
 | offline predictor artifact | analysis-only prediction joined by `row_id` after labels are locked; it is not runtime authority. |
 
 `agent skill` and `action skill` are different. An `agent skill` is a Codex or
@@ -393,21 +402,22 @@ evidence, and persistence stay traceable despite that size.
   Mineflayer call.
 - Generated action candidates now leave source, schema, helper, verifier, trial,
   and promotion artifacts.
-- The active research plan now names the missing substrate explicitly instead of
-  treating verification, row shape, or logs as the research contribution.
+- The active research plan now separates individual capability, goal continuity,
+  social opportunity, observation, and controlled claims.
 
 ## Current Implementation Risks
 
-1. The live path is still short of the active experiment: shared 2-3 actor
-   scheduling, cross-actor observation, chat capture, non-vacuous response
-   windows, public-history export, declaration writing, and offline scoring are
-   not yet one integrated runtime path.
+1. The runtime does not yet expose the active program as one integrated live
+   path. A3 limit handling and B2 bag loading pass provider-free tests, but a
+   case signal still does not cancel a provider SDK request already in flight.
+   Social/observation/phenomenon files are not connected to a live V4
+   multi-actor session, and A5/B3 live still need provider approval.
 2. Response-window semantics are the highest-risk logic. A window that closes on
    immediate post-action observation recreates the old `no_observable_response`
    vacuity and makes social-response labels uninformative.
-3. Public/private separation is not yet enforceable by artifact shape. Predictor
-   inputs must come from an allowlisted public-history export, not from raw actor
-   workspaces or provider snapshots.
+3. The C3 public export rejects its named private fields, but no live V4 writer
+   yet proves that raw actor workspaces and provider snapshots stay outside the
+   bundle. Live export still needs an explicit allowlisted producer.
 4. `socialCycleRunner.ts` is still a large orchestration file; the architecture
    risk is not size by itself, but whether slot events, actor routing, row
    assembly, evidence, and response-window closure remain traceable through it.
@@ -415,11 +425,11 @@ evidence, and persistence stay traceable despite that size.
    continuity only when meaningful social requests, blockers, obligations, and
    repeated no-progress evidence create/update durable records.
 6. Long-run behavior can still loop on observe/inspect/wait or repeated
-   low-value actions even when runtime status is `passed`; K6/K7-style
-   diagnostics must separate substrate failure from research failure.
-7. A docs/test green state is not enough. Session 1 needs a deterministic
-   provider-free end-to-end smoke artifact, and Session 2 needs a preregistered
-   live batch before any legibility claim is made.
+   low-value actions even when runtime status is `passed`; capability and
+   continuity diagnostics must separate substrate failure from social behavior.
+7. A docs/test green state is not enough. Each benchmark pass needs current-run
+   target evidence, and each social observation needs competence controls,
+   scenario provenance, and linked long-run evidence before interpretation.
 
 ## Documentation Authority
 
@@ -427,13 +437,14 @@ If documents disagree, start from:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-4. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-5. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
-6. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
-7. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
-8. `project-docs/orientation/documentation-map.md`
-9. `project-docs/orientation/terminology.md`
+3. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+4. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+5. `project-docs/research/benchmarks/project-level-benchmark-plan.md`
+6. `project-docs/runtime/actor-turn/actor-turn-tool-calling-and-full-context-codegen.md`
+7. `project-docs/runtime/actor-turn/actor-episode-and-actor-turn-architecture.md`
+8. `project-docs/operations/handoffs/current-handoff-and-next-work.md`
+9. `project-docs/orientation/documentation-map.md`
+10. `project-docs/orientation/terminology.md`
 
 Reference docs under `project-docs/references/**` and historical docs under
 `project-docs/archive/**` are not active implementation specs unless a current

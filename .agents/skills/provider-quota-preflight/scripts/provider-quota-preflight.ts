@@ -4,7 +4,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { defaultProviderQuotaPolicies } from "../../../../probe/src/provider/providerQuotaPolicies.ts";
+import {
+  defaultProviderQuotaPolicies,
+  isOperatorProvidedOpenAiComplimentaryCandidate
+} from "../../../../probe/src/provider/providerQuotaPolicies.ts";
 import type {
   ProviderUsageBudget,
   ProviderUsageCounts,
@@ -16,6 +19,17 @@ type Candidate = {
   model: string;
 };
 
+type ExternalAlreadyUsedObservation = {
+  schema: "provider-external-already-used/v1";
+  provider_id: string;
+  quota_day_utc: string;
+  observed_at: string;
+  period_certainty: "confirmed_exact_utc_day" | "ambiguous_period";
+  overlap_with_local_ledger: "unknown" | "includes_local" | "disjoint";
+  source_note: string;
+  usage: ProviderUsageCounts;
+};
+
 type Args = {
   candidates: Candidate[];
   ledgerPath: string;
@@ -24,6 +38,7 @@ type Args = {
   approvalNote?: string;
   estimate: ProviderUsageCounts;
   minuteEstimate: ProviderUsageCounts;
+  externalAlreadyUsed: ExternalAlreadyUsedObservation[];
   operatorApproved: boolean;
   estimateRequestsProvided: boolean;
   estimateTokensProvided: boolean;
@@ -39,7 +54,7 @@ const zero: ProviderUsageCounts = {
 };
 
 function usage() {
-  return `usage: provider-quota-preflight.ts --candidate provider:model --estimate-requests N --estimate-total-tokens N --estimate-requests-per-minute N [--out path] [--operator-approved --approval-note text]`;
+  return `usage: provider-quota-preflight.ts --candidate provider:model --estimate-requests N --estimate-total-tokens N --estimate-requests-per-minute N [--external-already-used observation.json] [--out path] [--operator-approved --approval-note text]`;
 }
 
 function hasValue(value: string | undefined) {
@@ -82,6 +97,7 @@ function parseArgs(argv: string[], cwd = process.cwd()): Args {
     approvalNote: undefined,
     estimate: { ...zero },
     minuteEstimate: { ...zero },
+    externalAlreadyUsed: [],
     operatorApproved: false,
     estimateRequestsProvided: false,
     estimateTokensProvided: false,
@@ -104,10 +120,15 @@ function parseArgs(argv: string[], cwd = process.cwd()): Args {
       args.outPath = path.resolve(cwd, next);
       index += 1;
     } else if (arg === "--approval-note" && hasValue(next)) {
-      args.approvalNote = next;
+      args.approvalNote = next.trim();
       index += 1;
     } else if (arg === "--approval-note-file" && hasValue(next)) {
       args.approvalNote = fs.readFileSync(path.resolve(cwd, next), "utf8").trim();
+      index += 1;
+    } else if (arg === "--external-already-used" && hasValue(next)) {
+      args.externalAlreadyUsed.push(
+        readExternalAlreadyUsedObservation(path.resolve(cwd, next))
+      );
       index += 1;
     } else if (arg === "--estimate-requests" && hasValue(next)) {
       args.estimate.requests = parsePositiveInt(next, arg);
@@ -184,8 +205,18 @@ function parseArgs(argv: string[], cwd = process.cwd()): Args {
       Math.ceil(args.estimate.total_tokens / args.estimate.requests) *
       Math.max(1, args.minuteEstimate.requests);
   }
-  if (args.operatorApproved && !args.approvalNote) {
+  if (args.approvalNote !== undefined) {
+    args.approvalNote = args.approvalNote.trim();
+  }
+  if (args.operatorApproved && !(args.approvalNote && args.approvalNote.length > 0)) {
     throw new Error("--operator-approved requires --approval-note or --approval-note-file");
+  }
+  const externalProviders = new Set<string>();
+  for (const observation of args.externalAlreadyUsed) {
+    if (externalProviders.has(observation.provider_id)) {
+      throw new Error(`Only one --external-already-used observation is allowed per provider (${observation.provider_id})`);
+    }
+    externalProviders.add(observation.provider_id);
   }
   return args;
 }
@@ -195,6 +226,100 @@ function readJsonIfExists(filePath: string) {
     return null;
   }
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertExactKeys(value: Record<string, unknown>, allowed: readonly string[], label: string) {
+  const extras = Object.keys(value).filter((key) => !allowed.includes(key));
+  if (extras.length > 0) {
+    throw new Error(`${label} contains unknown fields: ${extras.join(", ")}`);
+  }
+}
+
+function nonNegativeCount(value: unknown, label: string) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function readExternalAlreadyUsedObservation(filePath: string): ExternalAlreadyUsedObservation {
+  const value = readJsonIfExists(filePath);
+  if (!isRecord(value)) {
+    throw new Error(`--external-already-used must point to a JSON object: ${filePath}`);
+  }
+  assertExactKeys(value, [
+    "schema",
+    "provider_id",
+    "quota_day_utc",
+    "observed_at",
+    "period_certainty",
+    "overlap_with_local_ledger",
+    "source_note",
+    "usage"
+  ], "external_already_used");
+  if (value.schema !== "provider-external-already-used/v1") {
+    throw new Error("external_already_used.schema must be provider-external-already-used/v1");
+  }
+  if (typeof value.provider_id !== "string" || value.provider_id.length === 0) {
+    throw new Error("external_already_used.provider_id must be a non-empty string");
+  }
+  const quotaDayDate = typeof value.quota_day_utc === "string"
+    ? new Date(`${value.quota_day_utc}T00:00:00.000Z`)
+    : null;
+  if (typeof value.quota_day_utc !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value.quota_day_utc) ||
+    !quotaDayDate ||
+    !Number.isFinite(quotaDayDate.getTime()) ||
+    quotaDayDate.toISOString().slice(0, 10) !== value.quota_day_utc) {
+    throw new Error("external_already_used.quota_day_utc must be YYYY-MM-DD");
+  }
+  if (typeof value.observed_at !== "string" ||
+    !value.observed_at.includes("T") ||
+    !Number.isFinite(Date.parse(value.observed_at))) {
+    throw new Error("external_already_used.observed_at must be an ISO date-time");
+  }
+  if (value.period_certainty !== "confirmed_exact_utc_day" && value.period_certainty !== "ambiguous_period") {
+    throw new Error("external_already_used.period_certainty must be confirmed_exact_utc_day or ambiguous_period");
+  }
+  if (value.overlap_with_local_ledger !== "unknown" &&
+    value.overlap_with_local_ledger !== "includes_local" &&
+    value.overlap_with_local_ledger !== "disjoint") {
+    throw new Error("external_already_used.overlap_with_local_ledger must be unknown, includes_local, or disjoint");
+  }
+  if (typeof value.source_note !== "string" || value.source_note.trim().length === 0) {
+    throw new Error("external_already_used.source_note must be a non-empty string");
+  }
+  if (!isRecord(value.usage)) {
+    throw new Error("external_already_used.usage must be an object");
+  }
+  assertExactKeys(value.usage, [
+    "requests",
+    "input_tokens",
+    "output_tokens",
+    "thinking_tokens",
+    "total_tokens"
+  ], "external_already_used.usage");
+  const usage: ProviderUsageCounts = {
+    requests: nonNegativeCount(value.usage.requests, "external_already_used.usage.requests"),
+    input_tokens: nonNegativeCount(value.usage.input_tokens ?? 0, "external_already_used.usage.input_tokens"),
+    output_tokens: nonNegativeCount(value.usage.output_tokens ?? 0, "external_already_used.usage.output_tokens"),
+    thinking_tokens: nonNegativeCount(value.usage.thinking_tokens ?? 0, "external_already_used.usage.thinking_tokens"),
+    total_tokens: nonNegativeCount(value.usage.total_tokens, "external_already_used.usage.total_tokens")
+  };
+  return {
+    schema: "provider-external-already-used/v1",
+    provider_id: value.provider_id,
+    quota_day_utc: value.quota_day_utc,
+    observed_at: new Date(value.observed_at).toISOString(),
+    period_certainty: value.period_certainty,
+    overlap_with_local_ledger: value.overlap_with_local_ledger,
+    source_note: value.source_note.trim(),
+    usage
+  };
 }
 
 function readBudgets(filePath: string): ProviderUsageBudget[] {
@@ -247,6 +372,16 @@ function addCounts(a: ProviderUsageCounts, b: Partial<ProviderUsageCounts> = {})
   };
 }
 
+function maxCounts(a: ProviderUsageCounts, b: ProviderUsageCounts): ProviderUsageCounts {
+  return {
+    requests: Math.max(a.requests, b.requests),
+    input_tokens: Math.max(a.input_tokens, b.input_tokens),
+    output_tokens: Math.max(a.output_tokens, b.output_tokens),
+    thinking_tokens: Math.max(a.thinking_tokens, b.thinking_tokens),
+    total_tokens: Math.max(a.total_tokens, b.total_tokens)
+  };
+}
+
 function utcDay(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -290,7 +425,9 @@ function currentWindows(date: Date) {
     reset_notes: {
       openai_api: "UTC day; documented reset 00:00 UTC / 09:00 KST",
       gemini_api: "Pacific day; documented reset midnight America/Los_Angeles",
-      modelscope_api: "UTC calendar month for local Qwen Ambassador API-call guard"
+      modelscope_api: "UTC calendar month for local Qwen Ambassador API-call guard",
+      alibaba_model_studio_api:
+        "UTC-minute local input-side pre-request estimate plus provider-reported post-call accounting. It is not a rolling 60-second limiter, does not reserve uncapped output/thinking tokens, and cannot guarantee one request will not cross 500K TPM."
     }
   };
 }
@@ -320,6 +457,80 @@ function totalsForBudget(records: ProviderUsageRecord[], budget: ProviderUsageBu
   };
 }
 
+function budgetUsesUtcDay(budget: ProviderUsageBudget, candidate: Candidate) {
+  if (budget.reset_window === "utc_day") {
+    return true;
+  }
+  return candidate.providerId === "openai-api" &&
+    budget.reset_window === undefined &&
+    [
+      budget.request_limit_per_day,
+      budget.input_token_limit_per_day,
+      budget.output_token_limit_per_day,
+      budget.total_token_limit_per_day
+    ].some((limit) => typeof limit === "number");
+}
+
+function applyExternalAlreadyUsed(input: {
+  candidate: Candidate;
+  budget: ProviderUsageBudget;
+  localDay: ProviderUsageCounts;
+  observation?: ExternalAlreadyUsedObservation;
+  windows: ReturnType<typeof currentWindows>;
+}) {
+  const base = {
+    local_day: input.localDay,
+    external_day: input.observation?.usage ?? null,
+    selected_day: input.localDay
+  };
+  if (!input.observation) {
+    return {
+      ...base,
+      status: "not_provided" as const,
+      reason: "No external dashboard usage observation was supplied for this provider."
+    };
+  }
+  if (!budgetUsesUtcDay(input.budget, input.candidate)) {
+    return {
+      ...base,
+      status: "not_applied_reset_window" as const,
+      reason: "The observation is UTC-day usage, but this policy does not use a UTC-day limit."
+    };
+  }
+  if (input.observation.period_certainty !== "confirmed_exact_utc_day") {
+    return {
+      ...base,
+      status: "not_applied_ambiguous_period" as const,
+      reason: "The dashboard period was not confirmed as one exact UTC quota day."
+    };
+  }
+  if (input.observation.quota_day_utc !== input.windows.utc_day ||
+    input.observation.observed_at.slice(0, 10) !== input.observation.quota_day_utc) {
+    return {
+      ...base,
+      status: "not_applied_stale" as const,
+      reason: `The observation does not match current UTC quota day ${input.windows.utc_day}.`
+    };
+  }
+  if (input.observation.overlap_with_local_ledger === "disjoint") {
+    const selectedDay = addCounts(input.localDay, input.observation.usage);
+    return {
+      ...base,
+      selected_day: selectedDay,
+      status: "applied_sum" as const,
+      reason: "Dashboard usage was confirmed disjoint from the local ledger, so both were added."
+    };
+  }
+  const selectedDay = maxCounts(input.localDay, input.observation.usage);
+  return {
+    ...base,
+    selected_day: selectedDay,
+    status: "applied_conservative_max" as const,
+    reason:
+      "Dashboard and local usage may overlap, so the larger count for each metric was used instead of adding both."
+  };
+}
+
 function checkLimit(projected: ProviderUsageCounts, budget: ProviderUsageBudget, windowName: "minute" | "day" | "month") {
   const suffix = windowName === "minute" ? "per_minute" : windowName === "day" ? "per_day" : "per_month";
   const checks = [
@@ -344,8 +555,22 @@ function evaluateCandidate(
   estimate: ProviderUsageCounts,
   minuteEstimate: ProviderUsageCounts,
   operatorApproved: boolean,
+  approvalNote: string | undefined,
+  externalAlreadyUsed: ExternalAlreadyUsedObservation[],
   windows: ReturnType<typeof currentWindows>
 ) {
+  if (
+    candidate.providerId === "openai-api" &&
+    !isOperatorProvidedOpenAiComplimentaryCandidate(candidate.model)
+  ) {
+    return {
+      ...candidate,
+      status: "unbudgeted",
+      reason:
+        "OpenAI model is absent from the operator-provided complimentary-usage candidate list; local budgets cannot promote it.",
+      matching_policies: []
+    };
+  }
   const matches = budgets.filter((budget) => matchesBudget(budget, candidate.providerId, candidate.model));
   if (matches.length === 0) {
     return {
@@ -356,8 +581,22 @@ function evaluateCandidate(
     };
   }
 
+  const externalObservation = externalAlreadyUsed.find(
+    (observation) => observation.provider_id === candidate.providerId
+  );
   const quota_checks = matches.map((budget) => {
-    const current = totalsForBudget(records, budget, windows);
+    const localCurrent = totalsForBudget(records, budget, windows);
+    const externalUsage = applyExternalAlreadyUsed({
+      candidate,
+      budget,
+      localDay: localCurrent.day,
+      observation: externalObservation,
+      windows
+    });
+    const current = {
+      ...localCurrent,
+      day: externalUsage.selected_day
+    };
     const projected = {
       minute: addCounts(current.minute, minuteEstimate),
       day: addCounts(current.day, estimate),
@@ -377,6 +616,7 @@ function evaluateCandidate(
       mode: budget.mode ?? "enforce",
       source: budget.source,
       current,
+      external_usage: externalUsage,
       estimate,
       minute_estimate: minuteEstimate,
       projected,
@@ -394,12 +634,41 @@ function evaluateCandidate(
       quota_checks
     };
   }
+  const approvalPolicies = matches.filter(
+    (budget) =>
+      budget.requires_operator_approval === true && (budget.mode ?? "enforce") !== "track"
+  );
+  const hasOperatorApprovalNote =
+    operatorApproved && typeof approvalNote === "string" && approvalNote.trim().length > 0;
+  if (approvalPolicies.length > 0 && !hasOperatorApprovalNote) {
+    const approvalReason =
+      approvalPolicies.find((budget) => typeof budget.approval_reason === "string")?.approval_reason ??
+      "Matching policy requires explicit operator approval before a live run.";
+    return {
+      ...candidate,
+      status: "needs_dashboard_approval",
+      reason: approvalReason,
+      quota_checks
+    };
+  }
   if (candidate.providerId === "openai-api" && !operatorApproved) {
     return {
       ...candidate,
       status: "needs_dashboard_approval",
       reason:
         "OpenAI API requires dashboard/free-tier eligibility and operator approval even when local ledger is under cap.",
+      quota_checks
+    };
+  }
+  if (candidate.providerId === "openai-api" && externalObservation &&
+    !quota_checks.some((check) =>
+      check.external_usage.status === "applied_sum" ||
+      check.external_usage.status === "applied_conservative_max")) {
+    return {
+      ...candidate,
+      status: "needs_dashboard_approval",
+      reason:
+        "The supplied OpenAI dashboard usage observation was ambiguous, stale, or incompatible with the UTC-day policy; obtain a confirmed current-day observation.",
       quota_checks
     };
   }
@@ -421,7 +690,17 @@ export function runProviderQuotaPreflight(
   const budgets = readBudgets(args.budgetsPath);
   const records = readLedger(args.ledgerPath);
   const results = args.candidates.map((candidate) =>
-    evaluateCandidate(candidate, budgets, records, args.estimate, args.minuteEstimate, args.operatorApproved, windows)
+    evaluateCandidate(
+      candidate,
+      budgets,
+      records,
+      args.estimate,
+      args.minuteEstimate,
+      args.operatorApproved,
+      args.approvalNote,
+      args.externalAlreadyUsed,
+      windows
+    )
   );
   const finalStatus = results.some((result) => result.status === "blocked" || result.status === "unbudgeted")
     ? "blocked"
@@ -438,6 +717,7 @@ export function runProviderQuotaPreflight(
       operator_approved: args.operatorApproved,
       approval_note: args.approvalNote ?? null
     },
+    external_already_used: args.externalAlreadyUsed,
     windows,
     estimate: args.estimate,
     minute_estimate: args.minuteEstimate,

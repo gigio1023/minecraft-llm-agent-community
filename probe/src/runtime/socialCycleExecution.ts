@@ -34,7 +34,7 @@ import { writeActorEvidenceRecord } from "./evidence/actorEvidence.js";
 import type { ActorEvidenceCategory } from "./evidence/actorEvidence.js";
 import { createDialogueState } from "./dialogueState.js";
 import { createMemory } from "./memory.js";
-import { observe, type ObserveResult } from "../tools/observe.js";
+import { observe, type ObserveChatEvent, type ObserveResult } from "../tools/observe.js";
 import { wait } from "../tools/wait.js";
 import { remember } from "../tools/remember.js";
 import { collectLogs } from "../tools/collectLogs.js";
@@ -173,6 +173,8 @@ export async function observeActorWorld(input: {
   actorId: string;
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
 }): Promise<ObserveResult | Record<string, unknown>> {
   if (!input.bot) {
     return syntheticObservation(input.actorId);
@@ -184,6 +186,12 @@ export async function observeActorWorld(input: {
   return observe({
     actor: asObserveActor(input.bot),
     target: asObserveActor(target),
+    ...(input.otherBots && input.otherBots.length > 0
+      ? { otherActors: input.otherBots.map(asObserveActor) }
+      : {}),
+    ...(input.chatEvents && input.chatEvents.length > 0
+      ? { chatEvents: [...input.chatEvents] }
+      : {}),
     dialogueState,
     memory
   });
@@ -548,7 +556,7 @@ function choosePlaceBlockItemName(input: {
   return undefined;
 }
 
-function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positioned {
+function readPlacementTarget(args: Record<string, unknown>): Positioned | null {
   const surfacePosition =
     readPositionedObject(args.surfacePosition) ??
     readPositionedObject(args.surface_position) ??
@@ -566,12 +574,7 @@ function readPlacementTarget(bot: Bot, args: Record<string, unknown>): Positione
     readPositionedObject(args.targetPosition) ??
     readPositionedObject(args.target_position) ??
     readPositionedObject(args.position) ??
-    readPositionedObject(args) ??
-    {
-      x: Math.floor(bot.entity.position.x) + 1,
-      y: Math.floor(bot.entity.position.y),
-      z: Math.floor(bot.entity.position.z)
-    }
+    readPositionedObject(args)
   );
 }
 
@@ -769,6 +772,8 @@ async function runSocialPrimitive(input: {
   args: Record<string, unknown>;
   bot: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
   signal?: AbortSignal;
 }): Promise<JsonValue> {
   const dialogueState = createDialogueState({ busyRepliesBeforeAvailable: 0 });
@@ -780,7 +785,18 @@ async function runSocialPrimitive(input: {
 
   switch (proposal.tool) {
     case "observe": {
-      const observed = await observe({ actor, target, dialogueState, memory });
+      const observed = await observe({
+        actor,
+        target,
+        ...(input.otherBots && input.otherBots.length > 0
+          ? { otherActors: input.otherBots.map(asObserveActor) }
+          : {}),
+        ...(input.chatEvents && input.chatEvents.length > 0
+          ? { chatEvents: [...input.chatEvents] }
+          : {}),
+        dialogueState,
+        memory
+      });
       return observed as unknown as JsonValue;
     }
     case "move_to":
@@ -881,10 +897,17 @@ async function runSocialPrimitive(input: {
       if (!itemName) {
         return { status: "blocked", reason: "place_block requires explicit itemName or a station-placement action skill" };
       }
+      const targetPosition = readPlacementTarget(proposal.args);
+      if (!targetPosition) {
+        return {
+          status: "blocked",
+          reason: "place_block requires an explicit structured target position"
+        };
+      }
       return (await placeBlock({
         bot: input.bot,
         itemName,
-        targetPosition: readPlacementTarget(input.bot, proposal.args),
+        targetPosition,
         signal: input.signal
       })) as unknown as JsonValue;
     }
@@ -1004,8 +1027,11 @@ async function executePrimitiveWithEvidence(input: {
   args: Record<string, unknown>;
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
   gate: ActiveActionSkillGate;
   allowActionSkillFallback: boolean;
+  signal?: AbortSignal;
 }): Promise<{
   toolResult: JsonValue;
   evidenceRef: string;
@@ -1153,8 +1179,11 @@ async function executePrimitiveWithEvidence(input: {
         args: input.args,
         bot: input.bot!,
         targetBot: input.targetBot,
+        ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+        ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
         signal
-      })
+      }),
+    ...(input.signal ? { externalSignal: input.signal } : {})
   });
   const toolResult = actionResult.ok
     ? (actionResult.value as JsonValue)
@@ -1636,11 +1665,17 @@ export async function executeActorTurnAction(input: {
   runtimeRetryConstraints?: readonly RuntimeRetryConstraint[];
   bot?: Bot;
   targetBot?: Bot;
+  otherBots?: readonly Bot[];
+  chatEvents?: readonly ObserveChatEvent[];
+  /** Case-budget abort threaded into runAction for abort+await cleanup. */
+  signal?: AbortSignal;
 }): Promise<SocialCycleExecutionResult> {
   const observation = await observeActorWorld({
     actorId: input.actorId,
     bot: input.bot,
-    targetBot: input.targetBot
+    targetBot: input.targetBot,
+    ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+    ...(input.chatEvents ? { chatEvents: input.chatEvents } : {})
   });
 
   const evidenceRefs: string[] = [];
@@ -1987,8 +2022,11 @@ export async function executeActorTurnAction(input: {
       args: argsForPrimitive(input.action, primitive, selectedActionSkill),
       bot: input.bot,
       targetBot: input.targetBot,
+      ...(input.otherBots ? { otherBots: input.otherBots } : {}),
+      ...(input.chatEvents ? { chatEvents: input.chatEvents } : {}),
       gate,
-      allowActionSkillFallback: input.action.kind === "use_action_skill"
+      allowActionSkillFallback: input.action.kind === "use_action_skill",
+      ...(input.signal ? { signal: input.signal } : {})
     });
     evidenceRefs.push(step.evidenceRef);
     executedTools.push(primitive);

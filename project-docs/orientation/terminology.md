@@ -32,12 +32,55 @@ Mineflayer, Minecraft, and schema-backed project terms over vague AI wording.
    they were the research contribution. Runtime checking and audit artifacts are
    experiment hygiene unless the project is explicitly studying verifier models.
 
-## Legibility, Action-Consequence, And Advisory Predictor Names
+## Capability-Gated Social Sandbox Terms
 
-The active research headline is the **embodied co-actor legibility experiment**:
-whether public interaction history improves prediction of a co-actor's
-`social_response` and `material_access` labels under the conditions, baselines,
-and stop-results in
+The active research direction is the **capability-gated Minecraft social
+sandbox** in
+`project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`.
+Use these terms for current work:
+
+- **individual capability gate**: dataset-free Minecraft scenario benchmarks
+  using natural-language goals, target-state predicates, milestones, budgets,
+  runtime evidence, efficiency, blocker recovery, and truthful failure;
+- **autonomous goal continuity gate**: long-horizon evaluation of intermediate
+  goal creation, persistence, revision, interruption recovery, and
+  evidence-grounded closure;
+- **interdependent social sandbox**: a shared Minecraft scenario whose economic,
+  cooperative, or quest structure creates material reasons to interact without
+  prescribing the social response;
+- **discovery run**: a versioned long run used to observe behavior with
+  structured artifacts, metrics, and video, not a controlled experiment;
+- **candidate phenomenon**: a recurring observation with evidence, scenario
+  provenance, alternative explanations, and a proposed distinguishing control;
+- **controlled follow-up**: a selected study with a target, baseline, falsifier,
+  competence controls, and prior-work proximity analysis.
+
+Do not call benchmark completion, clean logs, multiple connected bots, or a
+compelling video a social phenomenon by themselves.
+
+## Historical Legibility And Predictor Names
+
+The **lived-vs-told experiment** (V3) was superseded on 2026-07-11. Its terms
+remain valid when reading historical artifacts:
+
+- **history family**: a matched valence pair of partner behavior toward the
+  responder (`prior_help`, `permission`, `promise`);
+- **delivery rung**: how history reaches the responder (`no_history`,
+  `narrated_summary`, `narrated_verbatim`, `enacted`); the four rungs form
+  the **history delivery ladder** (`HISTORY_DELIVERY_LADDER`);
+- **enacted history**: the responder actually played the history episode;
+  only its own memory artifacts carry it;
+- **narrated history**: a deterministic, audited narration generated from
+  the enacted episode's public event log;
+- **material follow-through** (`MATERIAL_FOLLOW_THROUGH`): the binary
+  primary target — the requested material act toward the partner, read only
+  from typed `material-access-evidence/v1`, with intent (chosen action) and
+  execution (tool result) recorded separately;
+- **same-model rule** (`SAME_MODEL_RULE`): V3 conditions ran one base
+  model and one fixed ActorSoul; soul text is never an independent variable.
+
+The **embodied co-actor legibility experiment** (V2) is superseded
+2026-07-10; read it only as audit trail in
 `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`.
 
 For deferred branches and historical references, prefer concrete names over the
@@ -50,12 +93,9 @@ historical **WAM** banner:
   deltas as the object of analysis;
 - `transition-row/v1` when discussing the current legibility data unit.
 
-**Advisory social-material WAM** is historical shorthand and a possible
-advisory-use branch reference. It should not be used as the current project
-headline. If it appears in older docs, read it through
-`project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-(the active plan, whose crosswalk also retires the F-native/F-loop/F-society
-branch names).
+**Advisory social-material WAM** is historical shorthand. It should not be used
+as the current project headline. If it appears in older docs, interpret it
+through the active V4 plan and the superseded V3/V2 audit trail.
 
 An advisory consequence predictor predicts deltas before an action and is scored
 after the action against runtime-observed deltas. It does not select the executed
@@ -67,7 +107,7 @@ representation choice, not the research contribution.
 
 ## Transition Row
 
-A **transition row** is the current legibility experiment data unit. It is an
+A **transition row** is the current experiment data unit. It is an
 independent before/action/after record for one executed Minecraft action:
 
 ```text

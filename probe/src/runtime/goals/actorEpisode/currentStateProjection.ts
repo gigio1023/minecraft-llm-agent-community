@@ -189,6 +189,7 @@ function worldScanFromObservation(observation: unknown): ActorTurnCurrentStatePr
     return undefined;
   }
   const blockObservations = asRecord(summary.block_observations);
+  const sampling = asRecord(blockObservations?.sampling);
   const loadedCoverage = asRecord(summary.loaded_coverage);
   const byName = Array.isArray(blockObservations?.by_name) ? blockObservations.by_name : [];
   const nearest = Array.isArray(blockObservations?.nearest) ? blockObservations.nearest : [];
@@ -247,6 +248,35 @@ function worldScanFromObservation(observation: unknown): ActorTurnCurrentStatePr
     absence_claims_exhaustive: readBoolean(loadedCoverage?.absence_claims_exhaustive) ?? false,
     total_verified_blocks: readNumber(blockObservations?.total_verified) ?? 0,
     truncated: readBoolean(blockObservations?.truncated) ?? false,
+    ...(sampling &&
+      readString(sampling.method) &&
+      readNumber(sampling.query_count) !== undefined &&
+      readNumber(sampling.candidate_verified) !== undefined &&
+      readNumber(sampling.retained) !== undefined
+      ? {
+          sampling: {
+            method: readString(sampling.method) as string,
+            query_count: readNumber(sampling.query_count) as number,
+            candidate_verified: readNumber(sampling.candidate_verified) as number,
+            retained: readNumber(sampling.retained) as number,
+            distance_bands_retained: Array.isArray(sampling.distance_bands_retained)
+              ? sampling.distance_bands_retained.filter(
+                  (entry): entry is number => typeof entry === "number"
+                )
+              : [],
+            direction_sectors_retained: Array.isArray(sampling.direction_sectors_retained)
+              ? sampling.direction_sectors_retained.filter(
+                  (entry): entry is number => typeof entry === "number"
+                )
+              : [],
+            vertical_bands_retained: Array.isArray(sampling.vertical_bands_retained)
+              ? sampling.vertical_bands_retained.filter(
+                  (entry): entry is number => typeof entry === "number"
+                )
+              : []
+          }
+        }
+      : {}),
     retained_block_counts: retainedBlockCounts,
     nearest_blocks: nearest
       .map(scanExampleFromRecord)

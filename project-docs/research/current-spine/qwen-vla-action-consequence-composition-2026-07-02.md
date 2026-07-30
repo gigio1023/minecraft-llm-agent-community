@@ -3,9 +3,9 @@
 Status: proposal and review artifact, superseded in sequencing by
 `central-plan-embodied-co-actor-legibility.md` (2026-07-05). Its arm-design
 discipline (mandatory nulls, forced-action prediction lanes, policy/prediction
-separation) was absorbed into the active plan; its Qwen/VLA model arms remain
-deferred until the legibility experiment produces a decision. This file does
-not authorize provider-backed runs.
+separation) is historical reference. V4 does not promote its Qwen/VLA model
+arms; any future use requires a selected phenomenon and fresh research-value
+review. This file does not authorize provider-backed runs.
 
 Search token: `QWEN_VLA_ACTION_CONSEQUENCE_COMPOSITION_2026_07_02`.
 

@@ -36,8 +36,8 @@ Provider-backed paths are useful for:
 
 The social-cycle provider path is separate from the `openai-codex` gameplay and
 reviewer providers. It can use Gemini API (`gemini-api`), OpenAI API
-(`openai-api`), or ModelScope API-Inference (`modelscope-api`) from the
-repo-root `.env`.
+(`openai-api`), ModelScope API-Inference (`modelscope-api`), or Alibaba Cloud
+Model Studio (`alibaba-model-studio-api`) from the repo-root `.env`.
 
 Private Qwen models exposed through ModelScope API-Inference are documented in
 `project-docs/operations/setup/modelscope-qwen-api-access.md`. The `modelscope-api`
@@ -96,18 +96,19 @@ The guard has a built-in provider/model quota policy matrix in
 brakes or overrides; they do not replace the need for the built-in policy unless
 `PROVIDER_USAGE_DISABLE_DEFAULT_BUDGETS=1` is deliberately set for a focused
 test. A request is allowed only if every matching enforced policy remains under
-limit. This matters for shared pools such as OpenAI's complimentary mini/nano
-token group, where `gpt-5.4-mini` and `gpt-5.4-nano` draw from the same daily
-pool rather than isolated per-model counters.
+limit. This matters for shared pools such as OpenAI's complimentary large-model
+group, where `gpt-5.4` and `gpt-5.2` draw from the same daily pool rather than
+isolated per-model counters.
 
 Current built-in quota policy types:
 
 | Provider | Models | Metric | Window | Active guard |
 | --- | --- | --- | --- | --- |
-| `openai-api` | documented large-model data-sharing group | total tokens | UTC day | 1M/day shared pool |
-| `openai-api` | documented mini/nano data-sharing group | total tokens | UTC day | 10M/day shared pool |
+| `openai-api` | exact operator-provided large-model aliases | total tokens | UTC day | 1M/day shared pool |
+| `openai-api` | exact operator-provided mini/nano aliases | total tokens | UTC day | 10M/day shared pool |
 | `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Max` | API calls | calendar month | 2500 calls/month |
 | `modelscope-api` | `Qwen-Ambassador/Qwen3.7-Plus` | API calls | calendar month | 10000 calls/month |
+| `alibaba-model-studio-api` | `qwen3.8-max-preview` | requests/tokens | UTC minute | 120 RPM and 500K TPM per person |
 | `gemini-api` | configured Gemini/Gemma free-tier references | requests/tokens | Pacific day/minute | operator-observed RPM/RPD/TPM brakes |
 
 Budget JSON shape:
@@ -153,13 +154,28 @@ Daily provider budget windows are provider-specific. `openai-api` uses
 at midnight Pacific time.
 
 OpenAI API calls need an additional operator approval step before any live
-benchmark. The data-sharing complimentary tokens apply only when the org is
-eligible, the relevant project is sharing API inputs/outputs with OpenAI, the
-account has positive balance, and the actual model is in the documented offer.
+benchmark. The only complimentary-usage candidates in this repo are the exact
+aliases copied from the operator's active dashboard and recorded in
+`openai-tier3-free-usage.md`; public documentation must not add candidates.
+The data-sharing complimentary tokens apply only when the org is eligible, the
+relevant project is sharing API inputs/outputs with OpenAI, the account has
+positive balance, the exact model is in that operator-provided notice, and the
+request type is included.
+
+The selected model for the next provider-capability work is exactly
+`openai-api:gpt-5.4`, in the 1M/day shared large-model pool. GPT-5.5, GPT-5.6,
+and dated snapshots are not candidates. `gpt-5.4-mini` is a different model
+and must not be used as a fallback.
+
+The Help Center article excludes tool use from complimentary usage. Actor Turn
+uses required function tools, so a GPT-5.4 Actor Turn lane requires a separate
+approved tool-call canary plus before/after dashboard evidence before it can be
+treated as complimentary.
+
 If one request would cross the daily token pool, that entire request is billed
 at normal rates. Therefore, before any `openai-api` benchmark, report the
 ledger's current UTC-day usage, estimate the requested batch's tokens, state
-whether the model appears in the eligible pool, and ask the operator for
+whether the model and request type appear eligible, and ask the operator for
 approval. Do not infer that a request is free merely because the repo ledger is
 under the local cap.
 
@@ -176,11 +192,11 @@ continuing a run.
 ## Social-Cycle Model Selection
 
 `probe:social-cycle` does not choose live provider models from environment
-fallbacks. For `openai-api`, `gemini-api`, and `modelscope-api`, pass the exact
-model id with `--model` on every run. The CLI intentionally ignores
-`OPENAI_MODEL`, `GEMINI_MODEL`, `MODELSCOPE_MODEL`, and `SOCIAL_CYCLE_MODEL`
-for social-cycle model selection so benchmark reports cannot hide which model
-was evaluated.
+fallbacks. For `openai-api`, `gemini-api`, `modelscope-api`, and
+`alibaba-model-studio-api`, pass the exact model id with `--model` on every run.
+The CLI intentionally ignores provider model environment fallbacks and
+`SOCIAL_CYCLE_MODEL` for social-cycle model selection so benchmark reports
+cannot hide which model was evaluated.
 
 `deterministic-social` remains the local baseline and uses
 `model: "deterministic-social"` as a harness label, not as an external model
@@ -259,6 +275,61 @@ bun run probe:social-cycle -- \
 The CLI default provider is `deterministic-social`; pass `--provider gemini-api`
 or `SOCIAL_CYCLE_PROVIDER=gemini-api` to make live calls explicit. Live provider
 runs must also pass `--model`.
+
+## Social-Cycle Alibaba Cloud Model Studio
+
+Qwen 3.8 Max preview is served by Alibaba Cloud **Model Studio**, not
+ModelScope. The adapter uses the workspace-scoped Singapore
+OpenAI-compatible endpoint and keeps a separate provider identity so
+credentials, usage records, and quota policy cannot be confused with
+`modelscope-api`.
+
+Repo-root `.env`:
+
+```text
+MODEL_STUDIO_WORKSPACE_ID=...
+MODEL_STUDIO_API_KEY=...
+```
+
+The runtime constructs this endpoint from the workspace id:
+
+```text
+https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+```
+
+Run it only with the exact preview model id:
+
+```bash
+cd probe
+bun run probe:social-cycle -- \
+  --provider alibaba-model-studio-api \
+  --model qwen3.8-max-preview \
+  --actor npc_b \
+  --cycles 1 \
+  --no-dashboard
+```
+
+The adapter intentionally omits `enable_thinking` and `reasoning_effort`.
+The preview therefore keeps the administrator-announced behavior: thinking is
+always enabled and the service default `reasoning_effort=xhigh` remains in
+effect. The raw Chat Completions result includes `reasoning_content`, and Actor
+Turn snapshots retain that raw provider output. The current runtime sends each
+request statelessly and does not replay conversation history. If a future path
+adds provider conversation history, it must pass back the complete
+`reasoning_content` unchanged rather than concatenating it into `content`.
+
+The built-in guard records the announced 120 RPM and 500K TPM per-person
+capacity. Local accounting is UTC-minute local input-side pre-request estimate
+plus provider-reported post-call accounting. It is not a rolling 60-second
+limiter, does not reserve uncapped output/thinking tokens, and cannot guarantee
+one request will not cross 500K TPM. Those limits do **not** establish whether
+the preview is billed. Until the administrator confirms billing treatment,
+treat billing status as unknown, require explicit operator acknowledgement in
+preflight, and keep live tests deliberately small.
+
+Operational rule: only one Model Studio-backed process may run at a time for
+this per-person preview allocation, regardless of ledger path. Concurrent
+safety is unverified and outside this patch.
 
 ## Gameplay Provider Switch
 
@@ -425,7 +496,7 @@ cd probe
 bun run probe:social-cycle -- \
   --actor npc_b \
   --provider openai-api \
-  --model gpt-5.4-mini \
+  --model gpt-5.4 \
   --cycles 2 \
   --max-actions-per-cycle 3 \
   --report ../tmp/social-cycle-openai-real-action.json \

@@ -268,14 +268,6 @@ function actionCardDescription(card: ActionCard) {
   return [
     `Action Card ${card.action_card_id}: ${card.title}.`,
     card.description,
-    `Parameter schema ref: ${card.parameters_schema_ref}.`,
-    "The function schema exposes only provider-supplied structured parameters; executable authority comes from these strict function args plus runtime validators.",
-    "Runtime mapping refs, primitive/action-skill ids, actor ids, timeouts, evidence paths, and verifier ids remain hidden from the provider-facing arguments.",
-    "Current-state hints are advisory selection context only; they do not inject missing target cells, items, counts, permissions, or defaults.",
-    `Parameter hints: ${card.parameter_hints.join(" | ") || "none"}.`,
-    `Current-state advisory hints: ${card.current_state_requirements.join(" | ") || "none"}.`,
-    `Expected evidence: ${card.expected_evidence.join(" | ") || "runtime evidence"}.`,
-    `Likely blockers: ${card.likely_blockers.join(" | ") || "none"}.`,
     `Readiness: ${card.readiness}.`
   ].join(" ");
 }

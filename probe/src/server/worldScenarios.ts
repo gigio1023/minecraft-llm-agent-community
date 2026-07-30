@@ -7,7 +7,8 @@ export const worldScenarioIds = [
   "natural-survival",
   "natural-safe-spawn-v1",
   "roofless-hut-flat-survival-v1",
-  "wooden-pickaxe-flat-benchmark-v1"
+  "wooden-pickaxe-flat-benchmark-v1",
+  "first-iron-batch-flat-benchmark-v1"
 ] as const;
 
 export type WorldScenarioId = typeof worldScenarioIds[number];
@@ -271,6 +272,47 @@ const scenarios: Record<WorldScenarioId, WorldScenario> = {
       "The target is reached only when runtime evidence shows a wooden_pickaxe in inventory or held item state.",
       "Tool-call schema compliance is not a benchmark score; runtime world and inventory evidence are the score authority."
     ]
+  },
+  "first-iron-batch-flat-benchmark-v1": {
+    id: "first-iron-batch-flat-benchmark-v1",
+    lane: "fixture_probe",
+    title: "First Iron Batch Flat Benchmark Fixture",
+    description:
+      "A controlled survival fixture for testing a long early-game dependency chain through stone-tier iron extraction and furnace placement.",
+    fixtureDependency: true,
+    requiresFreshWorld: true,
+    world: {
+      seed: "first-iron-batch-flat-benchmark-v1",
+      levelType: "FLAT",
+      generatorSettings: flatPlainsGeneratorSettings,
+      generateStructures: false,
+      spawnNpcs: false,
+      spawnAnimals: false,
+      spawnMonsters: false,
+      difficulty: "peaceful",
+      viewDistance: 6,
+      simulationDistance: 6
+    },
+    actorStart: { x: 0, y: 64, z: 0, yaw: 0, pitch: 0 },
+    buildArea: {
+      center: { x: 0, y: 64, z: 0 },
+      half_extent: 10,
+      purpose:
+        "A deterministic worksite with separated wood, stone, coal, and iron sources for a long-horizon capability measurement."
+    },
+    resourceFixture: {
+      type: "early_game_resource_outcrops",
+      description:
+        "Nearby exposed oak logs, stone, coal ore, and iron ore remove seed availability as a confound. The actor begins empty and must physically obtain every credited item.",
+      credited_as_actor_progress: false
+    },
+    worldEventSummary:
+      "Benchmark worksite: begin with empty inventory and establish a ready-to-smelt first iron-tool batch. Setup blocks only make the required natural resources available; they do not count as actor progress.",
+    notes: [
+      "The fixture fixes resource availability while leaving action choice and ordering to the actor.",
+      "Iron ore yields credited raw_iron only when the runtime equips a stone_pickaxe or better.",
+      "Every acquisition and placed block must be supported by current-run runtime evidence."
+    ]
   }
 };
 
@@ -420,7 +462,8 @@ export function buildWorldScenarioCommands(input: {
 }): WorldScenarioCommand[] {
   if (
     input.scenario.id !== "roofless-hut-flat-survival-v1" &&
-    input.scenario.id !== "wooden-pickaxe-flat-benchmark-v1"
+    input.scenario.id !== "wooden-pickaxe-flat-benchmark-v1" &&
+    input.scenario.id !== "first-iron-batch-flat-benchmark-v1"
   ) {
     return [];
   }
@@ -429,6 +472,30 @@ export function buildWorldScenarioCommands(input: {
   const username = input.bot?.username;
 
   if (input.phase === "pre_bot") {
+    const resourceCommands: WorldScenarioCommand[] =
+      input.scenario.id === "first-iron-batch-flat-benchmark-v1"
+        ? [
+            {
+              phase: "pre_bot",
+              args: ["fill", "-10", "64", "-3", "-7", "66", "3", "minecraft:stone", "replace"],
+              required: true,
+              purpose: "place an exposed stone outcrop for actor-mined cobblestone"
+            },
+            {
+              phase: "pre_bot",
+              args: ["fill", "-3", "64", "8", "-1", "65", "10", "minecraft:coal_ore", "replace"],
+              required: true,
+              purpose: "place an exposed coal vein for actor-mined furnace fuel"
+            },
+            {
+              phase: "pre_bot",
+              args: ["fill", "2", "64", "8", "4", "65", "10", "minecraft:iron_ore", "replace"],
+              required: true,
+              purpose: "place an exposed iron vein for stone-tier extraction"
+            }
+          ]
+        : [];
+
     return [
       {
         phase: "pre_bot",
@@ -495,7 +562,8 @@ export function buildWorldScenarioCommands(input: {
         args: ["fill", "8", "64", "-2", "10", "65", "2", "minecraft:oak_log", "replace"],
         required: true,
         purpose: "place a nearby log rack as survival material source"
-      }
+      },
+      ...resourceCommands
     ];
   }
 

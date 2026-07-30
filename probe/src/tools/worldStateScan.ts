@@ -17,9 +17,13 @@ export type WorldStateScanBot = {
   };
   dimension?: string;
   findBlocks?(input: {
-    matching: (block: { name: string }) => boolean;
+    matching: (block: { name: string; position?: WorldStatePosition }) => boolean;
     maxDistance: number;
     count: number;
+    useExtraInfo?: (block: {
+      name: string;
+      position?: WorldStatePosition;
+    }) => boolean;
   }): WorldStatePosition[];
   blockAt?(position: WorldStatePosition, extraInfos?: boolean): MineflayerBlockLike | null | undefined;
 };
@@ -73,6 +77,15 @@ export type WorldStateScan = {
   block_observations: {
     total_verified: number;
     truncated: boolean;
+    sampling: {
+      method: "distance-direction-height-stratified/v1";
+      query_count: number;
+      candidate_verified: number;
+      retained: number;
+      distance_bands_retained: number[];
+      direction_sectors_retained: number[];
+      vertical_bands_retained: number[];
+    };
     by_name: WorldStateNamedCount[];
     nearest: WorldStateBlockExample[];
   };
@@ -199,6 +212,7 @@ function safeFindBlocks(input: {
   radius: number;
   count: number;
   limitations: Set<string>;
+  extraFilter?: (block: { name: string; position?: WorldStatePosition }) => boolean;
   }) {
   if (!input.bot.findBlocks) {
     addLimitation(input.limitations, "findBlocks API missing; block observations are unavailable.");
@@ -209,12 +223,105 @@ function safeFindBlocks(input: {
     return input.bot.findBlocks({
       matching: (block) => isObservedBlockName(block.name),
       maxDistance: input.radius,
-      count: input.count
+      count: input.count,
+      ...(input.extraFilter ? { useExtraInfo: input.extraFilter } : {})
     });
   } catch {
     addLimitation(input.limitations, "findBlocks scan threw; block observations are incomplete.");
     return [];
   }
+}
+
+function distanceBand(distanceValue: number, radius: number) {
+  if (radius <= 0) return 0;
+  return Math.min(3, Math.floor((distanceValue / radius) * 4));
+}
+
+function directionSector(position: WorldStatePosition, center: WorldStatePosition) {
+  const angle = Math.atan2(position.z - center.z, position.x - center.x);
+  return Math.min(3, Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 4));
+}
+
+function verticalBand(position: WorldStatePosition, center: WorldStatePosition) {
+  const delta = position.y - center.y;
+  return delta < -1 ? 0 : delta > 1 ? 2 : 1;
+}
+
+function blockSamplingKey(
+  block: VerifiedBlock,
+  center: WorldStatePosition,
+  radius: number
+) {
+  return [
+    distanceBand(block.distance, radius),
+    directionSector(block.position, center),
+    verticalBand(block.position, center)
+  ].join(":");
+}
+
+function selectDiverseBlocks(input: {
+  blocks: VerifiedBlock[];
+  center: WorldStatePosition;
+  radius: number;
+  cap: number;
+}) {
+  const stable = [...input.blocks].sort(
+    (left, right) =>
+      left.distance - right.distance ||
+      left.name.localeCompare(right.name) ||
+      positionKey(left.position).localeCompare(positionKey(right.position))
+  );
+  const selected: VerifiedBlock[] = [];
+  const selectedKeys = new Set<string>();
+  const add = (block: VerifiedBlock) => {
+    const key = `${block.name}:${positionKey(block.position)}`;
+    if (selected.length >= input.cap || selectedKeys.has(key)) return;
+    selectedKeys.add(key);
+    selected.push(block);
+  };
+
+  const byName = new Map<string, VerifiedBlock[]>();
+  for (const block of stable) {
+    byName.set(block.name, [...(byName.get(block.name) ?? []), block]);
+  }
+  const namedGroups = [...byName.entries()].sort(
+    ([leftName, left], [rightName, right]) =>
+      (left[0]?.distance ?? 0) - (right[0]?.distance ?? 0) ||
+      leftName.localeCompare(rightName)
+  );
+  for (let exampleIndex = 0; exampleIndex < 2; exampleIndex++) {
+    for (const [, blocks] of namedGroups) {
+      const block = blocks[exampleIndex];
+      if (block) add(block);
+    }
+  }
+
+  const strata = new Map<string, VerifiedBlock[]>();
+  for (const block of stable) {
+    const key = blockSamplingKey(block, input.center, input.radius);
+    strata.set(key, [...(strata.get(key) ?? []), block]);
+  }
+  const orderedStrata = [...strata.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
+  for (let index = 0; selected.length < input.cap; index++) {
+    let added = false;
+    for (const [, blocks] of orderedStrata) {
+      const before = selected.length;
+      const block = blocks[index];
+      if (block) add(block);
+      added ||= selected.length > before;
+    }
+    if (!added) break;
+  }
+  for (const block of stable) add(block);
+
+  return selected.sort(
+    (left, right) =>
+      left.distance - right.distance ||
+      left.name.localeCompare(right.name) ||
+      positionKey(left.position).localeCompare(positionKey(right.position))
+  );
 }
 
 function collectVerifiedBlocks(input: {
@@ -226,22 +333,44 @@ function collectVerifiedBlocks(input: {
   cap: number;
   limitations: Set<string>;
 }) {
-  const positions = safeFindBlocks({
-    bot: input.bot,
-    radius: input.radius,
-    count: input.cap,
-    limitations: input.limitations
-  });
-  const truncated = positions.length >= input.cap;
-  const seen = new Set<string>();
-  const blocks: VerifiedBlock[] = [];
-
-  if (truncated) {
-    addLimitation(
-      input.limitations,
-      `block observations reached cap ${input.cap}; counts and absence claims are truncated.`
-    );
+  const perQueryCount = Math.max(8, Math.ceil(input.cap / 4));
+  const queries: Array<(block: { name: string; position?: WorldStatePosition }) => boolean> = [];
+  for (let band = 0; band < 4; band++) {
+    queries.push((block) => {
+      if (!block.position) return true;
+      return distanceBand(distance(input.center, block.position), input.radius) === band;
+    });
   }
+  for (let sector = 0; sector < 4; sector++) {
+    queries.push((block) => {
+      if (!block.position) return true;
+      return directionSector(block.position, input.center) === sector;
+    });
+  }
+  for (let band = 0; band < 3; band++) {
+    queries.push((block) => {
+      if (!block.position) return true;
+      return verticalBand(block.position, input.center) === band;
+    });
+  }
+  const positionMap = new Map<string, WorldStatePosition>();
+  let candidateQueryTruncated = false;
+  for (const extraFilter of queries) {
+    const found = safeFindBlocks({
+      bot: input.bot,
+      radius: input.radius,
+      count: perQueryCount,
+      limitations: input.limitations,
+      extraFilter
+    });
+    candidateQueryTruncated ||= found.length >= perQueryCount;
+    for (const position of found) {
+      positionMap.set(positionKey(position), position);
+    }
+  }
+  const positions = [...positionMap.values()];
+  const seen = new Set<string>();
+  const candidates: VerifiedBlock[] = [];
 
   for (const foundPosition of positions) {
     const block = safeBlockAt(input.bot, foundPosition, input.limitations);
@@ -260,15 +389,60 @@ function collectVerifiedBlocks(input: {
       continue;
     }
     seen.add(key);
-    blocks.push({
+    candidates.push({
       name: block.name,
       position,
       distance: roundNumber(distance(input.center, position))
     });
   }
-
-  blocks.sort((left, right) => left.distance - right.distance);
-  return { blocks, truncated };
+  const blocks = selectDiverseBlocks({
+    blocks: candidates,
+    center: input.center,
+    radius: input.radius,
+    cap: input.cap
+  });
+  const truncated = candidateQueryTruncated || candidates.length > input.cap;
+  if (truncated) {
+    addLimitation(
+      input.limitations,
+      `block observations were sampled from ${candidates.length} verified candidates into cap ${input.cap}; counts and absence claims are truncated.`
+    );
+  }
+  const distanceBandsRetained = [0, 1, 2, 3].map(
+    (band) => blocks.filter((block) => distanceBand(block.distance, input.radius) === band).length
+  );
+  const directionSectorsRetained = [0, 1, 2, 3].map(
+    (sector) =>
+      blocks.filter((block) => directionSector(block.position, input.center) === sector).length
+  );
+  const verticalBandsRetained = [0, 1, 2].map(
+    (band) => blocks.filter((block) => verticalBand(block.position, input.center) === band).length
+  );
+  if (distanceBandsRetained[3] === 0) {
+    addLimitation(
+      input.limitations,
+      "retained block sample has no verified examples in the outer quarter of the requested radius."
+    );
+  }
+  if (directionSectorsRetained.some((count) => count === 0)) {
+    addLimitation(
+      input.limitations,
+      "retained block sample does not cover every horizontal direction sector."
+    );
+  }
+  return {
+    blocks,
+    truncated,
+    sampling: {
+      method: "distance-direction-height-stratified/v1" as const,
+      query_count: queries.length,
+      candidate_verified: candidates.length,
+      retained: blocks.length,
+      distance_bands_retained: distanceBandsRetained,
+      direction_sectors_retained: directionSectorsRetained,
+      vertical_bands_retained: verticalBandsRetained
+    }
+  };
 }
 
 function toBlockExample(block: VerifiedBlock): WorldStateBlockExample {
@@ -460,6 +634,7 @@ export function scanWorldState(input: WorldStateScanInput): WorldStateScan {
     block_observations: {
       total_verified: verified.blocks.length,
       truncated: verified.truncated,
+      sampling: verified.sampling,
       by_name: summarizeByName(verified.blocks, caps.nearestExamples),
       nearest: verified.blocks.slice(0, caps.nearestExamples).map(toBlockExample)
     }

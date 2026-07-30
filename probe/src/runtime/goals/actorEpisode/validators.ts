@@ -501,8 +501,16 @@ export function validateActionCard(value: unknown): ValidationResult<ActionCard,
     errors.push("ActionCard.schema must be action-card/v1");
   }
   assertString(value, "action_card_id", "ActionCard", errors);
+  if (value.behavior_kind !== undefined &&
+    value.behavior_kind !== "direct_primitive" &&
+    value.behavior_kind !== "actor_owned_action_skill") {
+    errors.push("ActionCard.behavior_kind must be direct_primitive or actor_owned_action_skill");
+  }
   assertString(value, "title", "ActionCard", errors);
   assertString(value, "description", "ActionCard", errors);
+  if (value.shared_guidance_ref !== undefined && value.shared_guidance_ref !== "action-card-shared-guidance") {
+    errors.push("ActionCard.shared_guidance_ref must be action-card-shared-guidance");
+  }
   assertString(value, "parameters_schema_ref", "ActionCard", errors);
   assertString(value, "runtime_mapping_ref", "ActionCard", errors);
   assertStringArray(value, "parameter_hints", "ActionCard", errors);
@@ -592,6 +600,39 @@ export function validateActorTurnInput(
     errors.push("ActorTurnInput.schema must be actor-turn-input/v1");
   }
   assertString(value, "turn_id", "ActorTurnInput", errors);
+  if (value.capability_case_context !== undefined) {
+    const capabilityContext = assertRecord(
+      value,
+      "capability_case_context",
+      "ActorTurnInput",
+      errors
+    );
+    if (capabilityContext) {
+      if (capabilityContext.schema !== "capability-case-context/v1") {
+        errors.push(
+          "ActorTurnInput.capability_case_context.schema must be capability-case-context/v1"
+        );
+      }
+      assertString(
+        capabilityContext,
+        "case_id",
+        "ActorTurnInput.capability_case_context",
+        errors
+      );
+      assertString(
+        capabilityContext,
+        "top_level_goal",
+        "ActorTurnInput.capability_case_context",
+        errors
+      );
+      assertString(
+        capabilityContext,
+        "manifest_hash",
+        "ActorTurnInput.capability_case_context",
+        errors
+      );
+    }
+  }
   validateDecisionFrame(
     value.decision_frame,
     "ActorTurnInput.decision_frame",
@@ -613,10 +654,78 @@ export function validateActorTurnInput(
   for (const [index, constraint] of assertArray(value, "runtime_retry_constraints", "ActorTurnInput", errors).entries()) {
     validateRetryConstraint(constraint, `ActorTurnInput.runtime_retry_constraints[${index}]`, errors);
   }
+  if (value.action_card_shared_guidance !== undefined) {
+    const guidance = assertRecord(value, "action_card_shared_guidance", "ActorTurnInput", errors);
+    if (guidance) {
+      if (guidance.schema !== "action-card-shared-guidance/v1") {
+        errors.push("ActorTurnInput.action_card_shared_guidance.schema must be action-card-shared-guidance/v1");
+      }
+      if (guidance.guidance_ref !== "action-card-shared-guidance") {
+        errors.push("ActorTurnInput.action_card_shared_guidance.guidance_ref must be action-card-shared-guidance");
+      }
+      if (guidance.applies_to !== "all_action_cards") {
+        errors.push("ActorTurnInput.action_card_shared_guidance.applies_to must be all_action_cards");
+      }
+      assertStringArray(guidance, "parameter_rules", "ActorTurnInput.action_card_shared_guidance", errors);
+      assertStringArray(guidance, "evidence_rules", "ActorTurnInput.action_card_shared_guidance", errors);
+      assertStringArray(guidance, "selection_rules", "ActorTurnInput.action_card_shared_guidance", errors);
+      for (const [index, group] of assertArray(guidance, "grouped_guidance", "ActorTurnInput.action_card_shared_guidance", errors).entries()) {
+        if (!isRecord(group)) {
+          errors.push(`ActorTurnInput.action_card_shared_guidance.grouped_guidance[${index}] must be an object`);
+          continue;
+        }
+        assertStringArray(group, "action_card_ids", `ActorTurnInput.action_card_shared_guidance.grouped_guidance[${index}]`, errors);
+        assertStringArray(group, "guidance", `ActorTurnInput.action_card_shared_guidance.grouped_guidance[${index}]`, errors);
+      }
+      for (const [index, group] of assertArray(guidance, "overlap_groups", "ActorTurnInput.action_card_shared_guidance", errors).entries()) {
+        if (!isRecord(group)) {
+          errors.push(`ActorTurnInput.action_card_shared_guidance.overlap_groups[${index}] must be an object`);
+          continue;
+        }
+        assertString(group, "direct_primitive_action_card_id", `ActorTurnInput.action_card_shared_guidance.overlap_groups[${index}]`, errors);
+        assertStringArray(group, "actor_owned_action_skill_card_ids", `ActorTurnInput.action_card_shared_guidance.overlap_groups[${index}]`, errors);
+      }
+    }
+  }
   for (const [index, card] of assertArray(value, "action_cards", "ActorTurnInput", errors).entries()) {
     const result = validateActionCard(card);
     if (!result.ok) {
       errors.push(...result.errors.map((error) => `ActorTurnInput.action_cards[${index}]: ${error}`));
+    }
+  }
+  if (isRecord(value.action_card_shared_guidance) && Array.isArray(value.action_cards)) {
+    const cardIds = new Set(
+      value.action_cards
+        .filter(isRecord)
+        .map((card) => card.action_card_id)
+        .filter((cardId): cardId is string => typeof cardId === "string")
+    );
+    for (const card of value.action_cards.filter(isRecord)) {
+      if (card.shared_guidance_ref !== "action-card-shared-guidance") {
+        errors.push("ActorTurnInput Action Cards must reference action-card-shared-guidance when shared guidance is present");
+      }
+    }
+    const groupedGuidance = value.action_card_shared_guidance.grouped_guidance;
+    const overlapGroups = value.action_card_shared_guidance.overlap_groups;
+    const referencedIds = [
+      ...(Array.isArray(groupedGuidance)
+        ? groupedGuidance.flatMap((group) =>
+            isRecord(group) && Array.isArray(group.action_card_ids) ? group.action_card_ids : [])
+        : []),
+      ...(Array.isArray(overlapGroups)
+        ? overlapGroups.flatMap((group) =>
+            isRecord(group)
+              ? [group.direct_primitive_action_card_id,
+                  ...(Array.isArray(group.actor_owned_action_skill_card_ids)
+                    ? group.actor_owned_action_skill_card_ids
+                    : [])]
+              : [])
+        : [])
+    ];
+    for (const referencedId of referencedIds) {
+      if (typeof referencedId === "string" && !cardIds.has(referencedId)) {
+        errors.push(`ActorTurnInput shared Action Card guidance references unknown card ${referencedId}`);
+      }
     }
   }
 

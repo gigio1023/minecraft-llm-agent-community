@@ -147,8 +147,11 @@ function actionSkillExposure(input: {
     action_skill_id: input.record.skill_id,
     exposure: executable ? "direct" : "deferred",
     executable,
-    ...(input.record.generated_input_schema
-      ? { input_schema: input.record.generated_input_schema }
+    ...(input.record.input_schema ?? input.record.generated_input_schema
+      ? {
+          input_schema:
+            input.record.input_schema ?? input.record.generated_input_schema
+        }
       : {}),
     required_primitives: [...input.record.required_primitives],
     missing_primitives: missing,

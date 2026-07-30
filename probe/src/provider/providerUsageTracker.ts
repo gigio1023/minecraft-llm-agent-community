@@ -2,7 +2,10 @@ import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type { JsonValue } from "./inputSnapshot.js";
-import { defaultProviderQuotaPolicies } from "./providerQuotaPolicies.js";
+import {
+  defaultProviderQuotaPolicies,
+  isOperatorProvidedOpenAiComplimentaryCandidate
+} from "./providerQuotaPolicies.js";
 
 /**
  * Runtime-owned provider usage ledger and free-tier guard.
@@ -49,6 +52,9 @@ export type ProviderUsageBudget = {
   already_used_this_month?: Partial<ProviderUsageCounts>;
   mode?: "enforce" | "track";
   source?: string;
+  /** Preflight-only; runtime quota guard must not consume these fields. */
+  requires_operator_approval?: boolean;
+  approval_reason?: string;
 };
 
 export type ProviderUsageQuotaCheck = {
@@ -435,6 +441,19 @@ export async function guardProviderUsageRequest(input: {
   const now = input.now ?? new Date();
   const repoRoot = input.context?.repoRoot;
   const budgets = await loadConfiguredBudgets(repoRoot);
+  if (
+    input.providerId === "openai-api" &&
+    !isOperatorProvidedOpenAiComplimentaryCandidate(input.model)
+  ) {
+    throw new ProviderUsageBudgetError({
+      schema: "provider-usage-budget-decision/v1",
+      status: "blocked",
+      provider_id: input.providerId,
+      model: input.model,
+      reason:
+        "OpenAI model is absent from the operator-provided complimentary-usage candidate list; local budgets cannot promote it."
+    });
+  }
   const matchingBudgets = selectBudgets(budgets, input.providerId, input.model);
   if (matchingBudgets.length === 0) {
     const decision: ProviderUsageBudgetDecision = {

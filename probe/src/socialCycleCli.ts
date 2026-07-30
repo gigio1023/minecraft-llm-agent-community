@@ -148,6 +148,7 @@ function normalizeSocialCycleProvider(value: string | undefined): SocialCyclePro
     value === "openai-api" ||
     value === "gemini-api" ||
     value === "modelscope-api" ||
+    value === "alibaba-model-studio-api" ||
     value === "deterministic-social" ||
     value === "scripted-social"
   ) {
@@ -176,12 +177,13 @@ function resolveModelForProvider(input: {
   if (
     input.providerId === "openai-api" ||
     input.providerId === "gemini-api" ||
-    input.providerId === "modelscope-api"
+    input.providerId === "modelscope-api" ||
+    input.providerId === "alibaba-model-studio-api"
   ) {
     if (!explicitModel) {
       throw new Error(
         `--model is required for --provider ${input.providerId}. ` +
-          "Do not rely on OPENAI_MODEL, GEMINI_MODEL, or SOCIAL_CYCLE_MODEL for benchmark runs."
+          "Do not rely on provider model environment defaults for benchmark runs."
       );
     }
     return explicitModel;
@@ -193,7 +195,14 @@ async function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../..");
   loadRepoDotEnv(repoRoot, {
-    overrideKeys: ["OPENAI_API_KEY", "GEMINI_API_KEY", "MODELSCOPE_API_KEY", "MODELSCOPE_BASE_URL"]
+    overrideKeys: [
+      "OPENAI_API_KEY",
+      "GEMINI_API_KEY",
+      "MODELSCOPE_API_KEY",
+      "MODELSCOPE_BASE_URL",
+      "MODEL_STUDIO_API_KEY",
+      "MODEL_STUDIO_WORKSPACE_ID"
+    ]
   });
 
   const parsed = parseArgs(process.argv.slice(2));

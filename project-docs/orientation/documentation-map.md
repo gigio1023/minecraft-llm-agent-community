@@ -19,16 +19,17 @@ When documents disagree, use this order:
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `CLAUDE.md`, subordinate to `AGENTS.md`
-4. current research spine docs under `project-docs/research/current-spine/`
-5. long-term specs under `project-docs/specification/`
-6. `project-docs/orientation/terminology.md`
-7. `project-docs/orientation/agent-search-index.md`
-8. active runtime support docs under `project-docs/runtime/`
-9. current setup, handoff, audit, future-work, and run-report docs under
+3. current research spine docs under `project-docs/research/current-spine/`
+4. long-term specs under `project-docs/specification/`
+5. `PROJECT.md`, as a durable intent digest subordinate to the sources above
+6. `CLAUDE.md`, as an adapter subordinate to `AGENTS.md`
+7. `project-docs/orientation/terminology.md`
+8. `project-docs/orientation/agent-search-index.md`
+9. active runtime support docs under `project-docs/runtime/`
+10. current setup, handoff, audit, future-work, and run-report docs under
    `project-docs/operations/`
-10. reference material under `project-docs/references/`
-11. historical material under `project-docs/archive/`
+11. reference material under `project-docs/references/`
+12. historical material under `project-docs/archive/`
 
 Do not fix a conflict by silently rewriting the spec. If the conflict changes
 long-term direction, get explicit user approval first.
@@ -63,6 +64,7 @@ reviewers, or implementation review:
 - `README.md`
 - `SPEC.md`
 - `AGENTS.md`
+- `PROJECT.md`
 - `CLAUDE.md`
 - `CONTRIBUTING.md`
 - `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
@@ -70,6 +72,12 @@ reviewers, or implementation review:
 The current implementation review document lives at the repo root because it is
 an internal whole-project implementation map. Keep large review diagrams there
 instead of making `README.md` or public docs noisy.
+
+`PROJECT.md` is the compact durable intent layer. Its human-owned top half
+records confirmed diagnosis, pillars, non-goals, and judgment rules; its
+model-updated bottom half tracks the current risk, position, settled decisions,
+and project-wide done criteria. Detailed contracts remain in the canonical
+specs and active plans.
 
 ## Public Docusaurus Docs
 
@@ -104,15 +112,23 @@ Start from:
 Current research direction lives under:
 
 - `project-docs/research/current-spine/research-documentation-hierarchy.md`
-- `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-- `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
+- `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+- `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
 - `project-docs/research/current-spine/research-value-harness.md`
 - `project-docs/research/current-spine/transition-row-v1-contract.md`
 - `project-docs/research/current-spine/transition-row-label-codebook.md`
 - `project-docs/research/current-spine/society-observable-preflight.md`
 
-The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05) and
-carry superseded status headers in place.
+V4 implementation / reference notes (not direction-defining):
+
+- `project-docs/research/benchmarks/individual-capability-manifest-a1.md`
+- `project-docs/research/benchmarks/v4-implementation-explanation.md`
+
+The 2026-06-29 no-regret/Goldilocks docs are superseded (2026-07-05), and
+the V2 co-actor legibility docs (central plan, implementation plan, cycle 2
+work plan) are superseded (2026-07-10). The V3 lived-vs-told central plan and
+implementation plan are superseded (2026-07-11). All remain in place with
+superseded status headers as audit trail.
 
 Long-term specification files live under:
 

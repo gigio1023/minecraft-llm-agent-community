@@ -1,10 +1,17 @@
 import type { SocialCycleProviderId } from "../runtime/goals/types.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 
-export type LegibilityCondition =
-  | "scripted_responder"
-  | "stable_soul"
-  | "resampled_soul";
+export const legibilityConditions = [
+  "scripted_responder",
+  "stable_soul",
+  "resampled_soul"
+] as const;
+
+export type LegibilityCondition = typeof legibilityConditions[number];
+
+export function isLegibilityCondition(value: unknown): value is LegibilityCondition {
+  return typeof value === "string" && legibilityConditions.includes(value as LegibilityCondition);
+}
 
 export type LegibilityLayer = "social_response" | "material_access";
 
@@ -37,11 +44,68 @@ export type LegibilityLabel =
   | LegibilitySocialResponseLabel
   | LegibilityMaterialAccessLabel;
 
+export type ActorSoulRouteMode =
+  | "not_applicable"
+  | "stable_actor_soul"
+  | "resampled_actor_soul";
+
+export type SoulConsistencyMode =
+  | "scripted_policy_no_actor_soul"
+  | "stable_private_actor_soul"
+  | "resampled_private_actor_soul";
+
+export type FamilyHoldoutPolicy = {
+  actor_model_family: string;
+  predictor_model_family: string;
+  held_out_family_required: boolean;
+  held_out_family_satisfied: boolean;
+  same_family_predictor_role: "diagnostic_only";
+};
+
+export type ConditionSeedResetMetadata = {
+  seed_or_reset_id: string;
+  seed_reset_ref?: string;
+  declared_before_outcome: true;
+  reset_index: number;
+  provenance_path: string;
+};
+
+export type ConditionSoulProvenance = {
+  actor_soul_route: ActorSoulRouteMode;
+  soul_consistency: SoulConsistencyMode;
+  soul_family_id: string;
+  soul_instance_id: string;
+  soul_generation_seed: string;
+  private_soul_ref?: string;
+  resampled_from_soul_instance_id?: string;
+  family_holdout: FamilyHoldoutPolicy;
+  private_soul_text_in_declaration: false;
+};
+
+export type LegibilityConditionDeclaration = {
+  condition_id: string;
+  condition: LegibilityCondition;
+  actor_ids: string[];
+  responder_actor_ids: string[];
+  counterbalancing: string;
+  seed_reset: ConditionSeedResetMetadata;
+  soul_provenance: ConditionSoulProvenance;
+  provenance_refs: string[];
+};
+
 export type ActorProviderRoute = {
   actor_id: string;
   provider_id: SocialCycleProviderId;
   model: string;
   condition?: LegibilityCondition;
+  condition_id?: string;
+  actor_soul_route?: ActorSoulRouteMode;
+  seed_or_reset_id?: string;
+  seed_reset_ref?: string;
+  soul_family_id?: string;
+  soul_instance_id?: string;
+  actor_model_family?: string;
+  predictor_model_family?: string;
 };
 
 export type ActorTurnSlotCompletionEvent = {
@@ -68,6 +132,7 @@ export type StructuredChatEvent = {
   observed_by: string[];
   slot_index: number;
   observed_at: string;
+  tick?: number;
   position?: { x: number; y: number; z: number };
   evidence_refs: string[];
 };
@@ -214,11 +279,14 @@ export type ExperimentDeclarationV1 = {
   schema_version: "experiment-declaration/v1";
   experiment_id: string;
   written_at: string;
-  conditions: Array<{
-    condition: LegibilityCondition;
-    actor_ids: string[];
-    counterbalancing: string;
-  }>;
+  conditions: LegibilityConditionDeclaration[];
+  soul_generation_rules: {
+    schema: "soul-generation-rules/v1";
+    scripted_responder: string;
+    stable_soul: string;
+    resampled_soul: string;
+    private_soul_text_in_declaration: false;
+  };
   public_private_boundary: {
     public_history_allowlist_version: "public-history-allowlist/v1";
     forbidden_fields: string[];
@@ -244,6 +312,77 @@ export type ExperimentDeclarationV1 = {
     preflight_ref?: string;
   };
   seed_reset_refs: string[];
+};
+
+export type SeedResetSessionKind =
+  | "fresh_seed"
+  | "reset_session"
+  | "reused_live_session"
+  | "deterministic_no_world"
+  | "offline_control";
+
+export type SeedResetDeterministicMode =
+  | "none"
+  | "deterministic_provider"
+  | "deterministic_fixture"
+  | "no_world";
+
+export type SeedResetRecordV1 = {
+  schema_version: "seed-reset-record/v1";
+  record_id: string;
+  run_id: string;
+  recorded_at: string;
+  seed_or_reset_id: string;
+  session_kind: SeedResetSessionKind;
+  counts_toward_legibility_seed_requirement: boolean;
+  counting_rationale: string;
+  world: {
+    world_setup_id?: string;
+    minecraft_seed?: string;
+    world_instance_id?: string;
+    dimension?: string;
+    generated_at?: string;
+    reset_from_record_id?: string;
+    reset_method?: string;
+    setup_artifact_refs: string[];
+    loaded_world_caveats: string[];
+  };
+  runtime: {
+    platform: string;
+    server_mode: string;
+    minecraft_version?: string;
+    mineflayer_version?: string;
+    provider: SocialCycleProviderId | "none" | "mixed";
+    model: string;
+    offline: boolean;
+    deterministic_mode: SeedResetDeterministicMode;
+    provider_budget_guard: string;
+  };
+  scope: {
+    active_actor_ids: string[];
+    passive_observed_actor_ids: string[];
+    scenario_family_ids_declared: string[];
+    world_setup_lane_ids: string[];
+  };
+  evidence_refs: {
+    pre_run_declaration_ref?: string;
+    transition_row_batch_ref?: string;
+    batch_audit_ref?: string;
+    provider_usage_ref?: string;
+    environment_log_refs: string[];
+  };
+  condition_provenance?: {
+    condition_id: string;
+    condition: LegibilityCondition;
+    actor_soul_route: ActorSoulRouteMode;
+    soul_family_id: string;
+    soul_instance_id: string;
+    soul_generation_seed: string;
+    resampled_from_soul_instance_id?: string;
+    family_holdout: FamilyHoldoutPolicy;
+    private_soul_text_in_record: false;
+  };
+  negative_result_notes: string[];
 };
 
 export type LegibilityPrediction = {

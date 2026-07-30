@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Claude Code Repo Guidance
 
 `AGENTS.md` is the binding authority for this repository. This file is only a
@@ -8,25 +10,28 @@ and `AGENTS.md` disagree, follow `AGENTS.md`.
 
 1. `SPEC.md`
 2. `AGENTS.md`
-3. `project-docs/research/current-spine/central-plan-embodied-co-actor-legibility.md`
-4. `project-docs/research/current-spine/embodied-co-actor-legibility-implementation-plan.md`
-5. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
-6. `project-docs/orientation/documentation-map.md`
-7. `project-docs/orientation/agent-search-index.md`
-8. `project-docs/orientation/terminology.md`
-9. Task-relevant docs routed by the search index or repo-local agent skills.
+3. `PROJECT.md`
+4. `project-docs/research/current-spine/central-plan-capability-gated-social-sandbox.md`
+5. `project-docs/research/current-spine/capability-gated-social-sandbox-implementation-plan.md`
+6. `CURRENT_IMPLEMENTATION_ARCHITECTURE_REVIEW.md`
+7. `project-docs/orientation/documentation-map.md`
+8. `project-docs/orientation/agent-search-index.md`
+9. `project-docs/orientation/terminology.md`
+10. Task-relevant docs routed by the search index or repo-local agent skills.
 
 `GEMINI.md` no longer exists and is not part of the active guidance surface.
 
 ## Current Direction (pointer)
 
-Active target: the preregistered embodied co-actor legibility experiment
-(`ACTIVE_CENTRAL_PLAN`), built per the implementation plan
-(`LEGIBILITY_IMPLEMENTATION_PLAN`). Substrate premise is depth, not scale
-(`DEPTH_NOT_SCALE`): 2-3 actors, dense attributable interaction,
-longitudinal per-responder public history. Never scale actor count to
-rescue weak signal. Standing requirements live in `AGENTS.md` (Current
-Direction) and the two plan docs above.
+Active target: the capability-gated Minecraft social sandbox
+(`ACTIVE_CENTRAL_PLAN`, V4 2026-07-11). First verify individual Minecraft
+competence and autonomous goal continuity; then run capable actors in
+interdependent economic, cooperative, and quest scenarios; record long-run
+evidence, metrics, and video; and choose controlled studies from recurring
+phenomena. Standing requirements live in `AGENTS.md` (Current Direction) and
+the V4 central and implementation plans above. The V3 lived-vs-told and V2
+co-actor-legibility plans are superseded audit trail; do not build or run from
+them.
 
 ## Use Repo-Local Agent Skills
 

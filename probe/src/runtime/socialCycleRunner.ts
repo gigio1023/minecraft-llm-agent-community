@@ -12,7 +12,6 @@ import { getActorWorkspacePaths, sanitizeWorkspaceFileId } from "./actorWorkspac
 import { ensureActorSoul, soulRef } from "./goals/actorSoulStore.js";
 import { bumpLifeGoalCounters, ensureActiveLifeGoal } from "./goals/lifeGoalStore.js";
 import { writeCycleGoal } from "./goals/cycleGoalStore.js";
-import { writeActorGoalArtifact } from "./goals/goalJsonStore.js";
 import { listStrategicGoals } from "./goals/strategicGoalStore.js";
 import {
   assembleSocialCycleContext,
@@ -21,6 +20,9 @@ import {
 import { createEmptySocialCycleReport, finalizeRuntimeStatus } from "./goals/cycleReport.js";
 import type {
   ActorCycleGoal,
+  CapabilityCaseContext,
+  CapabilityProgressMeasurement,
+  CapabilityProgressSummary,
   CycleJudgment,
   SocialCycleProviderId,
   SocialCycleRunReport,
@@ -28,24 +30,19 @@ import type {
 } from "./goals/types.js";
 import { createWorldEvent, listWorldEvents, writeWorldEvent } from "./goals/worldEventStore.js";
 import { runSocialCycleGoalProvider } from "../provider/socialGoalMindProvider.js";
-import {
-  runSocialActorTurnProvider,
-  type ActorTurnProviderResult
-} from "../provider/socialActorTurnProvider.js";
 import { runSocialDeliberationProvider } from "../provider/socialDeliberationProvider.js";
 import type { OpenAiJsonProviderConfig } from "../provider/openaiApiJsonProvider.js";
 import type { GeminiJsonProviderConfig } from "../provider/geminiApiJsonProvider.js";
 import type { ModelScopeApiProviderConfig } from "../provider/modelscopeApiProvider.js";
+import type { ModelStudioApiProviderConfig } from "../provider/modelStudioApiProvider.js";
 import { summarizeProviderUsage } from "../provider/providerUsageTracker.js";
 import type { JsonValue } from "../provider/inputSnapshot.js";
 import {
   compileSocialAllowedPrimitives,
-  executeActorTurnAction,
   filterExecutableSocialActionSkills,
   observeActorWorld
 } from "./socialCycleExecution.js";
 import {
-  buildRuntimeRetryAttempt,
   deriveRuntimeRetryConstraints,
   type RuntimeRetryAttempt
 } from "./retryConstraints.js";
@@ -99,17 +96,21 @@ import {
   buildActorTurnCurrentStateProjection,
   buildActorTurnInput,
   anchorActiveEpisodeToPlanBeadContext,
-  classifyActorTurnRuntime,
-  classifyActorTurnProviderContractRejection,
   writeActiveEpisode,
   writeDeliberationBranch,
   type ActiveEpisode,
   type DeliberationBranch,
   type DeliberationBranchReason,
-  type ActorTurnRuntimeClassifierResult,
   type ActorTurnResolvedAction,
   type EvidenceTraceEntry
 } from "./goals/actorEpisode/index.js";
+import {
+  optionalStringArrayProperty,
+  providerRefs,
+  runSocialCycleTurnCore,
+  type SocialCycleActionAttemptReport,
+  type SocialCycleRuntimeClassifier
+} from "./socialCycleTurnCore.js";
 import {
   createUnavailableVisualEvidence,
   startVisualEvidenceRecorder,
@@ -122,34 +123,12 @@ import {
   type RuntimeSessionLifecycleTracker
 } from "./sessionLifecycle.js";
 
-type ServerEndpoint = {
+export type ServerEndpoint = {
   host: string;
   port: number;
   mode: "manual" | "live_smoke" | "fresh_world";
   runRcon?: (args: string[]) => Promise<string>;
   stop: () => Promise<void>;
-};
-
-type SocialCycleActionAttemptReport = {
-  attempt_id: string;
-  action_index: number;
-  turn_id: string;
-  active_episode_id?: string;
-  action_ref: string;
-  provider_input_refs: string[];
-  provider_output_refs: string[];
-  evidence_refs: string[];
-  judgment_ref: string;
-  verifier_status: "passed" | "failed" | "not_applicable";
-  executed_tools: string[];
-  tool_statuses: SocialPrimitiveAttemptStatus[];
-  runtime_result: JsonValue;
-  runtime_status: string;
-  retry_constraint_blocked: boolean;
-  branch_recommended?: boolean;
-  branch_reason?: string;
-  postcondition_results: ActionSkillPostconditionResult[];
-  plan_bead_operation_result_refs: string[];
 };
 
 type SocialCycleReportCycleWithAttempts = SocialCycleRunReport["cycles"][number] & {
@@ -172,54 +151,6 @@ type EvidenceTraceAttempt = Pick<
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
-}
-
-function actorRelativeRef(actorDir: string, ref: string | undefined) {
-  if (!ref) {
-    return undefined;
-  }
-  return path.isAbsolute(ref) ? path.relative(actorDir, ref) : ref;
-}
-
-function optionalStringProperty(value: unknown, key: string) {
-  return value &&
-    typeof value === "object" &&
-    typeof (value as Record<string, unknown>)[key] === "string"
-    ? (value as Record<string, string>)[key]
-    : undefined;
-}
-
-function optionalStringArrayProperty(value: unknown, key: string) {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-  const candidate = (value as Record<string, unknown>)[key];
-  return Array.isArray(candidate) && candidate.every((entry) => typeof entry === "string")
-    ? candidate
-    : undefined;
-}
-
-function providerRefs(input: {
-  actorDir: string;
-  inputRef?: string;
-  outputRef?: string;
-  intermediateInputRefs?: string[];
-  intermediateOutputRefs?: string[];
-}) {
-  return {
-    provider_input_refs: [
-      ...(input.intermediateInputRefs ?? []),
-      input.inputRef
-    ]
-      .map((ref) => actorRelativeRef(input.actorDir, ref))
-      .filter((ref): ref is string => Boolean(ref)),
-    provider_output_refs: [
-      ...(input.intermediateOutputRefs ?? []),
-      input.outputRef
-    ]
-      .map((ref) => actorRelativeRef(input.actorDir, ref))
-      .filter((ref): ref is string => Boolean(ref))
-  };
 }
 
 function appendProviderErrorRefs(input: {
@@ -247,118 +178,6 @@ function appendProviderErrorRefs(input: {
     error: input.error,
     ...refs
   });
-}
-
-function actorTurnProviderFailureKind(
-  result: ActorTurnProviderResult
-) {
-  return !result.ok && "failureKind" in result ? result.failureKind : undefined;
-}
-
-async function buildActorTurnProviderContractRejectionAttempt(input: {
-  rootDir: string;
-  actorDir: string;
-  actorId: string;
-  runId: string;
-  cycleId: string;
-  turnId: string;
-  actionIndex: number;
-  cycleGoal: ActorCycleGoal;
-  activeEpisodeId?: string;
-  planner: Extract<ActorTurnProviderResult, { ok: false }>;
-}): Promise<{
-  attempt: SocialCycleActionAttemptReport;
-  judgment: CycleJudgment;
-  judgmentRef: string;
-}> {
-  const refs = providerRefs({
-    actorDir: input.actorDir,
-    inputRef: input.planner.inputRef,
-    outputRef: input.planner.outputRef,
-    intermediateInputRefs: input.planner.intermediateInputRefs,
-    intermediateOutputRefs: input.planner.intermediateOutputRefs
-  });
-  const { ref: markerRef } = await writeActorGoalArtifact(
-    input.rootDir,
-    input.actorId,
-    path.join("goals", "cycle", "intents"),
-    `${input.turnId}-provider-contract-rejection`,
-    {
-      schema: "actor-turn-provider-contract-rejection/v1",
-      actor_id: input.actorId,
-      cycle_id: input.cycleId,
-      turn_id: input.turnId,
-      non_executable: true,
-      error: input.planner.error,
-      provider_input_refs: refs.provider_input_refs,
-      provider_output_refs: refs.provider_output_refs
-    }
-  );
-  const { ref: evidenceRef } = await writeActorGoalArtifact(
-    input.rootDir,
-    input.actorId,
-    "evidence",
-    `${input.turnId}-provider-contract-rejection`,
-    {
-      schema: "actor-turn-provider-contract-rejection-evidence/v1",
-      actor_id: input.actorId,
-      cycle_id: input.cycleId,
-      turn_id: input.turnId,
-      status: "blocked",
-      verifier_status: "failed",
-      no_minecraft_action_executed: true,
-      error: input.planner.error,
-      provider_input_refs: refs.provider_input_refs,
-      provider_output_refs: refs.provider_output_refs
-    }
-  );
-  const judgmentResult = await classifyActorTurnProviderContractRejection({
-    actorWorkspaceRootDir: input.rootDir,
-    actorId: input.actorId,
-    cycleId: input.cycleId,
-    turnId: input.turnId,
-    runId: input.runId,
-    cycleGoal: input.cycleGoal,
-    error: input.planner.error,
-    evidenceRefs: [evidenceRef]
-  });
-  if (!judgmentResult.ok) {
-    throw new Error(`failed to write provider contract rejection judgment: ${judgmentResult.error}`);
-  }
-  const runtimeResult: JsonValue = {
-    schema: "actor-turn-provider-contract-rejection-runtime-result/v1",
-    status: "blocked",
-    verifier_status: "failed",
-    no_minecraft_action_executed: true,
-    error: input.planner.error,
-    provider_input_refs: refs.provider_input_refs,
-    provider_output_refs: refs.provider_output_refs
-  };
-  return {
-    judgment: judgmentResult.judgment,
-    judgmentRef: judgmentResult.judgmentRef,
-    attempt: {
-      attempt_id: input.turnId,
-      action_index: input.actionIndex,
-      turn_id: input.turnId,
-      active_episode_id: input.activeEpisodeId,
-      action_ref: markerRef,
-      provider_input_refs: refs.provider_input_refs,
-      provider_output_refs: refs.provider_output_refs,
-      evidence_refs: [evidenceRef],
-      judgment_ref: judgmentResult.judgmentRef,
-      verifier_status: "failed",
-      executed_tools: ["actor_turn_provider_contract"],
-      tool_statuses: [{ tool: "actor_turn_provider_contract", status: "rejected" }],
-      runtime_result: runtimeResult,
-      runtime_status: "blocked",
-      retry_constraint_blocked: false,
-      branch_recommended: judgmentResult.branchRecommended,
-      branch_reason: judgmentResult.branchReason,
-      postcondition_results: [],
-      plan_bead_operation_result_refs: []
-    }
-  };
 }
 
 function countRelationshipContextRefs(context: {
@@ -519,7 +338,7 @@ function actorTurnDefaultPrimitive(input: {
   return input.configured?.[linearIndex] ?? (input.actionIndex === 0 ? "observe" : "wait");
 }
 
-async function resolveServerEndpoint(
+export async function resolveServerEndpoint(
   config: ProbeConfig,
   options: { freshWorld?: boolean } = {}
 ): Promise<ServerEndpoint | null> {
@@ -547,6 +366,41 @@ async function resolveServerEndpoint(
   return { host: live.host, port: live.port, mode: "live_smoke", stop: async () => {} };
 }
 
+export type SocialCycleCaseBudgets = {
+  max_wall_time_ms: number;
+  max_provider_requests?: number;
+  max_total_tokens?: number;
+  max_estimated_cost?: number;
+};
+
+export type SocialCycleCaseBudgetStop = {
+  exhausted_dimensions: Array<
+    | "wall_time"
+    | "provider_requests"
+    | "total_tokens"
+    | "estimated_cost"
+    | "cycles"
+    | "runtime_actions"
+  >;
+  cost_unverifiable: boolean;
+  observed: {
+    cycles: number;
+    runtime_actions: number;
+    wall_time_ms: number;
+    provider_requests: number;
+    total_tokens: number;
+    estimated_cost?: number;
+  };
+};
+
+/** Observer output only: no measurement counts or stop policy. */
+export type SocialCycleCapabilityProgressObservation = {
+  targetStatus: "passed" | "failed" | "unknown";
+  passedMilestoneIds: string[];
+  evidenceRefs: string[];
+  milestoneEvidenceRefs?: Record<string, string[]>;
+};
+
 export type SocialCycleRunOptions = {
   actorId: string;
   providerId: SocialCycleProviderId;
@@ -571,6 +425,8 @@ export type SocialCycleRunOptions = {
    * still owns action selection and runtime verifiers still own progress truth.
    */
   worldScenario?: WorldScenarioId;
+  /** Model-visible capability goal. Evaluation predicates remain outside Actor Turn. */
+  capabilityCaseContext?: CapabilityCaseContext;
   benchmarkTask?: string;
   worldSeed?: string;
   levelType?: string;
@@ -582,12 +438,122 @@ export type SocialCycleRunOptions = {
   deterministicActorTurnPrimitives?: string[];
   /** Optional bot-view screenshots for human review; visual evidence never grants progress authority. */
   visualEvidence?: VisualEvidenceOptions;
+  /**
+   * External abort for case-level budget stopping. Prefer abort + await in-flight
+   * work; do not race the whole run against a timer that returns early.
+   */
+  signal?: AbortSignal;
+  /** Manifest/case ceilings checked before each new provider or runtime action. */
+  caseBudgets?: SocialCycleCaseBudgets;
+  /** Optional clock for deterministic wall-time tests. */
+  nowMs?: () => number;
+  /** Case start captured by an outer wrapper before server/world preparation. */
+  caseStartedAtMs?: number;
+  /**
+   * Optional usage observer. Default reads run-scoped ledger totals.
+   * estimated_cost is omitted unless a real normalized cost source exists.
+   * ponytail: no USD invention; replace when provider usage gains a cost field.
+   */
+  observeCaseUsage?: () => Promise<{
+    requests: number;
+    total_tokens: number;
+    estimated_cost?: number;
+  }>;
+  /**
+   * Optional progress observer for capability early completion. Called after each
+   * completed action is recorded on the report (in-progress cycle upserted) and
+   * before the next action starts. Must not own measurement persistence or stop
+   * policy.
+   */
+  observeCapabilityProgress?: (input: {
+    report: SocialCycleRunReport;
+    actorWorkspaceDir: string;
+  }) =>
+    | SocialCycleCapabilityProgressObservation
+    | Promise<SocialCycleCapabilityProgressObservation>;
+  /** Test/debug hook invoked before starting a cycle or action; must honor signal. */
+  beforeProviderOrRuntimeAction?: (input: {
+    signal: AbortSignal;
+    phase: "cycle" | "action";
+    cycleIndex: number;
+    actionIndex?: number;
+  }) => Promise<void>;
+  /** Test-only replacement for the deterministic post-action classifier. */
+  classifyRuntimeForTest?: SocialCycleRuntimeClassifier;
 };
 
 export type SocialCycleRunResult = {
   report: SocialCycleRunReport;
   reportPath: string;
+  /** Elapsed wall ms for this case (`nowMs() - start`); always set. */
+  observedWallTimeMs: number;
+  caseBudgetStop?: SocialCycleCaseBudgetStop;
 };
+
+export function buildSocialCycleOpenAiConfig(input: {
+  apiKey: string;
+  model: string;
+  reasoning?: string;
+  repoRoot: string;
+  caseBudgets?: SocialCycleCaseBudgets;
+}): OpenAiJsonProviderConfig {
+  const requestBounded = input.caseBudgets?.max_provider_requests !== undefined;
+  return {
+    apiKey: input.apiKey,
+    model: input.model,
+    reasoning: input.reasoning,
+    repoRoot: input.repoRoot,
+    ...(requestBounded
+      ? {
+          // One provider stage must equal one HTTP request when the case declares
+          // a hard request ceiling. Background polling and hidden retries would
+          // otherwise cross that ceiling before the runner regains control.
+          responsesBackground: false,
+          maxRetries: 0
+        }
+      : {})
+  };
+}
+
+export function resolveReportedProviderReasoning(input: {
+  providerId: string;
+  model: string;
+  requestedReasoning?: string;
+}): string {
+  if (
+    input.providerId === "alibaba-model-studio-api" &&
+    input.model === "qwen3.8-max-preview"
+  ) {
+    return "xhigh";
+  }
+  return input.requestedReasoning ?? process.env.SOCIAL_CYCLE_REASONING ?? "low";
+}
+
+export async function resolveProviderStageFailureAttribution(input: {
+  signal: AbortSignal;
+  materializeCaseBudgetStop: () => Promise<void>;
+}): Promise<"case_budget_stop" | "provider_failure"> {
+  if (input.signal.aborted) {
+    await input.materializeCaseBudgetStop();
+    return "case_budget_stop";
+  }
+  return "provider_failure";
+}
+
+export function selectDeliberationBranchEvidenceRefs(input: {
+  actionEvidenceRefs: readonly string[];
+  lastJudgmentRef?: string;
+  stopping: boolean;
+}) {
+  if (input.stopping) {
+    return [];
+  }
+  const refs = input.actionEvidenceRefs.filter((ref) => ref.trim().length > 0);
+  if (refs.length > 0) {
+    return [...new Set(refs)];
+  }
+  return input.lastJudgmentRef?.trim() ? [input.lastJudgmentRef] : [];
+}
 
 export function selectGeminiModelForCall(input: {
   rotation?: readonly string[];
@@ -676,6 +642,53 @@ function buildBenchmarkTaskCycleGoal(input: {
       "benchmark target reached with runtime evidence",
       "max cycles reached",
       "runtime gate blocked",
+      "environment setup failed"
+    ]
+  };
+}
+
+function buildCapabilityCaseCycleGoal(input: {
+  actorId: string;
+  cycleId: string;
+  context: SocialCycleContextPacket;
+  capabilityCaseContext: CapabilityCaseContext;
+  allowedActionSkillIds: readonly string[];
+  allowedPrimitiveIds: readonly string[];
+}): ActorCycleGoal {
+  return {
+    schema: "actor-cycle-goal/v1",
+    actor_id: input.actorId,
+    goal_id: `cycle-goal-${randomUUID()}`,
+    life_goal_id: input.context.ActorLifeGoal.goal_id,
+    cycle_id: input.cycleId,
+    status: "active",
+    source: "world_event_context",
+    summary: input.capabilityCaseContext.top_level_goal,
+    rationale:
+      `Declared capability case ${input.capabilityCaseContext.case_id}. ` +
+      "Choose actions from current state; evaluation milestones and a preferred action order are not provided.",
+    derived_from: {
+      soul_ref: soulRef(input.actorId),
+      observation_refs: [],
+      world_event_refs: [],
+      memory_refs: listActorMemoryRefs(input.context.memory_packet).map((ref) => ref.memory_id),
+      relationship_refs: [],
+      previous_cycle_judgment_refs: input.context.previous_cycle_judgments.map(
+        (judgment) => judgment.ref
+      )
+    },
+    success_condition: {
+      verifier: "capability_target_runtime_evidence",
+      evidence_required: [
+        "Physical completion is decided by runtime-recorded inventory, held-item, block, container, or position evidence."
+      ]
+    },
+    allowed_action_skill_ids: [...input.allowedActionSkillIds],
+    allowed_primitive_ids: [...input.allowedPrimitiveIds],
+    stop_conditions: [
+      "declared capability target reached with runtime evidence",
+      "case limits reached",
+      "runtime blocked",
       "environment setup failed"
     ]
   };
@@ -840,6 +853,153 @@ function sharedStorageSocialSmokeSummary(actorId: string) {
   return `npc_a requests that ${actorId} deposit one oak_log into shared storage before npc_a trusts ${actorId}'s next progress claim.`;
 }
 
+function countReportRuntimeActions(report: SocialCycleRunReport): number {
+  let count = 0;
+  for (const cycle of report.cycles) {
+    if (cycle.action_attempts && cycle.action_attempts.length > 0) {
+      count += cycle.action_attempts.length;
+    }
+  }
+  return count;
+}
+
+function sortUniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+}
+
+function applyCapabilityProgressObservation(input: {
+  report: SocialCycleRunReport;
+  observation: SocialCycleCapabilityProgressObservation;
+  measurement: Omit<CapabilityProgressMeasurement, "passed_milestone_ids" | "evidence_refs">;
+}): void {
+  const passedMilestoneIds = sortUniqueStrings(input.observation.passedMilestoneIds);
+  const evidenceRefs = sortUniqueStrings(input.observation.evidenceRefs);
+  const previous = input.report.capability_progress;
+  const milestoneFirstObservations = [
+    ...(previous?.milestone_first_observations ?? [])
+  ];
+  const alreadyObserved = new Set(
+    milestoneFirstObservations.map((observation) => observation.milestone_id)
+  );
+  for (const milestoneId of passedMilestoneIds) {
+    if (alreadyObserved.has(milestoneId)) {
+      continue;
+    }
+    milestoneFirstObservations.push({
+      milestone_id: milestoneId,
+      ...input.measurement,
+      evidence_refs: sortUniqueStrings(
+        input.observation.milestoneEvidenceRefs?.[milestoneId] ?? evidenceRefs
+      )
+    });
+  }
+  milestoneFirstObservations.sort((left, right) =>
+    left.runtime_action_count - right.runtime_action_count ||
+    left.milestone_id.localeCompare(right.milestone_id)
+  );
+  const summary: CapabilityProgressSummary = {
+    schema: "capability-progress-summary/v1",
+    latest_target_status: input.observation.targetStatus,
+    latest_passed_milestone_ids: passedMilestoneIds,
+    milestone_first_observations: milestoneFirstObservations,
+    ...(previous?.first_measurable_progress
+      ? { first_measurable_progress: previous.first_measurable_progress }
+      : {}),
+    ...(previous?.target_completion ? { target_completion: previous.target_completion } : {})
+  };
+
+  const measurable =
+    input.observation.targetStatus === "passed" || passedMilestoneIds.length > 0;
+  if (measurable && !summary.first_measurable_progress) {
+    summary.first_measurable_progress = {
+      ...input.measurement,
+      passed_milestone_ids: passedMilestoneIds,
+      evidence_refs: evidenceRefs
+    };
+  }
+  if (input.observation.targetStatus === "passed" && !summary.target_completion) {
+    summary.target_completion = {
+      ...input.measurement,
+      passed_milestone_ids: passedMilestoneIds,
+      evidence_refs: evidenceRefs
+    };
+  }
+  input.report.capability_progress = summary;
+}
+
+function upsertReportCycle(
+  report: SocialCycleRunReport,
+  cycle: SocialCycleReportCycleWithAttempts
+): void {
+  const index = report.cycles.findIndex((entry) => entry.cycle_id === cycle.cycle_id);
+  if (index >= 0) {
+    report.cycles[index] = cycle;
+    return;
+  }
+  report.cycles.push(cycle);
+}
+
+async function defaultObserveCaseUsage(input: {
+  repoRoot: string;
+  runId: string;
+}): Promise<{ requests: number; total_tokens: number; estimated_cost?: number }> {
+  const summary = await summarizeProviderUsage({
+    repoRoot: input.repoRoot,
+    runId: input.runId
+  });
+  let requests = 0;
+  let total_tokens = 0;
+  for (const entry of summary.totals) {
+    requests += entry.usage.requests;
+    total_tokens += entry.usage.total_tokens;
+  }
+  // ProviderUsageRecord has no cost field — never invent USD here.
+  return { requests, total_tokens };
+}
+
+function evaluateRuntimeCaseBudgetStop(input: {
+  caseBudgets: SocialCycleCaseBudgets;
+  observed: SocialCycleCaseBudgetStop["observed"];
+}): SocialCycleCaseBudgetStop | null {
+  const exhausted_dimensions: SocialCycleCaseBudgetStop["exhausted_dimensions"] = [];
+  let cost_unverifiable = false;
+
+  if (input.observed.wall_time_ms >= input.caseBudgets.max_wall_time_ms) {
+    exhausted_dimensions.push("wall_time");
+  }
+  if (
+    input.caseBudgets.max_provider_requests !== undefined &&
+    input.observed.provider_requests >= input.caseBudgets.max_provider_requests
+  ) {
+    exhausted_dimensions.push("provider_requests");
+  }
+  if (
+    input.caseBudgets.max_total_tokens !== undefined &&
+    input.observed.total_tokens >= input.caseBudgets.max_total_tokens
+  ) {
+    exhausted_dimensions.push("total_tokens");
+  }
+  if (input.caseBudgets.max_estimated_cost !== undefined) {
+    if (input.observed.estimated_cost === undefined) {
+      cost_unverifiable = true;
+      exhausted_dimensions.push("estimated_cost");
+    } else if (input.observed.estimated_cost >= input.caseBudgets.max_estimated_cost) {
+      exhausted_dimensions.push("estimated_cost");
+    }
+  }
+
+  if (exhausted_dimensions.length === 0) {
+    return null;
+  }
+  return {
+    exhausted_dimensions,
+    cost_unverifiable,
+    observed: input.observed
+  };
+}
+
 export async function runSocialCycle(input: SocialCycleRunOptions): Promise<SocialCycleRunResult> {
   const repoRoot = input.repoRoot ?? path.resolve(process.cwd(), "..");
   const loadedConfig = loadProbeConfig();
@@ -864,7 +1024,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       ? path.join(workspaceBaseDir, "social-runs", runId)
       : workspaceBaseDir;
   const profile = getActorProfile(input.actorId);
-  const reasoning = input.reasoning ?? process.env.SOCIAL_CYCLE_REASONING ?? "low";
+  const reasoning = resolveReportedProviderReasoning({
+    providerId: input.providerId,
+    model: input.model,
+    requestedReasoning: input.reasoning
+  });
 
   const report = createEmptySocialCycleReport({
     runId,
@@ -873,6 +1037,9 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     model: input.model,
     reasoning
   });
+  if (input.capabilityCaseContext) {
+    report.capability_case_context = { ...input.capabilityCaseContext };
+  }
   report.agency_status.builtin_execution_source =
     input.providerId === "deterministic-social" || input.providerId === "scripted-social";
   report.actor_workspace_root_dir = rootDir;
@@ -895,12 +1062,13 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
   const openAi: OpenAiJsonProviderConfig | undefined =
     input.providerId === "openai-api"
-      ? {
+      ? buildSocialCycleOpenAiConfig({
           apiKey: input.openAiApiKey ?? process.env.OPENAI_API_KEY ?? "",
           model: input.model,
           reasoning,
-          repoRoot
-        }
+          repoRoot,
+          caseBudgets: input.caseBudgets
+        })
       : undefined;
   const gemini: GeminiJsonProviderConfig | undefined =
     input.providerId === "gemini-api"
@@ -920,6 +1088,16 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           model: input.model,
           requestTimeoutMs: Number(process.env.MODELSCOPE_REQUEST_TIMEOUT_MS ?? 180_000),
           maxRetries: Number(process.env.MODELSCOPE_JSON_MAX_RETRIES ?? 1),
+          repoRoot
+        }
+      : undefined;
+  const modelStudio: ModelStudioApiProviderConfig | undefined =
+    input.providerId === "alibaba-model-studio-api"
+      ? {
+          apiKey: process.env.MODEL_STUDIO_API_KEY ?? "",
+          workspaceId: process.env.MODEL_STUDIO_WORKSPACE_ID ?? "",
+          model: input.model,
+          requestTimeoutMs: 180_000,
           repoRoot
         }
       : undefined;
@@ -975,7 +1153,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       worldScenario.fixtureDependency;
   }
 
-  if (worldScenario.worldEventSummary) {
+  if (worldScenario.worldEventSummary && !input.capabilityCaseContext) {
     const event = createWorldEvent({
       summary: worldScenario.worldEventSummary,
       kind: "scenario_event",
@@ -1231,7 +1409,111 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     );
 
   let providerFailed = false;
+  let runtimeClassifierFailed = false;
   let anyMeaningfulProgress = false;
+  let caseBudgetStop: SocialCycleCaseBudgetStop | undefined;
+  let externalAbortStop = false;
+  let earlyTargetCompleted = false;
+  const nowMs = input.nowMs ?? (() => Date.now());
+  const caseBudgetStartedAtMs = input.caseStartedAtMs ?? nowMs();
+  const caseBudgetController = new AbortController();
+  const onExternalAbort = () => {
+    externalAbortStop = true;
+    if (!caseBudgetController.signal.aborted) {
+      caseBudgetController.abort();
+    }
+  };
+  if (input.signal?.aborted) {
+    externalAbortStop = true;
+    caseBudgetController.abort();
+  } else if (input.signal) {
+    input.signal.addEventListener("abort", onExternalAbort, { once: true });
+  }
+  let wallDeadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  if (input.caseBudgets?.max_wall_time_ms !== undefined) {
+    const remainingWallTimeMs = Math.max(
+      0,
+      input.caseBudgets.max_wall_time_ms - (nowMs() - caseBudgetStartedAtMs)
+    );
+    if (remainingWallTimeMs === 0) {
+      caseBudgetController.abort();
+    } else {
+      wallDeadlineTimer = setTimeout(() => {
+        if (!caseBudgetController.signal.aborted) {
+          caseBudgetController.abort();
+        }
+      }, remainingWallTimeMs);
+    }
+  }
+  const observeUsage =
+    input.observeCaseUsage ??
+    (() => defaultObserveCaseUsage({ repoRoot, runId }));
+
+  const collectCaseBudgetObserved = async (): Promise<
+    SocialCycleCaseBudgetStop["observed"]
+  > => {
+    const usage = await observeUsage();
+    return {
+      cycles: report.cycles.length,
+      runtime_actions: countReportRuntimeActions(report),
+      wall_time_ms: Math.max(0, nowMs() - caseBudgetStartedAtMs),
+      provider_requests: usage.requests,
+      total_tokens: usage.total_tokens,
+      ...(usage.estimated_cost !== undefined
+        ? { estimated_cost: usage.estimated_cost }
+        : {})
+    };
+  };
+
+  const checkCaseBudgetBeforeWork = async (): Promise<boolean> => {
+    if (!input.caseBudgets) {
+      if (caseBudgetController.signal.aborted) {
+        externalAbortStop = true;
+      }
+      return caseBudgetController.signal.aborted;
+    }
+    const observed = await collectCaseBudgetObserved();
+    const stop = evaluateRuntimeCaseBudgetStop({
+      caseBudgets: input.caseBudgets,
+      observed
+    });
+    if (stop) {
+      caseBudgetStop = stop;
+      if (!caseBudgetController.signal.aborted) {
+        caseBudgetController.abort();
+      }
+      return true;
+    }
+    if (caseBudgetController.signal.aborted) {
+      // Deadline/external abort without a prior ceiling snapshot.
+      const abortedStop = evaluateRuntimeCaseBudgetStop({
+        caseBudgets: input.caseBudgets,
+        observed: {
+          ...observed,
+          wall_time_ms: Math.max(
+            observed.wall_time_ms,
+            input.caseBudgets.max_wall_time_ms
+          )
+        }
+      });
+      caseBudgetStop =
+        abortedStop ??
+        ({
+          exhausted_dimensions: ["wall_time"],
+          cost_unverifiable: false,
+          observed: {
+            ...observed,
+            wall_time_ms: Math.max(
+              observed.wall_time_ms,
+              input.caseBudgets.max_wall_time_ms
+            )
+          }
+        } satisfies SocialCycleCaseBudgetStop);
+      return true;
+    }
+    return false;
+  };
+
   let previousCycleJudgment: {
     ref: string;
     judgment: CycleJudgment;
@@ -1258,6 +1540,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     const allowedSkillIds = executableActiveSkills.map((s) => s.skill_id);
 
     for (let cycleIndex = 0; !environmentBlocked && cycleIndex < input.cycles; cycleIndex++) {
+      if (await checkCaseBudgetBeforeWork()) {
+        break;
+      }
+      if (input.beforeProviderOrRuntimeAction) {
+        await input.beforeProviderOrRuntimeAction({
+          signal: caseBudgetController.signal,
+          phase: "cycle",
+          cycleIndex
+        });
+        if (await checkCaseBudgetBeforeWork()) {
+          break;
+        }
+      }
       const cycleId = `cycle-${String(cycleIndex + 1).padStart(4, "0")}`;
       const worldEvents = await listWorldEvents(rootDir, input.actorId, { runId });
       const strategicGoals = await listStrategicGoals(rootDir, input.actorId);
@@ -1453,9 +1748,20 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           openAi,
           gemini: geminiForProviderCall(),
           modelScope,
-          runId
+          modelStudio,
+          runId,
+          signal: caseBudgetController.signal
         });
         if (!deliberation.ok) {
+          const attribution = await resolveProviderStageFailureAttribution({
+            signal: caseBudgetController.signal,
+            materializeCaseBudgetStop: async () => {
+              await checkCaseBudgetBeforeWork();
+            }
+          });
+          if (attribution === "case_budget_stop") {
+            break;
+          }
           providerFailed = true;
           report.provider_error = deliberation.error;
           appendProviderErrorRefs({
@@ -1514,6 +1820,43 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.agency_status.cycle_goal_source = cycleGoal.source;
         report.agency_status.builtin_goal_authority =
           input.providerId === "deterministic-social" || input.providerId === "scripted-social";
+      } else if (input.capabilityCaseContext) {
+        cycleGoal = buildCapabilityCaseCycleGoal({
+          actorId: input.actorId,
+          cycleId,
+          context,
+          capabilityCaseContext: input.capabilityCaseContext,
+          allowedActionSkillIds: allowedSkillIds,
+          allowedPrimitiveIds: allowedPrimitives
+        });
+        const writtenCycleGoal = await writeCycleGoal(rootDir, input.actorId, cycleGoal);
+        cycleGoalRef = writtenCycleGoal.ref;
+        activeEpisodeForCycle = buildActiveEpisodeFromCycleGoal({
+          episodeId: `episode-${cycleId}`,
+          context,
+          cycleGoal,
+          selectedPlanBeadRefs: [],
+          startedAtTurnRef: `${cycleId}-action-01`
+        });
+        const activeEpisodeWritten = await writeActiveEpisode(
+          rootDir,
+          input.actorId,
+          activeEpisodeForCycle
+        );
+        activeEpisodeRefForCycle = activeEpisodeWritten.ref;
+        activeEpisodeState = {
+          episode: activeEpisodeForCycle,
+          ref: activeEpisodeRefForCycle,
+          openedCycleId: cycleId
+        };
+        pendingDeliberationBranch = null;
+        report.active_episode_refs = pushUniqueRef(
+          report.active_episode_refs,
+          activeEpisodeRefForCycle
+        );
+        report.agency_status.strategic_goal_source = "runtime_rule";
+        report.agency_status.cycle_goal_source = cycleGoal.source;
+        report.agency_status.builtin_goal_authority = false;
       } else if (input.benchmarkTask?.trim()) {
         cycleGoal = buildBenchmarkTaskCycleGoal({
           actorId: input.actorId,
@@ -1558,12 +1901,23 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           openAi,
           gemini: geminiForProviderCall(),
           modelScope,
+          modelStudio,
           allowedActionSkillIds: allowedSkillIds,
           allowedPrimitiveIds: allowedPrimitives,
-          runId
+          runId,
+          signal: caseBudgetController.signal
         });
 
         if (!cycleGoalProvider.ok) {
+          const attribution = await resolveProviderStageFailureAttribution({
+            signal: caseBudgetController.signal,
+            materializeCaseBudgetStop: async () => {
+              await checkCaseBudgetBeforeWork();
+            }
+          });
+          if (attribution === "case_budget_stop") {
+            break;
+          }
           providerFailed = true;
           report.provider_error = cycleGoalProvider.error;
           appendProviderErrorRefs({
@@ -1624,7 +1978,24 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
       const actionAttempts: SocialCycleActionAttemptReport[] = [];
 
       for (let actionIndex = 0; actionIndex < input.maxActionsPerCycle; actionIndex++) {
+        if (await checkCaseBudgetBeforeWork()) {
+          break;
+        }
+        if (input.beforeProviderOrRuntimeAction) {
+          await input.beforeProviderOrRuntimeAction({
+            signal: caseBudgetController.signal,
+            phase: "action",
+            cycleIndex,
+            actionIndex
+          });
+          if (await checkCaseBudgetBeforeWork()) {
+            break;
+          }
+        }
         const actionTurnId = `${cycleId}-action-${String(actionIndex + 1).padStart(2, "0")}`;
+        const priorRecordedCycles = report.cycles.filter(
+          (cycle) => cycle.cycle_id !== cycleId
+        );
         const actionRetryConstraints = deriveRuntimeRetryConstraints({
           actorId: input.actorId,
           attempts: runtimeRetryAttempts
@@ -1648,11 +2019,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
                 recentToolResults: settlementToolResults,
                 postconditionResults: allPostconditionResults,
                 evidenceRefs: [
-                  ...report.cycles.flatMap((cycle) => cycle.evidence_refs),
+                  ...priorRecordedCycles.flatMap((cycle) => cycle.evidence_refs),
                   ...actionAttempts.flatMap((attempt) => attempt.evidence_refs)
                 ],
                 judgmentRefs: [
-                  ...report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+                  ...priorRecordedCycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
                   ...(lastJudgmentRef ? [lastJudgmentRef] : [])
                 ],
                 memoryWriteCount,
@@ -1669,111 +2040,112 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           runtime_retry_constraints: actionRetryConstraints
         };
         report.runtime_retry_constraints = actionRetryConstraints;
-        const planner: ActorTurnProviderResult = await (async () => {
-          const episodeId = activeEpisodeForCycle.episode_id;
-          const priorActionAttempts = report.cycles.flatMap((cycle) => cycle.action_attempts ?? []);
-          const { actorTurnInput, actionCardProjection } = buildActorTurnInput({
-            turnId: actionTurnId,
-            context: actionContext,
-            activeEpisode: activeEpisodeForCycle,
-            currentObservationRefs: cycleGoal.derived_from.observation_refs,
-            recentEvidenceTrace: evidenceTraceFromActionAttempts({
-              cycleId,
-              episodeId,
-              attempts: [...priorActionAttempts, ...actionAttempts].slice(-4)
-            }),
-            providerBudgetHint: {
-              provider_id: input.providerId,
-              model: input.model,
-              status: "unknown"
-            }
-          });
-          return runSocialActorTurnProvider({
-            providerId: input.providerId,
-            actorWorkspaceRootDir: rootDir,
-            actorId: input.actorId,
+        const episodeId = activeEpisodeForCycle.episode_id;
+        const priorActionAttempts = priorRecordedCycles.flatMap(
+          (cycle) => cycle.action_attempts ?? []
+        );
+        const { actorTurnInput, actionCardProjection } = buildActorTurnInput({
+          turnId: actionTurnId,
+          context: actionContext,
+          activeEpisode: activeEpisodeForCycle,
+          currentObservationRefs: cycleGoal.derived_from.observation_refs,
+          recentEvidenceTrace: evidenceTraceFromActionAttempts({
             cycleId,
-            cycleGoalId: cycleGoal.goal_id,
-            actorTurnInput,
-            actionCardProjection,
+            episodeId,
+            attempts: [...priorActionAttempts, ...actionAttempts].slice(-4)
+          }),
+          providerBudgetHint: {
+            provider_id: input.providerId,
+            model: input.model,
+            status: "unknown"
+          },
+          ...(input.capabilityCaseContext
+            ? { capabilityCaseContext: input.capabilityCaseContext }
+            : {})
+        });
+        // Abort + await: never Promise.race the turn against the case deadline.
+        const turnCore = await runSocialCycleTurnCore({
+          providerId: input.providerId,
+          actorWorkspaceRootDir: rootDir,
+          actorDir: paths.actorDir,
+          actorId: input.actorId,
+          runId,
+          cycleId,
+          turnId: actionTurnId,
+          actionIndex,
+          cycleGoal,
+          cycleGoalId: cycleGoal.goal_id,
+          activeEpisodeId: activeEpisodeForCycle.episode_id,
+          actorTurnInput,
+          actionCardProjection,
+          activeActionSkills: executableActiveSkills,
+          runtimeRetryConstraints: actionRetryConstraints,
+          defaultPrimitive: actorTurnDefaultPrimitive({
+            configured: input.deterministicActorTurnPrimitives,
+            cycleIndex,
+            actionIndex,
+            maxActionsPerCycle: input.maxActionsPerCycle
+          }),
+          bot,
+          providerConfig: {
             openAi,
             gemini: geminiForProviderCall(),
             modelScope,
-            defaultPrimitive: actorTurnDefaultPrimitive({
-              configured: input.deterministicActorTurnPrimitives,
-              cycleIndex,
-              actionIndex,
-              maxActionsPerCycle: input.maxActionsPerCycle
-            }),
-            runId
-          });
-        })();
+            modelStudio
+          },
+          signal: caseBudgetController.signal,
+          ...(input.classifyRuntimeForTest
+            ? { classifyRuntimeForTest: input.classifyRuntimeForTest }
+            : {})
+        });
+        if (caseBudgetController.signal.aborted) {
+          await checkCaseBudgetBeforeWork();
+        }
 
-        if (!planner.ok) {
-          if (actorTurnProviderFailureKind(planner) === "provider_contract_rejection") {
-            const contractRejection = await buildActorTurnProviderContractRejectionAttempt({
-              rootDir,
-              actorDir: paths.actorDir,
-              actorId: input.actorId,
-              runId,
-              cycleId,
-              turnId: actionTurnId,
-              actionIndex,
-              cycleGoal,
-              activeEpisodeId: activeEpisodeForCycle.episode_id,
-              planner
-            });
-            lastActionRef = contractRejection.attempt.action_ref;
-            lastVerifier = "failed";
-            lastJudgmentRef = contractRejection.judgmentRef;
-            lastJudgment = {
-              ref: contractRejection.judgmentRef,
-              judgment: contractRejection.judgment
-            };
-            actionAttempts.push(contractRejection.attempt);
+        if (turnCore.status === "provider_contract_rejection") {
+          lastActionRef = turnCore.attempt.action_ref;
+          lastVerifier = "failed";
+          lastJudgmentRef = turnCore.judgmentRef;
+          lastJudgment = {
+            ref: turnCore.judgmentRef,
+            judgment: turnCore.judgment
+          };
+          actionAttempts.push(turnCore.attempt);
+          break;
+        }
+
+        if (turnCore.status === "provider_failed") {
+          // Budget abort before/during planning returns provider_failed shape but
+          // must not be attributed as provider failure when cancellation is materialized.
+          if (caseBudgetStop || externalAbortStop) {
             break;
           }
           providerFailed = true;
-          report.provider_error = planner.error;
+          report.provider_error = turnCore.planner.error;
           appendProviderErrorRefs({
             report,
             actorDir: paths.actorDir,
             stage: "actor_turn",
             turnId: actionTurnId,
-            error: planner.error,
-            inputRef: planner.inputRef,
-            outputRef: planner.outputRef,
-            intermediateInputRefs: optionalStringArrayProperty(planner, "intermediateInputRefs"),
-            intermediateOutputRefs: optionalStringArrayProperty(planner, "intermediateOutputRefs")
+            error: turnCore.planner.error,
+            inputRef: turnCore.planner.inputRef,
+            outputRef: turnCore.planner.outputRef,
+            intermediateInputRefs: optionalStringArrayProperty(turnCore.planner, "intermediateInputRefs"),
+            intermediateOutputRefs: optionalStringArrayProperty(turnCore.planner, "intermediateOutputRefs")
           });
           break;
         }
 
-        const plannedActionRef = planner.actionRef;
-        const plannedRuntimeAction: ReportedRuntimeAction = planner.action;
-        lastActionRef = plannedActionRef;
+        const plannedRuntimeAction: ReportedRuntimeAction = turnCore.plannedRuntimeAction;
+        const execution = turnCore.execution;
+        const turnClassifierFailed = turnCore.status === "classifier_failed";
+        if (turnClassifierFailed) {
+          runtimeClassifierFailed = true;
+        }
+        lastActionRef = turnCore.plannedActionRef;
 
-        const execution = await executeActorTurnAction({
-          actorWorkspaceRootDir: rootDir,
-          actorId: input.actorId,
-          cycleId,
-          turnId: actionTurnId,
-          cycleGoal,
-          action: planner.action,
-          activeActionSkills: executableActiveSkills,
-          runtimeRetryConstraints: actionRetryConstraints,
-          bot
-        });
-        const retryAttempt = buildRuntimeRetryAttempt({
-          actorId: input.actorId,
-          cycleId,
-          turnId: actionTurnId,
-          actionIndex,
-          intent: plannedRuntimeAction,
-          execution
-        });
-        if (retryAttempt) {
-          runtimeRetryAttempts.push(retryAttempt);
+        if (turnCore.retryAttempt) {
+          runtimeRetryAttempts.push(turnCore.retryAttempt);
           if (runtimeRetryAttempts.length > 48) {
             runtimeRetryAttempts.splice(0, runtimeRetryAttempts.length - 48);
           }
@@ -1800,40 +2172,10 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           recentToolResults.splice(0, recentToolResults.length - 20);
         }
 
-        const judgmentResult: ActorTurnRuntimeClassifierResult = await classifyActorTurnRuntime({
-          actorWorkspaceRootDir: rootDir,
-          actorId: input.actorId,
-          cycleId,
-          turnId: actionTurnId,
-          runId,
-          cycleGoal,
-          action: plannedRuntimeAction,
-          evidenceRefs: execution.evidenceRefs,
-          executedTools: execution.executedTools,
-          toolStatuses: execution.toolStatuses,
-          verifierStatus: execution.verifierStatus,
-          retryConstraintBlocked: execution.retryConstraintBlocked
-        });
-
-        if (!judgmentResult.ok) {
-          providerFailed = true;
-          report.provider_error = judgmentResult.error;
-          appendProviderErrorRefs({
-            report,
-            actorDir: paths.actorDir,
-            stage: "actor_turn_classifier",
-            turnId: actionTurnId,
-            error: judgmentResult.error,
-            inputRef: optionalStringProperty(judgmentResult, "inputRef"),
-            outputRef: optionalStringProperty(judgmentResult, "outputRef")
-          });
-          break;
-        }
-
-        lastJudgmentRef = judgmentResult.judgmentRef;
+        lastJudgmentRef = turnCore.judgmentRef;
         lastJudgment = {
-          ref: judgmentResult.judgmentRef,
-          judgment: judgmentResult.judgment
+          ref: turnCore.judgmentRef,
+          judgment: turnCore.judgment
         };
         const lifecycleBeadOperations = derivePlanBeadLifecycleOperationsFromTurnEvidence({
           actorId: input.actorId,
@@ -1851,7 +2193,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           cycleId,
           turnId: actionTurnId,
           operations: [
-            ...(judgmentResult.judgment.bead_op_proposals ?? []),
+            ...(turnCore.judgment.bead_op_proposals ?? []),
             ...lifecycleBeadOperations
           ]
         });
@@ -1867,62 +2209,20 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
             reason: result.reason
           }))
         );
-        const judgmentInputRef = optionalStringProperty(judgmentResult, "inputRef");
-        const judgmentOutputRef = optionalStringProperty(judgmentResult, "outputRef");
-        const plannerProviderRefs = providerRefs({
-          actorDir: paths.actorDir,
-          inputRef: planner.inputRef,
-          outputRef: planner.outputRef,
-          intermediateInputRefs: optionalStringArrayProperty(planner, "intermediateInputRefs"),
-          intermediateOutputRefs: optionalStringArrayProperty(planner, "intermediateOutputRefs")
-        });
-        const branchRecommended = "branchRecommended" in judgmentResult
-          ? judgmentResult.branchRecommended
-          : undefined;
-        const branchReason = "branchReason" in judgmentResult && judgmentResult.branchReason
-          ? judgmentResult.branchReason
-          : undefined;
         actionAttempts.push({
-          attempt_id: actionTurnId,
-          action_index: actionIndex,
-          turn_id: actionTurnId,
-          active_episode_id: activeEpisodeForCycle.episode_id,
-          action_ref: plannedActionRef,
-          provider_input_refs: [
-            ...plannerProviderRefs.provider_input_refs,
-            judgmentInputRef ? path.relative(paths.actorDir, judgmentInputRef) : ""
-          ].filter(Boolean),
-          provider_output_refs: [
-            ...plannerProviderRefs.provider_output_refs,
-            judgmentOutputRef ? path.relative(paths.actorDir, judgmentOutputRef) : ""
-          ].filter(Boolean),
-          evidence_refs: execution.evidenceRefs,
-          judgment_ref: judgmentResult.judgmentRef,
-          verifier_status: execution.verifierStatus,
-          executed_tools: execution.executedTools,
-          tool_statuses: execution.toolStatuses,
-          runtime_result: execution.runtimeResult,
-          runtime_status: execution.gateBlocked
-            ? "blocked"
-            : execution.verifierStatus === "failed"
-              ? "failed"
-              : "completed",
-          retry_constraint_blocked: execution.retryConstraintBlocked,
-          branch_recommended: branchRecommended,
-          branch_reason: branchReason,
-          postcondition_results: execution.postconditionResults,
+          ...turnCore.attempt,
           plan_bead_operation_result_refs: beadOperationApplication.result_refs
         });
 
         const memoryWrites = await persistJudgmentMemoryWrites(
           rootDir,
           input.actorId,
-          judgmentResult.judgment,
+          turnCore.judgment,
           plannedRuntimeAction,
           execution.executedTools,
           execution.runtimeResult,
           execution.toolStatuses,
-          judgmentResult.judgmentRef
+          turnCore.judgmentRef
         );
         memoryWriteCount += memoryWrites;
         if (report.memory_reuse) {
@@ -1930,11 +2230,109 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         }
         const relationshipApplications = await applyCycleJudgmentRelationshipEventProposals(
           rootDir,
-          judgmentResult.judgment
+          turnCore.judgment
         );
         report.relationship_application_results?.push(...relationshipApplications);
         await bumpLifeGoalCounters(rootDir, input.actorId, { actions: 1 });
 
+        if (input.observeCapabilityProgress) {
+          // Expose this action's evidence before the next action starts. Adapters
+          // and runtime-action counts only see cycles already on the report.
+          const priorCycleEvidenceRefs = report.cycles
+            .filter((cycle) => cycle.cycle_id !== cycleId)
+            .flatMap((cycle) => cycle.evidence_refs);
+          const priorCycleJudgmentRefs = report.cycles
+            .filter((cycle) => cycle.cycle_id !== cycleId)
+            .map((cycle) => cycle.judgment_ref)
+            .filter(Boolean);
+          report.settlement_state = buildSettlementState({
+            actorId: input.actorId,
+            observation: await observeCurrentActorWorld(),
+            activeActionSkills: executableActiveSkills,
+            previousJudgments: lastJudgment ? [lastJudgment] : [],
+            recentToolResults: settlementToolResults,
+            postconditionResults: allPostconditionResults,
+            evidenceRefs: [
+              ...priorCycleEvidenceRefs,
+              ...actionAttempts.flatMap((attempt) => attempt.evidence_refs)
+            ],
+            judgmentRefs: [
+              ...priorCycleJudgmentRefs,
+              ...(lastJudgmentRef ? [lastJudgmentRef] : [])
+            ],
+            memoryWriteCount
+          });
+          report.settlement_checklist = report.settlement_state.checklist;
+          upsertReportCycle(report, {
+            cycle_id: cycleId,
+            cycle_goal_ref: cycleGoalRef,
+            action_ref: lastActionRef,
+            provider_input_refs: [
+              cycleGoalInputRef ? path.relative(paths.actorDir, cycleGoalInputRef) : "",
+              ...actionAttempts.flatMap((attempt) => attempt.provider_input_refs)
+            ].filter(Boolean),
+            provider_output_refs: [
+              cycleGoalOutputRef ? path.relative(paths.actorDir, cycleGoalOutputRef) : "",
+              ...actionAttempts.flatMap((attempt) => attempt.provider_output_refs)
+            ].filter(Boolean),
+            evidence_refs: actionAttempts.flatMap((attempt) => attempt.evidence_refs),
+            judgment_ref: lastJudgmentRef,
+            verifier_status: lastVerifier,
+            plan_bead_packet_ref: readyFrontSnapshot.ref,
+            active_episode_ref: activeEpisodeRefForCycle,
+            selected_plan_bead_refs: activeEpisodeForCycle.selected_plan_bead_refs,
+            plan_bead_operation_result_refs: [
+              ...cyclePlanBeadOperationResultRefs,
+              ...actionAttempts.flatMap((attempt) => attempt.plan_bead_operation_result_refs ?? [])
+            ],
+            action_attempts: actionAttempts
+          });
+          // Flush before observer so a predicate failure cannot hide this action.
+          await writeJson(input.reportPath, report);
+          const actorWorkspaceDir = getActorWorkspacePaths(rootDir, input.actorId).actorDir;
+          const progressObservation = await input.observeCapabilityProgress({
+            report,
+            actorWorkspaceDir
+          });
+          const observed = await collectCaseBudgetObserved();
+          if (input.caseBudgets && !caseBudgetStop) {
+            const budgetAtObservation = evaluateRuntimeCaseBudgetStop({
+              caseBudgets: input.caseBudgets,
+              observed
+            });
+            if (budgetAtObservation) {
+              caseBudgetStop = budgetAtObservation;
+              if (!caseBudgetController.signal.aborted) {
+                caseBudgetController.abort();
+              }
+            }
+          }
+          applyCapabilityProgressObservation({
+            report,
+            observation: progressObservation,
+            measurement: {
+              cycle_count: observed.cycles,
+              runtime_action_count: observed.runtime_actions,
+              wall_time_ms: observed.wall_time_ms,
+              provider_requests: observed.provider_requests,
+              total_tokens: observed.total_tokens
+            }
+          });
+          await writeJson(input.reportPath, report);
+          // Budget stop retains priority when already recorded before or at target observation.
+          if (progressObservation.targetStatus === "passed" && !caseBudgetStop) {
+            earlyTargetCompleted = true;
+            anyMeaningfulProgress = true;
+            break;
+          }
+          if (caseBudgetStop) {
+            break;
+          }
+        }
+
+        if (turnClassifierFailed) {
+          break;
+        }
         if (execution.verifierStatus === "passed" || execution.verifierStatus === "failed") {
           break;
         }
@@ -1946,6 +2344,13 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
 
       let cycleDeliberationBranchRef: string | undefined;
       let deliberationTriggerReason: DeliberationBranchReason | undefined;
+      const priorCycleEvidenceRefs = report.cycles
+        .filter((cycle) => cycle.cycle_id !== cycleId)
+        .flatMap((cycle) => cycle.evidence_refs);
+      const priorCycleJudgmentRefs = report.cycles
+        .filter((cycle) => cycle.cycle_id !== cycleId)
+        .map((cycle) => cycle.judgment_ref)
+        .filter(Boolean);
       const postCycleSettlementState = buildSettlementState({
         actorId: input.actorId,
         observation: await observeCurrentActorWorld(),
@@ -1954,11 +2359,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         recentToolResults: settlementToolResults,
         postconditionResults: allPostconditionResults,
         evidenceRefs: [
-          ...report.cycles.flatMap((cycle) => cycle.evidence_refs),
+          ...priorCycleEvidenceRefs,
           ...actionAttempts.flatMap((attempt) => attempt.evidence_refs)
         ],
         judgmentRefs: [
-          ...report.cycles.map((cycle) => cycle.judgment_ref).filter(Boolean),
+          ...priorCycleJudgmentRefs,
           ...(lastJudgmentRef ? [lastJudgmentRef] : [])
         ],
         memoryWriteCount
@@ -1968,17 +2373,19 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
           activeEpisode: activeEpisodeForCycle,
           context
         });
-      if (branchReason && activeEpisodeState) {
-        const branchEvidenceRefs = actionAttempts.flatMap((attempt) => attempt.evidence_refs);
+      const branchEvidenceRefs = selectDeliberationBranchEvidenceRefs({
+        actionEvidenceRefs: actionAttempts.flatMap((attempt) => attempt.evidence_refs),
+        lastJudgmentRef,
+        stopping: Boolean(
+          earlyTargetCompleted || caseBudgetStop || runtimeClassifierFailed || providerFailed
+        )
+      });
+      if (branchReason && activeEpisodeState && branchEvidenceRefs.length > 0) {
         const branch = {
           schema: "deliberation-branch/v1" as const,
           branch_id: `branch-${cycleId}-${randomUUID()}`,
           reason: branchReason,
-          evidence_refs: branchEvidenceRefs.length > 0
-            ? branchEvidenceRefs
-            : lastJudgmentRef
-              ? [lastJudgmentRef]
-              : [],
+          evidence_refs: branchEvidenceRefs,
           current_episode_ref: activeEpisodeState.ref
         };
         const writtenBranch = await writeDeliberationBranch(rootDir, input.actorId, branch);
@@ -1995,7 +2402,7 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         );
       }
 
-      report.cycles.push({
+      upsertReportCycle(report, {
         cycle_id: cycleId,
         cycle_goal_ref: cycleGoalRef,
         action_ref: lastActionRef,
@@ -2036,8 +2443,12 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         report.visual_evidence = visualEvidenceRecorder.manifest;
       }
 
-      // Long runs flush after each cycle so partial progress stays reviewable on failure.
+      // Persist the finalized cycle. Progress observation already ran after each
+      // action; stop here when the target passed or a budget ceiling tripped mid-cycle.
       await writeJson(input.reportPath, report);
+      if (earlyTargetCompleted || caseBudgetStop || runtimeClassifierFailed) {
+        break;
+      }
     }
   } finally {
     const cleanupErrors: string[] = [];
@@ -2076,6 +2487,11 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
         error: `Post-run cleanup failed: ${cleanupErrors.join("; ")}`
       };
     }
+    if (wallDeadlineTimer) {
+      clearTimeout(wallDeadlineTimer);
+      wallDeadlineTimer = undefined;
+    }
+    input.signal?.removeEventListener("abort", onExternalAbort);
   }
 
   report.agency_status.gameplay_progress_verified = anyMeaningfulProgress;
@@ -2088,11 +2504,24 @@ export async function runSocialCycle(input: SocialCycleRunOptions): Promise<Soci
     environmentBlocked
   });
 
-  if (providerFailed) {
+  if (caseBudgetStop || externalAbortStop) {
+    // Case-budget exhaustion and its external cancellation signal are distinct
+    // from actor incompetence or provider/runtime failure.
+    report.runtime_status = "timeout";
+  } else if (providerFailed || runtimeClassifierFailed) {
     report.runtime_status = "failed";
+  } else if (earlyTargetCompleted && !environmentBlocked) {
+    // Target evidence stopped the case early; not a budget timeout or blocked exit.
+    report.runtime_status = "passed";
   }
 
   report.provider_usage = await summarizeProviderUsage({ repoRoot, runId });
   await writeJson(input.reportPath, report);
-  return { report, reportPath: input.reportPath };
+  const observedWallTimeMs = Math.max(0, nowMs() - caseBudgetStartedAtMs);
+  return {
+    report,
+    reportPath: input.reportPath,
+    observedWallTimeMs,
+    ...(caseBudgetStop ? { caseBudgetStop } : {})
+  };
 }
