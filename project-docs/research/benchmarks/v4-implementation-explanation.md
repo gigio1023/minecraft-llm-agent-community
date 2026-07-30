@@ -2,8 +2,8 @@
 
 Search token: `V4_IMPLEMENTATION_EXPLANATION_2026_07_11`.
 
-Branch: `codex/capability-gated-social-sandbox-v4`  
-Date: 2026-07-11  
+Branch: `codex/capability-gated-social-sandbox-v4`
+Date: 2026-07-11
 Authority: `handoff-prompt.md` + active V4 central/implementation plans.
 
 This page explains **what was built in this handoff wave, why, and what is
