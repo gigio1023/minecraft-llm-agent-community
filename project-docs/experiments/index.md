@@ -46,6 +46,7 @@ assets that are meant to be read directly.
 
 Current curated reports:
 
+- `2026-07-30/qwen38-natural-wooden-pickaxe/README.md`
 - `2026-07-12/gpt54mini-v4-repaired-stage1/README.md`
 - `2026-07-11/gpt54mini-v4-live-validation/README.md`
 - `2026-06-13/qwen-comparison-worksite/index.html`
